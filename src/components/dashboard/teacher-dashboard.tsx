@@ -211,6 +211,16 @@ function areSortedStringArraysEqual(left: string[] | null | undefined, right: st
   return left.every((value, index) => value === right[index]);
 }
 
+function getSeatCanvasId(
+  seat?: Pick<AttendanceCurrent, 'id' | 'roomId' | 'roomSeatNo'> | null
+) {
+  const roomSeatNo = Number(seat?.roomSeatNo || 0);
+  if (seat?.roomId && Number.isFinite(roomSeatNo) && roomSeatNo > 0) {
+    return buildSeatId(seat.roomId, roomSeatNo);
+  }
+  return typeof seat?.id === 'string' ? seat.id : '';
+}
+
 function resolveRequestPenalty(req: Partial<AttendanceRequest>) {
   const explicitDelta = Number((req as any).penaltyPointsDelta);
   if (Number.isFinite(explicitDelta) && explicitDelta > 0) {
@@ -1015,7 +1025,11 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
     if (existingSeat) {
       return {
         ...existingSeat,
+        roomId: room.id,
+        roomSeatNo,
+        seatNo: getGlobalSeatNo(room.id, roomSeatNo),
         seatLabel: configuredSeatLabel || undefined,
+        type: effectiveAisleSeatIdSet.has(seatId) ? 'aisle' : 'seat',
       };
     }
 
@@ -1986,10 +2000,14 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
     () => Boolean(selectedSeatManualOccupantName),
     [selectedSeatManualOccupantName]
   );
+  const selectedSeatCanvasId = useMemo(
+    () => getSeatCanvasId(selectedSeat),
+    [selectedSeat?.id, selectedSeat?.roomId, selectedSeat?.roomSeatNo]
+  );
 
   useEffect(() => {
     setManualSeatOccupantName(selectedSeatManualOccupantName);
-  }, [selectedSeat?.id, selectedSeatManualOccupantName]);
+  }, [selectedSeatCanvasId, selectedSeatManualOccupantName]);
 
   const selectedSeatDisplayLabel = useMemo(
     () => getSeatDisplayLabel(selectedSeat, persistedSeatLabelsBySeatId),
@@ -1999,7 +2017,7 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
 
   useEffect(() => {
     setSeatLabelDraft(selectedSeatDisplayLabel);
-  }, [selectedSeat?.id, selectedSeatDisplayLabel]);
+  }, [selectedSeatCanvasId, selectedSeatDisplayLabel]);
 
   const selectedSeatLabel = useMemo(
     () => formatSeatLabel(selectedSeat, roomConfigs, '좌석 미지정', persistedSeatLabelsBySeatId),
@@ -2087,10 +2105,11 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
   const selectedSeatSignal = useMemo<CenterAdminStudentSeatSignal | null>(() => {
     if (!selectedSeat) return null;
     return (
+      seatSignalsBySeatId.get(selectedSeatCanvasId) ||
       seatSignalsBySeatId.get(selectedSeat.id) ||
       (selectedSeat.studentId ? studentSignalsByStudentId.get(selectedSeat.studentId) || null : null)
     );
-  }, [selectedSeat, seatSignalsBySeatId, studentSignalsByStudentId]);
+  }, [selectedSeat, selectedSeatCanvasId, seatSignalsBySeatId, studentSignalsByStudentId]);
 
   const selectedSeatDomainSummary = useMemo(
     () => getCenterAdminDomainSummary(selectedSeatSignal, { includeFinancialSignals: false }),
@@ -2122,15 +2141,16 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
 
   useEffect(() => {
     setIsSeatSecondaryExpanded(false);
-  }, [selectedSeat?.id]);
+  }, [selectedSeatCanvasId]);
 
   const selectedAttendanceSignal = useMemo<CenterAdminAttendanceSeatSignal | null>(() => {
     if (!selectedSeat) return null;
     return (
+      attendanceSeatSignalsBySeatId.get(selectedSeatCanvasId) ||
       attendanceSeatSignalsBySeatId.get(selectedSeat.id) ||
       (selectedSeat.studentId ? attendanceSeatSignalsByStudentId.get(selectedSeat.studentId) || null : null)
     );
-  }, [attendanceSeatSignalsBySeatId, attendanceSeatSignalsByStudentId, selectedSeat]);
+  }, [attendanceSeatSignalsBySeatId, attendanceSeatSignalsByStudentId, selectedSeat, selectedSeatCanvasId]);
 
   const selectedPenaltyRecovery = useMemo(() => {
     const basePoints = Math.max(0, Math.round(Number(selectedStudentPenaltyPoints || 0)));
@@ -2503,19 +2523,23 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
   };
 
   const handleSeatClick = (seat: AttendanceCurrent) => {
-    setSelectedSeat(seat);
+    const normalizedSeat: AttendanceCurrent = {
+      ...seat,
+      type: effectiveAisleSeatIdSet.has(getSeatCanvasId(seat)) ? 'aisle' : 'seat',
+    };
+    setSelectedSeat(normalizedSeat);
     if (isEditMode) {
       setIsManaging(false);
       setIsAssigning(false);
-      if (seat.studentId) {
-        fetchStudentDetails(seat.studentId);
+      if (normalizedSeat.studentId) {
+        fetchStudentDetails(normalizedSeat.studentId);
       }
       return;
     }
 
-    if (seat.studentId && seat.type !== 'aisle') {
+    if (normalizedSeat.studentId && normalizedSeat.type !== 'aisle') {
       setIsManaging(true);
-      fetchStudentDetails(seat.studentId);
+      fetchStudentDetails(normalizedSeat.studentId);
     }
   };
 
@@ -2985,7 +3009,19 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
   const handleToggleCellType = async () => {
     if (!firestore || !centerId || !selectedSeat) return;
     const nextType = selectedSeat.type === 'aisle' ? 'seat' : 'aisle';
-    const targetSeatId = buildSeatId(selectedSeat.roomId || PRIMARY_ROOM_ID, selectedSeat.roomSeatNo ?? 0);
+    const targetSeatId =
+      getSeatCanvasId(selectedSeat) ||
+      buildSeatId(selectedSeat.roomId || PRIMARY_ROOM_ID, selectedSeat.roomSeatNo ?? 0);
+    const previousSelectedSeat = selectedSeat;
+    const nextSelectedSeat: AttendanceCurrent = {
+      ...selectedSeat,
+      type: nextType,
+      studentId: nextType === 'aisle' ? undefined : selectedSeat.studentId,
+      manualOccupantName: nextType === 'aisle' ? undefined : selectedSeat.manualOccupantName,
+      seatZone: nextType === 'aisle' ? undefined : selectedSeat.seatZone,
+      status: 'absent',
+      lastCheckInAt: undefined,
+    };
     setIsSaving(true);
     try {
       const batch = writeBatch(firestore);
@@ -3068,23 +3104,15 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
       );
       const optimisticNextAisles = Array.from(nextAisleSeatIds).sort();
       setOptimisticAisleSeatIds(optimisticNextAisles);
-      await batch.commit();
-      const nextSeatZone = nextType === 'aisle' ? undefined : selectedSeat.seatZone;
-      setSelectedSeat({
-        ...selectedSeat,
-        type: nextType,
-        studentId: nextType === 'aisle' ? undefined : selectedSeat.studentId,
-        manualOccupantName: nextType === 'aisle' ? undefined : selectedSeat.manualOccupantName,
-        seatZone: nextSeatZone,
-        status: 'absent',
-        lastCheckInAt: undefined,
-      });
+      setSelectedSeat(nextSelectedSeat);
       if (nextType === 'aisle') {
         setManualSeatOccupantName('');
       }
+      await batch.commit();
       toast({ title: nextType === 'aisle' ? "통로로 변경됨" : "좌석으로 변경됨" });
     } catch (e) {
       setOptimisticAisleSeatIds(null);
+      setSelectedSeat(previousSelectedSeat);
       toast({ variant: "destructive", title: "변경 실패" });
     } finally { setIsSaving(false); }
   };
@@ -3514,6 +3542,7 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
                   const seatDisplayLabel =
                     getSeatDisplayLabel(seat, persistedSeatLabelsBySeatId) || String(roomSeatNo);
                   const isAisle = seat.type === 'aisle';
+                  const seatCanvasId = getSeatCanvasId(seat);
                   const nameTextClass =
                     hasOccupant && overlayPresentation.isDark
                       ? 'text-white drop-shadow-[0_1px_6px_rgba(15,23,42,0.28)]'
@@ -3527,7 +3556,7 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
                         'relative aspect-square cursor-pointer overflow-hidden border-2 outline-none shadow-sm transition-all duration-500',
                         compact ? 'min-w-[52px] rounded-[1.1rem] p-1' : 'min-w-[64px] rounded-2xl p-1',
                         'flex flex-col items-center justify-center',
-                        selectedSeat?.id === seat.id && 'ring-4 ring-[#FFB273]/40 ring-offset-2 ring-offset-white',
+                        selectedSeatCanvasId === seatCanvasId && 'ring-4 ring-[#FFB273]/40 ring-offset-2 ring-offset-white',
                         isFilteredOut ? 'border-transparent bg-muted/10 opacity-20 grayscale' :
                         isAisle ? (isEditMode
                           ? 'border-dashed border-[#FFB273] bg-[#FFF7EF] text-[#C95A08] hover:border-[#FF7A16]'
