@@ -12,6 +12,7 @@ import {
   buildSeatId,
   getGlobalSeatNo,
   getRoomLabel,
+  normalizeAisleSeatIds,
   normalizeLayoutRooms,
 } from '@/lib/seat-layout';
 
@@ -185,7 +186,7 @@ export function buildPublicSeatRooms(params: {
   const rooms = normalizeLayoutRooms(params.layoutSettings);
   const occupiedSeatIds = new Set<string>();
   const heldSeatIds = new Set<string>();
-  const aisleSeatIds = new Set<string>();
+  const aisleSeatIds = new Set<string>(normalizeAisleSeatIds(params.layoutSettings));
 
   (params.students || []).forEach((student) => {
     if (!Number.isFinite(student.roomSeatNo) || Number(student.roomSeatNo) <= 0) return;

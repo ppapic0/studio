@@ -833,6 +833,7 @@ export interface LayoutRoomConfig {
 
 export interface LayoutSettings {
   rooms?: LayoutRoomConfig[];
+  aisleSeatIds?: string[];
   rows?: number;
   cols?: number;
   updatedAt?: Timestamp;

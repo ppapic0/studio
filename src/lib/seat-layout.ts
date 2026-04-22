@@ -63,6 +63,19 @@ export function normalizeLayoutRooms(layoutSettings?: LayoutSettings | Record<st
   return getDefaultLayoutRooms(legacyRows, legacyCols);
 }
 
+export function normalizeAisleSeatIds(layoutSettings?: LayoutSettings | Record<string, unknown> | null) {
+  const source = (layoutSettings as LayoutSettings | undefined)?.aisleSeatIds;
+  if (!Array.isArray(source)) return [];
+
+  return Array.from(
+    new Set(
+      source
+        .map((seatId) => (typeof seatId === 'string' ? seatId.trim() : ''))
+        .filter(Boolean)
+    )
+  ).sort();
+}
+
 export function normalizeRoomId(roomId?: string | null, seatNo?: number | null) {
   if (typeof roomId === 'string' && roomId.trim()) {
     return roomId.trim();
@@ -104,6 +117,30 @@ export function buildSeatId(roomId: string, roomSeatNo: number) {
     return `seat_${padSeatNo(roomSeatNo)}`;
   }
   return `${roomId}_seat_${padSeatNo(roomSeatNo)}`;
+}
+
+export function parseSeatId(seatId?: string | null) {
+  if (typeof seatId !== 'string') return null;
+  const trimmed = seatId.trim();
+  if (!trimmed) return null;
+
+  const primaryMatch = /^seat_(\d+)$/.exec(trimmed);
+  if (primaryMatch) {
+    return {
+      roomId: PRIMARY_ROOM_ID,
+      roomSeatNo: Number(primaryMatch[1]),
+    };
+  }
+
+  const roomMatch = /^(room_\d+)_seat_(\d+)$/.exec(trimmed);
+  if (roomMatch) {
+    return {
+      roomId: roomMatch[1],
+      roomSeatNo: Number(roomMatch[2]),
+    };
+  }
+
+  return null;
 }
 
 function isSeatDocumentId(value?: string | null) {

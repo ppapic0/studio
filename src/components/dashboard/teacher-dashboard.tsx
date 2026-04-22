@@ -145,7 +145,9 @@ import {
   getGlobalSeatNo,
   getRoomLabel,
   hasAssignedSeat,
+  normalizeAisleSeatIds,
   normalizeLayoutRooms,
+  parseSeatId,
   resolveSeatIdentity,
 } from '@/lib/seat-layout';
 
@@ -423,6 +425,7 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
   const [historicalCenterMinutes, setHistoricalCenterMinutes] = useState<Record<string, number>>({});
   const [trendLoading, setTrendLoading] = useState(false);
   const staleSeatCleanupInFlightRef = useRef(false);
+  const aisleLayoutMigrationRef = useRef<string | null>(null);
   const liveBoardSectionRef = useRef<HTMLDivElement | null>(null);
   const seatInsightSectionRef = useRef<HTMLDivElement | null>(null);
   const appointmentsSectionRef = useRef<HTMLDivElement | null>(null);
@@ -530,6 +533,10 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
     () => new Map(roomConfigs.map((room) => [room.id, room])),
     [roomConfigs]
   );
+  const persistedAisleSeatIds = useMemo(
+    () => normalizeAisleSeatIds(centerData?.layoutSettings),
+    [centerData?.layoutSettings]
+  );
 
   const selectedRoomConfig =
     selectedRoomView === 'all'
@@ -563,7 +570,7 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
   }, [firestore, centerId, isActive]);
   const { data: attendanceList, isLoading: attendanceLoading } = useCollection<AttendanceCurrent>(attendanceQuery, { enabled: isActive });
 
-  const resolvedAttendanceList = useMemo<ResolvedAttendanceSeat[]>(() => {
+  const rawResolvedAttendanceList = useMemo<ResolvedAttendanceSeat[]>(() => {
     if (!attendanceList) return [];
     return attendanceList.map((seat) => {
       const identity = resolveSeatIdentity(seat);
@@ -576,6 +583,51 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
       };
     });
   }, [attendanceList]);
+  const effectiveAisleSeatIds = useMemo(() => {
+    const next = new Set(persistedAisleSeatIds);
+    rawResolvedAttendanceList.forEach((seat) => {
+      if (seat.type !== 'aisle') return;
+      const canonicalSeatId = buildSeatId(seat.roomId, seat.roomSeatNo);
+      if (canonicalSeatId) {
+        next.add(canonicalSeatId);
+      }
+    });
+    return Array.from(next).sort();
+  }, [persistedAisleSeatIds, rawResolvedAttendanceList]);
+  const effectiveAisleSeatIdSet = useMemo(
+    () => new Set(effectiveAisleSeatIds),
+    [effectiveAisleSeatIds]
+  );
+  const resolvedAttendanceList = useMemo<ResolvedAttendanceSeat[]>(
+    () =>
+      rawResolvedAttendanceList.map((seat) => ({
+        ...seat,
+        type: effectiveAisleSeatIdSet.has(buildSeatId(seat.roomId, seat.roomSeatNo)) ? 'aisle' : 'seat',
+      })),
+    [effectiveAisleSeatIdSet, rawResolvedAttendanceList]
+  );
+  useEffect(() => {
+    if (!firestore || !centerId || !isActive) return;
+    if (persistedAisleSeatIds.length > 0 || effectiveAisleSeatIds.length === 0) return;
+
+    const migrationKey = `${centerId}:${effectiveAisleSeatIds.join('|')}`;
+    if (aisleLayoutMigrationRef.current === migrationKey) return;
+    aisleLayoutMigrationRef.current = migrationKey;
+
+    void setDoc(
+      doc(firestore, 'centers', centerId),
+      {
+        layoutSettings: {
+          aisleSeatIds: effectiveAisleSeatIds,
+          updatedAt: serverTimestamp(),
+        },
+      },
+      { merge: true }
+    ).catch((migrationError) => {
+      aisleLayoutMigrationRef.current = null;
+      console.warn('[teacher-dashboard] aisle layout migration failed', migrationError);
+    });
+  }, [centerId, effectiveAisleSeatIds, firestore, isActive, persistedAisleSeatIds]);
 
   const studentsById = useMemo(
     () => new Map((students || []).map((student) => [student.id, student])),
@@ -588,7 +640,17 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
   );
 
   const seatById = useMemo(
-    () => new Map(resolvedAttendanceList.map((seat) => [seat.id, seat])),
+    () => {
+      const mapped = new Map<string, ResolvedAttendanceSeat>();
+      resolvedAttendanceList.forEach((seat) => {
+        mapped.set(seat.id, seat);
+        const canonicalSeatId = buildSeatId(seat.roomId, seat.roomSeatNo);
+        if (canonicalSeatId && (seat.id === canonicalSeatId || !mapped.has(canonicalSeatId))) {
+          mapped.set(canonicalSeatId, seat);
+        }
+      });
+      return mapped;
+    },
     [resolvedAttendanceList]
   );
 
@@ -903,7 +965,7 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
       roomSeatNo,
       seatNo: getGlobalSeatNo(room.id, roomSeatNo),
       status: 'absent',
-      type: 'seat',
+      type: effectiveAisleSeatIdSet.has(seatId) ? 'aisle' : 'seat',
       updatedAt: Timestamp.now(),
     };
   };
@@ -2059,6 +2121,12 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
             }
           : room
       );
+      const nextAisleSeatIds = effectiveAisleSeatIds.filter((seatId) => {
+        const parsed = parseSeatId(seatId);
+        if (!parsed) return false;
+        if (parsed.roomId !== roomId) return true;
+        return parsed.roomSeatNo <= nextMaxCells;
+      });
 
       conflicts.forEach((seat) => {
         const assignedStudentId = typeof seat.studentId === 'string' ? seat.studentId.trim() : '';
@@ -2080,6 +2148,7 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
         doc(firestore, 'centers', centerId),
         {
           layoutSettings: {
+            aisleSeatIds: nextAisleSeatIds,
             rows: nextRooms[0]?.rows ?? roomDraft.rows,
             cols: nextRooms[0]?.cols ?? roomDraft.cols,
             rooms: nextRooms,
@@ -2183,11 +2252,13 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
           ...room,
           order: index + 1,
         }));
+      const nextAisleSeatIds = effectiveAisleSeatIds.filter((seatId) => parseSeatId(seatId)?.roomId !== roomId);
 
       batch.set(
         doc(firestore, 'centers', centerId),
         {
           layoutSettings: {
+            aisleSeatIds: nextAisleSeatIds,
             rows: nextRooms[0]?.rows ?? targetRoom.rows,
             cols: nextRooms[0]?.cols ?? targetRoom.cols,
             rooms: nextRooms,
@@ -2680,10 +2751,19 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
   const handleToggleCellType = async () => {
     if (!firestore || !centerId || !selectedSeat) return;
     const nextType = selectedSeat.type === 'aisle' ? 'seat' : 'aisle';
+    const targetSeatId = buildSeatId(selectedSeat.roomId || PRIMARY_ROOM_ID, selectedSeat.roomSeatNo ?? 0);
     setIsSaving(true);
     try {
       const batch = writeBatch(firestore);
       const seatRef = doc(firestore, 'centers', centerId, 'attendanceCurrent', selectedSeat.id);
+      const nextAisleSeatIds = new Set(effectiveAisleSeatIds);
+      if (targetSeatId) {
+        if (nextType === 'aisle') {
+          nextAisleSeatIds.add(targetSeatId);
+        } else {
+          nextAisleSeatIds.delete(targetSeatId);
+        }
+      }
       if (nextType === 'aisle' && selectedSeat.studentId) {
         batch.update(doc(firestore, 'centers', centerId, 'students', selectedSeat.studentId), {
           seatNo: 0,
@@ -2741,6 +2821,16 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
           { merge: true }
         );
       }
+      batch.set(
+        doc(firestore, 'centers', centerId),
+        {
+          layoutSettings: {
+            aisleSeatIds: Array.from(nextAisleSeatIds).sort(),
+            updatedAt: serverTimestamp(),
+          },
+        },
+        { merge: true }
+      );
       await batch.commit();
       toast({ title: nextType === 'aisle' ? "통로로 변경됨" : "좌석으로 변경됨" });
       setIsManaging(false);
