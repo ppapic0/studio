@@ -807,36 +807,79 @@ export function MarketingConsultingCRM({
   const handleWebsiteBookingAccessSave = async () => {
     if (!firestore || !centerId || !selectedWebsiteRequest || !canManageLeadData) return;
 
-    const currentAccess = getWebsiteBookingAccess(selectedWebsiteRequest.bookingAccess);
-    const nextNote = websiteBookingAccessNote.trim();
-    const nextUnlockedAt = websiteBookingAccessEnabled
+    await handleWebsiteBookingAccessUpdate(selectedWebsiteRequest, {
+      isEnabled: websiteBookingAccessEnabled,
+      note: websiteBookingAccessNote,
+      source: 'detail',
+    });
+  };
+
+  const handleWebsiteBookingAccessUpdate = async (
+    request: WebsiteConsultRequest,
+    {
+      isEnabled,
+      note,
+      source,
+    }: {
+      isEnabled: boolean;
+      note?: string;
+      source: 'detail' | 'quick';
+    }
+  ) => {
+    if (!firestore || !centerId || !canManageLeadData) return;
+
+    const currentAccess = getWebsiteBookingAccess(request.bookingAccess);
+    const nextNote = typeof note === 'string' ? note.trim() : currentAccess.note || '';
+    const nextUnlockedAt = isEnabled
       ? currentAccess.unlockedAt || new Date().toISOString()
       : currentAccess.unlockedAt || null;
-    const nextUnlockedByUid = websiteBookingAccessEnabled
+    const nextUnlockedByUid = isEnabled
       ? currentAccess.unlockedByUid || user?.uid || null
       : currentAccess.unlockedByUid || null;
 
-    setSavingWebsiteBookingAccessId(selectedWebsiteRequest.id);
+    setSavingWebsiteBookingAccessId(request.id);
     try {
-      await updateDoc(doc(firestore, 'centers', centerId, 'websiteConsultRequests', selectedWebsiteRequest.id), {
+      await updateDoc(doc(firestore, 'centers', centerId, 'websiteConsultRequests', request.id), {
         bookingAccess: {
-          isEnabled: websiteBookingAccessEnabled,
+          isEnabled,
           unlockedAt: nextUnlockedAt,
           unlockedByUid: nextUnlockedByUid,
           note: nextNote || null,
         },
         updatedAt: serverTimestamp(),
       });
+
+      if (selectedWebsiteRequest?.id === request.id) {
+        setWebsiteBookingAccessEnabled(isEnabled);
+        setWebsiteBookingAccessNote(nextNote);
+      }
+
       toast({
-        title: websiteBookingAccessEnabled ? '웹 예약 권한을 열었습니다.' : '웹 예약 권한을 잠갔습니다.',
-      description: '해당 어머님 문의 건의 방문예약과 좌석예약 가능 상태가 갱신되었습니다.',
+        title: isEnabled ? '예약 가능 번호를 열었습니다.' : '예약 가능 번호를 다시 잠갔습니다.',
+        description:
+          source === 'quick'
+            ? `${request.studentName || '해당 문의'} 번호의 방문예약과 좌석예약 가능 상태를 바로 갱신했습니다.`
+            : '해당 어머님 문의 건의 방문예약과 좌석예약 가능 상태가 갱신되었습니다.',
       });
     } catch (error) {
       console.error(error);
-      toast({ variant: 'destructive', title: '예약 권한 저장 실패', description: '웹 예약 권한을 저장하는 중 오류가 발생했습니다.' });
+      toast({
+        variant: 'destructive',
+        title: '예약 권한 저장 실패',
+        description: '웹 예약 권한을 저장하는 중 오류가 발생했습니다.',
+      });
     } finally {
       setSavingWebsiteBookingAccessId(null);
     }
+  };
+
+  const handleQuickWebsiteBookingAccessToggle = async (request: WebsiteConsultRequest) => {
+    const currentAccess = getWebsiteBookingAccess(request.bookingAccess);
+    await handleWebsiteBookingAccessUpdate(request, {
+      isEnabled: !currentAccess.isEnabled,
+      note: currentAccess.note || '',
+      source: 'quick',
+    });
   };
 
   const handleWebsiteDelete = async (requestId: string) => {
@@ -1246,6 +1289,25 @@ export function MarketingConsultingCRM({
                   >
                     상세 보기
                   </Button>
+                  {canManageLeadData ? (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      className={cn(
+                        'h-9 rounded-lg px-3 text-xs font-black',
+                        getWebsiteBookingAccess(request.bookingAccess).isEnabled
+                          ? 'border-slate-200 text-slate-700 hover:bg-slate-50'
+                          : 'border-emerald-200 text-emerald-700 hover:bg-emerald-50'
+                      )}
+                      onClick={() => void handleQuickWebsiteBookingAccessToggle(request)}
+                      disabled={savingWebsiteBookingAccessId === request.id}
+                    >
+                      {savingWebsiteBookingAccessId === request.id ? (
+                        <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" />
+                      ) : null}
+                      {getWebsiteBookingAccess(request.bookingAccess).isEnabled ? '번호 잠그기' : '번호 풀기'}
+                    </Button>
+                  ) : null}
                   {canManageLeadData ? (
                     <Select
                       value={request.status || 'new'}
@@ -2278,14 +2340,14 @@ export function MarketingConsultingCRM({
                 <div className="rounded-2xl border border-slate-200 bg-white p-4">
                   <div className="flex items-start justify-between gap-3">
                     <div>
-                      <p className="text-[10px] font-black uppercase tracking-widest text-slate-500">웹 예약 권한</p>
+                      <p className="text-[10px] font-black uppercase tracking-widest text-slate-500">예약 가능 번호 관리</p>
                       <p className="mt-2 text-sm font-bold text-slate-700">
-                        순서가 된 어머님 문의 건만 방문예약과 좌석예약을 열어드립니다.
+                        순서가 된 어머님 문의 건만 번호를 풀어서 방문예약과 좌석예약을 열어드립니다.
                       </p>
                     </div>
                     <div className="flex items-center gap-3 rounded-full bg-slate-100 px-3 py-2">
                       <span className="text-xs font-black text-slate-700">
-                        {websiteBookingAccessEnabled ? '예약 가능' : '대기'}
+                        {websiteBookingAccessEnabled ? '번호 열림' : '대기'}
                       </span>
                       <Switch
                         checked={websiteBookingAccessEnabled}
@@ -2376,7 +2438,7 @@ export function MarketingConsultingCRM({
                         {savingWebsiteBookingAccessId === selectedWebsiteRequest.id ? (
                           <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                         ) : null}
-                        예약 권한 저장
+                        번호 상태 저장
                       </Button>
                     </div>
                   ) : null}
