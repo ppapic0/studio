@@ -8,6 +8,8 @@ type CenterEnvironmentSectionProps = {
 };
 
 export function CenterEnvironmentSection({ centerEnvironment }: CenterEnvironmentSectionProps) {
+  const [overviewPhoto, ...seatPhotos] = centerEnvironment.photos;
+
   return (
     <section
       id="track-view"
@@ -54,12 +56,12 @@ export function CenterEnvironmentSection({ centerEnvironment }: CenterEnvironmen
                 <div>
                   <p className="text-[10px] font-black tracking-[0.18em] text-[#FF7A16]">TRACK VIEW GUIDE</p>
                   <p className="mt-1 break-keep text-[0.98rem] font-black leading-[1.35] text-[#14295F]">
-                    전경과 좌석 타입을 한 번에 소개합니다
+                    실제 스터디센터 전경과 좌석 구성을 소개합니다
                   </p>
                 </div>
               </div>
               <p className="mt-4 break-keep text-[13px] font-semibold leading-[1.72] text-[#51667D]">
-                실제 사진만 준비되면 이 구간에 바로 교체할 수 있도록 전경 1장, 좌석 소개 2장 구조로 먼저 잡아두었습니다.
+                전경은 공간 분위기를 먼저 보여주고, 아래에서는 좌석 타입별 특징을 사진과 함께 바로 확인할 수 있게 구성했습니다.
               </p>
               <div className="mt-4 flex flex-wrap gap-2">
                 {centerEnvironment.photos.slice(1).map((photo) => (
@@ -76,53 +78,78 @@ export function CenterEnvironmentSection({ centerEnvironment }: CenterEnvironmen
           </div>
         </article>
 
-        <div className="mt-5 grid grid-cols-1 gap-4 sm:grid-cols-2 sm:gap-4 lg:grid-cols-3">
-          {centerEnvironment.photos.map((photo, index) => (
+        {overviewPhoto ? (
+          <article className="marketing-card brand-sheen-panel mt-5 overflow-hidden p-4 sm:p-5 lg:p-6">
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <div>
+                <p className="text-[10px] font-black tracking-[0.18em] text-[#FF7A16]">TRACK 01</p>
+                <h3 className="mt-2 break-keep text-[1.2rem] font-black leading-[1.2] text-[#14295F] sm:text-[1.55rem]">
+                  {overviewPhoto.title}
+                </h3>
+              </div>
+              <span className="rounded-full border border-[#14295F]/10 bg-[#F7FAFF] px-3 py-1.5 text-[10px] font-black text-[#425A75]">
+                실제 공간 사진
+              </span>
+            </div>
+
+            <div className="mt-4 grid gap-4 lg:grid-cols-[minmax(0,1.7fr)_minmax(18rem,0.9fr)] lg:items-end">
+              <div className="relative aspect-[16/11] overflow-hidden rounded-[1.35rem] border border-[#14295F]/10 bg-white">
+                {overviewPhoto.image ? (
+                  <Image
+                    src={overviewPhoto.image}
+                    alt={overviewPhoto.alt}
+                    fill
+                    sizes="(max-width: 1024px) 92vw, 68vw"
+                    className="object-cover"
+                    priority
+                  />
+                ) : null}
+              </div>
+              <div className="rounded-[1.35rem] border border-[#14295F]/10 bg-[linear-gradient(180deg,#FFFFFF_0%,#F7FAFF_100%)] p-5">
+                <p className="text-[10px] font-black tracking-[0.18em] text-[#FF7A16]">SPACE OVERVIEW</p>
+                <p className="mt-3 break-keep text-[14px] font-semibold leading-[1.8] text-[#52667D] sm:text-[15px]">
+                  {overviewPhoto.summary}
+                </p>
+              </div>
+            </div>
+          </article>
+        ) : null}
+
+        <div className="mt-4 grid grid-cols-1 gap-4 lg:grid-cols-2">
+          {seatPhotos.map((photo, index) => (
             <article
               key={photo.title}
               className="marketing-card brand-sheen-panel overflow-hidden p-4 sm:p-5"
             >
               <div className="flex items-start justify-between gap-3">
                 <div>
-                  <p className="text-[8.5px] font-black tracking-[0.16em] text-[#FF7A16] sm:text-[10px]">TRACK 0{index + 1}</p>
-                  <h3 className="mt-1.5 break-keep text-[0.9rem] font-black leading-[1.28] text-[#14295F] sm:mt-2 sm:text-[1.1rem]">
+                  <p className="text-[10px] font-black tracking-[0.18em] text-[#FF7A16]">
+                    TRACK 0{index + 2}
+                  </p>
+                  <h3 className="mt-2 break-keep text-[1.08rem] font-black leading-[1.24] text-[#14295F] sm:text-[1.28rem]">
                     {photo.title}
                   </h3>
                 </div>
-                <span className="rounded-full border border-[#14295F]/10 bg-[#F7FAFF] px-2.5 py-1 text-[8.5px] font-black text-[#425A75] sm:px-3 sm:text-[10px]">
-                  <span className="sm:hidden">사진 교체</span>
-                  <span className="hidden sm:inline">실제 사진 교체 예정</span>
+                <span className="rounded-full border border-[#14295F]/10 bg-[#F7FAFF] px-3 py-1.5 text-[10px] font-black text-[#425A75]">
+                  좌석 타입 소개
                 </span>
               </div>
 
-              <div className="mt-3 rounded-[1rem] border border-[#14295F]/10 bg-[linear-gradient(160deg,#F7FAFF_0%,#FFFFFF_100%)] p-2 sm:mt-4 sm:rounded-[1.25rem] sm:p-3">
-                <div className="relative min-h-[21rem] overflow-hidden rounded-[0.95rem] border border-dashed border-[#14295F]/14 bg-white sm:min-h-0 sm:aspect-[4/3] sm:rounded-[1rem]">
+              <div className="mt-4 rounded-[1.2rem] border border-[#14295F]/10 bg-[linear-gradient(160deg,#F7FAFF_0%,#FFFFFF_100%)] p-3">
+                <div className="relative aspect-[4/5] overflow-hidden rounded-[1rem] border border-[#14295F]/10 bg-white sm:aspect-[4/3]">
                   {photo.image ? (
                     <Image
                       src={photo.image}
                       alt={photo.alt}
                       fill
-                      sizes="(max-width: 640px) 92vw, (max-width: 1280px) 50vw, 33vw"
+                      sizes="(max-width: 1024px) 92vw, 46vw"
                       className="object-cover"
                     />
-                  ) : (
-                    <div className="absolute inset-0 flex flex-col items-center justify-center bg-[radial-gradient(circle_at_top,rgba(255,122,22,0.10),transparent_34%),linear-gradient(160deg,#F9FBFF_0%,#FFFFFF_100%)] px-4 text-center sm:px-6">
-                      <div className="h-10 w-10 rounded-[0.95rem] border border-[#FF7A16]/14 bg-white shadow-[0_14px_28px_rgba(20,41,95,0.06)] sm:h-14 sm:w-14 sm:rounded-[1.25rem]" />
-                      <p className="mt-2.5 text-[8.5px] font-black tracking-[0.14em] text-[#FF7A16] sm:mt-4 sm:text-[11px]">TRACK PHOTO</p>
-                      <p className="mt-1.5 break-keep text-[0.92rem] font-black leading-[1.32] text-[#14295F] sm:mt-2 sm:text-[0.98rem]">
-                        <span className="sm:hidden">실제 사진 자리</span>
-                        <span className="hidden sm:inline">실제 스터디센터 사진 자리</span>
-                      </p>
-                      <p className="mt-1.5 break-keep text-[11px] font-semibold leading-[1.55] text-[#5B7087] sm:mt-2 sm:text-[12px] sm:leading-[1.7]">
-                        <span className="sm:hidden">준비되면 교체</span>
-                        <span className="hidden sm:inline">준비되면 이 자리에 바로 교체할 수 있습니다.</span>
-                      </p>
-                    </div>
-                  )}
+                  ) : null}
                 </div>
               </div>
 
-              <p className="mt-3 break-keep text-[11px] font-semibold leading-[1.62] text-[#52667D] sm:mt-4 sm:text-[12.8px] sm:leading-[1.72]">
+              <p className="mt-4 break-keep text-[12px] font-semibold leading-[1.72] text-[#52667D] sm:text-[13.5px]">
                 {photo.summary}
               </p>
             </article>
