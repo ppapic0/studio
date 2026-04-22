@@ -73,12 +73,12 @@ export const CLASS_TUITION_NOTICE = {
   tuitionRows: [
     {
       target: '고1·고2',
-      amount: '375,000원',
+      amount: '320,000원',
       detail: '월 4회 기준 국어 수업',
     },
     {
-      target: '고3·N수생',
-      amount: '400,000원',
+      target: '고3',
+      amount: '350,000원',
       detail: '월 4회 기준 국어 수업',
     },
   ],
