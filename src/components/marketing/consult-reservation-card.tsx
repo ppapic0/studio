@@ -763,13 +763,13 @@ export function ConsultReservationCard() {
                               "rounded-full px-2.5 py-1 text-[10px] font-black",
                               slot.isAvailable
                                 ? "bg-[#FFF2E8] text-[#FF7A16]"
-                                : "bg-white/10 text-white/66"
+                                : "bg-white/10 text-white"
                             )}
                           >
                             {slot.isAvailable ? "전화번호 인증 후 예약" : "예약 마감"}
                           </span>
                         </div>
-                        <p className="mt-2 text-xs font-semibold leading-5 text-white/68">
+                        <p className="mt-2 text-xs font-semibold leading-5 text-white">
                           {slot.label}
                         </p>
                       </button>
