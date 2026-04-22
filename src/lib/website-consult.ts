@@ -24,8 +24,12 @@ const LEGACY_WEBSITE_NON_REFUNDABLE_NOTICE =
   '자리찜 예약금 5만원은 상담 취소 또는 단순 변심 시에도 환불되지 않습니다.';
 export const DEFAULT_WEBSITE_NON_REFUNDABLE_NOTICE =
   '좌석예약 예약금 5만원은 상담 취소 또는 단순 변심 시에도 환불되지 않습니다.';
-export const DEFAULT_WEBSITE_SLOT_GUIDE =
+const LEGACY_WEBSITE_SLOT_GUIDE =
   '상담 시간은 센터가 미리 연 고정 슬롯만 예약할 수 있습니다.';
+const SECONDARY_LEGACY_WEBSITE_SLOT_GUIDE =
+  '홍보리드 DB에 등록된 연락처를 먼저 확인하고, 센터가 열어둔 문의 건만 방문예약과 좌석예약을 진행할 수 있습니다.';
+export const DEFAULT_WEBSITE_SLOT_GUIDE =
+  '현재 방문 상담은 대기 순서에 따라 순차적으로 연락드리고 있습니다. 센터에서 연락을 드린 분에 한해 방문 상담 신청을 부탁드리며, 대기 순서에 맞지 않게 먼저 방문 상담을 신청해 주셔도 실제 방문 상담은 진행되지 않는 점 양해 부탁드립니다.';
 const LEGACY_WEBSITE_SEAT_GUIDE =
   '빈 좌석번호를 확인한 뒤 원하는 자리를 선택해 자리찜을 신청할 수 있습니다.';
 export const DEFAULT_WEBSITE_SEAT_GUIDE =
@@ -136,6 +140,11 @@ export function getWebsiteReservationSettings(
     settings?.nonRefundableNotice?.trim() === LEGACY_WEBSITE_NON_REFUNDABLE_NOTICE
       ? DEFAULT_WEBSITE_NON_REFUNDABLE_NOTICE
       : settings?.nonRefundableNotice?.trim();
+  const normalizedSlotGuideText =
+    settings?.slotGuideText?.trim() === LEGACY_WEBSITE_SLOT_GUIDE ||
+    settings?.slotGuideText?.trim() === SECONDARY_LEGACY_WEBSITE_SLOT_GUIDE
+      ? DEFAULT_WEBSITE_SLOT_GUIDE
+      : settings?.slotGuideText?.trim();
   const normalizedSeatGuideText =
     settings?.seatGuideText?.trim() === LEGACY_WEBSITE_SEAT_GUIDE
       ? DEFAULT_WEBSITE_SEAT_GUIDE
@@ -153,7 +162,7 @@ export function getWebsiteReservationSettings(
     depositorGuide: settings?.depositorGuide?.trim() || DEFAULT_WEBSITE_DEPOSITOR_GUIDE,
     nonRefundableNotice:
       normalizedNonRefundableNotice || DEFAULT_WEBSITE_NON_REFUNDABLE_NOTICE,
-    slotGuideText: settings?.slotGuideText?.trim() || DEFAULT_WEBSITE_SLOT_GUIDE,
+    slotGuideText: normalizedSlotGuideText || DEFAULT_WEBSITE_SLOT_GUIDE,
     seatGuideText: normalizedSeatGuideText || DEFAULT_WEBSITE_SEAT_GUIDE,
     createdAt: settings?.createdAt,
     updatedAt: settings?.updatedAt,

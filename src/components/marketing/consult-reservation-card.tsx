@@ -14,6 +14,7 @@ import {
 import { cn } from "@/lib/utils";
 import { getSafeErrorMessage } from "@/lib/exposed-error";
 import { logHandledClientIssue } from "@/lib/handled-client-log";
+import { DEFAULT_WEBSITE_SLOT_GUIDE } from "@/lib/website-consult";
 
 type PublicSettings = {
   isPublicEnabled?: boolean;
@@ -616,7 +617,7 @@ export function ConsultReservationCard() {
               <p className="text-sm font-black text-[#14295F]">온라인 예약은 순차 오픈 방식입니다</p>
               <p className="mt-1 text-xs font-semibold leading-5 text-[#14295F]/78">
                 {activeSettings?.slotGuideText ||
-                  "홍보리드 DB에 등록된 연락처를 먼저 확인하고, 센터가 열어둔 문의 건만 방문예약과 좌석예약을 진행할 수 있습니다."}
+                  DEFAULT_WEBSITE_SLOT_GUIDE}
               </p>
             </div>
           </div>
