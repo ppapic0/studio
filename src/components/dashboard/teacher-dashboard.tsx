@@ -2048,14 +2048,14 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
     [selectedSeat?.seatZone, selectedSeat?.type]
   );
   const selectedSeatAssignmentLabel = useMemo(() => {
-    if (selectedSeat?.type === 'aisle') return '학생 배정 비활성';
+    if (selectedSeat?.type === 'aisle') return '학생 배정 활성화 필요';
     if (selectedSeatManualOccupantName) return '임시 사용중 좌석';
     if (selectedSeat?.studentId) return '현재 배정된 좌석';
     return '즉시 배정 가능';
   }, [selectedSeat?.studentId, selectedSeat?.type, selectedSeatManualOccupantName]);
   const selectedSeatAvailabilityCopy = useMemo(() => {
     if (selectedSeat?.type === 'aisle') {
-      return '현재는 이동 동선 확보용 통로로 설정되어 있습니다.';
+      return '현재는 이동 동선 확보용 통로입니다. 필요하면 바로 좌석으로 다시 활성화해 학생 배정을 이어갈 수 있습니다.';
     }
     if (selectedSeatManualOccupantName) {
       return `${selectedSeatManualOccupantName} 이름으로 임시 사용중 처리된 좌석입니다.`;
@@ -6009,7 +6009,7 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
                     </div>
                     <div className="rounded-full border border-[#D7E4FF] bg-[#F7FAFF] px-3 py-1 text-[10px] font-black uppercase tracking-[0.18em] text-[#14295F]">
                       {selectedSeat?.type === 'aisle'
-                        ? '배정 잠금'
+                        ? '활성화 필요'
                         : selectedSeatHasManualOccupant
                           ? '임시 사용중'
                           : unassignedStudentCountLabel}
@@ -6162,11 +6162,20 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
                     </div>
                   ) : (
                     <div className="mt-6 rounded-[1.8rem] bg-[#14295F] p-6 text-white shadow-[0_18px_36px_rgba(20,41,95,0.2)]">
-                      <p className="text-[10px] font-black uppercase tracking-[0.22em] text-white/68">Assign Locked</p>
-                      <p className="mt-3 text-lg font-black text-white">학생 배정이 잠겨 있습니다.</p>
+                      <p className="text-[10px] font-black uppercase tracking-[0.22em] text-white/68">Assign Activation</p>
+                      <p className="mt-3 text-lg font-black text-white">학생 배정을 바로 다시 열 수 있습니다.</p>
                       <p className="mt-2 text-sm font-semibold leading-6 text-white/78">
-                        통로 모드에서는 학생 검색과 배정 리스트가 숨겨집니다. 좌석으로 다시 전환하면 여기서 바로 학생을 연결할 수 있습니다.
+                        지금은 통로로 설정되어 있어 학생 검색과 배정 리스트를 숨겨둔 상태입니다. 아래 버튼을 누르면 이 칸을 좌석으로 되돌리고, 바로 학생 배정 흐름으로 이어집니다.
                       </p>
+                      <Button
+                        type="button"
+                        onClick={handleToggleCellType}
+                        disabled={isSaving}
+                        className="mt-5 h-12 w-full rounded-[1.05rem] bg-white font-black text-[#14295F] hover:bg-white/92"
+                      >
+                        {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <UserPlus className="mr-2 h-4 w-4" />}
+                        학생 배정 활성화
+                      </Button>
                     </div>
                   )}
                 </motion.div>
