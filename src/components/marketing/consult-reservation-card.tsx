@@ -232,11 +232,11 @@ function getLeadAccessLabel(lead: VerifiedLead) {
 
 function getLeadAccessDescription(lead: VerifiedLead) {
   if (lead.canReserve) {
-    return "센터에서 이 문의 건을 예약 가능 상태로 열어 두었습니다. 지금 바로 방문예약을 진행할 수 있습니다.";
+    return "센터에서 이 문의 건을 예약 가능 상태로 열어 두었습니다. 아래 공개된 시간 중에서 방문 상담 예약을 진행할 수 있습니다.";
   }
   return (
     lead.bookingAccessNote ||
-    "현재는 이 문의 건의 순서가 아직 열리지 않아 슬롯과 좌석 현황만 확인할 수 있습니다. 센터에서 순차적으로 열어드린 뒤 예약이 가능합니다."
+    "현재는 이 문의 건의 순서가 아직 열리지 않아 상담 시간과 좌석 현황만 확인할 수 있습니다. 센터에서 순차적으로 열어드린 뒤 예약이 가능합니다."
   );
 }
 
@@ -313,6 +313,7 @@ export function ConsultReservationCard() {
   const [isLoading, setIsLoading] = useState(true);
   const [slotError, setSlotError] = useState<string | null>(null);
   const [seatDialogOpen, setSeatDialogOpen] = useState(false);
+  const [slotPanelOpen, setSlotPanelOpen] = useState(false);
   const [action, setAction] = useState<ReservationAction | null>(null);
   const [phone, setPhone] = useState("");
   const [verifying, setVerifying] = useState(false);
@@ -459,10 +460,15 @@ export function ConsultReservationCard() {
         setActionError("이 번호로 접수된 홍보 리드가 없습니다. 먼저 아래 상담 폼을 작성해 주세요.");
         return;
       }
-      setVerifiedLeads(data.leads);
-      const defaultLead = data.leads.find((lead) => lead.canReserve) || data.leads[0] || null;
+      const sortedLeads = [...data.leads].sort((left, right) => {
+        const reservePriorityGap = Number(right.canReserve) - Number(left.canReserve);
+        if (reservePriorityGap !== 0) return reservePriorityGap;
+        return new Date(right.createdAt || 0).getTime() - new Date(left.createdAt || 0).getTime();
+      });
+      setVerifiedLeads(sortedLeads);
+      const defaultLead = sortedLeads.find((lead) => lead.canReserve) || sortedLeads[0] || null;
       setSelectedLeadId(defaultLead?.id || null);
-      if (!data.leads.some((lead) => lead.canReserve)) {
+      if (!sortedLeads.some((lead) => lead.canReserve)) {
         setActionError(getLeadAccessDescription(defaultLead as VerifiedLead));
       }
     } catch (error) {
@@ -587,7 +593,7 @@ export function ConsultReservationCard() {
               실시간 좌석 확인
             </h3>
             <p className="mt-3 break-keep text-sm font-semibold leading-6 text-white">
-              기존 입학문의에 남긴 연락처로 인증하면 상담 슬롯과 빈 좌석번호를 볼 수 있고, 센터가 순차적으로 열어드린 문의 건만 바로 예약할 수 있습니다.
+              방문 상담 가능한 시간과 1호실 실시간 좌석을 먼저 확인할 수 있고, 실제 예약은 홍보리드 DB에서 예약 가능 상태로 열린 문의 건만 진행됩니다.
             </p>
           </div>
           <div className="hidden rounded-full border border-white/10 bg-white/[0.08] p-3 text-white/80 sm:block">
@@ -596,18 +602,19 @@ export function ConsultReservationCard() {
         </div>
 
         <div className="mt-5 grid gap-3 sm:grid-cols-3">
-          <SummaryChip label="예약 가능 슬롯" value={`${availableSlotCount}개`} />
-          <SummaryChip label="실시간 빈좌석" value={`${seatSummary.availableCount}석`} />
+          <SummaryChip label="공개된 상담 슬롯" value={`${availableSlotCount}개`} />
+          <SummaryChip label="1호실 빈좌석" value={`${seatSummary.availableCount}석`} />
           <SummaryChip label="자리찜 진행" value={`${seatSummary.heldCount}석`} tone="accent" />
         </div>
 
-        <div className="mt-5 rounded-[1.35rem] border border-white/10 bg-white/[0.05] p-4">
+        <div className="mt-5 rounded-[1.35rem] border border-[#FFB273]/20 bg-[#FFF2E8] p-4">
           <div className="flex items-start gap-3">
-            <Phone className="mt-0.5 h-4 w-4 shrink-0 text-[#FFB273]" />
+            <Phone className="mt-0.5 h-4 w-4 shrink-0 text-[#FF7A16]" />
             <div className="min-w-0">
-              <p className="text-sm font-black text-white">전화번호 인증 후 예약</p>
-              <p className="mt-1 text-xs font-semibold leading-5 text-white">
-                {activeSettings?.slotGuideText || "리드 DB에 등록되고 센터가 예약 가능 상태로 열어준 문의 건만 방문예약과 자리찜을 진행할 수 있습니다."}
+              <p className="text-sm font-black text-[#14295F]">온라인 예약은 순차 오픈 방식입니다</p>
+              <p className="mt-1 text-xs font-semibold leading-5 text-[#14295F]/78">
+                {activeSettings?.slotGuideText ||
+                  "홍보리드 DB에 등록된 연락처를 먼저 확인하고, 센터가 열어둔 문의 건만 방문예약과 자리찜을 진행할 수 있습니다."}
               </p>
             </div>
           </div>
@@ -620,23 +627,43 @@ export function ConsultReservationCard() {
         ) : null}
 
         <div className="mt-5 space-y-4">
-          <div className="flex items-center justify-between gap-3">
+          <div className={cn("flex gap-3", "flex-col sm:flex-row sm:items-center sm:justify-between")}>
             <div>
-              <p className="text-xs font-black tracking-[0.18em] text-white/90">상담 예약 가능 시간</p>
-              <p className="mt-1 text-sm font-semibold text-white">슬롯과 좌석 현황은 볼 수 있고, 실제 예약은 순차 해제된 문의 건만 가능합니다.</p>
+              <p className="text-xs font-black tracking-[0.18em] text-white/90">방문 상담 가능한 시간</p>
+              <p className="mt-1 text-sm font-semibold text-white">
+                버튼을 누르면 센터가 열어둔 상담 시간을 볼 수 있고, 실제 예약은 전화번호 인증 후 예약 가능 상태인 문의 건만 가능합니다.
+              </p>
             </div>
-            <Button
-              type="button"
-              onClick={() => setSeatDialogOpen(true)}
-              className="h-11 rounded-full bg-white text-[#14295F] hover:bg-[#f7faff]"
-              disabled={!activeSettings?.isPublicEnabled}
-            >
-              <Armchair className="mr-2 h-4 w-4" />
-              실시간 좌석 보기
-            </Button>
+            <div className="flex flex-wrap gap-2">
+              <Button
+                type="button"
+                onClick={() => setSlotPanelOpen((prev) => !prev)}
+                className="h-11 rounded-full bg-[#FF7A16] text-white hover:bg-[#e86d11]"
+                disabled={!activeSettings?.isPublicEnabled}
+              >
+                <CalendarDays className="mr-2 h-4 w-4" />
+                {slotPanelOpen ? "방문 상담 가능한 시간 닫기" : "방문 상담 가능한 시간 보기"}
+              </Button>
+              <Button
+                type="button"
+                onClick={() => setSeatDialogOpen(true)}
+                className="h-11 rounded-full bg-white text-[#14295F] hover:bg-[#f7faff]"
+                disabled={!activeSettings?.isPublicEnabled}
+              >
+                <Armchair className="mr-2 h-4 w-4" />
+                실시간 좌석 보기
+              </Button>
+            </div>
           </div>
 
-          {isLoading ? (
+          {!slotPanelOpen ? (
+            <div className="rounded-[1.25rem] border border-dashed border-white/14 bg-white/[0.04] px-4 py-6 text-center">
+              <p className="text-sm font-black text-white">열어둔 상담 시간을 확인하려면 버튼을 눌러주세요.</p>
+              <p className="mt-2 text-xs font-semibold leading-5 text-white/72">
+                예약 단계에서는 홍보리드 DB에 남긴 학부모 연락처 확인과 예약 가능 여부를 다시 확인합니다.
+              </p>
+            </div>
+          ) : isLoading ? (
             <div className="rounded-[1.25rem] border border-white/10 bg-white/[0.04] px-4 py-8 text-center text-sm font-bold text-white/70">
               <Loader2 className="mx-auto h-5 w-5 animate-spin text-white/60" />
               <p className="mt-3">예약 가능한 상담 시간을 불러오고 있습니다.</p>
@@ -678,11 +705,11 @@ export function ConsultReservationCard() {
                             ? "border-white/12 bg-white/[0.08] hover:-translate-y-0.5 hover:bg-white/[0.12]"
                             : "border-white/8 bg-white/[0.03] opacity-55"
                         )}
-                      >
-                        <div className="flex items-center justify-between gap-3">
-                          <p className="text-sm font-black text-white">
-                            {formatKoreanTime(slot.startsAt)} - {formatKoreanTime(slot.endsAt)}
-                          </p>
+                        >
+                          <div className="flex items-center justify-between gap-3">
+                            <p className="text-sm font-black text-white">
+                              {formatKoreanTime(slot.startsAt)} - {formatKoreanTime(slot.endsAt)}
+                            </p>
                           <span
                             className={cn(
                               "rounded-full px-2.5 py-1 text-[10px] font-black",
@@ -691,7 +718,7 @@ export function ConsultReservationCard() {
                                 : "bg-white/10 text-white/66"
                             )}
                           >
-                            {slot.isAvailable ? "인증 필요" : "예약 마감"}
+                            {slot.isAvailable ? "전화번호 인증 후 예약" : "예약 마감"}
                           </span>
                         </div>
                         <p className="mt-2 text-xs font-semibold leading-5 text-white/68">
@@ -713,7 +740,7 @@ export function ConsultReservationCard() {
             <DialogHeader className="text-left">
               <DialogTitle className="text-[1.65rem] font-black tracking-[-0.04em]">실시간 좌석 현황</DialogTitle>
               <DialogDescription className="pt-2 text-sm font-semibold leading-6 text-white/78">
-                빈자리만 선택 가능합니다. 자리찜은 리드 DB에 등록되고 센터가 예약 가능 상태로 열어준 관리형 스터디센터 문의 번호만 신청할 수 있습니다.
+                지금은 1호실 좌석만 공개됩니다. 자리찜은 홍보리드 DB에 등록된 관리형 스터디센터 문의 건 중 센터가 예약 가능 상태로 열어둔 번호만 신청할 수 있습니다.
               </DialogDescription>
             </DialogHeader>
           </div>
@@ -782,7 +809,7 @@ export function ConsultReservationCard() {
             <DialogHeader className="text-left">
               <DialogTitle className="text-[1.7rem] font-black tracking-[-0.04em]">{actionTitle}</DialogTitle>
               <DialogDescription className="pt-2 text-sm font-semibold leading-6 text-white/78">
-                기존 홍보 입학문의에 남긴 학부모 연락처로 인증한 뒤, 센터가 예약 가능 상태로 열어둔 문의 건만 진행됩니다.
+                홍보리드 DB에 등록된 학부모 연락처와 일치하는지 먼저 확인한 뒤, 센터가 예약 가능 상태로 열어둔 문의 건만 진행됩니다.
               </DialogDescription>
             </DialogHeader>
           </div>
@@ -859,7 +886,7 @@ export function ConsultReservationCard() {
                     </Button>
                   </div>
                   <p className="mt-2 text-[11px] font-semibold leading-5 text-[#5c6e97]">
-                    리드 DB에 등록된 번호만 확인되며, 등록 후에도 센터가 순차적으로 예약 가능 상태를 열어드립니다.
+                    홍보리드 DB에 등록된 학부모 연락처와 일치해야 하며, 센터가 순차적으로 예약 가능 상태를 연 문의 건만 예약할 수 있습니다.
                   </p>
                 </div>
 
