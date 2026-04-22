@@ -656,10 +656,8 @@ export function ConsultReservationCard() {
           </div>
         </div>
 
-        <div className="mt-5 grid gap-3 sm:grid-cols-3">
-          <SummaryChip label="공개된 방문 시간" value={`${availableSlotCount}개`} />
+        <div className="mt-5 grid gap-3 sm:grid-cols-1">
           <SummaryChip label={`${publicRoomLabel} 빈좌석`} value={`${seatSummary.availableCount}석`} />
-          <SummaryChip label="좌석예약 진행" value={`${seatSummary.heldCount}석`} tone="accent" />
         </div>
 
         <div className="mt-5 rounded-[1.35rem] border border-[#FFB273]/20 bg-[#FFF2E8] p-4">
