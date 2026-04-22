@@ -2534,6 +2534,7 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
       if (normalizedSeat.studentId) {
         fetchStudentDetails(normalizedSeat.studentId);
       }
+      scrollToSection(seatInsightSectionRef);
       return;
     }
 
@@ -2541,6 +2542,20 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
       setIsManaging(true);
       fetchStudentDetails(normalizedSeat.studentId);
     }
+  };
+
+  const handleEditModeSaveClick = (roomId: string) => {
+    if (selectedRoomSummary?.hasUnsavedChanges) {
+      void handleSaveRoomSettings(roomId);
+      return;
+    }
+
+    toast({
+      title: '통로와 좌석 변경은 바로 저장됩니다.',
+      description: selectedSeat
+        ? `${selectedSeatLabel} 설정은 즉시 반영되며, 가로·세로 구조를 바꿀 때만 별도 저장이 필요합니다.`
+        : '현재는 가로·세로 구조 변경이 없어 추가 저장이 필요하지 않습니다.',
+    });
   };
 
   const appendPenaltyLogLocally = (log: PenaltyLog) => {
@@ -3418,6 +3433,29 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
                   </div>
                   <p className="ml-1 text-[11px] font-semibold leading-5 text-slate-500">
                     드롭다운에서 빠르게 고르거나 직접 입력할 수 있습니다. 비워두면 기본 순번 {selectedSeatDefaultLabel || '-'}번을 사용합니다.
+                  </p>
+                </div>
+
+                <div className="space-y-2">
+                  <Label className="ml-1 flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.2em] text-slate-500">
+                    <ArrowRightLeft className="h-3 w-3" /> 좌석/통로 전환
+                  </Label>
+                  <Button
+                    type="button"
+                    onClick={handleToggleCellType}
+                    disabled={isSaving}
+                    className={cn(
+                      "h-11 w-full rounded-xl font-black",
+                      selectedSeat?.type === 'aisle'
+                        ? "bg-[#14295F] text-white hover:bg-[#10224E]"
+                        : "bg-[#FF7A16] text-white hover:bg-[#E9680C]"
+                    )}
+                  >
+                    {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <ArrowRightLeft className="mr-2 h-4 w-4" />}
+                    {selectedSeat?.type === 'aisle' ? '좌석으로 다시 사용' : '통로로 전환'}
+                  </Button>
+                  <p className="ml-1 text-[11px] font-semibold leading-5 text-slate-500">
+                    통로도 누르면 바로 좌석으로 되돌릴 수 있고, 기존 좌석은 여기서 바로 통로로 바꿉니다.
                   </p>
                 </div>
 
@@ -4452,8 +4490,8 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
                           </Button>
                           <Button
                             type="button"
-                            onClick={() => handleSaveRoomSettings(selectedRoomConfig.id)}
-                            disabled={isSaving || !selectedRoomSummary?.hasUnsavedChanges}
+                            onClick={() => handleEditModeSaveClick(selectedRoomConfig.id)}
+                            disabled={isSaving}
                             className="h-11 rounded-xl bg-[#FF7A16] font-black text-white gap-2 hover:bg-[#EB6E12]"
                           >
                             {isSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
