@@ -1925,7 +1925,7 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
     if (!isTimerActive) {
       toast({
         title: '키오스크에서 시작해 주세요.',
-        description: '학생 앱에서는 공부 시작을 할 수 없어요. 준비된 키오스크에서 6자리 번호를 입력한 뒤 진행해 주세요.',
+        description: '공부 시작은 준비된 키오스크에서 진행할 수 있어요.',
       });
       return;
     }

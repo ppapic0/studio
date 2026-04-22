@@ -626,9 +626,18 @@ export default function GrowthPage() {
 
   const hasStudentPhone = useMemo(() => isValidKoreanMobilePhone(resolvedStudentPhone), [resolvedStudentPhone]);
 
-  const giftishowProducts = useMemo(
-    () => sortGiftishowProducts((giftishowProductsRaw || []).filter(isGiftishowStudentCatalogProduct)),
+  const syncedGiftishowProducts = useMemo(
+    () => sortGiftishowProducts(giftishowProductsRaw || []),
     [giftishowProductsRaw]
+  );
+  const studentCatalogGiftishowProducts = useMemo(
+    () => syncedGiftishowProducts.filter(isGiftishowStudentCatalogProduct),
+    [syncedGiftishowProducts]
+  );
+  const isUsingGiftishowCatalogFallback = syncedGiftishowProducts.length > 0 && studentCatalogGiftishowProducts.length === 0;
+  const giftishowProducts = useMemo(
+    () => (isUsingGiftishowCatalogFallback ? syncedGiftishowProducts : studentCatalogGiftishowProducts),
+    [isUsingGiftishowCatalogFallback, syncedGiftishowProducts, studentCatalogGiftishowProducts]
   );
   const giftishowOrders = useMemo(
     () => sortGiftishowOrdersByRecent(giftishowOrdersRaw || []),
@@ -1949,7 +1958,7 @@ export default function GrowthPage() {
             <div className="grid grid-cols-3 gap-2.5">
               <div className="rounded-[1.2rem] border border-white/70 bg-white/88 px-3 py-3">
                 <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#6E7FA7]">동기화 상품</p>
-                <p className="mt-2 text-lg font-black tracking-tight text-[#14295F]">{giftishowProducts.length.toLocaleString()}개</p>
+                <p className="mt-2 text-lg font-black tracking-tight text-[#14295F]">{syncedGiftishowProducts.length.toLocaleString()}개</p>
               </div>
               <div className="rounded-[1.2rem] border border-white/70 bg-white/88 px-3 py-3">
                 <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#6E7FA7]">교환 가능</p>
@@ -2007,6 +2016,12 @@ export default function GrowthPage() {
               </div>
             </div>
 
+            {!isGiftishowProductsLoading && isUsingGiftishowCatalogFallback ? (
+              <div className="rounded-[1.2rem] border border-[#D7E4FF] bg-[#F4F8FF] px-3 py-3 text-xs font-bold leading-5 text-[#4D679F]">
+                학생용 추천 필터로 표시할 상품이 비어 있어서, 지금은 동기화된 전체 상품을 먼저 보여드리고 있어요.
+              </div>
+            ) : null}
+
             {!isGiftishowProductsLoading &&
             giftishowFilterMode === 'all' &&
             giftishowProducts.length > 0 &&
@@ -2035,7 +2050,7 @@ export default function GrowthPage() {
                   </div>
                 ) : filteredGiftishowProducts.length === 0 ? (
                   <div className="rounded-[1.4rem] border border-dashed border-[#FFD39E] bg-white/70 px-4 py-10 text-center text-sm font-bold text-[#7B5A2A]">
-                    {giftishowProducts.length === 0
+                    {syncedGiftishowProducts.length === 0
                       ? '아직 동기화된 상품이 없어요. 센터에서 카탈로그를 연결하면 이곳에서 바로 고를 수 있어요.'
                       : giftishowSearchQuery
                         ? '검색 결과가 없어요. 다른 키워드로 다시 찾아보세요.'

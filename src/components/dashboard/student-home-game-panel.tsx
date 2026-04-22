@@ -754,11 +754,6 @@ export function StudentHomeGamePanel({
                       <p className="mt-2 text-sm font-black text-white">
                         {primaryActionActive ? "현재 공부중 상태예요" : "공부 시작은 키오스크에서 진행해 주세요"}
                       </p>
-                      <p className="mt-1 text-xs font-semibold leading-5 text-[var(--text-on-dark-soft)]">
-                        {primaryActionActive
-                          ? "종료나 상태 변경은 준비된 키오스크에서 6자리 번호를 입력한 뒤 진행해 주세요."
-                          : "학생 앱에서는 직접 시작할 수 없어요. 준비된 키오스크에서 6자리 번호를 입력한 뒤 시작해 주세요."}
-                      </p>
                     </div>
                   </div>
                 </div>

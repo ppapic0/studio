@@ -136,7 +136,7 @@ export function isGiftishowProductAvailable(product?: GiftishowProduct | null, s
 }
 
 export function getGiftishowStudentCatalogExclusionReason(product?: GiftishowProduct | null) {
-  const text = getGiftishowProductSearchText(product);
+  const text = getGiftishowProductCatalogFilterText(product);
   if (!text) return null;
 
   const matchedRule = GIFTISHOW_STUDENT_CATALOG_EXCLUSION_RULES.find((rule) =>
@@ -151,7 +151,7 @@ export function isGiftishowStudentCatalogProduct(product?: GiftishowProduct | nu
 }
 
 export function getGiftishowStudentReviewCandidateReasons(product?: GiftishowProduct | null) {
-  const text = getGiftishowProductSearchText(product);
+  const text = getGiftishowProductCatalogFilterText(product);
   if (!text) return [];
   if (product?.studentReviewApprovedAt) return [];
   if (GIFTISHOW_STUDENT_REVIEW_ALLOWLIST_KEYWORDS.some((keyword) => text.includes(keyword.toLowerCase()))) return [];
@@ -256,6 +256,20 @@ function getGiftishowProductSearchText(product?: GiftishowProduct | null) {
     product.goodsTypeDtlNm,
     product.content,
     product.contentAddDesc,
+  ]
+    .filter(Boolean)
+    .join(' ')
+    .toLowerCase();
+}
+
+function getGiftishowProductCatalogFilterText(product?: GiftishowProduct | null) {
+  if (!product) return '';
+  return [
+    product.goodsName,
+    product.brandName,
+    product.affiliate,
+    product.goodsTypeNm,
+    product.goodsTypeDtlNm,
   ]
     .filter(Boolean)
     .join(' ')
