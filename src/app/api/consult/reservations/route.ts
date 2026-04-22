@@ -73,8 +73,8 @@ export async function GET(request: NextRequest) {
         .collection('websiteReservationSettings')
         .doc(WEBSITE_RESERVATION_SETTINGS_DOC_ID)
         .get(),
-      centerRef.collection('websiteConsultSlots').limit(200).get(),
-      centerRef.collection('websiteConsultReservations').limit(300).get(),
+      centerRef.collection('websiteConsultSlots').orderBy('startsAt', 'desc').limit(300).get(),
+      centerRef.collection('websiteConsultReservations').orderBy('createdAt', 'desc').limit(400).get(),
     ]);
 
     const settings = getWebsiteReservationSettings(
