@@ -761,8 +761,8 @@ export default function AnalysisTrackPage() {
           <TabsTrigger value="full" className={cn(
             'font-aggro-display rounded-[1.1rem] border px-3 py-2.5 text-xs font-black opacity-100 data-[state=active]:bg-[var(--accent-orange)]',
             growthTabMatchesDesktop
-              ? 'border-white/10 bg-white/[0.05] text-white/80 hover:text-white data-[state=active]:border-transparent data-[state=active]:text-white'
-              : 'border-[#EADBC8] bg-white/80 text-[#6F4D28] shadow-[inset_0_1px_0_rgba(255,255,255,0.8)] hover:text-[#17326B] data-[state=active]:border-transparent data-[state=active]:text-[#17326B]'
+              ? 'border-white/10 bg-white/[0.05] text-black hover:text-black data-[state=active]:border-transparent data-[state=active]:text-white'
+              : 'border-[#EADBC8] bg-white/80 text-black shadow-[inset_0_1px_0_rgba(255,255,255,0.8)] hover:text-black data-[state=active]:border-transparent data-[state=active]:text-[#17326B]'
           )}>
             <BarChart3 className="mr-1.5 h-3.5 w-3.5" /> 전체 분석
           </TabsTrigger>

@@ -3777,9 +3777,6 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
                         <p className="font-aggro-display mt-4 text-[clamp(1.26rem,2.1vw,1.55rem)] font-black leading-[1.04] tracking-[-0.04em] text-[#14295F]">
                           공부시간 추이
                         </p>
-                        <p className="mt-2 max-w-[32rem] text-[13px] font-semibold leading-6 text-[#5F7299]">
-                          집중 시간이 흔들리는 구간과 가장 잘 잡힌 날을 팝업에서 크게 확인할 수 있어요.
-                        </p>
                       </div>
                       <span className="flex h-10 w-10 shrink-0 self-end items-center justify-center rounded-[1rem] border border-[#ffd7b6] bg-[#fff3e9] text-[#ff7a16] shadow-[0_16px_30px_-24px_rgba(255,122,22,0.28)] sm:self-auto">
                         <ArrowUpRight className="h-4 w-4" />
