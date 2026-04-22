@@ -2,11 +2,9 @@ import { BookOpenCheck, Smartphone, Sparkles, Wifi } from 'lucide-react';
 
 import { cn } from '@/lib/utils';
 
-import { SectionHeading } from './section-heading';
-
 const centerIntroPoints = [
-  { icon: Wifi, title: '학습 집중 환경/휴대폰 수거 관리', detail: '허용 사이트 중심 와이파이 운영 · 러셀형 프리미엄 좌석 운영' },
-  { icon: Smartphone, title: '앱 연동 관리', detail: '현황과 피드백을 바로 연결' },
+  { icon: Wifi, title: '학습 집중 환경/휴대폰 수거 관리', detail: '허용 사이트 중심 와이파이 운영\n러셀형 프리미엄 좌석 운영' },
+  { icon: Smartphone, title: '질문진료 & 학습관리 앱 운영', detail: '현황과 피드백을 바로 연결' },
   { icon: BookOpenCheck, title: '실전 모의 운영', detail: '더프리미엄 · 이감 · 한수 · 서바이벌 프로' },
   { icon: Sparkles, title: '상벌점 제도 운영', detail: '엄격한 규정과 체계적인 관리로 학습 분위기 조성' },
 ] as const;
@@ -18,31 +16,40 @@ type CenterIntroSectionProps = {
 export function CenterIntroSection({ surface = 'card' }: CenterIntroSectionProps) {
   const isCard = surface === 'card';
   const isDark = surface === 'flat-dark';
-  const isFlat = !isCard;
 
   return (
     <section
       className={cn(
-        'relative overflow-hidden px-6 sm:px-8 lg:px-10',
-        isFlat ? 'py-10 sm:py-12 lg:py-14' : 'py-7 sm:py-8 lg:py-10',
-        isCard && 'rounded-[2.7rem] border border-[#14295F]/10 bg-white shadow-[0_28px_64px_rgba(20,41,95,0.10)]',
+        'relative overflow-hidden',
+        isCard ? 'rounded-[2.35rem] border border-[#dbe4f3] px-5 py-6 shadow-[0_26px_60px_rgba(20,41,95,0.10)] sm:rounded-[2.7rem] sm:px-8 sm:py-8 lg:px-10 lg:py-10' : 'rounded-[2.7rem] border border-[#dbe4f3] px-6 py-8 shadow-[0_24px_56px_rgba(20,41,95,0.08)] sm:px-8 lg:px-10 lg:py-10',
+        isDark
+          ? 'border-white/12 bg-[linear-gradient(180deg,rgba(255,255,255,0.06)_0%,rgba(255,255,255,0.04)_100%)] shadow-none'
+          : 'bg-[radial-gradient(circle_at_top_right,rgba(255,122,22,0.12),transparent_34%),linear-gradient(180deg,#ffffff_0%,#f8fbff_100%)]',
       )}
     >
-      <div
-        className={cn(
-          'absolute inset-0',
-          isDark
-            ? 'bg-[radial-gradient(circle_at_14%_18%,rgba(255,255,255,0.08),transparent_24%),radial-gradient(circle_at_92%_8%,rgba(255,122,22,0.16),transparent_24%)]'
-            : 'bg-[radial-gradient(circle_at_14%_18%,rgba(20,41,95,0.06),transparent_24%),radial-gradient(circle_at_92%_8%,rgba(255,122,22,0.10),transparent_24%)]',
-        )}
-      />
-      <div className={cn('relative grid lg:grid-cols-[1.02fr_0.98fr] lg:items-end', isFlat ? 'gap-8 lg:gap-10' : 'gap-6')}>
-        <div>
-          <SectionHeading eyebrow="CENTER INTRO" title="트랙의 센터 소개" light={isDark} />
+      <div className={cn('absolute inset-x-4 top-0 h-[5px] rounded-b-full sm:inset-x-6', isDark ? 'bg-white/16' : 'bg-[linear-gradient(90deg,#14295F_0%,#365dc9_58%,#ffb274_100%)]')} />
+      <div className="relative">
+        <div className="max-w-3xl">
+          <div
+            className={cn(
+              'inline-flex rounded-full border px-4 py-2 text-[10px] font-black tracking-[0.26em]',
+              isDark ? 'border-white/14 bg-white/10 text-white/72' : 'border-[#ead8c7] bg-[#fff4ea] text-[#c66f1e]'
+            )}
+          >
+            CENTER INTRO
+          </div>
+          <h2
+            className={cn(
+              'font-aggro-display mt-4 break-keep text-[2rem] font-black leading-[1.02] tracking-[-0.05em] sm:mt-5 sm:text-[2.4rem] lg:text-[2.9rem]',
+              isDark ? 'text-white' : 'text-[#14295F]'
+            )}
+          >
+            트랙의 센터 소개
+          </h2>
           <p
             className={cn(
-              'mt-4 max-w-2xl break-keep text-[15px] font-bold leading-[1.82] sm:text-[15.5px]',
-              isDark ? 'text-white/[0.82]' : 'text-[#2c3f58]',
+              'mt-5 max-w-2xl break-keep text-[14px] font-bold leading-[1.95] sm:text-[15px]',
+              isDark ? 'text-white/82' : 'text-[#324765]'
             )}
           >
             <span className="block">공간만 제공하는 것이 아니라</span>
@@ -51,35 +58,49 @@ export function CenterIntroSection({ surface = 'card' }: CenterIntroSectionProps
           </p>
         </div>
 
-        <div className={cn('grid sm:grid-cols-2', isFlat ? 'gap-x-5 gap-y-6' : 'gap-3')}>
+        <div className="mt-7 grid gap-3.5 sm:mt-8 sm:gap-4 lg:mt-9">
           {centerIntroPoints.map(({ icon: Icon, title, detail }) => (
-            <div
+            <article
               key={title}
               className={cn(
-                'px-4 py-4',
-                isCard &&
-                  (isDark
-                    ? 'rounded-[1.45rem] border border-white/[0.12] bg-white/[0.08] backdrop-blur-sm'
-                    : 'rounded-[1.45rem] border border-[#14295F]/10 bg-[#F9FBFF]'),
-                isFlat && 'rounded-none border-none bg-transparent px-0 py-0 shadow-none backdrop-blur-none',
+                'rounded-[1.55rem] border px-4 py-4 sm:px-5 sm:py-5',
+                isDark
+                  ? 'border-white/12 bg-white/8 backdrop-blur-sm'
+                  : 'border-[#dbe4f3] bg-white shadow-[0_18px_38px_rgba(20,41,95,0.06)]'
               )}
             >
-              <div className="flex items-center gap-3">
+              <div className="flex items-start gap-3.5 sm:gap-4">
                 <span
                   className={cn(
-                    'flex h-10 w-10 items-center justify-center rounded-2xl',
-                    isDark ? 'bg-white/[0.12] text-white' : 'bg-[#14295F] text-white',
+                    'mt-0.5 flex h-11 w-11 shrink-0 items-center justify-center rounded-[1.1rem]',
+                    isDark ? 'bg-white/12 text-white' : 'bg-[#14295F] text-white'
                   )}
                 >
-                  <Icon className="h-4.5 w-4.5" />
+                  <Icon className="h-[18px] w-[18px]" />
                 </span>
-                <div>
-                  <p className={cn('text-[10px] font-black tracking-[0.16em]', isDark ? 'text-white/[0.55]' : 'text-[#14295F]/50')}>CENTER POINT</p>
-                  <p className={cn('font-aggro-display mt-1 break-keep text-[0.98rem] font-black leading-[1.34] tracking-[-0.03em]', isDark ? 'text-white' : 'text-[#14295F]')}>{title}</p>
+                <div className="min-w-0">
+                  <p className={cn('text-[10px] font-black tracking-[0.22em]', isDark ? 'text-white/58' : 'text-[#97a5bb]')}>
+                    CENTER POINT
+                  </p>
+                  <p
+                    className={cn(
+                      'font-aggro-display mt-1 break-keep text-[1.04rem] font-black leading-[1.34] tracking-[-0.04em] sm:text-[1.14rem]',
+                      isDark ? 'text-white' : 'text-[#14295F]'
+                    )}
+                  >
+                    {title}
+                  </p>
+                  <p
+                    className={cn(
+                      'mt-3 whitespace-pre-line break-keep text-[13px] font-semibold leading-[1.78] sm:text-[13.5px]',
+                      isDark ? 'text-white/76' : 'text-[#596d88]'
+                    )}
+                  >
+                    {detail}
+                  </p>
                 </div>
               </div>
-              <p className={cn('mt-3 break-keep text-[13px] font-semibold leading-[1.7]', isDark ? 'text-white/[0.74]' : 'text-[#53687F]')}>{detail}</p>
-            </div>
+            </article>
           ))}
         </div>
       </div>
