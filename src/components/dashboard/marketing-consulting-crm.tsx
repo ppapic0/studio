@@ -1123,6 +1123,172 @@ export function MarketingConsultingCRM({
     exportToCsv();
   };
 
+  const websiteConsultIntakePanel = (
+    <div className="rounded-xl border border-orange-100 bg-orange-50/60 p-4">
+      <div className={cn('flex gap-3', isMobile ? 'flex-col' : 'items-start justify-between')}>
+        <div className="space-y-1">
+          <div className="flex items-center gap-2">
+            <Globe2 className="h-4 w-4 text-[#FF7A16]" />
+            <p className="text-sm font-black text-slate-900">웹사이트 상담폼 접수</p>
+          </div>
+          <p className="text-xs font-semibold text-slate-600">
+            방문상담 탭에서 웹 문의 확인, 순차 오픈, 방문예약/자리찜 진행까지 한 번에 관리합니다.
+          </p>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          <Badge className="border-none bg-transparent text-[#C25A00] shadow-none">전체 {websiteSummary.total}건</Badge>
+          <Badge className="border-none bg-transparent text-blue-700 shadow-none">신규 {websiteSummary.newCount}건</Badge>
+          <Badge className="border-none bg-transparent text-amber-700 shadow-none">연락중 {websiteSummary.contactedCount}건</Badge>
+          <Badge className="border-none bg-transparent text-emerald-700 shadow-none">예약 가능 {websiteSummary.enabledCount}건</Badge>
+        </div>
+      </div>
+
+      <div className={cn('mt-3 grid gap-2', isMobile ? 'grid-cols-2' : 'grid-cols-4')}>
+        <div className="rounded-lg bg-white px-3 py-2 shadow-sm">
+          <p className="text-[10px] font-black uppercase tracking-wider text-slate-400">랜딩 방문</p>
+          <p className="mt-0.5 text-xl font-black text-slate-800">{visitSummary.landingViews}</p>
+          <p className="text-[10px] font-semibold text-slate-400">체험 {visitSummary.experienceViews}회 포함</p>
+        </div>
+        <div className="rounded-lg bg-white px-3 py-2 shadow-sm">
+          <p className="text-[10px] font-black uppercase tracking-wider text-slate-400">고유 방문자</p>
+          <p className="mt-0.5 text-xl font-black text-slate-800">{visitSummary.uniqueVisitors}</p>
+          <p className="text-[10px] font-semibold text-slate-400">중복 제거</p>
+        </div>
+        <div className="rounded-lg bg-white px-3 py-2 shadow-sm">
+          <p className="text-[10px] font-black uppercase tracking-wider text-slate-400">버튼 클릭</p>
+          <p className="mt-0.5 text-xl font-black text-slate-800">{visitSummary.entryClicks}</p>
+          <p className="text-[10px] font-semibold text-slate-400">로그인 성공 {visitSummary.loginSuccesses}회</p>
+        </div>
+        <div className="rounded-lg bg-white px-3 py-2 shadow-sm">
+          <p className="text-[10px] font-black uppercase tracking-wider text-slate-400">상담폼 전환율</p>
+          <p className="mt-0.5 text-xl font-black text-slate-800">
+            {visitSummary.formConversionRate !== null ? `${visitSummary.formConversionRate}%` : '-'}
+          </p>
+          <p className="text-[10px] font-semibold text-slate-400">방문 대비 문의</p>
+        </div>
+      </div>
+
+      <div className="mt-4 space-y-2">
+        {websiteRequestsLoading ? (
+          <div className="flex h-24 items-center justify-center rounded-xl border border-dashed border-orange-200 bg-white/80">
+            <Loader2 className="h-5 w-5 animate-spin text-[#FF7A16]" />
+          </div>
+        ) : filteredWebsiteRequests.length === 0 ? (
+          <div className="rounded-xl border border-dashed border-orange-200 bg-white/80 px-4 py-6 text-center text-sm font-semibold text-slate-500">
+            지금 확인할 웹사이트 상담 접수는 없습니다.
+          </div>
+        ) : (
+          filteredWebsiteRequests.slice(0, 8).map((request) => (
+            <div key={request.id} className="rounded-xl border border-orange-100 bg-white px-4 py-3 shadow-sm">
+              <div className={cn('flex gap-3', isMobile ? 'flex-col' : 'items-start justify-between')}>
+                <div className="space-y-1">
+                  {(() => {
+                    const requestBadge = getWebsiteRequestStatusBadge(
+                      request,
+                      latestWebsiteReservationByLeadId.get(request.id),
+                      latestWebsiteSeatHoldByLeadId.get(request.id)
+                    );
+                    return (
+                      <div className="flex flex-wrap items-center gap-2">
+                        <p className="text-sm font-black text-slate-900">{request.studentName || '(학생명 미입력)'}</p>
+                        {request.receiptId ? (
+                          <Badge variant="outline" className="text-[10px] font-black text-[#14295F]">
+                            접수번호 {request.receiptId}
+                          </Badge>
+                        ) : null}
+                        <Badge className={cn('border text-[10px] font-black', STATUS_META[request.status || 'new'].className)}>
+                          {STATUS_META[request.status || 'new'].label}
+                        </Badge>
+                        {request.school && (
+                          <Badge variant="outline" className="max-w-[180px] truncate text-[10px] font-black text-slate-700">
+                            {request.school}
+                          </Badge>
+                        )}
+                        {request.grade && (
+                          <Badge variant="outline" className="text-[10px] font-black text-slate-700">
+                            {request.grade}
+                          </Badge>
+                        )}
+                        {request.serviceType && (
+                          <Badge className={cn('border text-[10px] font-black', SERVICE_TYPE_META[request.serviceType].color)}>
+                            {request.requestTypeLabel || SERVICE_TYPE_META[request.serviceType].label}
+                          </Badge>
+                        )}
+                        <Badge variant="outline" className="text-[10px] font-black">
+                          {request.sourceLabel || '웹사이트'}
+                        </Badge>
+                        <Badge className={cn('border text-[10px] font-black', requestBadge.className)}>
+                          {requestBadge.label}
+                        </Badge>
+                        {request.linkedLeadId ? (
+                          <Badge variant="outline" className="text-[10px] font-black text-[#14295F]">
+                            리드 연결됨
+                          </Badge>
+                        ) : null}
+                      </div>
+                    );
+                  })()}
+                  <p className="text-xs font-semibold text-slate-600">
+                    학교: {request.school || '-'} {request.grade ? `· ${request.grade}` : ''} · 연락처: {request.consultPhone || '-'}
+                  </p>
+                  <p className="text-[11px] font-semibold text-slate-500">
+                    접수일: {request.consultationDate || '-'} · 접수시각: {formatDateTimeLabel(request.createdAt)}
+                  </p>
+                </div>
+                <div className={cn('flex gap-2', isMobile ? 'w-full flex-wrap' : 'items-center')}>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="h-9 rounded-lg px-3 text-xs font-black"
+                    onClick={() => setSelectedDrawer({ type: 'website', id: request.id })}
+                  >
+                    상세 보기
+                  </Button>
+                  {canManageLeadData ? (
+                    <Select
+                      value={request.status || 'new'}
+                      onValueChange={(value) => handleWebsiteStatusUpdate(request.id, value as LeadStatus)}
+                    >
+                      <SelectTrigger className="h-9 min-w-[120px] rounded-lg text-xs font-black">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {Object.entries(STATUS_META).map(([value, meta]) => (
+                          <SelectItem key={value} value={value}>{meta.label}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  ) : null}
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="h-9 rounded-lg px-3 text-xs font-black"
+                    onClick={() => void handlePromoteWebsiteRequest(request)}
+                    disabled={!canTransitionPipeline || promotingWebsiteId === request.id || !!request.linkedLeadId}
+                  >
+                    {promotingWebsiteId === request.id && <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" />}
+                    {request.linkedLeadId ? '리드 이동됨' : '리드 DB로 이동'}
+                  </Button>
+                  {canManageLeadData ? (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      className="h-9 rounded-lg border-rose-200 px-3 text-xs font-black text-rose-600 hover:bg-rose-50"
+                      onClick={() => void handleWebsiteDelete(request.id)}
+                    >
+                      <Trash2 className="mr-1 h-3.5 w-3.5" />
+                      삭제
+                    </Button>
+                  ) : null}
+                </div>
+              </div>
+            </div>
+          ))
+        )}
+      </div>
+    </div>
+  );
+
   if (!centerId) {
     return (
       <Card className="rounded-2xl border-none shadow-sm ring-1 ring-border/50">
@@ -1185,7 +1351,7 @@ export function MarketingConsultingCRM({
                   홍보/상담 리드 DB
                 </CardTitle>
                 <CardDescription className="font-semibold">
-                  웹사이트에서 새로 들어온 문의를 먼저 확인하고, 필요한 건만 상담 리드 워크벤치로 넘겨 관리합니다.
+                  상담 리드 운영과 방문상담 순차 오픈을 같은 워크벤치에서 이어서 관리합니다.
                 </CardDescription>
               </div>
               <Button
@@ -1227,177 +1393,12 @@ export function MarketingConsultingCRM({
                 )}
               >
                 <CalendarClock className="h-4 w-4" />
-                예약 운영
+                방문상담
               </button>
             </div>
 
             {leadWorkspaceTab === 'pipeline' ? (
               <>
-            {/* ── 웹사이트 상담폼 접수 ── */}
-            <div className="rounded-xl border border-orange-100 bg-orange-50/60 p-4">
-              <div className={cn('flex gap-3', isMobile ? 'flex-col' : 'items-start justify-between')}>
-                <div className="space-y-1">
-                  <div className="flex items-center gap-2">
-                    <Globe2 className="h-4 w-4 text-[#FF7A16]" />
-                    <p className="text-sm font-black text-slate-900">웹사이트 상담폼 접수</p>
-                  </div>
-                  <p className="text-xs font-semibold text-slate-600">
-                    웹 문의별로 순차 해제 상태와 방문예약, 자리찜 진행 상황을 함께 관리합니다.
-                  </p>
-                </div>
-                <div className="flex flex-wrap gap-2">
-                  <Badge className="border-none bg-transparent text-[#C25A00] shadow-none">전체 {websiteSummary.total}건</Badge>
-                  <Badge className="border-none bg-transparent text-blue-700 shadow-none">신규 {websiteSummary.newCount}건</Badge>
-                  <Badge className="border-none bg-transparent text-amber-700 shadow-none">연락중 {websiteSummary.contactedCount}건</Badge>
-                  <Badge className="border-none bg-transparent text-emerald-700 shadow-none">예약 가능 {websiteSummary.enabledCount}건</Badge>
-                </div>
-              </div>
-
-              <div className={cn('mt-3 grid gap-2', isMobile ? 'grid-cols-2' : 'grid-cols-4')}>
-                <div className="rounded-lg bg-white px-3 py-2 shadow-sm">
-                  <p className="text-[10px] font-black uppercase tracking-wider text-slate-400">랜딩 방문</p>
-                  <p className="mt-0.5 text-xl font-black text-slate-800">{visitSummary.landingViews}</p>
-                  <p className="text-[10px] font-semibold text-slate-400">체험 {visitSummary.experienceViews}회 포함</p>
-                </div>
-                <div className="rounded-lg bg-white px-3 py-2 shadow-sm">
-                  <p className="text-[10px] font-black uppercase tracking-wider text-slate-400">고유 방문자</p>
-                  <p className="mt-0.5 text-xl font-black text-slate-800">{visitSummary.uniqueVisitors}</p>
-                  <p className="text-[10px] font-semibold text-slate-400">중복 제거</p>
-                </div>
-                <div className="rounded-lg bg-white px-3 py-2 shadow-sm">
-                  <p className="text-[10px] font-black uppercase tracking-wider text-slate-400">버튼 클릭</p>
-                  <p className="mt-0.5 text-xl font-black text-slate-800">{visitSummary.entryClicks}</p>
-                  <p className="text-[10px] font-semibold text-slate-400">로그인 성공 {visitSummary.loginSuccesses}회</p>
-                </div>
-                <div className="rounded-lg bg-white px-3 py-2 shadow-sm">
-                  <p className="text-[10px] font-black uppercase tracking-wider text-slate-400">상담폼 전환율</p>
-                  <p className="mt-0.5 text-xl font-black text-slate-800">
-                    {visitSummary.formConversionRate !== null ? `${visitSummary.formConversionRate}%` : '-'}
-                  </p>
-                  <p className="text-[10px] font-semibold text-slate-400">방문 대비 문의</p>
-                </div>
-              </div>
-
-              <div className="mt-4 space-y-2">
-                {websiteRequestsLoading ? (
-                  <div className="flex h-24 items-center justify-center rounded-xl border border-dashed border-orange-200 bg-white/80">
-                    <Loader2 className="h-5 w-5 animate-spin text-[#FF7A16]" />
-                  </div>
-                ) : filteredWebsiteRequests.length === 0 ? (
-                  <div className="rounded-xl border border-dashed border-orange-200 bg-white/80 px-4 py-6 text-center text-sm font-semibold text-slate-500">
-                    지금 확인할 웹사이트 상담 접수는 없습니다.
-                  </div>
-                ) : (
-                  filteredWebsiteRequests.slice(0, 8).map((request) => (
-                    <div key={request.id} className="rounded-xl border border-orange-100 bg-white px-4 py-3 shadow-sm">
-                      <div className={cn('flex gap-3', isMobile ? 'flex-col' : 'items-start justify-between')}>
-                        <div className="space-y-1">
-                          {(() => {
-                            const requestBadge = getWebsiteRequestStatusBadge(
-                              request,
-                              latestWebsiteReservationByLeadId.get(request.id),
-                              latestWebsiteSeatHoldByLeadId.get(request.id)
-                            );
-                            return (
-                          <div className="flex flex-wrap items-center gap-2">
-                            <p className="text-sm font-black text-slate-900">{request.studentName || '(학생명 미입력)'}</p>
-                            {request.receiptId ? (
-                              <Badge variant="outline" className="text-[10px] font-black text-[#14295F]">
-                                접수번호 {request.receiptId}
-                              </Badge>
-                            ) : null}
-                            <Badge className={cn('border text-[10px] font-black', STATUS_META[request.status || 'new'].className)}>
-                              {STATUS_META[request.status || 'new'].label}
-                            </Badge>
-                            {request.school && (
-                              <Badge variant="outline" className="max-w-[180px] truncate text-[10px] font-black text-slate-700">
-                                {request.school}
-                              </Badge>
-                            )}
-                            {request.grade && (
-                              <Badge variant="outline" className="text-[10px] font-black text-slate-700">
-                                {request.grade}
-                              </Badge>
-                            )}
-                            {request.serviceType && (
-                              <Badge className={cn('border text-[10px] font-black', SERVICE_TYPE_META[request.serviceType].color)}>
-                                {request.requestTypeLabel || SERVICE_TYPE_META[request.serviceType].label}
-                              </Badge>
-                            )}
-                            <Badge variant="outline" className="text-[10px] font-black">
-                              {request.sourceLabel || '웹사이트'}
-                            </Badge>
-                            <Badge className={cn('border text-[10px] font-black', requestBadge.className)}>
-                              {requestBadge.label}
-                            </Badge>
-                            {request.linkedLeadId ? (
-                              <Badge variant="outline" className="text-[10px] font-black text-[#14295F]">
-                                리드 연결됨
-                              </Badge>
-                            ) : null}
-                          </div>
-                            );
-                          })()}
-                          <p className="text-xs font-semibold text-slate-600">
-                            학교: {request.school || '-'} {request.grade ? `· ${request.grade}` : ''} · 연락처: {request.consultPhone || '-'}
-                          </p>
-                          <p className="text-[11px] font-semibold text-slate-500">
-                            접수일: {request.consultationDate || '-'} · 접수시각: {formatDateTimeLabel(request.createdAt)}
-                          </p>
-                        </div>
-                        <div className={cn('flex gap-2', isMobile ? 'w-full flex-wrap' : 'items-center')}>
-                          <Button
-                            type="button"
-                            variant="outline"
-                            className="h-9 rounded-lg px-3 text-xs font-black"
-                            onClick={() => setSelectedDrawer({ type: 'website', id: request.id })}
-                          >
-                            상세 보기
-                          </Button>
-                          {canManageLeadData ? (
-                            <Select
-                              value={request.status || 'new'}
-                              onValueChange={(value) => handleWebsiteStatusUpdate(request.id, value as LeadStatus)}
-                            >
-                              <SelectTrigger className="h-9 min-w-[120px] rounded-lg text-xs font-black">
-                                <SelectValue />
-                              </SelectTrigger>
-                              <SelectContent>
-                                {Object.entries(STATUS_META).map(([value, meta]) => (
-                                  <SelectItem key={value} value={value}>{meta.label}</SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
-                          ) : null}
-                          <Button
-                            type="button"
-                            variant="outline"
-                            className="h-9 rounded-lg px-3 text-xs font-black"
-                            onClick={() => void handlePromoteWebsiteRequest(request)}
-                            disabled={!canTransitionPipeline || promotingWebsiteId === request.id || !!request.linkedLeadId}
-                          >
-                            {promotingWebsiteId === request.id && <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" />}
-                            {request.linkedLeadId ? '리드 이동됨' : '리드 DB로 이동'}
-                          </Button>
-                          {canManageLeadData ? (
-                            <Button
-                              type="button"
-                              variant="outline"
-                              className="h-9 rounded-lg border-rose-200 px-3 text-xs font-black text-rose-600 hover:bg-rose-50"
-                              onClick={() => void handleWebsiteDelete(request.id)}
-                            >
-                              <Trash2 className="mr-1 h-3.5 w-3.5" />
-                              삭제
-                            </Button>
-                          ) : null}
-                        </div>
-                      </div>
-                    </div>
-                  ))
-                )}
-              </div>
-            </div>
-
             {/* ── Summary cards ── */}
             <div className={cn('grid gap-3', isMobile ? 'grid-cols-2' : 'md:grid-cols-4')}>
               <Card className="rounded-xl border-none bg-primary shadow-sm">
@@ -1623,11 +1624,11 @@ export function MarketingConsultingCRM({
                 ...Object.entries(STATUS_META).map(([value, meta]) => ({ value, label: meta.label })),
               ]}
               selectLabel="리드 상태"
-              quickActions={[
-                ...(canManageLeadData
-                  ? [{ label: editingId ? '입력 초기화' : '상담 리드 등록', icon: <PlusCircle className="h-4 w-4" />, onClick: resetForm }]
-                  : []),
-                { label: '예약 운영', icon: <CalendarClock className="h-4 w-4" />, onClick: () => setLeadWorkspaceTab('reservations') },
+                quickActions={[
+                  ...(canManageLeadData
+                    ? [{ label: editingId ? '입력 초기화' : '상담 리드 등록', icon: <PlusCircle className="h-4 w-4" />, onClick: resetForm }]
+                    : []),
+                { label: '방문상담', icon: <CalendarClock className="h-4 w-4" />, onClick: () => setLeadWorkspaceTab('reservations') },
                 { label: '입학 대기 DB', icon: <ListChecks className="h-4 w-4" />, onClick: () => setActiveTab('waitlist') },
                 ...(canOpenFinance ? [{ label: '수익분석', icon: <TrendingUp className="h-4 w-4" />, href: '/dashboard/revenue' }] : []),
                 { label: 'CSV 다운로드', icon: <Download className="h-4 w-4" />, onClick: handleDownloadCsv },
@@ -1841,13 +1842,14 @@ export function MarketingConsultingCRM({
               </>
             ) : (
               <div className="space-y-4">
+                {websiteConsultIntakePanel}
                 <div className="rounded-[1.75rem] border border-[#dbe5ff] bg-[linear-gradient(135deg,#ffffff_0%,#f7fbff_48%,#eef4ff_100%)] p-5 shadow-[0_24px_52px_-40px_rgba(20,41,95,0.28)]">
                   <div className={cn('flex gap-3', isMobile ? 'flex-col' : 'items-start justify-between')}>
                     <div className="space-y-2">
                       <p className="text-[11px] font-black uppercase tracking-[0.18em] text-[#5c6e97]">Reservation Desk</p>
-                      <h3 className="text-lg font-black tracking-tight text-[#14295F]">방문 가능 일자 열기와 입금 확인을 여기서 바로 처리합니다.</h3>
+                      <h3 className="text-lg font-black tracking-tight text-[#14295F]">방문상담 운영 설정을 여기서 모두 처리합니다.</h3>
                       <p className="text-sm font-semibold leading-6 text-[#5c6e97]">
-                        홍보 리드 DB 안에서 상담 슬롯 공개, 방문예약 확인, 실제 입금 후 자리찜 확정까지 한 흐름으로 관리합니다.
+                        웹 상담 접수 확인, 예약 가능 상태 순차 오픈, 상담 슬롯 공개, 방문예약 확인, 입금 후 자리찜 확정까지 같은 탭에서 관리합니다.
                       </p>
                     </div>
                     <div className="grid gap-2 sm:grid-cols-3">
