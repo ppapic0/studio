@@ -1,6 +1,7 @@
 import { headers } from 'next/headers';
 
 import { ConsultSection } from '@/components/marketing/consult-section';
+import { CenterEnvironmentSection } from '@/components/marketing/center-environment-section';
 import { CenterIntroSection } from '@/components/marketing/center-intro-section';
 import { CenterOverviewStack } from '@/components/marketing/center-overview-stack';
 import { FeedbackManagementSection } from '@/components/marketing/feedback-management-section';
@@ -37,6 +38,9 @@ export default async function HomePage() {
       {isMobile ? (
         <>
           <CenterOverviewStack className="pt-8 sm:pt-10 lg:pt-12" />
+          <ScrollReveal>
+            <CenterEnvironmentSection centerEnvironment={marketingContent.centerEnvironment} />
+          </ScrollReveal>
           <div className="mx-auto w-full max-w-7xl px-4 pt-6 sm:px-6 sm:pt-8 lg:px-8 lg:pt-10">
             <ScrollReveal>
               <FeedbackManagementSection titleBreakMode="app" />
@@ -62,6 +66,9 @@ export default async function HomePage() {
               </ScrollReveal>
             </div>
           </section>
+          <ScrollReveal>
+            <CenterEnvironmentSection centerEnvironment={marketingContent.centerEnvironment} />
+          </ScrollReveal>
           <section className="bg-[#14295F] py-14 lg:py-18">
             <div className="mx-auto w-full max-w-7xl px-4 sm:px-6 lg:px-8">
               <ScrollReveal>
