@@ -326,6 +326,46 @@ export function ConsultReservationCard() {
   const [actionError, setActionError] = useState<string | null>(null);
   const [success, setSuccess] = useState<SuccessState | null>(null);
 
+  async function refreshPublicData(options?: { showLoading?: boolean; resetError?: boolean }) {
+    const showLoading = options?.showLoading ?? false;
+    const resetError = options?.resetError ?? showLoading;
+
+    if (showLoading) {
+      setIsLoading(true);
+    }
+    if (resetError) {
+      setSlotError(null);
+    }
+
+    try {
+      const [slotRes, seatRes] = await Promise.all([
+        fetch("/api/consult/reservations", { cache: "no-store" }),
+        fetch("/api/consult/seats", { cache: "no-store" }),
+      ]);
+      const slotData = (await slotRes.json()) as SlotResponse;
+      const seatData = (await seatRes.json()) as SeatResponse;
+
+      if (!slotRes.ok || !slotData.ok) {
+        throw new Error(getSafeErrorMessage(slotData.message, "상담 예약 정보를 불러오지 못했습니다."));
+      }
+      if (!seatRes.ok || !seatData.ok) {
+        throw new Error(getSafeErrorMessage(seatData.message, "좌석 현황을 불러오지 못했습니다."));
+      }
+
+      setSettings(slotData.settings || seatData.settings);
+      setSlots(slotData.slots || []);
+      setSeatSummary(seatData.summary);
+      setSeatRooms(seatData.rooms || []);
+    } catch (error) {
+      logHandledClientIssue("[consult-reservation-card] refresh failed", error);
+      setSlotError(getSafeErrorMessage(error, "예약 정보를 불러오지 못했습니다."));
+    } finally {
+      if (showLoading) {
+        setIsLoading(false);
+      }
+    }
+  }
+
   useEffect(() => {
     let mounted = true;
 
@@ -370,6 +410,23 @@ export function ConsultReservationCard() {
       mounted = false;
     };
   }, []);
+
+  useEffect(() => {
+    if (!slotPanelOpen) return;
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState !== "visible") return;
+      void refreshPublicData();
+    };
+
+    window.addEventListener("focus", handleVisibilityChange);
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+
+    return () => {
+      window.removeEventListener("focus", handleVisibilityChange);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+    };
+  }, [slotPanelOpen]);
 
   const groupedSlots = useMemo(() => {
     const groups = new Map<string, { label: string; slots: PublicSlot[] }>();
@@ -417,26 +474,14 @@ export function ConsultReservationCard() {
     setSeatDialogOpen(false);
   }
 
-  async function refreshPublicData() {
-    try {
-      const [slotRes, seatRes] = await Promise.all([
-        fetch("/api/consult/reservations", { cache: "no-store" }),
-        fetch("/api/consult/seats", { cache: "no-store" }),
-      ]);
-      const slotData = (await slotRes.json()) as SlotResponse;
-      const seatData = (await seatRes.json()) as SeatResponse;
-
-      if (slotRes.ok && slotData.ok) {
-        setSettings(slotData.settings);
-        setSlots(slotData.slots || []);
-      }
-      if (seatRes.ok && seatData.ok) {
-        setSeatSummary(seatData.summary);
-        setSeatRooms(seatData.rooms || []);
-      }
-    } catch (error) {
-      logHandledClientIssue("[consult-reservation-card] refresh failed", error);
+  async function handleToggleSlotPanel() {
+    if (slotPanelOpen) {
+      setSlotPanelOpen(false);
+      return;
     }
+
+    setSlotPanelOpen(true);
+    await refreshPublicData({ showLoading: true, resetError: true });
   }
 
   async function handleVerifyPhone() {
@@ -640,7 +685,7 @@ export function ConsultReservationCard() {
             <div className="flex flex-wrap gap-2">
               <Button
                 type="button"
-                onClick={() => setSlotPanelOpen((prev) => !prev)}
+                onClick={() => void handleToggleSlotPanel()}
                 className="h-11 rounded-full bg-[#FF7A16] text-white hover:bg-[#e86d11]"
                 disabled={!activeSettings?.isPublicEnabled}
               >
