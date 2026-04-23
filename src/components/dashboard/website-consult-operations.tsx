@@ -46,6 +46,14 @@ import { cn } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
@@ -68,6 +76,11 @@ type SettingsFormState = {
   nonRefundableNotice: string;
   slotGuideText: string;
   seatGuideText: string;
+};
+
+type ManualReservationFormState = {
+  consultPhone: string;
+  studentName: string;
 };
 
 const SLOT_STATUS_META = {
@@ -163,6 +176,13 @@ function getDefaultSettingsForm(settings?: WebsiteReservationSettings | null): S
   };
 }
 
+function getDefaultManualReservationForm(): ManualReservationFormState {
+  return {
+    consultPhone: '',
+    studentName: '',
+  };
+}
+
 function formatDateTime(value?: string | null) {
   if (!value) return '-';
   const parsed = new Date(value);
@@ -195,6 +215,9 @@ export function WebsiteConsultOperations() {
   const [isSavingSlot, setIsSavingSlot] = useState(false);
   const [isSavingSettings, setIsSavingSettings] = useState(false);
   const [processingId, setProcessingId] = useState<string | null>(null);
+  const [selectedManualReservationSlot, setSelectedManualReservationSlot] = useState<WebsiteConsultSlot | null>(null);
+  const [manualReservationForm, setManualReservationForm] = useState<ManualReservationFormState>(getDefaultManualReservationForm);
+  const [isSavingManualReservation, setIsSavingManualReservation] = useState(false);
 
   const settingsRef = useMemo(() => {
     if (!firestore || !centerId || !isAdmin) return null;
@@ -305,6 +328,17 @@ export function WebsiteConsultOperations() {
 
   if (!isAdmin || !centerId || !firestore) {
     return null;
+  }
+
+  function openManualReservationDialog(slot: WebsiteConsultSlot) {
+    setSelectedManualReservationSlot(slot);
+    setManualReservationForm(getDefaultManualReservationForm());
+  }
+
+  function closeManualReservationDialog(force = false) {
+    if (isSavingManualReservation && !force) return;
+    setSelectedManualReservationSlot(null);
+    setManualReservationForm(getDefaultManualReservationForm());
   }
 
   async function handleSaveSettings() {
@@ -590,6 +624,58 @@ export function WebsiteConsultOperations() {
     }
   }
 
+  async function handleManualReservationCreate() {
+    if (!selectedManualReservationSlot) return;
+
+    const studentName = manualReservationForm.studentName.trim();
+    const consultPhone = manualReservationForm.consultPhone.trim();
+
+    if (!studentName) {
+      toast({ variant: 'destructive', title: '학생 이름을 입력해 주세요.' });
+      return;
+    }
+
+    if (consultPhone.replace(/\D/g, '').length < 8) {
+      toast({ variant: 'destructive', title: '학부모 연락처를 다시 확인해 주세요.' });
+      return;
+    }
+
+    setIsSavingManualReservation(true);
+    try {
+      const response = await fetch('/api/dashboard/manual-consult-reservations', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          centerId,
+          slotId: selectedManualReservationSlot.id,
+          consultPhone,
+          studentName,
+        }),
+      });
+
+      const result = await response.json().catch(() => null);
+      if (!response.ok || !result?.ok) {
+        throw new Error(result?.message || '상담 예약 저장 중 오류가 발생했습니다.');
+      }
+
+      toast({
+        title: '상담 예약을 등록했습니다.',
+        description: `${studentName} 학생 · ${result.slotLabel || formatSlotLabel(selectedManualReservationSlot)}`,
+      });
+      closeManualReservationDialog(true);
+    } catch (error: any) {
+      toast({
+        variant: 'destructive',
+        title: '상담 예약 등록에 실패했습니다.',
+        description: error?.message || '잠시 후 다시 시도해 주세요.',
+      });
+    } finally {
+      setIsSavingManualReservation(false);
+    }
+  }
+
   return (
     <section className="space-y-5">
       <div className={cn('grid gap-4', isMobile ? 'grid-cols-2' : 'grid-cols-4')}>
@@ -812,6 +898,8 @@ export function WebsiteConsultOperations() {
                 slots.map((slot) => {
                   const activeCount = slot.reservationCount || 0;
                   const isEnded = toDateMs(slot.endsAt) < Date.now();
+                  const hasCapacity = activeCount < Math.max(1, Number(slot.capacity || 1));
+                  const canCreateManualReservation = !isEnded && hasCapacity;
                   const slotTone = !slot.isPublished
                     ? SLOT_STATUS_META.hidden
                     : isEnded
@@ -837,6 +925,18 @@ export function WebsiteConsultOperations() {
                         </Badge>
                       </div>
                       <div className="mt-4 flex flex-wrap gap-2">
+                        {canCreateManualReservation ? (
+                          <Button
+                            type="button"
+                            className="h-9 rounded-xl bg-[#14295F] text-white hover:bg-[#10224e]"
+                            onClick={() => openManualReservationDialog(slot)}
+                            disabled={
+                              isSavingManualReservation && selectedManualReservationSlot?.id === slot.id
+                            }
+                          >
+                            상담 예약하기
+                          </Button>
+                        ) : null}
                         <Button
                           type="button"
                           variant="outline"
@@ -870,9 +970,9 @@ export function WebsiteConsultOperations() {
       <div className={cn('grid gap-5', isMobile ? 'grid-cols-1' : 'xl:grid-cols-2')}>
         <Card className="rounded-[2rem] border-[#dbe5ff] shadow-[0_28px_60px_-44px_rgba(20,41,95,0.34)]">
           <CardHeader>
-            <CardTitle className="text-xl font-black text-[#14295F]">웹 상담 예약 목록</CardTitle>
+            <CardTitle className="text-xl font-black text-[#14295F]">상담 예약 목록</CardTitle>
             <CardDescription className="font-semibold text-[#5c6e97]">
-              홍보 리드 기반으로 들어온 예약을 확인하고 취소/완료 처리합니다.
+              홍보 웹 예약과 센터 전화 수기 예약을 함께 확인하고 취소/완료 처리합니다.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-3">
@@ -1028,6 +1128,91 @@ export function WebsiteConsultOperations() {
           </CardContent>
         </Card>
       </div>
+
+      <Dialog open={Boolean(selectedManualReservationSlot)} onOpenChange={(open) => !open && closeManualReservationDialog()}>
+        <DialogContent className="sm:max-w-[460px]">
+          <DialogHeader>
+            <DialogTitle>상담 예약하기</DialogTitle>
+            <DialogDescription>
+              전화로 들어온 상담을 바로 예약으로 등록합니다. 학부모 연락처와 학생 이름만 입력하면 됩니다.
+            </DialogDescription>
+          </DialogHeader>
+
+          {selectedManualReservationSlot ? (
+            <div className="flex flex-col gap-4">
+              <div className="rounded-[1.25rem] border border-[#dbe5ff] bg-[#f8fbff] px-4 py-3">
+                <p className="text-[10px] font-black tracking-[0.18em] text-[#5c6e97]">선택한 상담 시간</p>
+                <p className="mt-1 text-base font-black text-[#14295F]">
+                  {formatSlotLabel(selectedManualReservationSlot)}
+                </p>
+                <p className="mt-1 text-sm font-semibold text-[#5c6e97]">
+                  {formatDateTime(selectedManualReservationSlot.startsAt)} -{' '}
+                  {formatDateTime(selectedManualReservationSlot.endsAt)}
+                </p>
+                {!selectedManualReservationSlot.isPublished ? (
+                  <p className="mt-2 text-[11px] font-semibold text-[#9a5516]">
+                    현재 웹에는 숨겨진 슬롯이지만 센터 내부 예약으로는 바로 저장됩니다.
+                  </p>
+                ) : null}
+              </div>
+
+              <div className="grid gap-4">
+                <div className="grid gap-2">
+                  <Label htmlFor="manual-consult-phone" className="text-sm font-black text-[#14295F]">
+                    학부모 연락처
+                  </Label>
+                  <Input
+                    id="manual-consult-phone"
+                    type="tel"
+                    value={manualReservationForm.consultPhone}
+                    onChange={(event) =>
+                      setManualReservationForm((prev) => ({ ...prev, consultPhone: event.target.value }))
+                    }
+                    placeholder="01012345678"
+                    className="h-11 rounded-xl border-[#dbe5ff] font-bold text-[#14295F]"
+                  />
+                </div>
+
+                <div className="grid gap-2">
+                  <Label htmlFor="manual-consult-student-name" className="text-sm font-black text-[#14295F]">
+                    학생 이름
+                  </Label>
+                  <Input
+                    id="manual-consult-student-name"
+                    value={manualReservationForm.studentName}
+                    onChange={(event) =>
+                      setManualReservationForm((prev) => ({ ...prev, studentName: event.target.value }))
+                    }
+                    placeholder="학생 이름"
+                    className="h-11 rounded-xl border-[#dbe5ff] font-bold text-[#14295F]"
+                  />
+                </div>
+              </div>
+            </div>
+          ) : null}
+
+          <DialogFooter className="gap-2 sm:justify-end">
+            <Button
+              type="button"
+              variant="outline"
+              className="rounded-xl"
+              onClick={() => closeManualReservationDialog()}
+              disabled={isSavingManualReservation}
+            >
+              닫기
+            </Button>
+            <Button
+              type="button"
+              className="rounded-xl bg-[#14295F] text-white hover:bg-[#10224e]"
+              onClick={() => void handleManualReservationCreate()}
+              disabled={isSavingManualReservation || !selectedManualReservationSlot}
+            >
+              {isSavingManualReservation ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+              예약 저장
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </section>
   );
 }
