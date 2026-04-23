@@ -22,6 +22,7 @@ import {
   Trophy,
   ShieldAlert,
   FileText,
+  CreditCard,
   History,
   Target,
   BellRing,
@@ -88,6 +89,12 @@ import {
   type StudentManualRuleSection,
   type StudentPenaltyRuleRow,
 } from '@/lib/student-manual';
+import {
+  PARENT_MANUAL_DASHBOARD_SECTIONS,
+  PARENT_MANUAL_FIRST_DAY_FLOW,
+  PARENT_MANUAL_OPERATION_HIGHLIGHTS,
+  PARENT_MANUAL_PRO_TIPS,
+} from '@/lib/parent-manual';
 import { format } from 'date-fns';
 import { ko } from 'date-fns/locale';
 import { clearServerAuthSession } from '@/lib/client-auth-session';
@@ -177,13 +184,14 @@ function ManualHighlightCard({
   title,
   description,
   tone,
-}: StudentManualHighlight) {
+  badgeLabel = '핵심 규칙',
+}: StudentManualHighlight & { badgeLabel?: string }) {
   const toneClass = getManualToneClass(tone);
 
   return (
     <div className={cn('rounded-[1.4rem] border px-4 py-4 shadow-[0_16px_32px_-28px_rgba(10,28,72,0.28)]', toneClass.surface)}>
       <div className={cn('inline-flex rounded-full border px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.18em]', toneClass.badge)}>
-        핵심 규칙
+        {badgeLabel}
       </div>
       <p className="mt-3 text-[13px] font-black leading-5 text-[#17326B] break-keep">{title}</p>
       <p className="mt-2 text-[11.5px] font-semibold leading-5 text-[#5A6F95] break-keep">{description}</p>
@@ -197,7 +205,8 @@ function ManualRulePanel({
   description,
   items,
   tone,
-}: StudentManualRuleSection) {
+  badgeLabel = '생활규정',
+}: StudentManualRuleSection & { badgeLabel?: string }) {
   const toneClass = getManualToneClass(tone);
 
   return (
@@ -208,7 +217,7 @@ function ManualRulePanel({
           <p className="mt-1 text-[14px] font-black tracking-tight text-[#17326B] break-keep">{title}</p>
         </div>
         <span className={cn('shrink-0 rounded-full border px-2.5 py-1 text-[10px] font-black', toneClass.badge)}>
-          생활규정
+          {badgeLabel}
         </span>
       </div>
       <p className="mt-2 text-[11.5px] font-semibold leading-5 text-[#5A6F95] break-keep">{description}</p>
@@ -244,6 +253,488 @@ function PenaltyRuleRow({
         </span>
       </div>
     </div>
+  );
+}
+
+function ManualPenaltySection({
+  isMobileView,
+  intro,
+  note,
+}: {
+  isMobileView: boolean;
+  intro: string;
+  note: string;
+}) {
+  return (
+    <section className="rounded-[1.75rem] border border-[#F5C7D4] bg-[linear-gradient(180deg,#FFF6F8_0%,#FFF0F4_100%)] p-5 shadow-[0_18px_40px_-32px_rgba(170,34,88,0.16)]">
+      <div className="flex items-center gap-2">
+        <ShieldAlert className="h-4 w-4 text-[#C13D68]" />
+        <p className="text-[11px] font-black uppercase tracking-[0.22em] text-[#C13D68]">벌점 운영표</p>
+      </div>
+      <p className="mt-2 text-[12px] font-semibold leading-5 text-[#6F4960] break-keep">{intro}</p>
+
+      <div className="mt-4 space-y-2.5">
+        {STUDENT_MANUAL_PENALTY_RULE_ROWS.map((row) => (
+          <PenaltyRuleRow
+            key={row.key}
+            category={row.category}
+            pointsLabel={row.pointsLabel}
+            detail={row.detail}
+            tone={row.tone}
+          />
+        ))}
+      </div>
+
+      <div className={cn('mt-4 grid gap-2', isMobileView ? 'grid-cols-1' : 'grid-cols-3')}>
+        {STUDENT_PENALTY_STAGE_RULES.map((rule) => {
+          const toneClass = getManualToneClass(rule.tone);
+          return (
+            <div key={rule.key} className={cn('rounded-[1.25rem] border px-4 py-3', toneClass.surface)}>
+              <p className={cn('inline-flex rounded-full border px-2.5 py-1 text-[10px] font-black', toneClass.badge)}>
+                {rule.threshold}
+              </p>
+              <p className="mt-2 text-[12px] font-black leading-5 text-[#17326B] break-keep">{rule.action}</p>
+            </div>
+          );
+        })}
+      </div>
+
+      <div className="mt-4 rounded-[1.25rem] border border-[#F1B7C8] bg-white/80 px-4 py-3">
+        <p className="text-[11px] font-black uppercase tracking-[0.18em] text-[#C13D68]">중요</p>
+        <p className="mt-1 text-[11.5px] font-semibold leading-5 text-[#6F4960] break-keep">{note}</p>
+      </div>
+    </section>
+  );
+}
+
+function ManualTipsSection({
+  eyebrow = 'PRO TIPS',
+  tips,
+}: {
+  eyebrow?: string;
+  tips: string[];
+}) {
+  return (
+    <section className="rounded-[1.75rem] border border-[#D9E1F2] bg-white p-5 shadow-[0_18px_40px_-32px_rgba(10,28,72,0.18)]">
+      <div className="flex items-center gap-2">
+        <Lightbulb className="h-4 w-4 text-[#FF7A16]" />
+        <p className="text-[11px] font-black uppercase tracking-[0.22em] text-[#6781AE]">{eyebrow}</p>
+      </div>
+      <div className="mt-3 space-y-2.5">
+        {tips.map((tip) => (
+          <div key={tip} className="flex items-start gap-2">
+            <ChevronRight className="mt-0.5 h-3.5 w-3.5 shrink-0 text-[#FF7A16]" />
+            <p className="text-[12px] font-semibold leading-5 text-[#17326B] break-keep">{tip}</p>
+          </div>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+function StudentSupportManualBody({ isMobileView }: { isMobileView: boolean }) {
+  return (
+    <>
+      <section className="rounded-[1.9rem] border border-[#FFD7B0] bg-[linear-gradient(160deg,#FFF4E6_0%,#FFE6D0_45%,#FFF1E8_100%)] p-5 shadow-[0_24px_48px_-36px_rgba(239,97,0,0.42)]">
+        <div className="flex items-start gap-3">
+          <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-[#FF7A16] text-white shadow-[0_14px_28px_-14px_rgba(239,97,0,0.62)]">
+            <Sparkles className="h-5 w-5" />
+          </div>
+          <div className="min-w-0">
+            <p className="text-[10px] font-black uppercase tracking-[0.22em] text-[#B44A00]">FIRST DAY FLOW</p>
+            <p className="mt-1.5 text-[15px] font-black leading-6 text-[#17326B] break-keep">
+              처음 오면 이것부터: <span className="text-[#FF7A16]">휴대폰 반납</span> → <span className="text-[#FF7A16]">오늘 할 일 확인</span> → <span className="text-[#FF7A16]">키오스크 시작</span>
+            </p>
+            <p className="mt-2 text-[11.5px] font-semibold leading-5 text-[#5A6F95] break-keep">
+              트랙은 도착 직후의 5분이 하루 분위기를 결정해요. 생활 규정, 러닝 시스템, 벌점 기준까지 아래 순서대로 한 번만 읽으면 바로 적응할 수 있어요.
+            </p>
+          </div>
+        </div>
+
+        <div className={cn('mt-4 grid gap-3', isMobileView ? 'grid-cols-1' : 'grid-cols-2')}>
+          {STUDENT_MANUAL_FIRST_DAY_FLOW.map((item) => (
+            <ManualHighlightCard
+              key={item.key}
+              title={item.title}
+              description={item.description}
+              tone={item.tone}
+            />
+          ))}
+        </div>
+      </section>
+
+      <section className="rounded-[1.75rem] border border-[#DCE5F5] bg-white p-5 shadow-[0_20px_42px_-34px_rgba(10,28,72,0.16)]">
+        <div className="flex items-center gap-2">
+          <ShieldAlert className="h-4 w-4 text-[#17326B]" />
+          <p className="text-[11px] font-black uppercase tracking-[0.22em] text-[#6781AE]">운영 원칙</p>
+        </div>
+        <p className="mt-2 text-[12px] font-semibold leading-5 text-[#5A6F95] break-keep">
+          우리 센터는 몰입 유지가 최우선이에요. 휴대폰, 태블릿, 와이파이, 생활 태도를 전부 같은 기준으로 관리합니다.
+        </p>
+        <div className={cn('mt-4 grid gap-3', isMobileView ? 'grid-cols-1' : 'grid-cols-2')}>
+          {STUDENT_MANUAL_OPERATION_HIGHLIGHTS.map((item) => (
+            <ManualHighlightCard
+              key={item.key}
+              title={item.title}
+              description={item.description}
+              tone={item.tone}
+            />
+          ))}
+        </div>
+      </section>
+
+      <GuideSection
+        step={1}
+        title="입실 후 5분 루틴"
+        icon={<Play className="h-5 w-5" />}
+        accentColor="#2554D7"
+        tintColor="#EAF0FC"
+      >
+        <GuideStep
+          icon={<Smartphone className="h-4 w-4 text-[#2554D7]" />}
+          title="도착 즉시 휴대폰 반납"
+          body={<>센터에 도착하면 <Pill tone="rose">전원 OFF 후 반납</Pill>이 먼저예요. 가방에 계속 소지하고 있으면 바로 지도 대상이 됩니다.</>}
+        />
+        <GuideStep
+          icon={<CalendarDays className="h-4 w-4 text-[#2554D7]" />}
+          title="오늘 할 일부터 확인"
+          body={<>하단 <Pill>계획</Pill> 탭이나 홈 카드에서 오늘 과목, 순서, 목표 분량을 먼저 보고 공부 흐름을 고정하세요.</>}
+        />
+        <GuideStep
+          icon={<Play className="h-4 w-4 text-[#2554D7]" />}
+          title="착석 후 키오스크로 시작 처리"
+          body={<>공부 시작은 학생 앱 버튼이 아니라 <Pill>준비된 키오스크</Pill>에서 진행해요. 시작 처리가 끝나면 자리에서 바로 몰입하고, 앱에서는 진행 기록을 확인하면 돼요.</>}
+        />
+        <GuideTip tone="amber">
+          선생님들이 계속 순회하며 휴대폰, 무단이석, 잡담, 태블릿 사용 상태를 확인해요. 애매하면 먼저 물어보는 게 가장 안전해요.
+        </GuideTip>
+      </GuideSection>
+
+      <GuideSection
+        step={2}
+        title="러닝 시스템 활용"
+        icon={<Gift className="h-5 w-5" />}
+        accentColor="#FF7A16"
+        tintColor="#FFF0DE"
+      >
+        <GuideStep
+          icon={<Square className="h-4 w-4 text-[#FF7A16]" />}
+          title="자리 비울 때는 종료 먼저"
+          body={<>화장실, 상담, 잠깐 이석도 먼저 <Pill tone="orange">공부 종료하기</Pill>를 눌러요. 타이머를 켠 채 자리를 비우면 기록과 분위기 둘 다 어긋나요.</>}
+        />
+        <GuideStep
+          icon={<Trophy className="h-4 w-4 text-[#FF7A16]" />}
+          title="포인트와 리워드 상자"
+          body={<>공부 시간만큼 <Pill tone="orange">러닝 포인트</Pill>가 쌓이고, 누적 시간 기준을 넘기면 상자가 열려요. 홈과 <Pill tone="orange">포인트</Pill> 탭에서 바로 확인할 수 있어요.</>}
+        />
+        <GuideStep
+          icon={<FileText className="h-4 w-4 text-[#FF7A16]" />}
+          title="리포트는 바로 반영"
+          body={<>선생님 리포트가 오면 뱃지가 떠요. 피드백을 읽고 다음 세션에 즉시 반영하는 학생이 가장 빨리 성장해요.</>}
+        />
+        <GuideTip>
+          포인트보다 중요한 건 기록의 정확성이에요. 제대로 시작하고 제대로 종료하는 습관이 먼저예요.
+        </GuideTip>
+      </GuideSection>
+
+      <GuideSection
+        step={3}
+        title="계획·기록·요청"
+        icon={<History className="h-5 w-5" />}
+        accentColor="#17326B"
+        tintColor="#E7ECF7"
+      >
+        <GuideStep
+          icon={<Target className="h-4 w-4 text-[#17326B]" />}
+          title="오늘 할 일과 루틴"
+          body={<>하단 <Pill>계획</Pill>에서 오늘 분량을 체크하고, 매일 비슷한 시간에 오고 가는 루틴을 만드는 게 핵심이에요.</>}
+        />
+        <GuideStep
+          icon={<History className="h-4 w-4 text-[#17326B]" />}
+          title="기록 탭으로 성장 확인"
+          body={<>하단 <Pill>기록</Pill>에서는 세션 히스토리, 일자별 공부 시간, 주간 추세를 볼 수 있어요. 감이 아니라 기록으로 공부를 봐야 해요.</>}
+        />
+        <GuideStep
+          icon={<MessageCircle className="h-4 w-4 text-[#17326B]" />}
+          title="상담·와이파이 요청은 앱에서"
+          body={<>진로, 학습, 생활 상담은 <Pill>상담</Pill>에서, 학습 사이트 요청은 <Pill tone="amber">와이파이 요청</Pill>에서 남겨요. 임의 우회보다 공식 요청이 원칙이에요.</>}
+        />
+      </GuideSection>
+
+      <GuideSection
+        step={4}
+        title="기기 규정 & 와이파이"
+        icon={<Wifi className="h-5 w-5" />}
+        accentColor="#D97706"
+        tintColor="#FEF3E0"
+      >
+        <GuideStep
+          icon={<Monitor className="h-4 w-4 text-[#D97706]" />}
+          title="태블릿·노트북은 학습용만"
+          body={<>태블릿은 인강, PDF, 문제풀이 같은 학습 목적으로만 가능해요. 게임, SNS, 비학습 영상은 바로 규정 위반으로 봐요.</>}
+        />
+        <GuideStep
+          icon={<Wifi className="h-4 w-4 text-[#D97706]" />}
+          title="와이파이는 기본 차단"
+          body={<>센터 와이파이에는 방화벽이 걸려 있어요. 필요한 사이트는 요청 후 화이트리스트로 열 수 있고, 우회 시도는 중대 위반이에요.</>}
+        />
+        <GuideStep
+          icon={<BellRing className="h-4 w-4 text-[#D97706]" />}
+          title="이어폰은 필수"
+          body={<>인강은 반드시 이어폰으로만 듣고, 소리가 새지 않게 해야 해요. 주변 학생 집중을 깨면 바로 지도 대상이에요.</>}
+        />
+        <GuideTip tone="amber">
+          차단된 사이트가 필요하면 URL과 이유를 적어 바로 요청하세요. “잠깐이니까” 하며 우회하는 행동이 가장 크게 누적됩니다.
+        </GuideTip>
+      </GuideSection>
+
+      <section className="rounded-[1.75rem] border border-[#D9E1F2] bg-white p-5 shadow-[0_18px_40px_-32px_rgba(10,28,72,0.18)]">
+        <div className="flex items-center gap-2">
+          <BookOpen className="h-4 w-4 text-[#17326B]" />
+          <p className="text-[11px] font-black uppercase tracking-[0.22em] text-[#6781AE]">생활규정</p>
+        </div>
+        <p className="mt-2 text-[12px] font-semibold leading-5 text-[#5A6F95] break-keep">
+          아래 규정은 공부를 편하게 하려고 만든 권장사항이 아니라, 센터 안에서 반드시 지켜야 하는 운영 기준이에요.
+        </p>
+        <div className={cn('mt-4 grid gap-3', isMobileView ? 'grid-cols-1' : 'grid-cols-2')}>
+          {STUDENT_MANUAL_RULE_SECTIONS.map((section) => (
+            <ManualRulePanel
+              key={section.key}
+              eyebrow={section.eyebrow}
+              title={section.title}
+              description={section.description}
+              items={section.items}
+              tone={section.tone}
+            />
+          ))}
+        </div>
+      </section>
+
+      <ManualPenaltySection
+        isMobileView={isMobileView}
+        intro="기본 벌점 기준이에요. 반복, 은폐, 반항, 타인 피해가 겹치면 같은 항목도 더 강하게 반영될 수 있어요."
+        note="심각한 경우에는 누적 점수와 무관하게 즉시 귀가 조치, 보호자 통보, 퇴원 검토가 진행될 수 있어요."
+      />
+
+      <ManualTipsSection tips={STUDENT_MANUAL_PRO_TIPS} />
+    </>
+  );
+}
+
+function ParentSupportManualBody({ isMobileView }: { isMobileView: boolean }) {
+  return (
+    <>
+      <section className="rounded-[1.9rem] border border-[#FFD7B0] bg-[linear-gradient(160deg,#FFF4E6_0%,#FFE6D0_45%,#FFF1E8_100%)] p-5 shadow-[0_24px_48px_-36px_rgba(239,97,0,0.42)]">
+        <div className="flex items-start gap-3">
+          <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-[#FF7A16] text-white shadow-[0_14px_28px_-14px_rgba(239,97,0,0.62)]">
+            <Sparkles className="h-5 w-5" />
+          </div>
+          <div className="min-w-0">
+            <p className="text-[10px] font-black uppercase tracking-[0.22em] text-[#B44A00]">PARENT START GUIDE</p>
+            <p className="mt-1.5 text-[15px] font-black leading-6 text-[#17326B] break-keep">
+              처음 들어오면 이것부터: <span className="text-[#FF7A16]">자녀 선택</span> → <span className="text-[#FF7A16]">홈 탭 확인</span> → <span className="text-[#FF7A16]">중요 알림 확인</span>
+            </p>
+            <p className="mt-2 text-[11.5px] font-semibold leading-5 text-[#5A6F95] break-keep">
+              학부모 화면은 오늘 흐름, 리포트, 상담, 수납, 생활규정 확인이 한 번에 이어지도록 설계돼 있어요. 아래 순서대로 한 번만 읽어두시면 필요한 대응을 훨씬 빠르게 하실 수 있어요.
+            </p>
+          </div>
+        </div>
+
+        <div className={cn('mt-4 grid gap-3', isMobileView ? 'grid-cols-1' : 'grid-cols-2')}>
+          {PARENT_MANUAL_FIRST_DAY_FLOW.map((item) => (
+            <ManualHighlightCard
+              key={item.key}
+              title={item.title}
+              description={item.description}
+              tone={item.tone}
+              badgeLabel="빠른 확인"
+            />
+          ))}
+        </div>
+      </section>
+
+      <section className="rounded-[1.75rem] border border-[#DCE5F5] bg-white p-5 shadow-[0_20px_42px_-34px_rgba(10,28,72,0.16)]">
+        <div className="flex items-center gap-2">
+          <ShieldAlert className="h-4 w-4 text-[#17326B]" />
+          <p className="text-[11px] font-black uppercase tracking-[0.22em] text-[#6781AE]">센터 운영 원칙</p>
+        </div>
+        <p className="mt-2 text-[12px] font-semibold leading-5 text-[#5A6F95] break-keep">
+          학부모님도 꼭 함께 알고 계셔야 하는 생활 관리 기준이에요. 학생의 몰입과 안전을 위해 휴대폰, 태블릿, 와이파이, 생활 태도를 강하게 관리합니다.
+        </p>
+        <div className={cn('mt-4 grid gap-3', isMobileView ? 'grid-cols-1' : 'grid-cols-2')}>
+          {PARENT_MANUAL_OPERATION_HIGHLIGHTS.map((item) => (
+            <ManualHighlightCard
+              key={item.key}
+              title={item.title}
+              description={item.description}
+              tone={item.tone}
+              badgeLabel="운영 기준"
+            />
+          ))}
+        </div>
+      </section>
+
+      <GuideSection
+        step={1}
+        title="처음 로그인 후 3분 체크"
+        icon={<CalendarDays className="h-5 w-5" />}
+        accentColor="#2554D7"
+        tintColor="#EAF0FC"
+      >
+        <GuideStep
+          icon={<School className="h-4 w-4 text-[#2554D7]" />}
+          title="상단에서 자녀 선택"
+          body={<>연결된 자녀가 둘 이상이면 상단 선택기에서 <Pill>현재 확인 중인 자녀</Pill>를 먼저 맞춰 주세요. 요약, 리포트, 수납 정보가 이 기준으로 함께 바뀝니다.</>}
+        />
+        <GuideStep
+          icon={<Target className="h-4 w-4 text-[#2554D7]" />}
+          title="홈 탭부터 확인"
+          body={<>가장 먼저 <Pill>홈</Pill>에서 오늘 공부 시간, 출결 상태, 벌점 변화, 미확인 알림 수를 확인하세요. 큰 변화는 대부분 이 화면에서 먼저 잡혀요.</>}
+        />
+        <GuideStep
+          icon={<BellRing className="h-4 w-4 text-[#2554D7]" />}
+          title="중요 알림은 당일 확인"
+          body={<>등원, 하원, 벌점, 리포트 발행, 공지 알림은 읽음 상태로 관리돼요. <Pill tone="orange">중요</Pill> 표시가 뜬 항목은 그날 안에 열어보는 것이 좋아요.</>}
+        />
+        <GuideTip tone="amber">
+          홈 요약 숫자와 소통 탭의 알림 흐름을 함께 보면 놓치는 일이 크게 줄어들어요.
+        </GuideTip>
+      </GuideSection>
+
+      <GuideSection
+        step={2}
+        title="학습 흐름과 리포트 읽는 법"
+        icon={<History className="h-5 w-5" />}
+        accentColor="#FF7A16"
+        tintColor="#FFF0DE"
+      >
+        <GuideStep
+          icon={<History className="h-4 w-4 text-[#FF7A16]" />}
+          title="학습 탭은 날짜별 기록"
+          body={<>월간 캘린더에서 날짜를 누르면 등원, 학습 시작·종료, 이석 시간 같은 실제 흐름을 볼 수 있어요. 공부 시간이 흔들린 날을 먼저 찾아보기에 좋아요.</>}
+        />
+        <GuideStep
+          icon={<FileText className="h-4 w-4 text-[#FF7A16]" />}
+          title="데이터 탭은 추세 확인"
+          body={<>주간·최근 흐름 그래프, 과목 비중, 생활 리듬, <Pill tone="orange">AI 인사이트</Pill>까지 모아서 보여줘요. 하루 수치보다 추세를 읽는 탭이에요.</>}
+        />
+        <GuideStep
+          icon={<BookOpen className="h-4 w-4 text-[#FF7A16]" />}
+          title="리포트는 누적 보관"
+          body={<>받은 리포트는 날짜별로 쌓여 있어요. 최근 리포트만 보지 말고 전주·전월 흐름과 함께 다시 열어보면 변화가 더 분명하게 보여요.</>}
+        />
+        <GuideTip>
+          같은 학생의 전주, 전월 변화로 비교해서 보시면 감정이 아니라 기록 기준으로 판단하기 쉬워져요.
+        </GuideTip>
+      </GuideSection>
+
+      <GuideSection
+        step={3}
+        title="소통 센터 활용"
+        icon={<MessageCircle className="h-5 w-5" />}
+        accentColor="#17326B"
+        tintColor="#E7ECF7"
+      >
+        <GuideStep
+          icon={<Phone className="h-4 w-4 text-[#17326B]" />}
+          title="상담 요청은 방문·전화·온라인"
+          body={<>소통 탭에서 <Pill>방문</Pill>, <Pill tone="orange">전화</Pill>, <Pill tone="amber">온라인</Pill> 중 원하는 방식으로 상담 요청을 남길 수 있어요. 학습, 생활, 진로 문의를 한 흐름으로 전달할 수 있습니다.</>}
+        />
+        <GuideStep
+          icon={<MessageCircle className="h-4 w-4 text-[#17326B]" />}
+          title="질의·요청·건의 구분"
+          body={<>일반 문의는 질의사항, 일정 변경이나 확인 요청은 요청사항, 개선 의견은 건의사항으로 남겨 주세요. 제목과 내용을 구체적으로 적을수록 대응이 빨라져요.</>}
+        />
+        <GuideStep
+          icon={<BellRing className="h-4 w-4 text-[#17326B]" />}
+          title="공지와 답변은 같은 흐름"
+          body={<>센터 공지, 알림 상세, 상담 진행 기록이 함께 관리돼요. 미확인 알림을 눌러 읽으면 상태도 바로 반영됩니다.</>}
+        />
+        <GuideTip tone="amber">
+          긴급한 출결 변경이나 당일 일정 이슈는 센터로 바로 알려주시고, 앱에도 기록을 남겨 두시면 누락이 적어요.
+        </GuideTip>
+      </GuideSection>
+
+      <GuideSection
+        step={4}
+        title="수납과 생활관리 기준"
+        icon={<CreditCard className="h-5 w-5" />}
+        accentColor="#D97706"
+        tintColor="#FEF3E0"
+      >
+        <GuideStep
+          icon={<CreditCard className="h-4 w-4 text-[#D97706]" />}
+          title="수납 탭은 청구 확인 중심"
+          body={<>대표 청구서의 금액, 상태, 마감일, 이전 청구 이력을 볼 수 있어요. 현재는 <Pill tone="amber">앱 내 결제보다 청구 확인</Pill> 기능이 먼저 운영되고 있어요.</>}
+        />
+        <GuideStep
+          icon={<ShieldAlert className="h-4 w-4 text-[#D97706]" />}
+          title="벌점은 이력까지 함께 보기"
+          body={<>현재 점수만 보지 말고 사유, 반영 시점, 자동 회복 여부를 함께 확인해 주세요. 생활 흐름을 이해할 때 훨씬 정확합니다.</>}
+        />
+        <GuideStep
+          icon={<Smartphone className="h-4 w-4 text-[#D97706]" />}
+          title="센터는 생활규정을 강하게 적용"
+          body={<>학생은 도착 즉시 휴대폰을 반납하고, 태블릿은 학습용만 허용돼요. 방화벽 우회, 반복 위반, 타인 피해는 즉시 강한 조치가 들어갑니다.</>}
+        />
+        <GuideTip tone="amber">
+          규정이 애매한 경우 학생에게 임의 판단을 맡기기보다 센터에 바로 문의해 주시는 것이 가장 빠르고 안전해요.
+        </GuideTip>
+      </GuideSection>
+
+      <section className="rounded-[1.75rem] border border-[#D9E1F2] bg-white p-5 shadow-[0_18px_40px_-32px_rgba(10,28,72,0.18)]">
+        <div className="flex items-center gap-2">
+          <BookOpen className="h-4 w-4 text-[#17326B]" />
+          <p className="text-[11px] font-black uppercase tracking-[0.22em] text-[#6781AE]">대시보드 구성</p>
+        </div>
+        <p className="mt-2 text-[12px] font-semibold leading-5 text-[#5A6F95] break-keep">
+          학부모 화면은 탭마다 역할이 분명해요. 아래 기준대로 보시면 정보가 겹치지 않고 필요한 내용을 빠르게 찾을 수 있어요.
+        </p>
+        <div className={cn('mt-4 grid gap-3', isMobileView ? 'grid-cols-1' : 'grid-cols-2')}>
+          {PARENT_MANUAL_DASHBOARD_SECTIONS.map((section) => (
+            <ManualRulePanel
+              key={section.key}
+              eyebrow={section.eyebrow}
+              title={section.title}
+              description={section.description}
+              items={section.items}
+              tone={section.tone}
+              badgeLabel="기능 안내"
+            />
+          ))}
+        </div>
+      </section>
+
+      <section className="rounded-[1.75rem] border border-[#D9E1F2] bg-white p-5 shadow-[0_18px_40px_-32px_rgba(10,28,72,0.18)]">
+        <div className="flex items-center gap-2">
+          <ShieldAlert className="h-4 w-4 text-[#17326B]" />
+          <p className="text-[11px] font-black uppercase tracking-[0.22em] text-[#6781AE]">센터 생활규정</p>
+        </div>
+        <p className="mt-2 text-[12px] font-semibold leading-5 text-[#5A6F95] break-keep">
+          아래 규정은 학생에게 실제로 적용되는 기준이에요. 휴대폰 반납, 태블릿 사용, 와이파이 방화벽, 생활 태도 관리까지 학부모님도 같은 기준으로 함께 알고 계셔야 해요.
+        </p>
+        <div className={cn('mt-4 grid gap-3', isMobileView ? 'grid-cols-1' : 'grid-cols-2')}>
+          {STUDENT_MANUAL_RULE_SECTIONS.map((section) => (
+            <ManualRulePanel
+              key={section.key}
+              eyebrow={section.eyebrow}
+              title={section.title}
+              description={section.description}
+              items={section.items}
+              tone={section.tone}
+            />
+          ))}
+        </div>
+      </section>
+
+      <ManualPenaltySection
+        isMobileView={isMobileView}
+        intro="생활규정 기준과 실제 반영 단계를 함께 안내해 드려요. 앱에서 보이는 벌점 현황은 아래 기준으로 누적되고, 일정 기간 문제 없이 지내면 자동 회복도 반영됩니다."
+        note="반복 위반, 방화벽 우회, 시설 훼손, 타인 피해처럼 심각한 사안은 누적 점수와 무관하게 즉시 보호자 안내와 강한 조치가 가능합니다."
+      />
+
+      <ManualTipsSection eyebrow="PARENT TIPS" tips={PARENT_MANUAL_PRO_TIPS} />
+    </>
   );
 }
 
@@ -719,16 +1210,18 @@ export function DashboardHeader({ playStudentEntry = false }: DashboardHeaderPro
             <BookOpen className="pointer-events-none absolute -top-10 -right-10 h-48 w-48 opacity-10 rotate-12" />
             <Sparkles className="pointer-events-none absolute bottom-4 right-6 h-6 w-6 text-white/40" />
             <div className="inline-flex items-center gap-1.5 rounded-full bg-white/18 px-3 py-1 text-[10px] font-black uppercase tracking-[0.18em]">
-              <Flame className="h-3 w-3" /> STUDENT MANUAL
+              <Flame className="h-3 w-3" /> {isParentMode ? 'PARENT MANUAL' : 'STUDENT MANUAL'}
             </div>
             <DialogTitle className={cn(
               "font-black tracking-tighter flex items-center gap-3 mt-3",
               isMobileView ? "text-2xl" : "text-3xl"
             )}>
-              <BookOpen className="h-7 w-7" /> 스터디센터 이용 가이드
+              <BookOpen className="h-7 w-7" /> {isParentMode ? '학부모 이용 가이드' : '스터디센터 이용 가이드'}
             </DialogTitle>
             <DialogDescription className="text-white/85 font-bold mt-1.5 text-[12px] leading-5">
-              첫 등원 루틴, 러닝 시스템, 생활규정, 벌점 기준까지 한 번에 볼 수 있어요.
+              {isParentMode
+                ? '자녀 확인 순서, 리포트 읽는 법, 상담·수납, 생활규정과 벌점 기준까지 한 번에 볼 수 있어요.'
+                : '첫 등원 루틴, 러닝 시스템, 생활규정, 벌점 기준까지 한 번에 볼 수 있어요.'}
             </DialogDescription>
           </div>
 
@@ -736,245 +1229,16 @@ export function DashboardHeader({ playStudentEntry = false }: DashboardHeaderPro
             "flex-1 overflow-y-auto bg-[#f6f7fb] custom-scrollbar",
             isMobileView ? "p-5 space-y-6" : "p-8 space-y-8"
           )}>
-            <section className="rounded-[1.9rem] border border-[#FFD7B0] bg-[linear-gradient(160deg,#FFF4E6_0%,#FFE6D0_45%,#FFF1E8_100%)] p-5 shadow-[0_24px_48px_-36px_rgba(239,97,0,0.42)]">
-              <div className="flex items-start gap-3">
-                <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-[#FF7A16] text-white shadow-[0_14px_28px_-14px_rgba(239,97,0,0.62)]">
-                  <Sparkles className="h-5 w-5" />
-                </div>
-                <div className="min-w-0">
-                  <p className="text-[10px] font-black uppercase tracking-[0.22em] text-[#B44A00]">FIRST DAY FLOW</p>
-                  <p className="mt-1.5 text-[15px] font-black leading-6 text-[#17326B] break-keep">
-                    처음 오면 이것부터: <span className="text-[#FF7A16]">휴대폰 반납</span> → <span className="text-[#FF7A16]">오늘 할 일 확인</span> → <span className="text-[#FF7A16]">키오스크 시작</span>
-                  </p>
-                  <p className="mt-2 text-[11.5px] font-semibold leading-5 text-[#5A6F95] break-keep">
-                    트랙은 도착 직후의 5분이 하루 분위기를 결정해요. 생활 규정, 러닝 시스템, 벌점 기준까지 아래 순서대로 한 번만 읽으면 바로 적응할 수 있어요.
-                  </p>
-                </div>
-              </div>
-
-              <div className={cn('mt-4 grid gap-3', isMobileView ? 'grid-cols-1' : 'grid-cols-2')}>
-                {STUDENT_MANUAL_FIRST_DAY_FLOW.map((item) => (
-                  <ManualHighlightCard
-                    key={item.key}
-                    title={item.title}
-                    description={item.description}
-                    tone={item.tone}
-                  />
-                ))}
-              </div>
-            </section>
-
-            <section className="rounded-[1.75rem] border border-[#DCE5F5] bg-white p-5 shadow-[0_20px_42px_-34px_rgba(10,28,72,0.16)]">
-              <div className="flex items-center gap-2">
-                <ShieldAlert className="h-4 w-4 text-[#17326B]" />
-                <p className="text-[11px] font-black uppercase tracking-[0.22em] text-[#6781AE]">운영 원칙</p>
-              </div>
-              <p className="mt-2 text-[12px] font-semibold leading-5 text-[#5A6F95] break-keep">
-                우리 센터는 몰입 유지가 최우선이에요. 휴대폰, 태블릿, 와이파이, 생활 태도를 전부 같은 기준으로 관리합니다.
-              </p>
-              <div className={cn('mt-4 grid gap-3', isMobileView ? 'grid-cols-1' : 'grid-cols-2')}>
-                {STUDENT_MANUAL_OPERATION_HIGHLIGHTS.map((item) => (
-                  <ManualHighlightCard
-                    key={item.key}
-                    title={item.title}
-                    description={item.description}
-                    tone={item.tone}
-                  />
-                ))}
-              </div>
-            </section>
-
-            <GuideSection
-              step={1}
-              title="입실 후 5분 루틴"
-              icon={<Play className="h-5 w-5" />}
-              accentColor="#2554D7"
-              tintColor="#EAF0FC"
-            >
-              <GuideStep
-                icon={<Smartphone className="h-4 w-4 text-[#2554D7]" />}
-                title="도착 즉시 휴대폰 반납"
-                body={<>센터에 도착하면 <Pill tone="rose">전원 OFF 후 반납</Pill>이 먼저예요. 가방에 계속 소지하고 있으면 바로 지도 대상이 됩니다.</>}
-              />
-              <GuideStep
-                icon={<CalendarDays className="h-4 w-4 text-[#2554D7]" />}
-                title="오늘 할 일부터 확인"
-                body={<>하단 <Pill>계획</Pill> 탭이나 홈 카드에서 오늘 과목, 순서, 목표 분량을 먼저 보고 공부 흐름을 고정하세요.</>}
-              />
-              <GuideStep
-                icon={<Play className="h-4 w-4 text-[#2554D7]" />}
-                title="착석 후 키오스크로 시작 처리"
-                body={<>공부 시작은 학생 앱 버튼이 아니라 <Pill>준비된 키오스크</Pill>에서 진행해요. 시작 처리가 끝나면 자리에서 바로 몰입하고, 앱에서는 진행 기록을 확인하면 돼요.</>}
-              />
-              <GuideTip tone="amber">
-                선생님들이 계속 순회하며 휴대폰, 무단이석, 잡담, 태블릿 사용 상태를 확인해요. 애매하면 먼저 물어보는 게 가장 안전해요.
-              </GuideTip>
-            </GuideSection>
-
-            <GuideSection
-              step={2}
-              title="러닝 시스템 활용"
-              icon={<Gift className="h-5 w-5" />}
-              accentColor="#FF7A16"
-              tintColor="#FFF0DE"
-            >
-              <GuideStep
-                icon={<Square className="h-4 w-4 text-[#FF7A16]" />}
-                title="자리 비울 때는 종료 먼저"
-                body={<>화장실, 상담, 잠깐 이석도 먼저 <Pill tone="orange">공부 종료하기</Pill>를 눌러요. 타이머를 켠 채 자리를 비우면 기록과 분위기 둘 다 어긋나요.</>}
-              />
-              <GuideStep
-                icon={<Trophy className="h-4 w-4 text-[#FF7A16]" />}
-                title="포인트와 리워드 상자"
-                body={<>공부 시간만큼 <Pill tone="orange">러닝 포인트</Pill>가 쌓이고, 누적 시간 기준을 넘기면 상자가 열려요. 홈과 <Pill tone="orange">포인트</Pill> 탭에서 바로 확인할 수 있어요.</>}
-              />
-              <GuideStep
-                icon={<FileText className="h-4 w-4 text-[#FF7A16]" />}
-                title="리포트는 바로 반영"
-                body={<>선생님 리포트가 오면 뱃지가 떠요. 피드백을 읽고 다음 세션에 즉시 반영하는 학생이 가장 빨리 성장해요.</>}
-              />
-              <GuideTip>
-                포인트보다 중요한 건 기록의 정확성이에요. 제대로 시작하고 제대로 종료하는 습관이 먼저예요.
-              </GuideTip>
-            </GuideSection>
-
-            <GuideSection
-              step={3}
-              title="계획·기록·요청"
-              icon={<History className="h-5 w-5" />}
-              accentColor="#17326B"
-              tintColor="#E7ECF7"
-            >
-              <GuideStep
-                icon={<Target className="h-4 w-4 text-[#17326B]" />}
-                title="오늘 할 일과 루틴"
-                body={<>하단 <Pill>계획</Pill>에서 오늘 분량을 체크하고, 매일 비슷한 시간에 오고 가는 루틴을 만드는 게 핵심이에요.</>}
-              />
-              <GuideStep
-                icon={<History className="h-4 w-4 text-[#17326B]" />}
-                title="기록 탭으로 성장 확인"
-                body={<>하단 <Pill>기록</Pill>에서는 세션 히스토리, 일자별 공부 시간, 주간 추세를 볼 수 있어요. 감이 아니라 기록으로 공부를 봐야 해요.</>}
-              />
-              <GuideStep
-                icon={<MessageCircle className="h-4 w-4 text-[#17326B]" />}
-                title="상담·와이파이 요청은 앱에서"
-                body={<>진로, 학습, 생활 상담은 <Pill>상담</Pill>에서, 학습 사이트 요청은 <Pill tone="amber">와이파이 요청</Pill>에서 남겨요. 임의 우회보다 공식 요청이 원칙이에요.</>}
-              />
-            </GuideSection>
-
-            <GuideSection
-              step={4}
-              title="기기 규정 & 와이파이"
-              icon={<Wifi className="h-5 w-5" />}
-              accentColor="#D97706"
-              tintColor="#FEF3E0"
-            >
-              <GuideStep
-                icon={<Monitor className="h-4 w-4 text-[#D97706]" />}
-                title="태블릿·노트북은 학습용만"
-                body={<>태블릿은 인강, PDF, 문제풀이 같은 학습 목적으로만 가능해요. 게임, SNS, 비학습 영상은 바로 규정 위반으로 봐요.</>}
-              />
-              <GuideStep
-                icon={<Wifi className="h-4 w-4 text-[#D97706]" />}
-                title="와이파이는 기본 차단"
-                body={<>센터 와이파이에는 방화벽이 걸려 있어요. 필요한 사이트는 요청 후 화이트리스트로 열 수 있고, 우회 시도는 중대 위반이에요.</>}
-              />
-              <GuideStep
-                icon={<BellRing className="h-4 w-4 text-[#D97706]" />}
-                title="이어폰은 필수"
-                body={<>인강은 반드시 이어폰으로만 듣고, 소리가 새지 않게 해야 해요. 주변 학생 집중을 깨면 바로 지도 대상이에요.</>}
-              />
-              <GuideTip tone="amber">
-                차단된 사이트가 필요하면 URL과 이유를 적어 바로 요청하세요. “잠깐이니까” 하며 우회하는 행동이 가장 크게 누적됩니다.
-              </GuideTip>
-            </GuideSection>
-
-            <section className="rounded-[1.75rem] border border-[#D9E1F2] bg-white p-5 shadow-[0_18px_40px_-32px_rgba(10,28,72,0.18)]">
-              <div className="flex items-center gap-2">
-                <BookOpen className="h-4 w-4 text-[#17326B]" />
-                <p className="text-[11px] font-black uppercase tracking-[0.22em] text-[#6781AE]">생활규정</p>
-              </div>
-              <p className="mt-2 text-[12px] font-semibold leading-5 text-[#5A6F95] break-keep">
-                아래 규정은 공부를 편하게 하려고 만든 권장사항이 아니라, 센터 안에서 반드시 지켜야 하는 운영 기준이에요.
-              </p>
-              <div className={cn('mt-4 grid gap-3', isMobileView ? 'grid-cols-1' : 'grid-cols-2')}>
-                {STUDENT_MANUAL_RULE_SECTIONS.map((section) => (
-                  <ManualRulePanel
-                    key={section.key}
-                    eyebrow={section.eyebrow}
-                    title={section.title}
-                    description={section.description}
-                    items={section.items}
-                    tone={section.tone}
-                  />
-                ))}
-              </div>
-            </section>
-
-            <section className="rounded-[1.75rem] border border-[#F5C7D4] bg-[linear-gradient(180deg,#FFF6F8_0%,#FFF0F4_100%)] p-5 shadow-[0_18px_40px_-32px_rgba(170,34,88,0.16)]">
-              <div className="flex items-center gap-2">
-                <ShieldAlert className="h-4 w-4 text-[#C13D68]" />
-                <p className="text-[11px] font-black uppercase tracking-[0.22em] text-[#C13D68]">벌점 운영표</p>
-              </div>
-              <p className="mt-2 text-[12px] font-semibold leading-5 text-[#6F4960] break-keep">
-                기본 벌점 기준이에요. 반복, 은폐, 반항, 타인 피해가 겹치면 같은 항목도 더 강하게 반영될 수 있어요.
-              </p>
-
-              <div className="mt-4 space-y-2.5">
-                {STUDENT_MANUAL_PENALTY_RULE_ROWS.map((row) => (
-                  <PenaltyRuleRow
-                    key={row.key}
-                    category={row.category}
-                    pointsLabel={row.pointsLabel}
-                    detail={row.detail}
-                    tone={row.tone}
-                  />
-                ))}
-              </div>
-
-              <div className={cn('mt-4 grid gap-2', isMobileView ? 'grid-cols-1' : 'grid-cols-3')}>
-                {STUDENT_PENALTY_STAGE_RULES.map((rule) => {
-                  const toneClass = getManualToneClass(rule.tone);
-                  return (
-                    <div key={rule.key} className={cn('rounded-[1.25rem] border px-4 py-3', toneClass.surface)}>
-                      <p className={cn('inline-flex rounded-full border px-2.5 py-1 text-[10px] font-black', toneClass.badge)}>
-                        {rule.threshold}
-                      </p>
-                      <p className="mt-2 text-[12px] font-black leading-5 text-[#17326B] break-keep">{rule.action}</p>
-                    </div>
-                  );
-                })}
-              </div>
-
-              <div className="mt-4 rounded-[1.25rem] border border-[#F1B7C8] bg-white/80 px-4 py-3">
-                <p className="text-[11px] font-black uppercase tracking-[0.18em] text-[#C13D68]">중요</p>
-                <p className="mt-1 text-[11.5px] font-semibold leading-5 text-[#6F4960] break-keep">
-                  심각한 경우에는 누적 점수와 무관하게 즉시 귀가 조치, 보호자 통보, 퇴원 검토가 진행될 수 있어요.
-                </p>
-              </div>
-            </section>
-
-            <section className="rounded-[1.75rem] border border-[#D9E1F2] bg-white p-5 shadow-[0_18px_40px_-32px_rgba(10,28,72,0.18)]">
-              <div className="flex items-center gap-2">
-                <Lightbulb className="h-4 w-4 text-[#FF7A16]" />
-                <p className="text-[11px] font-black uppercase tracking-[0.22em] text-[#6781AE]">PRO TIPS</p>
-              </div>
-              <div className="mt-3 space-y-2.5">
-                {STUDENT_MANUAL_PRO_TIPS.map((tip) => (
-                  <div key={tip} className="flex items-start gap-2">
-                    <ChevronRight className="mt-0.5 h-3.5 w-3.5 shrink-0 text-[#FF7A16]" />
-                    <p className="text-[12px] font-semibold leading-5 text-[#17326B] break-keep">{tip}</p>
-                  </div>
-                ))}
-              </div>
-            </section>
+            {isParentMode ? <ParentSupportManualBody isMobileView={isMobileView} /> : <StudentSupportManualBody isMobileView={isMobileView} />}
           </div>
 
           <div className={cn(
             "bg-white border-t shrink-0 flex items-center justify-between",
             isMobileView ? "p-4" : "p-6"
           )}>
-            <p className="text-[11px] font-bold text-[#6781AE]">도움이 더 필요하면 <span className="text-[#FF7A16]">상담</span>으로!</p>
+            <p className="text-[11px] font-bold text-[#6781AE]">
+              {isParentMode ? <>도움이 더 필요하면 <span className="text-[#FF7A16]">소통 탭</span>이나 상담으로!</> : <>도움이 더 필요하면 <span className="text-[#FF7A16]">상담</span>으로!</>}
+            </p>
             <Button onClick={() => setIsSupportOpen(false)} className="rounded-xl font-black px-8 h-12 shadow-lg active:scale-95 transition-all">
               확인했어요
             </Button>
