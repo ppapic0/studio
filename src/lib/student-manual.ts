@@ -96,8 +96,8 @@ export const STUDENT_MANUAL_FIRST_DAY_FLOW: StudentManualHighlight[] = [
   },
   {
     key: 'focus',
-    title: '타이머 켜고 몰입 시작',
-    description: '착석 후 바로 집중 시작하기를 눌러 기록을 남겨요.',
+    title: '키오스크로 공부 시작',
+    description: '착석 후 준비된 키오스크에서 시작 처리하고 자리에서 바로 몰입해요.',
     tone: 'orange',
   },
 ];
@@ -307,7 +307,7 @@ export const STUDENT_PENALTY_STAGE_RULES: StudentPenaltyStageRule[] = [
 ];
 
 export const STUDENT_MANUAL_PRO_TIPS = [
-  '도착 후 5분 안에 휴대폰 반납, 오늘 할 일 확인, 타이머 시작까지 끝내면 흐름이 가장 좋아요.',
+  '도착 후 5분 안에 휴대폰 반납, 오늘 할 일 확인, 키오스크 시작 처리까지 끝내면 흐름이 가장 좋아요.',
   '학습에 필요한 사이트가 막혀 있으면 바로 와이파이 요청을 넣고, 임의로 우회하지 마세요.',
   '잠깐이라도 자리에서 일어나면 타이머부터 정리하는 습관이 벌점을 가장 잘 막아줘요.',
   '규정은 겁주기용이 아니라 몰입과 안전을 지키기 위한 기준이에요. 헷갈리면 바로 선생님께 물어보세요.',

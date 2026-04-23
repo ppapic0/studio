@@ -744,7 +744,7 @@ export function DashboardHeader({ playStudentEntry = false }: DashboardHeaderPro
                 <div className="min-w-0">
                   <p className="text-[10px] font-black uppercase tracking-[0.22em] text-[#B44A00]">FIRST DAY FLOW</p>
                   <p className="mt-1.5 text-[15px] font-black leading-6 text-[#17326B] break-keep">
-                    처음 오면 이것부터: <span className="text-[#FF7A16]">휴대폰 반납</span> → <span className="text-[#FF7A16]">오늘 할 일 확인</span> → <span className="text-[#FF7A16]">집중 시작</span>
+                    처음 오면 이것부터: <span className="text-[#FF7A16]">휴대폰 반납</span> → <span className="text-[#FF7A16]">오늘 할 일 확인</span> → <span className="text-[#FF7A16]">키오스크 시작</span>
                   </p>
                   <p className="mt-2 text-[11.5px] font-semibold leading-5 text-[#5A6F95] break-keep">
                     트랙은 도착 직후의 5분이 하루 분위기를 결정해요. 생활 규정, 러닝 시스템, 벌점 기준까지 아래 순서대로 한 번만 읽으면 바로 적응할 수 있어요.
@@ -803,8 +803,8 @@ export function DashboardHeader({ playStudentEntry = false }: DashboardHeaderPro
               />
               <GuideStep
                 icon={<Play className="h-4 w-4 text-[#2554D7]" />}
-                title="착석 후 바로 집중 시작"
-                body={<>홈 상단의 <Pill>집중 시작하기</Pill>를 눌러 실시간 타이머를 켜고 공부를 시작해요. 트랙에서는 시작 기록이 곧 루틴의 기준이 됩니다.</>}
+                title="착석 후 키오스크로 시작 처리"
+                body={<>공부 시작은 학생 앱 버튼이 아니라 <Pill>준비된 키오스크</Pill>에서 진행해요. 시작 처리가 끝나면 자리에서 바로 몰입하고, 앱에서는 진행 기록을 확인하면 돼요.</>}
               />
               <GuideTip tone="amber">
                 선생님들이 계속 순회하며 휴대폰, 무단이석, 잡담, 태블릿 사용 상태를 확인해요. 애매하면 먼저 물어보는 게 가장 안전해요.
