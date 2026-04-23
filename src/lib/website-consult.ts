@@ -112,7 +112,8 @@ export function isActiveWebsiteConsultReservation(
 }
 
 export function isActiveWebsiteSeatHold(status?: WebsiteSeatHoldRequest['status'] | null) {
-  return status === 'pending_transfer' || status === 'held';
+  // Seats should only be blocked after an admin confirms the deposit.
+  return status === 'held';
 }
 
 export function isAttendanceSeatOccupied(attendance?: Partial<AttendanceCurrent> | null) {
@@ -188,7 +189,7 @@ export function getWebsiteReservationSettings(
 
 function getSeatStatusLabel(status: PublicSeatStatus) {
   if (status === 'occupied') return '사용 중';
-  if (status === 'held') return '좌석예약 진행';
+  if (status === 'held') return '좌석예약 확정';
   return '빈자리';
 }
 

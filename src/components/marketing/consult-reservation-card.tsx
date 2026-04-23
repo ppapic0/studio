@@ -233,7 +233,7 @@ function getConsultReservationStatusLabel(status?: string | null) {
 }
 
 function getSeatHoldStatusLabel(status?: string | null) {
-  if (status === "pending_transfer") return "좌석예약 진행중";
+  if (status === "pending_transfer") return "입금 확인 대기";
   if (status === "held") return "좌석예약 확정";
   if (status === "canceled") return "좌석예약 취소";
   return null;
@@ -878,13 +878,13 @@ export function ConsultReservationCard() {
             <div className="grid gap-3 sm:grid-cols-3">
               <SummaryChip label="빈자리" value={`${seatSummary.availableCount}석`} tone="orange" />
               <SummaryChip label="사용 중" value={`${seatSummary.occupiedCount}석`} tone="light" />
-              <SummaryChip label="좌석예약 진행" value={`${seatSummary.heldCount}석`} tone="light" />
+              <SummaryChip label="좌석예약 확정" value={`${seatSummary.heldCount}석`} tone="light" />
             </div>
 
             <div className="mt-5 flex flex-wrap gap-2 text-[11px] font-bold text-[#14295F]/72">
               <span className="rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1.5">빈자리</span>
               <span className="rounded-full border border-slate-200 bg-slate-100 px-3 py-1.5">사용 중</span>
-              <span className="rounded-full border border-[#ffd9bd] bg-[#fff3e9] px-3 py-1.5">좌석예약 진행</span>
+              <span className="rounded-full border border-[#ffd9bd] bg-[#fff3e9] px-3 py-1.5">좌석예약 확정</span>
             </div>
 
             <div className="mt-6 space-y-5">

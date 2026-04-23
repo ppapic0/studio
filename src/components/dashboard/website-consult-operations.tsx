@@ -108,6 +108,12 @@ const SEAT_HOLD_STATUS_META: Record<WebsiteSeatHoldRequest['status'], string> = 
   canceled: 'border-slate-200 bg-slate-100 text-slate-600',
 };
 
+const SEAT_HOLD_STATUS_LABEL: Record<WebsiteSeatHoldRequest['status'], string> = {
+  pending_transfer: '입금 확인 대기',
+  held: '좌석예약 확정',
+  canceled: '좌석예약 취소',
+};
+
 function getTodayDateInput() {
   return new Intl.DateTimeFormat('en-CA', {
     timeZone: 'Asia/Seoul',
@@ -615,14 +621,28 @@ export function WebsiteConsultOperations() {
   ) {
     setProcessingId(seatHold.id);
     try {
-      await updateDoc(doc(firestore, 'centers', centerId, 'websiteSeatHoldRequests', seatHold.id), {
-        status: nextStatus,
-        updatedAt: new Date().toISOString(),
-        confirmedAt: nextStatus === 'held' ? new Date().toISOString() : null,
-        canceledAt: nextStatus === 'canceled' ? new Date().toISOString() : null,
-        updatedByUid: user?.uid || null,
+      const response = await fetch('/api/dashboard/seat-hold-status', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          centerId,
+          seatHoldId: seatHold.id,
+          nextStatus,
+        }),
       });
-      toast({ title: nextStatus === 'held' ? '좌석예약을 확정했습니다.' : '좌석예약을 해제했습니다.' });
+      const result = await response.json();
+      if (!response.ok || !result?.ok) {
+        throw new Error(result?.message || '좌석예약 상태 변경 중 오류가 발생했습니다.');
+      }
+      toast({
+        title: nextStatus === 'held' ? '좌석예약을 확정했습니다.' : '좌석예약을 해제했습니다.',
+        description:
+          nextStatus === 'held' && Number(result?.canceledCompetingCount || 0) > 0
+            ? `같은 좌석의 대기 ${result.canceledCompetingCount}건도 자동 취소했습니다.`
+            : undefined,
+      });
     } catch (error: any) {
       toast({ variant: 'destructive', title: '좌석예약 상태 변경에 실패했습니다.', description: error?.message });
     } finally {
@@ -1074,7 +1094,7 @@ export function WebsiteConsultOperations() {
                       </p>
                     </div>
                     <Badge className={cn('border font-black', SEAT_HOLD_STATUS_META[seatHold.status])}>
-                      {seatHold.status}
+                      {SEAT_HOLD_STATUS_LABEL[seatHold.status]}
                     </Badge>
                   </div>
 

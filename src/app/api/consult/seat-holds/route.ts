@@ -212,7 +212,7 @@ export async function POST(request: NextRequest) {
         return isActiveWebsiteSeatHold(currentHold.status);
       });
       if (alreadyHeld) {
-        throw new ApiError(409, '방금 다른 보호자가 먼저 좌석예약을 신청했습니다. 다른 자리를 선택해 주세요.');
+        throw new ApiError(409, '이미 확정된 좌석입니다. 다른 자리를 선택해 주세요.');
       }
 
       const settings = getWebsiteReservationSettings(

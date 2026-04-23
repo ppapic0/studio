@@ -210,7 +210,7 @@ const WEBSITE_BOOKING_BADGE_META = {
   locked: { label: '대기', className: 'bg-slate-100 text-slate-600 border-slate-200' },
   reservation_confirmed: { label: '예약접수', className: 'bg-[#eef4ff] text-[#17326B] border-[#dbe5ff]' },
   reservation_completed: { label: '예약확정', className: 'bg-indigo-100 text-indigo-700 border-indigo-200' },
-  seat_hold_pending: { label: '좌석예약 진행중', className: 'bg-[#fff3e9] text-[#c26a1c] border-[#ffd9bd]' },
+  seat_hold_pending: { label: '입금 확인 대기', className: 'bg-[#fff3e9] text-[#c26a1c] border-[#ffd9bd]' },
   seat_hold_held: { label: '좌석예약 확정', className: 'bg-orange-100 text-orange-700 border-orange-200' },
 } as const;
 
