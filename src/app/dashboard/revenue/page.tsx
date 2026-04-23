@@ -272,6 +272,7 @@ export default function RevenuePage() {
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isResetDialogOpen, setIsResetDialogOpen] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [timelineDeleteTarget, setTimelineDeleteTarget] = useState<Invoice | null>(null);
   const [showRiskPanel, setShowRiskPanel] = useState(false);
   const [quickIssueAmount, setQuickIssueAmount] = useState('390000');
   const [timelineMonth, setTimelineMonth] = useState(format(new Date(), 'yyyy-MM'));
@@ -559,7 +560,9 @@ export default function RevenuePage() {
   }, [allInvoices, businessLedgerEntries, paymentRecords, timelineMonth]);
 
   const timelineRows = useMemo(() => {
-    const rows = (allInvoices || []).filter((invoice) => getTimelineInvoiceMonth(invoice) === timelineMonth);
+    const rows = (allInvoices || []).filter(
+      (invoice) => getTimelineInvoiceMonth(invoice) === timelineMonth && invoice.status !== 'void'
+    );
     const trackFiltered = timelineTrackFilter === 'all'
       ? rows
       : rows.filter((invoice) => resolveInvoiceTrackCategory(invoice) === timelineTrackFilter);
@@ -733,6 +736,31 @@ export default function RevenuePage() {
       router.refresh();
     } catch (e: any) {
       toast({ variant: 'destructive', title: '복원 실패', description: e?.message || '다시 시도해 주세요.' });
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleTimelineDelete = async () => {
+    if (!firestore || !centerId || !timelineDeleteTarget) return;
+    setIsSaving(true);
+    try {
+      await clearLegacyInvoiceCollectionData(firestore, centerId, timelineDeleteTarget.id);
+      toast({
+        title: '잘못 생성한 인보이스를 타임라인에서 제거했습니다.',
+        description:
+          timelineDeleteTarget.status === 'paid'
+            ? '연결된 결제 로그도 함께 정리했습니다.'
+            : '무효 처리되어 타임라인과 합계에서 바로 제외됩니다.',
+      });
+      setTimelineDeleteTarget(null);
+      router.refresh();
+    } catch (e: any) {
+      toast({
+        variant: 'destructive',
+        title: '타임라인 삭제 실패',
+        description: e?.message || '다시 시도해 주세요.',
+      });
     } finally {
       setIsSaving(false);
     }
@@ -1613,6 +1641,20 @@ export default function RevenuePage() {
                               </Select>
                             </div>
                           )}
+
+                          <div className="flex items-center justify-end">
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => setTimelineDeleteTarget(inv)}
+                              disabled={isSaving}
+                              className="h-8 rounded-lg px-2 text-[11px] font-black text-rose-600 hover:bg-rose-50 hover:text-rose-700"
+                            >
+                              <Trash2 className="mr-1.5 h-3.5 w-3.5" />
+                              잘못 입력 삭제
+                            </Button>
+                          </div>
                         </div>
                       );
                     })}
@@ -2564,6 +2606,79 @@ export default function RevenuePage() {
               >
                 {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <CalendarX className="mr-2 h-4 w-4" />}
                 운영 시작 초기화
+              </Button>
+            </AlertDialogFooter>
+          </div>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog open={Boolean(timelineDeleteTarget)} onOpenChange={(open) => !open && setTimelineDeleteTarget(null)}>
+        <AlertDialogContent className="overflow-hidden rounded-[2rem] border-none bg-[linear-gradient(180deg,#ffffff_0%,#fff8fb_100%)] p-0 shadow-[0_32px_90px_-42px_rgba(148,27,75,0.42)] sm:max-w-[560px]">
+          <div className="relative overflow-hidden border-b border-rose-100/80 bg-[radial-gradient(circle_at_top_right,rgba(255,122,22,0.12),transparent_36%),linear-gradient(135deg,#fff7fa_0%,#ffffff_68%)] px-6 pb-6 pt-6 sm:px-8">
+            <div className="absolute -right-8 -top-8 h-32 w-32 rounded-full bg-rose-200/35 blur-3xl" />
+            <div className="absolute -left-10 bottom-0 h-24 w-24 rounded-full bg-amber-100/60 blur-2xl" />
+            <AlertDialogHeader className="relative space-y-4 text-left">
+              <div className="flex items-start gap-4">
+                <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-[1.4rem] border border-rose-100 bg-white text-rose-600 shadow-[0_18px_30px_-24px_rgba(225,29,72,0.55)]">
+                  {isSaving ? <Loader2 className="h-6 w-6 animate-spin" /> : <Trash2 className="h-6 w-6" />}
+                </div>
+                <div className="space-y-2">
+                  <p className="text-[10px] font-black uppercase tracking-[0.24em] text-rose-500/80">Timeline Delete</p>
+                  <AlertDialogTitle className="text-[1.5rem] font-black tracking-tight text-slate-950">
+                    잘못 만든 인보이스를 타임라인에서 제거할까요?
+                  </AlertDialogTitle>
+                  <AlertDialogDescription className="max-w-xl text-sm font-semibold leading-relaxed text-slate-600">
+                    인보이스 문서는 `void`로 바뀌고 타임라인/합계에서는 숨겨집니다. 이미 수납 완료된 항목이면 연결 결제 로그도 함께 정리됩니다.
+                  </AlertDialogDescription>
+                </div>
+              </div>
+            </AlertDialogHeader>
+          </div>
+
+          <div className="space-y-4 px-6 pb-6 pt-5 sm:px-8">
+            <div className="rounded-[1.5rem] border border-slate-200/80 bg-white/90 p-5 shadow-[0_18px_44px_-36px_rgba(15,23,42,0.26)]">
+              <div className="flex items-start justify-between gap-3">
+                <div className="space-y-1">
+                  <p className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-400">삭제 대상</p>
+                  <p className="text-base font-black tracking-tight text-slate-900">
+                    {timelineDeleteTarget?.studentName || '학생'} 학생
+                  </p>
+                  <p className="text-[11px] font-semibold leading-relaxed text-slate-500">
+                    이용 기간 {timelineDeleteTarget?.cycleStartDate ? format(timelineDeleteTarget.cycleStartDate.toDate(), 'yyyy.MM.dd') : '-'} ~ {timelineDeleteTarget?.cycleEndDate ? format(timelineDeleteTarget.cycleEndDate.toDate(), 'yyyy.MM.dd') : '-'}
+                  </p>
+                </div>
+                <div className="text-right">
+                  <p className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-400">금액</p>
+                  <p className="mt-1 text-lg font-black tracking-tight text-slate-900">
+                    {formatWon(Number(timelineDeleteTarget?.finalPrice || 0))}
+                  </p>
+                  {timelineDeleteTarget ? getStatusBadge(timelineDeleteTarget.status) : null}
+                </div>
+              </div>
+            </div>
+
+            <div className="flex items-start gap-3 rounded-[1.4rem] border border-amber-200 bg-amber-50/80 p-4 text-left">
+              <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-600" />
+              <div className="space-y-1">
+                <p className="text-xs font-black tracking-tight text-amber-900">실수로 만든 항목 정리용입니다.</p>
+                <p className="text-[11px] font-semibold leading-relaxed text-amber-800">
+                  학생, 금액, 기간이 맞는지 확인한 뒤 실행해 주세요. 삭제 후에는 이 타임라인 월의 카드와 합계에서도 바로 제외됩니다.
+                </p>
+              </div>
+            </div>
+
+            <AlertDialogFooter className="gap-2 border-t border-slate-100 pt-4 sm:gap-2">
+              <AlertDialogCancel className="rounded-2xl border-slate-200 bg-white font-black text-slate-600 hover:bg-slate-50">
+                취소
+              </AlertDialogCancel>
+              <Button
+                type="button"
+                onClick={handleTimelineDelete}
+                disabled={isSaving || !timelineDeleteTarget}
+                className="rounded-2xl bg-[linear-gradient(135deg,#E11D48_0%,#F43F5E_100%)] px-5 font-black text-white shadow-[0_18px_36px_-20px_rgba(225,29,72,0.6)] transition-all hover:-translate-y-0.5 hover:shadow-[0_24px_44px_-20px_rgba(225,29,72,0.7)]"
+              >
+                {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Trash2 className="mr-2 h-4 w-4" />}
+                타임라인에서 제거
               </Button>
             </AlertDialogFooter>
           </div>
