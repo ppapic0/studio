@@ -96,6 +96,12 @@ const RESERVATION_STATUS_META: Record<WebsiteConsultReservation['status'], strin
   completed: 'border-[#dbe5ff] bg-[#eef4ff] text-[#17326B]',
 };
 
+const RESERVATION_STATUS_LABEL: Record<WebsiteConsultReservation['status'], string> = {
+  confirmed: '예약 접수',
+  canceled: '예약 취소',
+  completed: '예약 확정',
+};
+
 const SEAT_HOLD_STATUS_META: Record<WebsiteSeatHoldRequest['status'], string> = {
   pending_transfer: 'border-[#ffd9bd] bg-[#fff4eb] text-[#c26a1c]',
   held: 'border-emerald-200 bg-emerald-50 text-emerald-700',
@@ -319,7 +325,7 @@ export function WebsiteConsultOperations() {
   const summary = useMemo(
     () => ({
       publishedSlots: slots.filter((slot) => slot.isPublished && toDateMs(slot.endsAt) >= Date.now()).length,
-      confirmedReservations: reservations.filter((item) => item.status === 'confirmed').length,
+      activeReservations: reservations.filter((item) => isActiveWebsiteConsultReservation(item.status)).length,
       pendingSeatHolds: seatHolds.filter((item) => item.status === 'pending_transfer').length,
       heldSeats: seatHolds.filter((item) => item.status === 'held').length,
     }),
@@ -595,7 +601,7 @@ export function WebsiteConsultOperations() {
         completedAt: nextStatus === 'completed' ? new Date().toISOString() : null,
         updatedByUid: user?.uid || null,
       });
-      toast({ title: nextStatus === 'canceled' ? '예약을 취소 처리했습니다.' : '예약을 완료 처리했습니다.' });
+      toast({ title: nextStatus === 'canceled' ? '예약을 취소 처리했습니다.' : '예약을 확정 처리했습니다.' });
     } catch (error: any) {
       toast({ variant: 'destructive', title: '예약 상태 변경에 실패했습니다.', description: error?.message });
     } finally {
@@ -681,7 +687,7 @@ export function WebsiteConsultOperations() {
       <div className={cn('grid gap-4', isMobile ? 'grid-cols-2' : 'grid-cols-4')}>
         {[
           { label: '공개 슬롯', value: `${summary.publishedSlots}개`, icon: <CalendarClock className="h-4 w-4" /> },
-          { label: '예약 확정', value: `${summary.confirmedReservations}건`, icon: <CheckCircle2 className="h-4 w-4" /> },
+          { label: '방문예약', value: `${summary.activeReservations}건`, icon: <CheckCircle2 className="h-4 w-4" /> },
           { label: '입금 대기', value: `${summary.pendingSeatHolds}건`, icon: <Receipt className="h-4 w-4" /> },
           { label: '좌석예약 확정', value: `${summary.heldSeats}건`, icon: <Armchair className="h-4 w-4" /> },
         ].map((item) => (
@@ -972,7 +978,7 @@ export function WebsiteConsultOperations() {
           <CardHeader>
             <CardTitle className="text-xl font-black text-[#14295F]">상담 예약 목록</CardTitle>
             <CardDescription className="font-semibold text-[#5c6e97]">
-              홍보 웹 예약과 센터 전화 수기 예약을 함께 확인하고 취소/완료 처리합니다.
+              홍보 웹 예약과 센터 전화 수기 예약을 함께 확인하고 취소/예약 확정 상태를 관리합니다.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-3">
@@ -1000,7 +1006,7 @@ export function WebsiteConsultOperations() {
                       </p>
                     </div>
                     <Badge className={cn('border font-black', RESERVATION_STATUS_META[reservation.status])}>
-                      {reservation.status}
+                      {RESERVATION_STATUS_LABEL[reservation.status]}
                     </Badge>
                   </div>
                   <div className="mt-3 rounded-[1rem] border border-[#dbe5ff] bg-white px-3 py-3">
@@ -1016,7 +1022,7 @@ export function WebsiteConsultOperations() {
                           onClick={() => void handleReservationStatus(reservation, 'completed')}
                           disabled={processingId === reservation.id}
                         >
-                          완료 처리
+                          예약 확정 처리
                         </Button>
                         <Button
                           type="button"

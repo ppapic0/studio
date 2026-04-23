@@ -36,7 +36,7 @@ import { useAppContext } from '@/contexts/app-context';
 import { useMemoFirebase } from '@/hooks/use-memo-firebase';
 import { useToast } from '@/hooks/use-toast';
 import { canManageLeadRecords, canReadFinance, canTransitionLeadPipeline } from '@/lib/dashboard-access';
-import { getWebsiteBookingAccess } from '@/lib/website-consult';
+import { getWebsiteBookingAccess, isActiveWebsiteConsultReservation } from '@/lib/website-consult';
 import type { WebsiteBookingAccess, WebsiteConsultReservation, WebsiteSeatHoldRequest } from '@/lib/types';
 import { cn } from '@/lib/utils';
 
@@ -208,8 +208,8 @@ const WAITLIST_STATUS_META: Record<WaitlistStatus, { label: string; className: s
 const WEBSITE_BOOKING_BADGE_META = {
   enabled: { label: '예약 가능', className: 'bg-emerald-100 text-emerald-700 border-emerald-200' },
   locked: { label: '대기', className: 'bg-slate-100 text-slate-600 border-slate-200' },
-  reservation_confirmed: { label: '예약완료', className: 'bg-[#eef4ff] text-[#17326B] border-[#dbe5ff]' },
-  reservation_completed: { label: '상담완료', className: 'bg-indigo-100 text-indigo-700 border-indigo-200' },
+  reservation_confirmed: { label: '예약접수', className: 'bg-[#eef4ff] text-[#17326B] border-[#dbe5ff]' },
+  reservation_completed: { label: '예약확정', className: 'bg-indigo-100 text-indigo-700 border-indigo-200' },
   seat_hold_pending: { label: '좌석예약 진행중', className: 'bg-[#fff3e9] text-[#c26a1c] border-[#ffd9bd]' },
   seat_hold_held: { label: '좌석예약 확정', className: 'bg-orange-100 text-orange-700 border-orange-200' },
 } as const;
@@ -1987,7 +1987,7 @@ export function MarketingConsultingCRM({
                       <div className="rounded-[1.25rem] border border-[#dbe5ff] bg-white px-4 py-3 shadow-[0_18px_38px_-34px_rgba(20,41,95,0.22)]">
                         <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#5c6e97]">방문예약</p>
                         <p className="mt-2 text-2xl font-black tracking-tight text-[#14295F]">
-                          {websiteReservations.filter((reservation) => reservation.status === 'confirmed').length}건
+                          {websiteReservations.filter((reservation) => isActiveWebsiteConsultReservation(reservation.status)).length}건
                         </p>
                       </div>
                       <div className="rounded-[1.25rem] border border-[#dbe5ff] bg-white px-4 py-3 shadow-[0_18px_38px_-34px_rgba(20,41,95,0.22)]">

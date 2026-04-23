@@ -106,7 +106,9 @@ export function sortIsoLikeDesc<T>(items: T[], getValue: (item: T) => TimestampL
 export function isActiveWebsiteConsultReservation(
   status?: WebsiteConsultReservation['status'] | null
 ) {
-  return status === 'confirmed';
+  // "completed" is used as an admin-side finalized reservation state, so it must
+  // keep occupying the slot just like an active confirmed reservation.
+  return status === 'confirmed' || status === 'completed';
 }
 
 export function isActiveWebsiteSeatHold(status?: WebsiteSeatHoldRequest['status'] | null) {

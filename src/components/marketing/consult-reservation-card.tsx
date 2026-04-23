@@ -226,8 +226,8 @@ function SummaryChip({ label, value, tone = "default" }: SummaryChipProps) {
 }
 
 function getConsultReservationStatusLabel(status?: string | null) {
-  if (status === "confirmed") return "예약완료";
-  if (status === "completed") return "방문완료";
+  if (status === "confirmed") return "예약접수";
+  if (status === "completed") return "예약확정";
   if (status === "canceled") return "예약취소";
   return null;
 }
