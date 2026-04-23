@@ -52,53 +52,65 @@ export const STUDENT_MANUAL_OPERATION_HIGHLIGHTS: StudentManualHighlight[] = [
   {
     key: 'phone',
     title: '도착 즉시 휴대폰 반납',
-    description: '입실하면 전원을 끄고 지정 장소에 맡겨요.',
+    description: '입실하면 전원을 끄고 지정 장소에 맡겨요. 공부 시작 전에 가장 먼저 끝내야 하는 기본 동작이에요.',
     tone: 'rose',
   },
   {
     key: 'tablet',
     title: '태블릿은 학습용만',
-    description: '인강·문서·문제풀이 외 사용은 바로 제지돼요.',
+    description: '인강, 문서, 문제풀이 외 사용은 바로 제지돼요. 게임, SNS, 웹서핑은 잠깐이어도 규정 위반이에요.',
     tone: 'navy',
+  },
+  {
+    key: 'record',
+    title: '시작·종료 기록이 기준',
+    description: '공부 시작과 종료를 정확히 남겨야 공부 시간, 포인트, 리포트가 맞게 쌓여요.',
+    tone: 'emerald',
   },
   {
     key: 'wifi',
     title: '와이파이는 기본 방화벽',
-    description: '필요한 사이트만 요청 후 화이트리스트로 열어요.',
+    description: '필요한 사이트만 요청 후 화이트리스트로 열어요. 막혀 있으면 우회하지 말고 앱에서 공식 요청해요.',
     tone: 'amber',
   },
   {
     key: 'patrol',
     title: '선생님 수시 순회 관리',
-    description: '분위기 저해 행동은 즉시 지도하고 강하게 반영해요.',
+    description: '분위기 저해 행동은 즉시 지도하고 강하게 반영해요. 애매하면 혼자 판단하지 말고 바로 질문하면 돼요.',
     tone: 'orange',
   },
 ];
 
 export const STUDENT_MANUAL_FIRST_DAY_FLOW: StudentManualHighlight[] = [
   {
-    key: 'arrival',
-    title: '자리 세팅부터',
-    description: '가방, 물, 필기구를 정리하고 오늘 공부 순서를 바로 확인해요.',
+    key: 'home',
+    title: '홈에서 오늘 상태 확인',
+    description: '앱 홈에서 오늘 목표 시간, 알림, 리포트 뱃지, 포인트 상태를 먼저 확인해요.',
     tone: 'navy',
   },
   {
     key: 'phone',
     title: '휴대폰 OFF 후 반납',
-    description: '센터 도착 후 바로 전원을 끄고 지정 장소에 맡겨야 해요.',
+    description: '센터 도착 후 바로 전원을 끄고 지정 장소에 맡겨야 해요. 가방 속 보관도 반납으로 보지 않아요.',
     tone: 'rose',
   },
   {
     key: 'plan',
-    title: '오늘 할 일 체크',
-    description: '계획 탭에서 과목 순서와 목표 분량을 먼저 확인해요.',
+    title: '계획 탭에서 순서 확인',
+    description: '오늘 할 일, 과목 순서, 예상 시간, 목표 분량을 보고 어디서부터 시작할지 정해요.',
     tone: 'amber',
   },
   {
-    key: 'focus',
+    key: 'kiosk',
     title: '키오스크로 공부 시작',
-    description: '착석 후 준비된 키오스크에서 시작 처리하고 자리에서 바로 몰입해요.',
+    description: '착석 후 준비된 키오스크에서 시작 처리하고 자리에서 바로 몰입해요. 시작 기록이 있어야 공부 시간이 맞게 쌓여요.',
     tone: 'orange',
+  },
+  {
+    key: 'finish',
+    title: '끝나면 완료와 종료 정리',
+    description: '공부가 끝난 뒤에는 계획 완료 체크와 종료 기록까지 마무리해야 포인트와 기록이 정확해져요.',
+    tone: 'emerald',
   },
 ];
 
@@ -111,6 +123,8 @@ export const STUDENT_MANUAL_RULE_SECTIONS: StudentManualRuleSection[] = [
     tone: 'navy',
     items: [
       '지각·외출·결석은 반드시 사전에 승인받아야 해요.',
+      '센터에 와도 시작 기록 전에는 공식 공부 시간으로 잡히지 않아요.',
+      '자리를 비울 때도 그냥 나가지 말고 종료 또는 안내를 먼저 받아야 해요.',
       '보호자 확인이 필요한 경우 센터 전용 연락망으로 직접 안내해요.',
       '입실 즉시 휴대폰은 전원 OFF 후 지정 장소에 반납해요.',
     ],
@@ -122,8 +136,10 @@ export const STUDENT_MANUAL_RULE_SECTIONS: StudentManualRuleSection[] = [
     description: '학습 시간에는 조용하고 정돈된 분위기를 유지하는 것이 기본입니다.',
     tone: 'orange',
     items: [
+      '책상에 앉았으면 바로 공부를 시작할 수 있는 상태로 정리해 두는 것이 기본이에요.',
       '학습 시간에는 자리 이동, 잡담, 불필요한 행동을 금지해요.',
       '필기구·책넘김·의자 이동 소리까지 포함해 소음을 최소화해요.',
+      '계획한 공부를 끝냈으면 앱에서 완료 기록까지 남겨야 다음 추천과 포인트가 정확해져요.',
       '음식 섭취는 지정된 공간에서만 가능하고, 휴식 시간에도 과도한 대화는 제한돼요.',
     ],
   },
@@ -136,6 +152,7 @@ export const STUDENT_MANUAL_RULE_SECTIONS: StudentManualRuleSection[] = [
     items: [
       '노트북·태블릿은 인강, 문서 열람, 문제풀이 같은 학습 용도로만 사용 가능해요.',
       '게임, SNS, 영상 시청 등 비학습 콘텐츠는 금지돼요.',
+      '학생 앱은 홈, 계획, 기록, 포인트, 상담 확인용으로 사용하고 다른 앱 탐색은 최소화해요.',
       '센터 와이파이는 방화벽이 적용되어 있고, 필요한 사이트만 요청 후 열 수 있어요.',
       '인강 시 이어폰은 필수이며 소리가 밖으로 새면 바로 지도돼요.',
     ],
@@ -307,9 +324,12 @@ export const STUDENT_PENALTY_STAGE_RULES: StudentPenaltyStageRule[] = [
 ];
 
 export const STUDENT_MANUAL_PRO_TIPS = [
-  '도착 후 5분 안에 휴대폰 반납, 오늘 할 일 확인, 키오스크 시작 처리까지 끝내면 흐름이 가장 좋아요.',
+  '도착 후 5분 안에 홈 확인, 휴대폰 반납, 계획 확인, 키오스크 시작까지 끝내면 하루 흐름이 가장 안정적이에요.',
+  '홈은 오늘 상태 확인용, 계획은 할 일 작성·완료 체크용, 기록은 복기용, 포인트는 보상 확인용이라고 생각하면 빨라요.',
+  '계획을 끝냈다면 바로 완료 체크를 남기세요. 기록이 늦어질수록 실제 공부량과 앱 데이터가 어긋나요.',
+  '계획 완수 포인트는 한 번 누를 때마다 쌓이지만, 같은 할 일은 중복 적립되지 않고 하루 제한도 있어요.',
   '학습에 필요한 사이트가 막혀 있으면 바로 와이파이 요청을 넣고, 임의로 우회하지 마세요.',
-  '잠깐이라도 자리에서 일어나면 타이머부터 정리하는 습관이 벌점을 가장 잘 막아줘요.',
+  '잠깐이라도 자리에서 일어나면 종료 또는 선생님 안내부터 받는 습관이 벌점을 가장 잘 막아줘요.',
   '규정은 겁주기용이 아니라 몰입과 안전을 지키기 위한 기준이에요. 헷갈리면 바로 선생님께 물어보세요.',
 ];
 

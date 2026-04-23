@@ -343,10 +343,10 @@ function StudentSupportManualBody({ isMobileView }: { isMobileView: boolean }) {
           <div className="min-w-0">
             <p className="text-[10px] font-black uppercase tracking-[0.22em] text-[#B44A00]">FIRST DAY FLOW</p>
             <p className="mt-1.5 text-[15px] font-black leading-6 text-[#17326B] break-keep">
-              처음 오면 이것부터: <span className="text-[#FF7A16]">휴대폰 반납</span> → <span className="text-[#FF7A16]">오늘 할 일 확인</span> → <span className="text-[#FF7A16]">키오스크 시작</span>
+              처음 오면 이것부터: <span className="text-[#FF7A16]">홈 확인</span> → <span className="text-[#FF7A16]">휴대폰 반납</span> → <span className="text-[#FF7A16]">계획 확인</span> → <span className="text-[#FF7A16]">키오스크 시작</span>
             </p>
             <p className="mt-2 text-[11.5px] font-semibold leading-5 text-[#5A6F95] break-keep">
-              트랙은 도착 직후의 5분이 하루 분위기를 결정해요. 생활 규정, 러닝 시스템, 벌점 기준까지 아래 순서대로 한 번만 읽으면 바로 적응할 수 있어요.
+              트랙은 도착 직후의 5분이 하루 분위기를 결정해요. 아래 안내는 학생이 실제로 쓰는 <span className="font-black text-[#17326B]">홈 · 포인트 · 기록 · 계획 · 상담</span> 메뉴 순서에 맞춰 정리했어요. 한 번만 읽어도 설명 없이 바로 적응할 수 있게 구성했어요.
             </p>
           </div>
         </div>
@@ -391,74 +391,87 @@ function StudentSupportManualBody({ isMobileView }: { isMobileView: boolean }) {
         tintColor="#EAF0FC"
       >
         <GuideStep
+          icon={<BookOpen className="h-4 w-4 text-[#2554D7]" />}
+          title="홈에서 오늘 상태 먼저 보기"
+          body={<>하단 <Pill>홈</Pill>에서 오늘 목표 시간, 포인트 변화, 열릴 상자, 읽지 않은 리포트나 알림이 있는지 먼저 확인하세요. 오늘 공부 흐름을 한눈에 잡는 화면이에요.</>}
+        />
+        <GuideStep
           icon={<Smartphone className="h-4 w-4 text-[#2554D7]" />}
           title="도착 즉시 휴대폰 반납"
           body={<>센터에 도착하면 <Pill tone="rose">전원 OFF 후 반납</Pill>이 먼저예요. 가방에 계속 소지하고 있으면 바로 지도 대상이 됩니다.</>}
         />
         <GuideStep
           icon={<CalendarDays className="h-4 w-4 text-[#2554D7]" />}
-          title="오늘 할 일부터 확인"
-          body={<>하단 <Pill>계획</Pill> 탭이나 홈 카드에서 오늘 과목, 순서, 목표 분량을 먼저 보고 공부 흐름을 고정하세요.</>}
+          title="계획에서 오늘 할 일 순서 고정"
+          body={<>하단 <Pill>계획</Pill>에서 오늘 과목, 순서, 목표 분량, 예상 시간을 먼저 보고 어느 공부부터 시작할지 정하세요. 계획이 비어 있으면 템플릿이나 전날 계획 복사로 바로 만들 수 있어요.</>}
         />
         <GuideStep
           icon={<Play className="h-4 w-4 text-[#2554D7]" />}
           title="착석 후 키오스크로 시작 처리"
-          body={<>공부 시작은 학생 앱 버튼이 아니라 <Pill>준비된 키오스크</Pill>에서 진행해요. 시작 처리가 끝나면 자리에서 바로 몰입하고, 앱에서는 진행 기록을 확인하면 돼요.</>}
+          body={<>공부 시작은 학생 앱 버튼이 아니라 <Pill>준비된 키오스크</Pill>에서 진행해요. 시작 처리가 끝나야 실제 공부 시간, 리포트, 포인트 흐름이 정확하게 쌓여요.</>}
         />
         <GuideTip tone="amber">
-          선생님들이 계속 순회하며 휴대폰, 무단이석, 잡담, 태블릿 사용 상태를 확인해요. 애매하면 먼저 물어보는 게 가장 안전해요.
+          선생님들이 계속 순회하며 휴대폰, 무단이석, 잡담, 태블릿 사용 상태를 확인해요. 화장실이나 상담처럼 잠깐 자리 비울 때도 먼저 종료 또는 안내를 받는 습관이 가장 중요해요.
         </GuideTip>
       </GuideSection>
 
       <GuideSection
         step={2}
-        title="러닝 시스템 활용"
+        title="러닝 시스템 핵심 화면"
         icon={<Gift className="h-5 w-5" />}
         accentColor="#FF7A16"
         tintColor="#FFF0DE"
       >
         <GuideStep
-          icon={<Square className="h-4 w-4 text-[#FF7A16]" />}
-          title="자리 비울 때는 종료 먼저"
-          body={<>화장실, 상담, 잠깐 이석도 먼저 <Pill tone="orange">공부 종료하기</Pill>를 눌러요. 타이머를 켠 채 자리를 비우면 기록과 분위기 둘 다 어긋나요.</>}
+          icon={<BookOpen className="h-4 w-4 text-[#FF7A16]" />}
+          title="홈은 오늘 상황판"
+          body={<>하단 <Pill>홈</Pill>에서는 오늘 공부 시간, 남은 목표, 열 수 있는 상자, 새 리포트, 주요 알림을 바로 볼 수 있어요. 오늘 센터 생활을 여는 기본 화면이라고 생각하면 돼요.</>}
+        />
+        <GuideStep
+          icon={<Target className="h-4 w-4 text-[#FF7A16]" />}
+          title="계획은 실행용 화면"
+          body={<>하단 <Pill>계획</Pill>에서 오늘 할 일을 추가하고, 끝난 공부는 완료 체크로 남겨요. 완료 기록은 다음 추천과 분석의 기준이 되고, 계획 완수 포인트도 이 흐름에서 적립돼요.</>}
         />
         <GuideStep
           icon={<Trophy className="h-4 w-4 text-[#FF7A16]" />}
-          title="포인트와 리워드 상자"
-          body={<>공부 시간만큼 <Pill tone="orange">러닝 포인트</Pill>가 쌓이고, 누적 시간 기준을 넘기면 상자가 열려요. 홈과 <Pill tone="orange">포인트</Pill> 탭에서 바로 확인할 수 있어요.</>}
+          title="포인트는 보상 확인용 화면"
+          body={<>하단 <Pill tone="orange">포인트</Pill>에서는 공부 시간으로 쌓인 포인트, 리워드 상자, 랭킹 보상 흐름을 확인해요. 상자는 열릴 때 바로 확인하고, 포인트 내역은 날짜별로 복기할 수 있어요.</>}
         />
         <GuideStep
-          icon={<FileText className="h-4 w-4 text-[#FF7A16]" />}
-          title="리포트는 바로 반영"
-          body={<>선생님 리포트가 오면 뱃지가 떠요. 피드백을 읽고 다음 세션에 즉시 반영하는 학생이 가장 빨리 성장해요.</>}
+          icon={<History className="h-4 w-4 text-[#FF7A16]" />}
+          title="기록은 복기용 화면"
+          body={<>하단 <Pill>기록</Pill>에서는 세션 히스토리, 일자별 공부 시간, 주간 흐름, 완료 기록을 다시 볼 수 있어요. 오늘 공부가 실제로 어떻게 흘렀는지 확인하는 화면이에요.</>}
         />
         <GuideTip>
-          포인트보다 중요한 건 기록의 정확성이에요. 제대로 시작하고 제대로 종료하는 습관이 먼저예요.
+          홈에서 상태를 보고, 계획에서 실행하고, 기록에서 복기하고, 포인트에서 보상을 확인한다고 생각하면 러닝 시스템이 가장 쉽게 정리돼요.
         </GuideTip>
       </GuideSection>
 
       <GuideSection
         step={3}
-        title="계획·기록·요청"
+        title="공부 중 꼭 하는 행동"
         icon={<History className="h-5 w-5" />}
         accentColor="#17326B"
         tintColor="#E7ECF7"
       >
         <GuideStep
           icon={<Target className="h-4 w-4 text-[#17326B]" />}
-          title="오늘 할 일과 루틴"
-          body={<>하단 <Pill>계획</Pill>에서 오늘 분량을 체크하고, 매일 비슷한 시간에 오고 가는 루틴을 만드는 게 핵심이에요.</>}
+          title="끝난 공부는 바로 완료 기록"
+          body={<>공부가 끝났으면 미루지 말고 <Pill>계획</Pill>에서 바로 완료 체크를 남기세요. 완수율과 걸린 시간을 같이 적어두면 다음 계획 추천과 리포트가 훨씬 정확해져요.</>}
         />
         <GuideStep
-          icon={<History className="h-4 w-4 text-[#17326B]" />}
-          title="기록 탭으로 성장 확인"
-          body={<>하단 <Pill>기록</Pill>에서는 세션 히스토리, 일자별 공부 시간, 주간 추세를 볼 수 있어요. 감이 아니라 기록으로 공부를 봐야 해요.</>}
+          icon={<Square className="h-4 w-4 text-[#17326B]" />}
+          title="자리 비울 때는 종료 먼저"
+          body={<>화장실, 상담, 잠깐 이석도 먼저 <Pill tone="orange">공부 종료하기</Pill>를 눌러요. 타이머를 켠 채 자리를 비우면 기록과 분위기 둘 다 어긋나요.</>}
         />
         <GuideStep
           icon={<MessageCircle className="h-4 w-4 text-[#17326B]" />}
-          title="상담·와이파이 요청은 앱에서"
-          body={<>진로, 학습, 생활 상담은 <Pill>상담</Pill>에서, 학습 사이트 요청은 <Pill tone="amber">와이파이 요청</Pill>에서 남겨요. 임의 우회보다 공식 요청이 원칙이에요.</>}
+          title="막히면 앱으로 바로 요청"
+          body={<>진로, 학습, 생활 상담은 <Pill>상담</Pill>에서, 학습 사이트 요청은 <Pill tone="amber">와이파이 요청</Pill>에서 남겨요. 혼자 해결하려고 우회하기보다 공식 요청을 남기는 게 원칙이에요.</>}
         />
+        <GuideTip tone="amber">
+          러닝 시스템은 “지금 상태를 정확히 남기는 학생”에게 가장 유리해요. 시작, 종료, 완료 기록만 정확해도 피드백 품질이 눈에 띄게 좋아져요.
+        </GuideTip>
       </GuideSection>
 
       <GuideSection
@@ -483,8 +496,40 @@ function StudentSupportManualBody({ isMobileView }: { isMobileView: boolean }) {
           title="이어폰은 필수"
           body={<>인강은 반드시 이어폰으로만 듣고, 소리가 새지 않게 해야 해요. 주변 학생 집중을 깨면 바로 지도 대상이에요.</>}
         />
+        <GuideStep
+          icon={<MessageCircle className="h-4 w-4 text-[#D97706]" />}
+          title="요청은 URL과 이유를 함께"
+          body={<>학습에 필요한 사이트가 막혀 있으면 사이트 주소와 필요한 이유를 같이 적어 요청하세요. 그래야 더 빠르게 승인되고 같은 실수가 반복되지 않아요.</>}
+        />
         <GuideTip tone="amber">
           차단된 사이트가 필요하면 URL과 이유를 적어 바로 요청하세요. “잠깐이니까” 하며 우회하는 행동이 가장 크게 누적됩니다.
+        </GuideTip>
+      </GuideSection>
+
+      <GuideSection
+        step={5}
+        title="하루 마감 루틴"
+        icon={<CheckCircle2 className="h-5 w-5" />}
+        accentColor="#0F8A5B"
+        tintColor="#E8F8F0"
+      >
+        <GuideStep
+          icon={<Square className="h-4 w-4 text-[#0F8A5B]" />}
+          title="마지막 공부 종료 처리"
+          body={<>집중이 끝났으면 종료 기록부터 정확히 남겨요. 종료가 안 되어 있으면 실제 공부 시간과 앱 기록이 계속 어긋날 수 있어요.</>}
+        />
+        <GuideStep
+          icon={<History className="h-4 w-4 text-[#0F8A5B]" />}
+          title="기록과 포인트를 짧게 복기"
+          body={<>하단 <Pill>기록</Pill>과 <Pill tone="orange">포인트</Pill>에서 오늘 시간이 맞게 쌓였는지, 완료 체크가 빠진 과목은 없는지 1분만 확인하세요.</>}
+        />
+        <GuideStep
+          icon={<CalendarDays className="h-4 w-4 text-[#0F8A5B]" />}
+          title="내일 계획의 첫 과목만 정해두기"
+          body={<>하루를 마칠 때 내일 가장 먼저 할 과목 하나만 정해두면 다음날 시작 속도가 훨씬 빨라져요. 완벽하게 다 짜기보다 첫 진입만 만들어 두면 돼요.</>}
+        />
+        <GuideTip>
+          잘하는 학생일수록 마감 루틴이 짧고 정확해요. 종료, 복기, 내일 첫 과목 설정 이 세 가지만 해도 적응 속도가 크게 달라져요.
         </GuideTip>
       </GuideSection>
 
