@@ -23,8 +23,10 @@ import {
 import type { SeatGenderPolicy } from '@/lib/types';
 
 export const WEBSITE_RESERVATION_SETTINGS_DOC_ID = 'default';
-export const DEFAULT_WEBSITE_BANK_ACCOUNT_DISPLAY =
+const LEGACY_WEBSITE_BANK_ACCOUNT_DISPLAY =
   '1005104905953 / 김재윤(트랙 관리형 스터디센터)';
+export const DEFAULT_WEBSITE_BANK_ACCOUNT_DISPLAY =
+  '1002461010935 / 김재윤';
 export const DEFAULT_WEBSITE_DEPOSITOR_GUIDE = '학생이름(학교)로 보내주세요.';
 export const DEFAULT_WEBSITE_DEPOSIT_AMOUNT = 50000;
 const LEGACY_WEBSITE_NON_REFUNDABLE_NOTICE =
@@ -152,6 +154,10 @@ export function getWebsiteBookingAccess(
 export function getWebsiteReservationSettings(
   settings?: Partial<WebsiteReservationSettings> | null
 ): WebsiteReservationSettings {
+  const normalizedBankAccountDisplay =
+    settings?.bankAccountDisplay?.trim() === LEGACY_WEBSITE_BANK_ACCOUNT_DISPLAY
+      ? DEFAULT_WEBSITE_BANK_ACCOUNT_DISPLAY
+      : settings?.bankAccountDisplay?.trim();
   const normalizedNonRefundableNotice =
     settings?.nonRefundableNotice?.trim() === LEGACY_WEBSITE_NON_REFUNDABLE_NOTICE
       ? DEFAULT_WEBSITE_NON_REFUNDABLE_NOTICE
@@ -171,7 +177,7 @@ export function getWebsiteReservationSettings(
     id: WEBSITE_RESERVATION_SETTINGS_DOC_ID,
     centerId: settings?.centerId ?? null,
     isPublicEnabled: settings?.isPublicEnabled ?? true,
-    bankAccountDisplay: settings?.bankAccountDisplay?.trim() || DEFAULT_WEBSITE_BANK_ACCOUNT_DISPLAY,
+    bankAccountDisplay: normalizedBankAccountDisplay || DEFAULT_WEBSITE_BANK_ACCOUNT_DISPLAY,
     depositAmount:
       Number.isFinite(settings?.depositAmount) && Number(settings?.depositAmount) > 0
         ? Number(settings?.depositAmount)
