@@ -92,7 +92,6 @@ import {
   type StudyPlanItem,
   type StudentProfile,
 } from '@/lib/types';
-import { ROUTINE_MISSING_PENALTY_POINTS } from '@/lib/attendance-auto';
 import {
   buildAwayTimeInsight,
   buildRhythmInsight,
@@ -100,6 +99,13 @@ import {
   buildWeeklyStudyInsight,
 } from '@/lib/learning-insights';
 import { getInvoiceCollectionEndDate } from '@/lib/invoice-collection-window';
+import {
+  PENALTY_RECOVERY_INTERVAL_DAYS,
+  REQUEST_PENALTY_POINTS,
+  STUDENT_MANUAL_PENALTY_RULE_ROWS,
+  STUDENT_PENALTY_STAGE_RULES,
+  getManualToneClass,
+} from '@/lib/student-manual';
 
 import { Badge } from '../ui/badge';
 import { Button } from '../ui/button';
@@ -1612,8 +1618,6 @@ const QUICK_REQUEST_TEMPLATES: Record<ParentQuickRequestKey, string> = {
 };
 
 const SUBJECT_COLORS = ['#FF7A16', '#14295F', '#10B981', '#0EA5E9', '#A855F7'];
-const REQUEST_PENALTY_POINTS: Record<'late' | 'absence', number> = { late: 1, absence: 2 };
-const PENALTY_RECOVERY_INTERVAL_DAYS = 7;
 
 type TimestampLike = { toDate?: () => Date } | Date | string | null | undefined;
 
@@ -5282,24 +5286,58 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
             </DialogDescription>
           </div>
 
-          <div className="space-y-3 bg-white p-6">
+            <div className="space-y-3 bg-white p-6">
             <div className="rounded-2xl border border-rose-100 bg-rose-50/50 p-4">
-              <p className="text-[11px] font-black uppercase tracking-widest text-rose-600">벌점 부여 기준</p>
-              <div className="mt-2 space-y-1.5 text-sm font-bold text-slate-700">
-                <p>지각 출석: +{REQUEST_PENALTY_POINTS.late}점</p>
-                <p>결석: +{REQUEST_PENALTY_POINTS.absence}점</p>
-                <p>루틴 미작성: +{ROUTINE_MISSING_PENALTY_POINTS}점</p>
-                <p>센터 수동 부여: 관리자가 설정한 점수</p>
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <p className="text-[11px] font-black uppercase tracking-widest text-rose-600">생활규정 벌점표</p>
+                  <p className="mt-1 text-xs font-bold leading-5 text-slate-500">
+                    자동 벌점과 생활규정 기반 수동 부여 기준을 함께 안내합니다.
+                  </p>
+                </div>
+                <Badge variant="outline" className="h-7 rounded-full border border-rose-200 bg-white px-3 text-[10px] font-black text-rose-600">
+                  기본 기준
+                </Badge>
+              </div>
+
+              <div className="mt-4 space-y-2.5">
+                {STUDENT_MANUAL_PENALTY_RULE_ROWS.map((row) => {
+                  const toneClass = getManualToneClass(row.tone);
+                  return (
+                    <div key={row.key} className="grid grid-cols-[minmax(0,1.25fr)_auto] gap-3 rounded-[1.2rem] border border-white/90 bg-white/95 px-3.5 py-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.9)]">
+                      <div className="min-w-0">
+                        <p className="text-sm font-black leading-5 text-[#14295F] break-keep">{row.category}</p>
+                        <p className="mt-1 text-[12px] font-semibold leading-5 text-slate-600 break-keep">{row.detail}</p>
+                      </div>
+                      <div className="flex items-start justify-end">
+                        <span className={cn('rounded-full border px-2.5 py-1 text-[10px] font-black whitespace-nowrap', toneClass.badge)}>
+                          {row.pointsLabel}
+                        </span>
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
             </div>
 
             <div className="rounded-2xl border border-amber-100 bg-amber-50/50 p-4">
               <p className="text-[11px] font-black uppercase tracking-widest text-amber-700">누적 단계 기준</p>
-              <div className="mt-2 space-y-1.5 text-sm font-bold text-slate-700">
-                <p>7점 이상: 선생님과 상담</p>
-                <p>12점 이상: 학부모 상담</p>
-                <p>20점 이상: 퇴원</p>
+              <div className="mt-3 grid gap-2 sm:grid-cols-3">
+                {STUDENT_PENALTY_STAGE_RULES.map((rule) => {
+                  const toneClass = getManualToneClass(rule.tone);
+                  return (
+                    <div key={rule.key} className={cn('rounded-[1.15rem] border px-3.5 py-3', toneClass.surface)}>
+                      <p className={cn('inline-flex rounded-full border px-2.5 py-1 text-[10px] font-black', toneClass.badge)}>
+                        {rule.threshold}
+                      </p>
+                      <p className="mt-2 text-sm font-black leading-5 text-[#14295F] break-keep">{rule.action}</p>
+                    </div>
+                  );
+                })}
               </div>
+              <p className="mt-3 text-xs font-bold leading-5 text-slate-600">
+                반복 위반, 방화벽 우회, 시설 훼손, 타인 피해처럼 심각한 사안은 누적 점수와 무관하게 즉시 귀가 또는 퇴원 검토가 가능합니다.
+              </p>
             </div>
 
             <div className="rounded-2xl border border-emerald-100 bg-emerald-50/50 p-4">

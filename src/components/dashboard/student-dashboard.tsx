@@ -87,7 +87,6 @@ import {
 } from '@/components/dashboard/student-home-game-panel';
 import { computePlannerStreak } from '@/lib/plan-track';
 import {
-  ROUTINE_MISSING_PENALTY_POINTS,
   syncAutoAttendanceRecord,
   toDateSafe as toDateSafeAttendance,
 } from '@/lib/attendance-auto';
@@ -138,6 +137,10 @@ import {
   getStudyDayKey,
   hasStudyBoxCarryoverExpired,
 } from '@/lib/study-day';
+import {
+  REQUEST_PENALTY_POINTS,
+  STUDENT_PENALTY_GUIDE_ITEMS,
+} from '@/lib/student-manual';
 
 const ACTIVE_ATTENDANCE_STATUSES: AttendanceCurrent['status'][] = ['studying', 'away', 'break'];
 const STUDY_BOX_CLAIM_CACHE_PREFIX = 'student-dashboard:claimed-boxes';
@@ -194,11 +197,6 @@ function toKoreanSubjectLabel(raw?: string | null): string | undefined {
   return source;
 }
 
-const REQUEST_PENALTY_POINTS: Record<'late' | 'absence', number> = {
-  late: 1,
-  absence: 2,
-};
-
 const REQUEST_TYPE_LABEL: Record<'late' | 'absence', string> = {
   late: '지각',
   absence: '결석',
@@ -210,37 +208,6 @@ const PENALTY_SOURCE_LABEL: Record<PenaltyLog['source'], string> = {
   reset: '초기화',
   routine_missing: '루틴 미실행',
 };
-
-const STUDENT_PENALTY_GUIDE_ITEMS = [
-  {
-    key: 'late',
-    title: '지각 신청',
-    description: '지각으로 출석을 바꾸면 자동 반영돼요.',
-    pointsLabel: `+${REQUEST_PENALTY_POINTS.late}점`,
-    tone: 'border-amber-100 bg-amber-50/70 text-amber-700',
-  },
-  {
-    key: 'absence',
-    title: '결석 신청',
-    description: '결석 신청이 접수되면 벌점이 함께 반영돼요.',
-    pointsLabel: `+${REQUEST_PENALTY_POINTS.absence}점`,
-    tone: 'border-rose-100 bg-rose-50/70 text-rose-600',
-  },
-  {
-    key: 'routine',
-    title: '루틴 미작성',
-    description: '등원 전 루틴을 쓰지 않으면 자동으로 기록돼요.',
-    pointsLabel: `+${ROUTINE_MISSING_PENALTY_POINTS}점`,
-    tone: 'border-sky-100 bg-sky-50/70 text-sky-700',
-  },
-  {
-    key: 'manual',
-    title: '센터 규정 위반',
-    description: '수업·생활 규정 위반은 선생님이 직접 반영할 수 있어요.',
-    pointsLabel: '센터 기준',
-    tone: 'border-slate-200 bg-slate-50 text-slate-700',
-  },
-] as const;
 
 type RankRange = 'daily' | 'weekly' | 'monthly';
 
@@ -4058,9 +4025,9 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
                       ))}
                     </div>
                     <div className="rounded-[1.35rem] border border-[#E8EEF8] bg-[#F7F9FD] px-4 py-3 text-[12px] font-semibold leading-5 text-[#5A6F95]">
-                      벌점은 학생을 혼내기 위한 게 아니라, 루틴을 지키는 기준을 분명하게 보여주기 위한 기록이에요.
+                      벌점은 학생을 혼내기 위한 게 아니라, 센터 루틴을 분명하게 지키기 위한 운영 기록이에요.
                       <span className="mt-1 block text-[#17326B]">
-                        센터마다 세부 생활 규정은 조금 다를 수 있으니 헷갈리면 선생님께 바로 확인해 주세요.
+                        도착 즉시 휴대폰 반납, 태블릿 학습용 사용, 방화벽 우회 금지, 잡담·소음 최소화만 지켜도 대부분의 벌점을 피할 수 있어요.
                       </span>
                     </div>
                   </div>
