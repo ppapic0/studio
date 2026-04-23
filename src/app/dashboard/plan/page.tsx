@@ -56,7 +56,6 @@ import {
   serverTimestamp,
   writeBatch,
   setDoc,
-  increment,
   limit,
   arrayUnion,
 } from 'firebase/firestore';
@@ -89,6 +88,10 @@ import { useToast } from '@/hooks/use-toast';
 import { getSafeErrorMessage } from '@/lib/exposed-error';
 import { logHandledClientIssue } from '@/lib/handled-client-log';
 import { applyPenaltyEventSecure } from '@/lib/penalty-actions';
+import {
+  claimPlannerCompletionRewardSecure,
+  PLANNER_COMPLETION_DAILY_REWARD_LIMIT,
+} from '@/lib/planner-completion-reward-actions';
 import { cn } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
@@ -2009,7 +2012,14 @@ export default function StudyPlanPage() {
     nextCompletedCount: number,
     totalTaskCount: number
   ) => {
-    if (!progressRef || !selectedDateKey) return 0;
+    if (!progressRef || !selectedDateKey || !activeMembership || !studentUid) {
+      return {
+        awardedPoints: 0,
+        alreadyClaimed: false,
+        dailyLimitReached: false,
+        rewardErrorMessage: null as string | null,
+      };
+    }
 
     const existingDayStatus = (progress?.dailyPointStatus?.[selectedDateKey] || {}) as Record<string, any>;
     const nextDayStatus: Record<string, any> = {
@@ -2058,20 +2068,44 @@ export default function StudyPlanPage() {
       }
     }
 
-    if (Object.keys(nextDayStatus).length > Object.keys(existingDayStatus).length) {
-      await setDoc(progressRef, {
-        dailyPointStatus: {
-          [selectedDateKey]: {
-            ...nextDayStatus,
-            updatedAt: serverTimestamp(),
+    try {
+      if (Object.keys(nextDayStatus).length > Object.keys(existingDayStatus).length) {
+        await setDoc(progressRef, {
+          dailyPointStatus: {
+            [selectedDateKey]: {
+              ...nextDayStatus,
+              updatedAt: serverTimestamp(),
+            },
           },
-        },
-        updatedAt: serverTimestamp(),
-      }, { merge: true });
+          updatedAt: serverTimestamp(),
+        }, { merge: true });
+      }
+    } catch (error) {
+      logHandledClientIssue('[planner] failed to update completion progress flags', error);
     }
 
-    return 0;
-  }, [progress?.dailyPointStatus, progressRef, selectedDateKey]);
+    try {
+      const rewardResult = await claimPlannerCompletionRewardSecure({
+        centerId: activeMembership.id,
+        dateKey: selectedDateKey,
+        taskId: item.id,
+      });
+      return {
+        awardedPoints: Math.max(0, Number(rewardResult.awardedPoints || 0)),
+        alreadyClaimed: Boolean(rewardResult.duplicate),
+        dailyLimitReached: Boolean(rewardResult.dailyLimitReached),
+        rewardErrorMessage: null as string | null,
+      };
+    } catch (error) {
+      logHandledClientIssue('[planner] failed to claim completion reward', error);
+      return {
+        awardedPoints: 0,
+        alreadyClaimed: false,
+        dailyLimitReached: false,
+        rewardErrorMessage: '포인트 적립은 잠시 뒤 다시 반영될 수 있어요.',
+      };
+    }
+  }, [activeMembership, progress?.dailyPointStatus, progressRef, selectedDateKey, studentUid]);
 
   const applySameDayRoutinePenalty = async (reason: string) => {
     if (!activeMembership || !user || !studentUid || !selectedDateKey) return false;
@@ -2963,19 +2997,33 @@ export default function StudyPlanPage() {
         updatedAt: serverTimestamp(),
       });
 
-      if (completionMarkedDone) {
-        const nextCompletedCount =
-          checklistTasks.filter((task) => task.id !== completionReviewItem.id && task.done).length + 1;
-        await awardPlannerCompletionPoints(
-          completionReviewItem,
-          nextCompletedCount,
-          checklistTasks.length
-        );
+      const rewardFeedback = completionMarkedDone
+        ? await awardPlannerCompletionPoints(
+            completionReviewItem,
+            checklistTasks.filter((task) => task.id !== completionReviewItem.id && task.done).length + 1,
+            checklistTasks.length
+          )
+        : {
+            awardedPoints: 0,
+            alreadyClaimed: false,
+            dailyLimitReached: false,
+            rewardErrorMessage: null as string | null,
+          };
+
+      const completionToastDescriptionParts = [`완수 ${completionPercent}% · ${actualDurationMinutes}분 기록됐어요.`];
+      if (rewardFeedback.awardedPoints > 0) {
+        completionToastDescriptionParts.push(`포인트 ${rewardFeedback.awardedPoints}P도 적립했어요.`);
+      } else if (completionMarkedDone && rewardFeedback.dailyLimitReached) {
+        completionToastDescriptionParts.push(`계획 완료 포인트는 하루 ${PLANNER_COMPLETION_DAILY_REWARD_LIMIT}회까지 적립돼요.`);
+      } else if (completionMarkedDone && rewardFeedback.alreadyClaimed) {
+        completionToastDescriptionParts.push('이 계획 포인트는 이미 반영되어 있어요.');
+      } else if (completionMarkedDone && rewardFeedback.rewardErrorMessage) {
+        completionToastDescriptionParts.push(rewardFeedback.rewardErrorMessage);
       }
 
       toast({
         title: completionMarkedDone ? '완료 결과를 저장했어요' : '진행 상황을 저장했어요',
-        description: `완수 ${completionPercent}% · ${actualDurationMinutes}분 기록됐어요.`,
+        description: completionToastDescriptionParts.join(' '),
       });
 
       setIsCompletionDialogOpen(false);

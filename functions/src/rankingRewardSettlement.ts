@@ -11,7 +11,7 @@ type StudentRankingRange = "daily" | "weekly" | "monthly";
 
 type DailyPointEventDoc = {
   id: string;
-  source: "study_box" | "daily_rank" | "weekly_rank" | "monthly_rank" | "manual_adjustment" | "legacy";
+  source: "study_box" | "daily_rank" | "weekly_rank" | "monthly_rank" | "plan_completion" | "manual_adjustment" | "legacy";
   label: string;
   points: number;
   createdAt: string;
@@ -161,7 +161,7 @@ function normalizeDailyPointEventEntry(value: unknown): DailyPointEventDoc | nul
   const createdAt = asNonEmptyString(value.createdAt);
 
   if (!id || !source || !label || points <= 0 || !createdAt) return null;
-  if (!["study_box", "daily_rank", "weekly_rank", "monthly_rank", "manual_adjustment", "legacy"].includes(source)) {
+  if (!["study_box", "daily_rank", "weekly_rank", "monthly_rank", "plan_completion", "manual_adjustment", "legacy"].includes(source)) {
     return null;
   }
 

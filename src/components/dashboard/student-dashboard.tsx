@@ -125,6 +125,10 @@ import { submitAttendanceRequestSecure } from '@/lib/penalty-actions';
 import { openStudyRewardBoxSecure } from '@/lib/study-box-actions';
 import { stopStudentStudySessionSecure } from '@/lib/study-session-actions';
 import {
+  claimPlannerCompletionRewardSecure,
+  PLANNER_COMPLETION_DAILY_REWARD_LIMIT,
+} from '@/lib/planner-completion-reward-actions';
+import {
   UNIVERSITY_THEMES,
   UNIVERSITY_THEME_OPTIONS,
   isSupportedUniversityThemeKey,
@@ -3279,6 +3283,32 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
           },
           updatedAt: serverTimestamp(),
         }, { merge: true });
+      }
+
+      try {
+        const rewardResult = await claimPlannerCompletionRewardSecure({
+          centerId: activeMembership.id,
+          dateKey: todayKey,
+          taskId,
+        });
+        const awardedPoints = Math.max(0, Number(rewardResult.awardedPoints || 0));
+        if (awardedPoints > 0) {
+          toast({
+            title: `계획 완료 포인트 ${awardedPoints}P 적립`,
+            description: `${targetTask.title} 완료가 반영됐어요.`,
+          });
+        } else if (rewardResult.dailyLimitReached) {
+          toast({
+            title: '오늘 계획 완료 포인트는 모두 받았어요',
+            description: `계획 완료 포인트는 하루 ${PLANNER_COMPLETION_DAILY_REWARD_LIMIT}회까지 적립돼요.`,
+          });
+        }
+      } catch (error: any) {
+        logHandledClientIssue('[student-track] home quest reward failed', error);
+        toast({
+          title: '계획 완료 포인트를 바로 적립하지 못했어요',
+          description: '완료 체크는 저장됐고, 포인트는 잠시 뒤 다시 반영될 수 있어요.',
+        });
       }
     } catch (error: any) {
       logHandledClientIssue('[student-track] home quest toggle failed', error);

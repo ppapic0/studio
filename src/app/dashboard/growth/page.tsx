@@ -81,6 +81,7 @@ const REWARD_TEXT_REVEAL_DELAY_MS = 460;
 const POINT_BREAKDOWN_CHIP_CLASS = {
   box: 'bg-[#FFF3E2] text-[#915A1E]',
   rank: 'bg-[#EAF1FF] text-[#3357A5]',
+  plan: 'bg-[#EAF8EF] text-[#1B7A52]',
   legacy: 'bg-[#F0F3FA] text-[#44546F]',
   adjustment: 'bg-[#F2F7EF] text-[#49733E]',
 } as const;

@@ -49,7 +49,7 @@ export type StudyBoxReward = {
   boostEventId?: string | null;
 };
 
-export type DailyPointBreakdownItemTone = 'box' | 'rank' | 'legacy' | 'adjustment';
+export type DailyPointBreakdownItemTone = 'box' | 'rank' | 'plan' | 'legacy' | 'adjustment';
 
 export type DailyPointBreakdownItem = {
   key: string;
@@ -110,6 +110,7 @@ function getDailyRankRewardPoints(dayStatus?: Record<string, any>): number {
 
 function getDailyPointEventTone(source: string): DailyPointBreakdownItemTone {
   if (source === 'study_box') return 'box';
+  if (source === 'plan_completion') return 'plan';
   if (source.includes('rank')) return 'rank';
   if (source.includes('adjustment')) return 'adjustment';
   return 'legacy';
@@ -130,6 +131,7 @@ function getDailyPointEventLabel(event: Record<string, any>): string {
         : '일간 랭킹';
 
   if (source === 'study_box' && Number.isFinite(hour) && hour > 0) return `${hour}시간 상자`;
+  if (source === 'plan_completion') return '계획 완수';
   if (source.includes('rank')) return rank > 0 ? `${rangeLabel} ${rank}위` : rangeLabel;
   if (source.includes('adjustment')) return '포인트 조정';
   return '이전 포인트 기록';

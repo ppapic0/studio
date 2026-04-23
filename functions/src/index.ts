@@ -199,7 +199,7 @@ type SecureStudyBoxReward = {
 
 type DailyPointEventDoc = {
   id: string;
-  source: "study_box" | "daily_rank" | "weekly_rank" | "monthly_rank" | "manual_adjustment" | "legacy";
+  source: "study_box" | "daily_rank" | "weekly_rank" | "monthly_rank" | "plan_completion" | "manual_adjustment" | "legacy";
   label: string;
   points: number;
   createdAt: string;
@@ -278,6 +278,8 @@ const LATE_STUDY_BOX_RARITY_WEIGHTS: Array<{ rarity: StudyBoxRarity; weight: num
   { rarity: "epic", weight: 10 },
 ];
 const DAILY_POINT_EARN_CAP = 1000;
+const PLANNER_COMPLETION_REWARD_POINTS = 5;
+const PLANNER_COMPLETION_DAILY_REWARD_LIMIT = 4;
 const ACTIVE_STUDY_ATTENDANCE_STATUS_VALUES = ["studying", "away", "break"] as const;
 const ACTIVE_STUDY_ATTENDANCE_STATUSES = new Set<string>(ACTIVE_STUDY_ATTENDANCE_STATUS_VALUES);
 const STUDY_DAY_RESET_HOUR = 1;
@@ -362,6 +364,17 @@ function upsertStudyBoxRewardEntries(existing: unknown, reward: SecureStudyBoxRe
   return Array.from(next.values()).sort((a, b) => a.milestone - b.milestone);
 }
 
+function normalizePlannerCompletionRewardTaskIds(value: unknown): string[] {
+  if (!Array.isArray(value)) return [];
+  return Array.from(
+    new Set(
+      value
+        .map((entry) => asTrimmedString(entry))
+        .filter((entry) => entry.length > 0)
+    )
+  ).slice(-200);
+}
+
 function normalizeDailyPointEventEntry(value: unknown): DailyPointEventDoc | null {
   if (!isPlainObject(value)) return null;
 
@@ -372,7 +385,7 @@ function normalizeDailyPointEventEntry(value: unknown): DailyPointEventDoc | nul
   const createdAt = asTrimmedString(value.createdAt);
 
   if (!id || !source || !label || points <= 0 || !createdAt) return null;
-  if (!["study_box", "daily_rank", "weekly_rank", "monthly_rank", "manual_adjustment", "legacy"].includes(source)) {
+  if (!["study_box", "daily_rank", "weekly_rank", "monthly_rank", "plan_completion", "manual_adjustment", "legacy"].includes(source)) {
     return null;
   }
 
@@ -7251,6 +7264,145 @@ export const submitAttendanceRequestSecure = functions.region(region).https.onCa
     requestId: requestRef.id,
     penaltyLogId: penaltyLogRef.id,
     penaltyPointsDelta,
+  };
+});
+
+export const claimPlannerCompletionRewardSecure = functions.region(region).https.onCall(async (data, context) => {
+  const db = admin.firestore();
+
+  if (!context.auth?.uid) {
+    throw new functions.https.HttpsError("unauthenticated", "로그인이 필요합니다.");
+  }
+  const authUid = context.auth.uid;
+
+  const centerId = asTrimmedString(data?.centerId);
+  const dateKey = asTrimmedString(data?.dateKey);
+  const taskId = asTrimmedString(data?.taskId);
+
+  if (!centerId) {
+    throw new functions.https.HttpsError("invalid-argument", "centerId is required.", {
+      userMessage: "센터 정보를 다시 확인해 주세요.",
+    });
+  }
+  if (!isValidDateKey(dateKey)) {
+    throw new functions.https.HttpsError("invalid-argument", "Invalid dateKey.", {
+      userMessage: "계획 날짜 정보가 올바르지 않습니다.",
+    });
+  }
+  if (!taskId) {
+    throw new functions.https.HttpsError("invalid-argument", "taskId is required.", {
+      userMessage: "완료한 계획 정보를 다시 확인해 주세요.",
+    });
+  }
+
+  const membership = await resolveCenterMembershipRole(db, centerId, authUid);
+  if (membership.role !== "student" || !isActiveMembershipStatus(membership.status)) {
+    throw new functions.https.HttpsError("permission-denied", "Only active students can claim planner rewards.", {
+      userMessage: "학생 본인만 계획 완료 포인트를 적립할 수 있습니다.",
+    });
+  }
+
+  const studentIdentity = await resolveCenterStudentIdentity(db, centerId, authUid);
+  if (!studentIdentity) {
+    throw new functions.https.HttpsError("failed-precondition", "Student profile not found.", {
+      userMessage: "학생 정보를 찾지 못했습니다.",
+    });
+  }
+
+  const studentId = studentIdentity.studentId;
+  const progressRef = db.doc(`centers/${centerId}/growthProgress/${studentId}`);
+  const eventCreatedAt = new Date().toISOString();
+
+  const result = await db.runTransaction(async (transaction) => {
+    const progressSnap = await transaction.get(progressRef);
+    const progressData = progressSnap.exists ? (progressSnap.data() as Record<string, unknown>) : {};
+    const dailyPointStatus = isPlainObject(progressData.dailyPointStatus)
+      ? (progressData.dailyPointStatus as Record<string, unknown>)
+      : {};
+    const currentDayStatus = isPlainObject(dailyPointStatus[dateKey])
+      ? (dailyPointStatus[dateKey] as Record<string, unknown>)
+      : {};
+    const rewardedTaskIds = normalizePlannerCompletionRewardTaskIds(currentDayStatus.planCompletionRewardTaskIds);
+    const currentRewardCount = Math.max(
+      rewardedTaskIds.length,
+      Math.max(0, Math.floor(parseFiniteNumber(currentDayStatus.planCompletionRewardCount) ?? 0))
+    );
+    const currentPointsBalance = Math.max(0, Math.floor(parseFiniteNumber(progressData.pointsBalance) ?? 0));
+    const currentTotalPointsEarned = Math.max(0, Math.floor(parseFiniteNumber(progressData.totalPointsEarned) ?? 0));
+
+    if (rewardedTaskIds.includes(taskId)) {
+      return {
+        awarded: false,
+        duplicate: true,
+        dailyLimitReached: false,
+        awardedPoints: 0,
+        rewardCount: currentRewardCount,
+        pointsBalance: currentPointsBalance,
+        totalPointsEarned: currentTotalPointsEarned,
+      };
+    }
+
+    if (currentRewardCount >= PLANNER_COMPLETION_DAILY_REWARD_LIMIT) {
+      return {
+        awarded: false,
+        duplicate: false,
+        dailyLimitReached: true,
+        awardedPoints: 0,
+        rewardCount: currentRewardCount,
+        pointsBalance: currentPointsBalance,
+        totalPointsEarned: currentTotalPointsEarned,
+      };
+    }
+
+    const awardClamp = clampDailyPointAward(currentDayStatus, PLANNER_COMPLETION_REWARD_POINTS);
+    const awardedPoints = awardClamp.awardedPoints;
+    const nextRewardedTaskIds = normalizePlannerCompletionRewardTaskIds([...rewardedTaskIds, taskId]);
+    const nextRewardCount = nextRewardedTaskIds.length;
+    const nextPointEvents = awardedPoints > 0
+      ? upsertDailyPointEvent(currentDayStatus.pointEvents, {
+          id: `plan_completion:${dateKey}:${taskId}`,
+          source: "plan_completion",
+          label: "계획 완수",
+          points: awardedPoints,
+          createdAt: eventCreatedAt,
+        })
+      : normalizeDailyPointEvents(currentDayStatus.pointEvents);
+
+    transaction.set(
+      progressRef,
+      {
+        pointsBalance: admin.firestore.FieldValue.increment(awardedPoints),
+        totalPointsEarned: admin.firestore.FieldValue.increment(awardedPoints),
+        dailyPointStatus: {
+          [dateKey]: {
+            ...currentDayStatus,
+            planCompletionRewardTaskIds: nextRewardedTaskIds,
+            planCompletionRewardCount: nextRewardCount,
+            pointEvents: nextPointEvents,
+            dailyPointAmount: admin.firestore.FieldValue.increment(awardedPoints),
+            updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+          },
+        },
+        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      },
+      { merge: true }
+    );
+
+    return {
+      awarded: awardedPoints > 0,
+      duplicate: false,
+      dailyLimitReached: false,
+      awardedPoints,
+      rewardCount: nextRewardCount,
+      pointsBalance: currentPointsBalance + awardedPoints,
+      totalPointsEarned: currentTotalPointsEarned + awardedPoints,
+    };
+  });
+
+  return {
+    ok: true,
+    ...result,
+    rewardLimit: PLANNER_COMPLETION_DAILY_REWARD_LIMIT,
   };
 });
 

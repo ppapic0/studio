@@ -19,7 +19,6 @@ import {
   updateDoc, 
   deleteDoc, 
   writeBatch,
-  increment,
   setDoc,
   limit,
 } from 'firebase/firestore';
@@ -101,6 +100,10 @@ import {
 import { useToast } from '@/hooks/use-toast';
 import Link from 'next/link';
 import { applyPenaltyEventSecure } from '@/lib/penalty-actions';
+import {
+  claimPlannerCompletionRewardSecure,
+  PLANNER_COMPLETION_DAILY_REWARD_LIMIT,
+} from '@/lib/planner-completion-reward-actions';
 import { getSafeErrorMessage } from '@/lib/exposed-error';
 import { VisualReportViewer } from '@/components/dashboard/visual-report-viewer';
 import { StudentTrackSubnav } from '@/components/dashboard/student-track-subnav';
@@ -1076,40 +1079,67 @@ export default function StudyHistoryPage() {
         updatedAt: serverTimestamp(),
       });
 
+      const rewardFeedback = {
+        awardedPoints: 0,
+        alreadyClaimed: false,
+        dailyLimitReached: false,
+        rewardErrorMessage: null as string | null,
+      };
+
       if (completionMarkedDone) {
-        const batch = writeBatch(firestore);
-        const achievementCount = progress?.dailyPointStatus?.[dateKey]?.achievementCount || 0;
         const existingDayStatus = (progress?.dailyPointStatus?.[dateKey] || {}) as Record<string, any>;
         const remainingStudyTasks = dailyPlans
           .filter((plan) => (plan.category === 'study' || !plan.category) && plan.id !== completionReviewItem.id && !plan.done);
         const shouldAwardPlanPoints = remainingStudyTasks.length === 0 && !existingDayStatus.plan;
-        const progressUpdate: Record<string, any> = {
-          dailyPointStatus: {
-            [dateKey]: {
-              ...existingDayStatus,
+        if (shouldAwardPlanPoints && progressRef) {
+          await setDoc(progressRef, {
+            dailyPointStatus: {
+              [dateKey]: {
+                ...existingDayStatus,
+                plan: true,
+              },
             },
-          },
-          updatedAt: serverTimestamp(),
-        };
-        if (shouldAwardPlanPoints) {
-          progressUpdate.dailyPointStatus[dateKey].plan = true;
-        }
-        if (achievementCount < 5) {
-          progressUpdate.dailyPointStatus[dateKey].achievementCount = increment(1);
-        }
-        batch.set(progressRef, progressUpdate, { merge: true });
-        await batch.commit();
-        if (shouldAwardPlanPoints) {
+            updatedAt: serverTimestamp(),
+          }, { merge: true });
           toast({
             title: '오늘 학습 계획 완료',
             description: '계획 완료 기록이 저장되었습니다.',
           });
         }
+
+        const canClaimCompletionReward = activeMembership.role === 'student' && targetUid === user.uid;
+        if (canClaimCompletionReward) {
+          try {
+            const rewardResult = await claimPlannerCompletionRewardSecure({
+              centerId: activeMembership.id,
+              dateKey,
+              taskId: completionReviewItem.id,
+            });
+            rewardFeedback.awardedPoints = Math.max(0, Number(rewardResult.awardedPoints || 0));
+            rewardFeedback.alreadyClaimed = Boolean(rewardResult.duplicate);
+            rewardFeedback.dailyLimitReached = Boolean(rewardResult.dailyLimitReached);
+          } catch (rewardError) {
+            rewardFeedback.rewardErrorMessage = '포인트 적립은 잠시 뒤 다시 반영될 수 있어요.';
+            toast({
+              title: '계획 완료 포인트를 바로 적립하지 못했어요',
+              description: rewardFeedback.rewardErrorMessage,
+            });
+          }
+        }
+      }
+
+      const completionToastDescriptionParts = [`완수 ${completionPercent}% · ${actualDurationMinutes}분 기록됐어요.`];
+      if (rewardFeedback.awardedPoints > 0) {
+        completionToastDescriptionParts.push(`포인트 ${rewardFeedback.awardedPoints}P도 적립했어요.`);
+      } else if (completionMarkedDone && rewardFeedback.dailyLimitReached) {
+        completionToastDescriptionParts.push(`계획 완료 포인트는 하루 ${PLANNER_COMPLETION_DAILY_REWARD_LIMIT}회까지 적립돼요.`);
+      } else if (completionMarkedDone && rewardFeedback.alreadyClaimed) {
+        completionToastDescriptionParts.push('이 계획 포인트는 이미 반영되어 있어요.');
       }
 
       toast({
         title: completionMarkedDone ? '완료 결과를 저장했어요' : '진행 상황을 저장했어요',
-        description: `완수 ${completionPercent}% · ${actualDurationMinutes}분 기록됐어요.`,
+        description: completionToastDescriptionParts.join(' '),
       });
 
       setIsCompletionDialogOpen(false);
