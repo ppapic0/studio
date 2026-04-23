@@ -14,7 +14,7 @@ export const INVOICE_TRACK_META: Record<
     accentClass: 'text-blue-700',
   },
   academy: {
-    label: '국어학원',
+    label: '트랙 분석지',
     badgeClass: 'bg-emerald-50 text-emerald-700 border-emerald-200',
     accentClass: 'text-emerald-700',
   },
