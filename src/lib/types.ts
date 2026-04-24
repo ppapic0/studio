@@ -1053,52 +1053,8 @@ export interface CounselingReservation {
   status: 'requested' | 'confirmed' | 'done' | 'canceled';
   studentNote?: string;
   teacherNote?: string;
-  requestMode?: 'general' | 'study_question';
-  availabilitySlotId?: string | null;
-  questionSubject?: string | null;
-  questionWorkbook?: string | null;
-  questionProblemNumbers?: string | null;
-  questionSummary?: string | null;
-  questionDetails?: string | null;
-  questionAttachments?: CounselingQuestionAttachment[];
-  questionAttachmentCleanupAt?: Timestamp | null;
-  questionAttachmentsDeletedAt?: Timestamp | null;
-  doneAt?: Timestamp | null;
-  canceledAt?: Timestamp | null;
   createdAt: Timestamp;
   updatedAt: Timestamp;
-}
-
-export interface CounselingQuestionAttachment {
-  id: string;
-  name: string;
-  path: string;
-  downloadUrl: string;
-  contentType: string;
-  sizeBytes: number;
-  width?: number | null;
-  height?: number | null;
-  uploadedAt?: Timestamp | null;
-  deletedAt?: Timestamp | null;
-}
-
-export interface CounselingAvailabilitySlot {
-  id: string;
-  centerId: string;
-  teacherId: string;
-  teacherName: string;
-  startsAt: Timestamp;
-  endsAt: Timestamp;
-  slotType?: 'study_question';
-  note?: string | null;
-  capacity?: number;
-  reservedCount?: number;
-  activeReservationIds?: string[];
-  isPublished: boolean;
-  createdAt?: Timestamp;
-  updatedAt?: Timestamp;
-  createdByUid?: string | null;
-  updatedByUid?: string | null;
 }
 
 export interface CounselingLog {

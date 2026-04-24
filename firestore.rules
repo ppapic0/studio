@@ -621,12 +621,6 @@ service cloud.firestore {
         allow write: if isCenterAdmin(centerId);
       }
 
-      match /counselingAvailabilitySlots/{slotId} {
-        allow read: if isTeacherOrAdmin(centerId)
-          || isStudent(centerId);
-        allow create, update, delete: if isTeacherOrAdmin(centerId);
-      }
-
       match /websiteSeatHoldRequests/{requestId} {
         allow read: if isTeacherOrAdmin(centerId);
         allow write: if isCenterAdmin(centerId);
