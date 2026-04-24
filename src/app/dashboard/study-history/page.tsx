@@ -101,7 +101,8 @@ import { useToast } from '@/hooks/use-toast';
 import Link from 'next/link';
 import { applyPenaltyEventSecure } from '@/lib/penalty-actions';
 import {
-  claimPlannerCompletionRewardSecure,
+  claimPlannerCompletionRewardWithFallback,
+  isPlannerCompletionRewardEligibleCategory,
   PLANNER_COMPLETION_DAILY_REWARD_LIMIT,
 } from '@/lib/planner-completion-reward-actions';
 import { getSafeErrorMessage } from '@/lib/exposed-error';
@@ -1107,13 +1108,18 @@ export default function StudyHistoryPage() {
           });
         }
 
-        const canClaimCompletionReward = activeMembership.role === 'student' && targetUid === user.uid;
+        const canClaimCompletionReward = activeMembership.role === 'student'
+          && targetUid === user.uid
+          && isPlannerCompletionRewardEligibleCategory(completionReviewItem.category);
         if (canClaimCompletionReward) {
           try {
-            const rewardResult = await claimPlannerCompletionRewardSecure({
+            const rewardResult = await claimPlannerCompletionRewardWithFallback({
               centerId: activeMembership.id,
               dateKey,
               taskId: completionReviewItem.id,
+              weekKey,
+              category: completionReviewItem.category,
+              progressRef,
             });
             rewardFeedback.awardedPoints = Math.max(0, Number(rewardResult.awardedPoints || 0));
             rewardFeedback.alreadyClaimed = Boolean(rewardResult.duplicate);

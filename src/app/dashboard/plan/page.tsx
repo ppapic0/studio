@@ -96,7 +96,8 @@ import {
   type AttendanceRequestProofUploadPayload,
 } from '@/lib/penalty-actions';
 import {
-  claimPlannerCompletionRewardSecure,
+  claimPlannerCompletionRewardWithFallback,
+  isPlannerCompletionRewardEligibleCategory,
   PLANNER_COMPLETION_DAILY_REWARD_LIMIT,
 } from '@/lib/planner-completion-reward-actions';
 import { cn } from '@/lib/utils';
@@ -2201,6 +2202,15 @@ export default function StudyPlanPage() {
     nextCompletedCount: number,
     totalTaskCount: number
   ) => {
+    if (!isPlannerCompletionRewardEligibleCategory(item.category)) {
+      return {
+        awardedPoints: 0,
+        alreadyClaimed: false,
+        dailyLimitReached: false,
+        rewardErrorMessage: null as string | null,
+      };
+    }
+
     if (!progressRef || !selectedDateKey || !activeMembership || !studentUid) {
       return {
         awardedPoints: 0,
@@ -2274,10 +2284,13 @@ export default function StudyPlanPage() {
     }
 
     try {
-      const rewardResult = await claimPlannerCompletionRewardSecure({
+      const rewardResult = await claimPlannerCompletionRewardWithFallback({
         centerId: activeMembership.id,
         dateKey: selectedDateKey,
         taskId: item.id,
+        weekKey,
+        category: item.category,
+        progressRef,
       });
       return {
         awardedPoints: Math.max(0, Number(rewardResult.awardedPoints || 0)),
@@ -2294,7 +2307,7 @@ export default function StudyPlanPage() {
         rewardErrorMessage: '포인트 적립은 잠시 뒤 다시 반영될 수 있어요.',
       };
     }
-  }, [activeMembership, progress?.dailyPointStatus, progressRef, selectedDateKey, studentUid]);
+  }, [activeMembership, progress?.dailyPointStatus, progressRef, selectedDateKey, studentUid, weekKey]);
 
   const applySameDayRoutinePenalty = async (reason: string) => {
     if (!activeMembership || !user || !studentUid || !selectedDateKey) return false;
@@ -3483,8 +3496,8 @@ export default function StudyPlanPage() {
       const rewardFeedback = completionMarkedDone
         ? await awardPlannerCompletionPoints(
             completionReviewItem,
-            checklistTasks.filter((task) => task.id !== completionReviewItem.id && task.done).length + 1,
-            checklistTasks.length
+            studyTasks.filter((task) => task.id !== completionReviewItem.id && task.done).length + 1,
+            studyTasks.length
           )
         : {
             awardedPoints: 0,
@@ -3517,7 +3530,6 @@ export default function StudyPlanPage() {
   }, [
     activeMembership,
     awardPlannerCompletionPoints,
-    checklistTasks,
     completionActualDurationDraft,
     completionMarkedDone,
     completionPercentDraft,
@@ -3525,6 +3537,7 @@ export default function StudyPlanPage() {
     firestore,
     isStudent,
     selectedDateKey,
+    studyTasks,
     toast,
     user,
     weekKey,

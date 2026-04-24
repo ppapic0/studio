@@ -1833,6 +1833,31 @@ function isValidDateKey(value: string): boolean {
   return /^\d{4}-\d{2}-\d{2}$/.test(value);
 }
 
+function getPlannerWeekKeyFromDateKey(dateKey: string): string {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(dateKey);
+  if (!match) return "";
+
+  const calendarYear = Number(match[1]);
+  const month = Number(match[2]);
+  const day = Number(match[3]);
+  const date = new Date(Date.UTC(calendarYear, month - 1, day));
+  if (
+    date.getUTCFullYear() !== calendarYear ||
+    date.getUTCMonth() !== month - 1 ||
+    date.getUTCDate() !== day
+  ) {
+    return "";
+  }
+
+  const isoWeekAnchor = new Date(date.getTime());
+  const weekday = isoWeekAnchor.getUTCDay() || 7;
+  isoWeekAnchor.setUTCDate(isoWeekAnchor.getUTCDate() + 4 - weekday);
+  const yearStart = new Date(Date.UTC(isoWeekAnchor.getUTCFullYear(), 0, 1));
+  const isoWeek = Math.ceil((((isoWeekAnchor.getTime() - yearStart.getTime()) / 86400000) + 1) / 7);
+
+  return `${String(calendarYear).padStart(4, "0")}-W${String(isoWeek).padStart(2, "0")}`;
+}
+
 function toDateKeyFromUnknownTimestamp(value: unknown): string | null {
   const millis = toMillisSafe(value);
   if (!Number.isFinite(millis) || millis <= 0) return null;
@@ -7681,11 +7706,22 @@ export const claimPlannerCompletionRewardSecure = functions.region(region).https
   }
 
   const studentId = studentIdentity.studentId;
+  const weekKey = getPlannerWeekKeyFromDateKey(dateKey);
+  if (!weekKey) {
+    throw new functions.https.HttpsError("invalid-argument", "Invalid planner week key.", {
+      userMessage: "계획 주차 정보가 올바르지 않습니다.",
+    });
+  }
+
+  const planItemRef = db.doc(`centers/${centerId}/plans/${studentId}/weeks/${weekKey}/items/${taskId}`);
   const progressRef = db.doc(`centers/${centerId}/growthProgress/${studentId}`);
   const eventCreatedAt = new Date().toISOString();
 
   const result = await db.runTransaction(async (transaction) => {
-    const progressSnap = await transaction.get(progressRef);
+    const [planItemSnap, progressSnap] = await Promise.all([
+      transaction.get(planItemRef),
+      transaction.get(progressRef),
+    ]);
     const progressData = progressSnap.exists ? (progressSnap.data() as Record<string, unknown>) : {};
     const dailyPointStatus = isPlainObject(progressData.dailyPointStatus)
       ? (progressData.dailyPointStatus as Record<string, unknown>)
@@ -7701,11 +7737,34 @@ export const claimPlannerCompletionRewardSecure = functions.region(region).https
     const currentPointsBalance = Math.max(0, Math.floor(parseFiniteNumber(progressData.pointsBalance) ?? 0));
     const currentTotalPointsEarned = Math.max(0, Math.floor(parseFiniteNumber(progressData.totalPointsEarned) ?? 0));
 
+    const planItemData = planItemSnap.exists ? (planItemSnap.data() as Record<string, unknown>) : null;
+    const planItemDateKey = asTrimmedString(planItemData?.dateKey);
+    const planItemCategory = asTrimmedString(planItemData?.category);
+    const isEligibleStudyTask =
+      Boolean(planItemData) &&
+      planItemDateKey === dateKey &&
+      (planItemCategory === "" || planItemCategory === "study") &&
+      planItemData?.done === true;
+
+    if (!isEligibleStudyTask) {
+      return {
+        awarded: false,
+        duplicate: false,
+        dailyLimitReached: false,
+        ineligible: true,
+        awardedPoints: 0,
+        rewardCount: currentRewardCount,
+        pointsBalance: currentPointsBalance,
+        totalPointsEarned: currentTotalPointsEarned,
+      };
+    }
+
     if (rewardedTaskIds.includes(taskId)) {
       return {
         awarded: false,
         duplicate: true,
         dailyLimitReached: false,
+        ineligible: false,
         awardedPoints: 0,
         rewardCount: currentRewardCount,
         pointsBalance: currentPointsBalance,
@@ -7718,6 +7777,7 @@ export const claimPlannerCompletionRewardSecure = functions.region(region).https
         awarded: false,
         duplicate: false,
         dailyLimitReached: true,
+        ineligible: false,
         awardedPoints: 0,
         rewardCount: currentRewardCount,
         pointsBalance: currentPointsBalance,
@@ -7763,6 +7823,7 @@ export const claimPlannerCompletionRewardSecure = functions.region(region).https
       awarded: awardedPoints > 0,
       duplicate: false,
       dailyLimitReached: false,
+      ineligible: false,
       awardedPoints,
       rewardCount: nextRewardCount,
       pointsBalance: currentPointsBalance + awardedPoints,

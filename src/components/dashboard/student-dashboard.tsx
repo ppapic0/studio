@@ -126,7 +126,7 @@ import { getAttendanceRequestTypeLabel } from '@/lib/attendance-request';
 import { openStudyRewardBoxSecure } from '@/lib/study-box-actions';
 import { stopStudentStudySessionSecure } from '@/lib/study-session-actions';
 import {
-  claimPlannerCompletionRewardSecure,
+  claimPlannerCompletionRewardWithFallback,
   PLANNER_COMPLETION_DAILY_REWARD_LIMIT,
 } from '@/lib/planner-completion-reward-actions';
 import {
@@ -3308,10 +3308,13 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
       }
 
       try {
-        const rewardResult = await claimPlannerCompletionRewardSecure({
+        const rewardResult = await claimPlannerCompletionRewardWithFallback({
           centerId: activeMembership.id,
           dateKey: todayKey,
           taskId,
+          weekKey,
+          category: targetTask.category,
+          progressRef,
         });
         const awardedPoints = Math.max(0, Number(rewardResult.awardedPoints || 0));
         if (awardedPoints > 0) {
