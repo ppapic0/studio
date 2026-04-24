@@ -421,6 +421,10 @@ function normalizeWifiMacAddress(value: string) {
   return hexOnly.match(/.{1,2}/g)?.join(':') || null;
 }
 
+function getWifiMacHexLength(value: string) {
+  return value.trim() ? value.replace(/[^0-9a-f]/gi, '').length : 0;
+}
+
 function getWifiRequestStatusMeta(status?: string) {
   switch (status) {
     case 'done':
@@ -1619,9 +1623,7 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
 
   const latestWifiRequest = wifiRequests[0] || null;
   const latestWifiRequestStatusMeta = getWifiRequestStatusMeta(latestWifiRequest?.status);
-  const wifiRequestMacHexLength = wifiRequestMacAddress.trim()
-    ? wifiRequestMacAddress.replace(/[^0-9a-f]/gi, '').length
-    : 0;
+  const wifiRequestMacHexLength = getWifiMacHexLength(wifiRequestMacAddress);
   const isWifiRequestMacComplete = wifiRequestMacHexLength === 12;
   const wifiRequestMacStatusLabel = !wifiRequestMacAddress.trim()
     ? '필수'
@@ -2304,9 +2306,13 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
     try {
       normalizedMacAddress = normalizeWifiMacAddress(wifiRequestMacAddress);
     } catch {
+      const macHexLength = getWifiMacHexLength(wifiRequestMacAddress);
       toast({
         variant: 'destructive',
-        title: 'MAC 주소를 정확히 입력해 주세요.',
+        title: 'MAC 주소 형식을 확인해 주세요.',
+        description: macHexLength > 0
+          ? `현재 ${macHexLength}/12자리입니다. 예: AA:BB:CC:DD:EE:FF처럼 6쌍을 입력해 주세요.`
+          : '예: AA:BB:CC:DD:EE:FF처럼 6쌍을 입력해 주세요.',
       });
       return;
     }

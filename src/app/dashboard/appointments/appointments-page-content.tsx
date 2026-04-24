@@ -161,6 +161,10 @@ function normalizeWifiMacAddress(value: string) {
   return hexOnly.match(/.{1,2}/g)?.join(':') || null;
 }
 
+function getWifiMacHexLength(value: string) {
+  return value.trim() ? value.replace(/[^0-9a-f]/gi, '').length : 0;
+}
+
 function isStudentChatEnabledThread(item: Pick<ParentCommunicationRecord, 'senderRole' | 'supportKind'>) {
   return item.senderRole === 'student'
     && (item.supportKind === 'wifi_unblock' || item.supportKind === 'student_suggestion');
@@ -722,7 +726,14 @@ export function AppointmentsPageContent({
       try {
         normalizedMacAddress = normalizeWifiMacAddress(firewallMacAddress);
       } catch {
-        toast({ variant: 'destructive', title: 'MAC 주소를 정확히 입력해 주세요.' });
+        const macHexLength = getWifiMacHexLength(firewallMacAddress);
+        toast({
+          variant: 'destructive',
+          title: 'MAC 주소 형식을 확인해 주세요.',
+          description: macHexLength > 0
+            ? `현재 ${macHexLength}/12자리입니다. 예: AA:BB:CC:DD:EE:FF처럼 6쌍을 입력해 주세요.`
+            : '예: AA:BB:CC:DD:EE:FF처럼 6쌍을 입력해 주세요.',
+        });
         return;
       }
 
@@ -1143,6 +1154,18 @@ export function AppointmentsPageContent({
   };
 
   const isStudentTrackTheme = isStudent;
+  const firewallMacHexLength = getWifiMacHexLength(firewallMacAddress);
+  const isFirewallMacComplete = firewallMacHexLength === 12;
+  const firewallMacStatusLabel = !firewallMacAddress.trim()
+    ? '필수'
+    : isFirewallMacComplete
+      ? '형식 확인'
+      : `${firewallMacHexLength}/12자리`;
+  const firewallMacStatusClass = !firewallMacAddress.trim()
+    ? isStudentTrackTheme ? 'text-rose-200' : 'text-rose-500'
+    : isFirewallMacComplete
+      ? isStudentTrackTheme ? 'text-emerald-200' : 'text-emerald-600'
+      : isStudentTrackTheme ? 'text-amber-200' : 'text-amber-600';
   const counselingCtaClass =
     'border border-[color:var(--accent-orange-border)] bg-[linear-gradient(180deg,var(--accent-orange-soft)_0%,var(--accent-orange)_100%)] text-[var(--text-on-accent)] shadow-[var(--accent-orange-shadow)] hover:brightness-[1.04]';
   const studentSectionCardClass = cn(
@@ -2202,12 +2225,20 @@ export function AppointmentsPageContent({
                         placeholder="예: classroom.google.com 또는 https://classroom.google.com"
                         className={cn("h-11 rounded-xl border-2 font-bold", isStudentTrackTheme && studentTrackInputClass)}
                       />
-                      <Input
-                        value={firewallMacAddress}
-                        onChange={(e) => setFirewallMacAddress(e.target.value)}
-                        placeholder="기기 MAC 주소 예: AA:BB:CC:DD:EE:FF"
-                        className={cn("h-11 rounded-xl border-2 font-bold uppercase", isStudentTrackTheme && studentTrackInputClass)}
-                      />
+                      <div className="space-y-1.5">
+                        <div className="flex items-center justify-between gap-3 px-1">
+                          <span className={cn("text-[10px] font-black uppercase", isStudentTrackTheme ? "text-white/60" : "text-muted-foreground")}>기기 MAC 주소</span>
+                          <span className={cn("text-[9px] font-bold", firewallMacStatusClass)}>
+                            {firewallMacStatusLabel}
+                          </span>
+                        </div>
+                        <Input
+                          value={firewallMacAddress}
+                          onChange={(e) => setFirewallMacAddress(e.target.value)}
+                          placeholder="기기 MAC 주소 예: AA:BB:CC:DD:EE:FF"
+                          className={cn("h-11 rounded-xl border-2 font-bold uppercase", isStudentTrackTheme && studentTrackInputClass)}
+                        />
+                      </div>
                       <p className={cn("px-1 text-[11px] font-medium leading-4", isStudentTrackTheme ? "text-white/70" : "text-[#6781AE]")}>
                         확인 방법: 설정 &gt; Wi-Fi &gt; 현재 연결된 와이파이 &gt; 상세 정보에서 확인할 수 있어요. 기종에 따라
                         Wi-Fi 주소로 표시될 수 있어요.
@@ -2229,7 +2260,7 @@ export function AppointmentsPageContent({
                   <div className="flex justify-end">
                     <Button
                       onClick={handleSubmitInquiry}
-                      disabled={isSubmitting || !inquiryBody.trim() || (inquiryType === 'firewall' && (!firewallUrl.trim() || !firewallMacAddress.trim()))}
+                      disabled={isSubmitting || !inquiryBody.trim() || (inquiryType === 'firewall' && (!firewallUrl.trim() || !isFirewallMacComplete))}
                       className={cn("rounded-xl font-black h-11 px-6", counselingCtaClass)}
                     >
                       {isSubmitting ? <Loader2 className="animate-spin h-4 w-4" /> : '등록하기'}
