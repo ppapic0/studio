@@ -170,6 +170,9 @@ function AttendanceDraftFields({
         <div className="rounded-[1rem] border border-[#D8E4FB] bg-[#F6F9FF] px-4 py-3">
           <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#5F739F]">적용된 교시제</p>
           <p className="mt-1 text-sm font-black text-[#17326B]">{draft.classScheduleName.trim()}</p>
+          <p className="mt-1 text-[11px] font-semibold leading-5 text-[#5F739F]">
+            특이사항이 없으면 이 교시제대로 가고, 학원 수업이 있는 날만 아래에 추가해요.
+          </p>
         </div>
       ) : null}
 
@@ -200,7 +203,7 @@ function AttendanceDraftFields({
         <div className="flex items-center gap-2">
           <CalendarClock className="h-4 w-4 text-[#17326B]" />
           <Label className="text-[11px] font-black uppercase tracking-[0.18em] text-[#17326B]">학원 일정</Label>
-          <span className="text-[10px] font-bold text-[#5F739F]">학원 수업이 있는 학생만 등록</span>
+          <span className="text-[10px] font-bold text-[#5F739F]">특이사항 있는 학생만 추가</span>
         </div>
         <div className="mt-3 flex flex-wrap gap-2">
           <Button
@@ -620,6 +623,11 @@ export function AttendanceScheduleSheet({
   };
 
   const selectedDayMeta = calendarDays.find((day) => day.isSelected);
+  const selectedDayUsesClassScheduleDefault = Boolean(
+    !selectedDayMeta?.hasSchedule &&
+      !hasSelectedWeekdayTemplate &&
+      matchedClassSchedule
+  );
 
   return (
     <>
@@ -653,7 +661,7 @@ export function AttendanceScheduleSheet({
                   출석 정보 수정
                 </DialogTitle>
                 <DialogDescription className="mt-1 text-[11px] font-semibold text-[#5F739F]">
-                  주간 기본 일정과 특정 날짜 예외만 간단하게 정리해요.
+                  반 교시제를 기본으로 두고, 필요한 날만 예외를 정리해요.
                 </DialogDescription>
               </div>
             </div>
@@ -751,7 +759,7 @@ export function AttendanceScheduleSheet({
                       ? 'border-[#FFD1A1] bg-[#FFF6E8] text-[#D86A11]'
                       : hasSelectedWeekdayTemplate
                         ? 'border-[#DCE6F7] bg-[#F8FBFF] text-[#17326B]'
-                        : 'border-[#E4ECF9] bg-white text-[#5F739F]'
+                      : 'border-[#E4ECF9] bg-white text-[#5F739F]'
                   )}
                 >
                   <p className="text-[10px] font-black uppercase tracking-[0.18em]">현재 상태</p>
@@ -762,14 +770,18 @@ export function AttendanceScheduleSheet({
                         : '이 날짜 예외 설정됨'
                       : hasSelectedWeekdayTemplate
                         ? '기본 일정 적용 중'
-                        : '아직 일정 없음'}
+                        : selectedDayUsesClassScheduleDefault
+                          ? '반 교시제 기본값 적용 중'
+                          : '아직 일정 없음'}
                   </p>
                   <p className="mt-1 text-[11px] font-semibold leading-5 opacity-80">
                     {selectedDayMeta?.hasSchedule
                       ? '기본 일정 대신 이 날짜에만 별도 설정이 적용되고 있어요.'
                       : hasSelectedWeekdayTemplate
                         ? `${selectedDateWeekdayLabel} 기본값이 이 날짜에도 적용돼요.`
-                        : '이 날짜는 아직 저장된 기본 일정이나 예외가 없어요.'}
+                        : selectedDayUsesClassScheduleDefault
+                          ? `${selectedDateWeekdayLabel}에는 반 교시제를 기본으로 보고, 학원 같은 특이사항만 추가하면 돼요.`
+                          : '이 날짜는 아직 저장된 기본 일정이나 예외가 없어요.'}
                   </p>
                 </div>
 
@@ -817,7 +829,7 @@ export function AttendanceScheduleSheet({
               {matchedClassSchedule ? (
                 <ClassSchedulePreviewCard
                   schedule={matchedClassSchedule}
-                  actionLabel="이 날짜에 적용"
+                  actionLabel="교시제 다시 적용"
                   onApply={() => {
                     markAsLocallyEdited();
                     onApplyMatchedClassScheduleToToday();
@@ -863,7 +875,7 @@ export function AttendanceScheduleSheet({
                   <p className="text-[11px] font-black uppercase tracking-[0.18em] text-[#5F739F]">주간 등원 일정</p>
                   <h3 className="mt-1 text-lg font-black tracking-tight text-[#17326B]">월~일 기본 일정을 간단히 정해두세요</h3>
                   <p className="mt-1 break-keep text-[11px] font-semibold leading-5 text-[#5F739F]">
-                    반복되는 등원 패턴을 먼저 정해두고, 필요한 날만 예외로 따로 바꿔요.
+                    반 교시제를 기본으로 보고, 학원처럼 달라지는 학생만 추가로 조정해요.
                   </p>
                 </div>
 
@@ -940,10 +952,10 @@ export function AttendanceScheduleSheet({
                 classSchedules.length > 0 ? (
                   <div className="rounded-[1.35rem] border border-[#D8E4FB] bg-white p-4 shadow-[0_18px_40px_-34px_rgba(15,33,73,0.16)]">
                     <div className="mb-3">
-                      <p className="text-[11px] font-black uppercase tracking-[0.18em] text-[#5F739F]">반 교시제 불러오기</p>
+                      <p className="text-[11px] font-black uppercase tracking-[0.18em] text-[#5F739F]">반 교시제 기본값</p>
                       <h3 className="mt-1 text-lg font-black tracking-tight text-[#17326B]">{studentClassName.trim()} 반 교시제</h3>
                       <p className="mt-1 break-keep text-[11px] font-semibold leading-5 text-[#5F739F]">
-                        반마다 교시제가 다를 수 있어서, 센터에서 등록한 반 스케줄을 그대로 가져올 수 있어요.
+                        특이사항이 없으면 이 교시제를 그대로 따르면 되고, 다른 학생만 학원 계획을 추가하면 돼요.
                       </p>
                     </div>
                     <div className="space-y-3">
@@ -951,7 +963,7 @@ export function AttendanceScheduleSheet({
                         <ClassSchedulePreviewCard
                           key={schedule.id || `${schedule.className}-${formatStudyRoomWeekdays(schedule.weekdays)}`}
                           schedule={schedule}
-                          actionLabel="선택 요일에 적용"
+                          actionLabel="교시제 다시 불러오기"
                           onApply={() => {
                             markAsLocallyEdited();
                             onApplyClassScheduleToWeekday(schedule);

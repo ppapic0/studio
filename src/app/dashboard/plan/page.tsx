@@ -243,6 +243,27 @@ function createAttendanceProofDraft(file: File): AttendanceProofDraft {
   };
 }
 
+function buildAttendanceDraftFromClassSchedule(schedule: StudyRoomClassScheduleTemplate): AttendanceScheduleDraft {
+  return {
+    ...EMPTY_ATTENDANCE_SCHEDULE_DRAFT,
+    inTime: schedule.arrivalTime,
+    outTime: schedule.departureTime,
+    classScheduleId: schedule.id || null,
+    classScheduleName: `${schedule.className} 반 교시제`,
+  };
+}
+
+function normalizeWeekdayValues(values: number[] = []) {
+  return [...values].sort((left, right) => left - right);
+}
+
+function areWeekdaySetsEqual(left: number[] = [], right: number[] = []) {
+  const normalizedLeft = normalizeWeekdayValues(left);
+  const normalizedRight = normalizeWeekdayValues(right);
+  if (normalizedLeft.length !== normalizedRight.length) return false;
+  return normalizedLeft.every((value, index) => value === normalizedRight[index]);
+}
+
 const SUBJECTS = [
   { id: 'kor', label: '국어', color: 'bg-red-500', light: 'bg-red-50', text: 'text-red-600' },
   { id: 'math', label: '수학', color: 'bg-blue-500', light: 'bg-blue-50', text: 'text-blue-600' },
@@ -1014,11 +1035,39 @@ export default function StudyPlanPage() {
       ) || null,
     [availableClassSchedules, selectedWeekdayValue]
   );
+  const preferredClassScheduleForWeek = useMemo(() => {
+    if (availableClassSchedules.length === 0) return null;
+
+    const normalizedSelectedWeekdays = normalizeWeekdayValues(selectedRecurringWeekdays);
+    const exactMatchedSchedule = availableClassSchedules.find((schedule) =>
+      areWeekdaySetsEqual(schedule.weekdays || [], normalizedSelectedWeekdays)
+    );
+
+    if (exactMatchedSchedule) return exactMatchedSchedule;
+    if (matchedClassSchedule) return matchedClassSchedule;
+    return availableClassSchedules[0] || null;
+  }, [availableClassSchedules, matchedClassSchedule, selectedRecurringWeekdays]);
   const selectedRecurringWeekdayLabel = useMemo(() => {
     const labels = WEEKDAY_OPTIONS.filter((option) => selectedRecurringWeekdays.includes(option.value)).map((option) => option.label);
     if (labels.length === 0) return '요일 미선택';
     return labels.join(', ');
   }, [selectedRecurringWeekdays]);
+  const isWeekdayDraftUntouched = useMemo(
+    () =>
+      weekdayDraft.inTime === EMPTY_ATTENDANCE_SCHEDULE_DRAFT.inTime &&
+      weekdayDraft.outTime === EMPTY_ATTENDANCE_SCHEDULE_DRAFT.outTime &&
+      weekdayDraft.academyName === EMPTY_ATTENDANCE_SCHEDULE_DRAFT.academyName &&
+      weekdayDraft.academyStartTime === EMPTY_ATTENDANCE_SCHEDULE_DRAFT.academyStartTime &&
+      weekdayDraft.academyEndTime === EMPTY_ATTENDANCE_SCHEDULE_DRAFT.academyEndTime &&
+      weekdayDraft.awayStartTime === EMPTY_ATTENDANCE_SCHEDULE_DRAFT.awayStartTime &&
+      weekdayDraft.awayEndTime === EMPTY_ATTENDANCE_SCHEDULE_DRAFT.awayEndTime &&
+      weekdayDraft.awayReason === EMPTY_ATTENDANCE_SCHEDULE_DRAFT.awayReason &&
+      (weekdayDraft.awaySlots?.length || 0) === 0 &&
+      !weekdayDraft.isAbsent &&
+      !weekdayDraft.classScheduleId &&
+      !weekdayDraft.classScheduleName,
+    [weekdayDraft]
+  );
   const matchingWeekdayLabel = useMemo(
     () => WEEKDAY_OPTIONS.find((option) => option.value === selectedWeekdayValue)?.label || '해당 요일',
     [selectedWeekdayValue]
@@ -1394,9 +1443,11 @@ export default function StudyPlanPage() {
                       endTime: matchingWeekdayTemplate.defaultExcursionEndAt,
                       reason: matchingWeekdayTemplate.defaultExcursionReason || '',
                     }
-                  : null,
+                : null,
               ].filter(Boolean) as any[],
           })
+        : matchedClassSchedule
+          ? buildAttendanceDraftFromClassSchedule(matchedClassSchedule)
         : null;
 
     const draft = scheduleSource || {
@@ -1426,8 +1477,13 @@ export default function StudyPlanPage() {
     setIsScheduleAbsent(Boolean(draft.isAbsent));
     setAppliedClassScheduleId(draft.classScheduleId || null);
     setAppliedClassScheduleName(draft.classScheduleName || null);
-    setScheduleNote((selectedScheduleDoc as any)?.note || '');
-  }, [matchingWeekdayTemplate, scheduleItems, selectedScheduleDoc]);
+    setScheduleNote(
+      (selectedScheduleDoc as any)?.note ||
+        matchingWeekdayTemplate?.note ||
+        matchedClassSchedule?.note ||
+        ''
+    );
+  }, [matchedClassSchedule, matchingWeekdayTemplate, scheduleItems, selectedScheduleDoc]);
 
   useEffect(() => {
     if (matchingRecurringTemplate) {
@@ -1464,8 +1520,21 @@ export default function StudyPlanPage() {
             ].filter(Boolean) as any[],
         })
       );
+      return;
     }
-  }, [matchingRecurringTemplate]);
+
+    if (!preferredClassScheduleForWeek || !isWeekdayDraftUntouched) return;
+
+    const nextWeekdays = normalizeWeekdayValues(preferredClassScheduleForWeek.weekdays || []);
+    const nextDraft = buildAttendanceDraftFromClassSchedule(preferredClassScheduleForWeek);
+
+    setSelectedRecurringWeekdays((previous) =>
+      areWeekdaySetsEqual(previous, nextWeekdays) ? previous : nextWeekdays
+    );
+    setWeekdayDraft(nextDraft);
+    setPresetName((previous) => (previous.trim() ? previous : `${preferredClassScheduleForWeek.className} 반 교시제`));
+    setScheduleNote(preferredClassScheduleForWeek.note?.trim() || '');
+  }, [isWeekdayDraftUntouched, matchingRecurringTemplate, preferredClassScheduleForWeek]);
 
   const studyTimeSummary = useMemo(() => {
     const summary: Record<string, number> = {};
@@ -3210,26 +3279,18 @@ export default function StudyPlanPage() {
     setWeekdayDraft(preset);
   }, []);
 
-  const buildDraftFromClassSchedule = useCallback((schedule: StudyRoomClassScheduleTemplate): AttendanceScheduleDraft => ({
-    ...EMPTY_ATTENDANCE_SCHEDULE_DRAFT,
-    inTime: schedule.arrivalTime,
-    outTime: schedule.departureTime,
-    classScheduleId: schedule.id || null,
-    classScheduleName: `${schedule.className} 반 교시제`,
-  }), []);
-
   const handleApplyMatchedClassScheduleToToday = useCallback(() => {
     if (!matchedClassSchedule) return;
-    applyAttendanceDraftToState(buildDraftFromClassSchedule(matchedClassSchedule));
+    applyAttendanceDraftToState(buildAttendanceDraftFromClassSchedule(matchedClassSchedule));
     setScheduleNote(matchedClassSchedule.note?.trim() || '');
-  }, [applyAttendanceDraftToState, buildDraftFromClassSchedule, matchedClassSchedule]);
+  }, [applyAttendanceDraftToState, matchedClassSchedule]);
 
   const handleApplyClassScheduleToWeekday = useCallback((schedule: StudyRoomClassScheduleTemplate) => {
-    setSelectedRecurringWeekdays([...(schedule.weekdays || [])].sort((left, right) => left - right));
-    setWeekdayDraft(buildDraftFromClassSchedule(schedule));
+    setSelectedRecurringWeekdays(normalizeWeekdayValues(schedule.weekdays || []));
+    setWeekdayDraft(buildAttendanceDraftFromClassSchedule(schedule));
     setPresetName(`${schedule.className} 반 교시제`);
     setScheduleNote(schedule.note?.trim() || '');
-  }, [buildDraftFromClassSchedule]);
+  }, []);
 
   const handleApplySelectedWeekdayTemplateToToday = useCallback(() => {
     if (!matchingWeekdayTemplate) return;
