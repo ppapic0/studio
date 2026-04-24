@@ -1,7 +1,7 @@
 
 'use client';
 
-import { useState, useEffect, useMemo, useRef } from 'react';
+import { useState, useEffect, useMemo, useRef, type ChangeEvent } from 'react';
 import { 
   Card, 
   CardContent, 
@@ -61,18 +61,36 @@ import {
   Send,
   Link2,
   ShieldCheck,
-  Wifi
+  Wifi,
+  BookOpen,
+  ImagePlus,
+  ImageIcon,
+  Trash2,
+  Users
 } from 'lucide-react';
-import { useCollection, useFirestore, useUser, useMemoFirebase } from '@/firebase';
+import { useCollection, useFirestore, useUser, useMemoFirebase, useFunctions, useStorage } from '@/firebase';
 import { useAppContext } from '@/contexts/app-context';
-import { collection, query, where, addDoc, serverTimestamp, Timestamp, updateDoc, doc, orderBy, limit, FieldValue } from 'firebase/firestore';
+import { collection, query, where, addDoc, serverTimestamp, Timestamp, updateDoc, doc, orderBy, limit, deleteDoc, type FieldValue } from 'firebase/firestore';
 import { format } from 'date-fns';
-import { CounselingReservation, CounselingLog, CenterMembership, StudentProfile, SupportThreadMessage, SupportThreadKind } from '@/lib/types';
+import { httpsCallable } from 'firebase/functions';
+import { deleteObject, ref as storageRef, uploadBytes } from 'firebase/storage';
+import { CounselingReservation, CounselingLog, CenterMembership, StudentProfile, SupportThreadMessage, SupportThreadKind, CounselingAvailabilitySlot } from '@/lib/types';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 import Link from 'next/link';
 import { isAdminRole, isTeacherOrAdminRole } from '@/lib/dashboard-access';
 import { WebsiteConsultOperations } from '@/components/dashboard/website-consult-operations';
+import {
+  COUNSELING_QUESTION_ATTACHMENT_LIMIT,
+  COUNSELING_QUESTION_ATTACHMENT_MAX_EDGE,
+  COUNSELING_QUESTION_ATTACHMENT_RETENTION_DAYS,
+  COUNSELING_QUESTION_ATTACHMENT_TARGET_BYTES,
+  COUNSELING_QUESTION_SUBJECT_OPTIONS,
+  buildStudyQuestionReservationPreview,
+  getCounselingAttachmentCountLabel,
+  getVisibleCounselingQuestionAttachments,
+  isStudyQuestionReservation,
+} from '@/lib/counseling-question';
 
 type ParentCommunicationRecord = {
   id: string;
@@ -125,6 +143,38 @@ type SupportThreadTimelineEntry = {
   isInitialRequest?: boolean;
 };
 
+type PendingQuestionAttachment = {
+  id: string;
+  file: File;
+  previewUrl: string;
+};
+
+type UploadedQuestionAttachmentPayload = {
+  id: string;
+  name: string;
+  path: string;
+  downloadToken: string;
+  contentType: string;
+  sizeBytes: number;
+  width?: number | null;
+  height?: number | null;
+};
+
+type RequestCounselingReservationSecureResponse = {
+  ok: boolean;
+  reservationId: string;
+  slotId: string;
+  scheduledAtMs: number;
+  teacherId: string;
+  teacherName: string;
+};
+
+type CancelCounselingReservationSecureResponse = {
+  ok: boolean;
+  reservationId: string;
+  alreadyCanceled?: boolean;
+};
+
 const STUDENT_SUPPORT_KIND_LABEL: Record<SupportThreadKind, string> = {
   student_question: '학생 질문',
   student_suggestion: '학생 건의',
@@ -165,6 +215,91 @@ function isStudentChatEnabledThread(item: Pick<ParentCommunicationRecord, 'sende
     && (item.supportKind === 'wifi_unblock' || item.supportKind === 'student_suggestion');
 }
 
+function getDateInputValue(date = new Date()) {
+  return format(date, 'yyyy-MM-dd');
+}
+
+function getReservedCounselingSlotCount(slot?: Pick<CounselingAvailabilitySlot, 'reservedCount' | 'activeReservationIds'> | null) {
+  const activeCount = Array.isArray(slot?.activeReservationIds) ? slot.activeReservationIds.length : 0;
+  const reservedCount = typeof slot?.reservedCount === 'number' ? slot.reservedCount : 0;
+  return Math.max(0, reservedCount, activeCount);
+}
+
+function getCounselingSlotCapacity(slot?: Pick<CounselingAvailabilitySlot, 'capacity'> | null) {
+  return Math.max(1, Number(slot?.capacity || 1));
+}
+
+function getCounselingSlotHasCapacity(slot?: CounselingAvailabilitySlot | null) {
+  return getReservedCounselingSlotCount(slot) < getCounselingSlotCapacity(slot);
+}
+
+function readFileAsDataUrl(file: File) {
+  return new Promise<string>((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result || ''));
+    reader.onerror = () => reject(reader.error || new Error('파일을 읽지 못했습니다.'));
+    reader.readAsDataURL(file);
+  });
+}
+
+function loadImageElement(src: string) {
+  return new Promise<HTMLImageElement>((resolve, reject) => {
+    const image = new Image();
+    image.onload = () => resolve(image);
+    image.onerror = () => reject(new Error('이미지를 불러오지 못했습니다.'));
+    image.src = src;
+  });
+}
+
+function canvasToBlob(canvas: HTMLCanvasElement, type: string, quality?: number) {
+  return new Promise<Blob>((resolve, reject) => {
+    canvas.toBlob((blob) => {
+      if (!blob) {
+        reject(new Error('이미지 변환에 실패했습니다.'));
+        return;
+      }
+      resolve(blob);
+    }, type, quality);
+  });
+}
+
+async function compressCounselingQuestionImage(file: File) {
+  if (!file.type.startsWith('image/')) {
+    throw new Error('이미지 파일만 업로드할 수 있습니다.');
+  }
+
+  const source = await readFileAsDataUrl(file);
+  const image = await loadImageElement(source);
+  const longestEdge = Math.max(image.naturalWidth, image.naturalHeight, 1);
+  const scale = Math.min(1, COUNSELING_QUESTION_ATTACHMENT_MAX_EDGE / longestEdge);
+  const targetWidth = Math.max(1, Math.round(image.naturalWidth * scale));
+  const targetHeight = Math.max(1, Math.round(image.naturalHeight * scale));
+  const canvas = document.createElement('canvas');
+  canvas.width = targetWidth;
+  canvas.height = targetHeight;
+
+  const context = canvas.getContext('2d');
+  if (!context) {
+    throw new Error('이미지 처리 컨텍스트를 열지 못했습니다.');
+  }
+
+  context.drawImage(image, 0, 0, targetWidth, targetHeight);
+
+  const qualities = [0.88, 0.8, 0.72, 0.64];
+  let blob = await canvasToBlob(canvas, 'image/jpeg', qualities[0]);
+  for (const quality of qualities.slice(1)) {
+    if (blob.size <= COUNSELING_QUESTION_ATTACHMENT_TARGET_BYTES) break;
+    blob = await canvasToBlob(canvas, 'image/jpeg', quality);
+  }
+
+  return {
+    blob,
+    width: targetWidth,
+    height: targetHeight,
+    contentType: 'image/jpeg',
+  };
+}
+
 const isPublishedAnnouncement = (item: CenterAnnouncementRecord) => {
   const normalizedStatus = item?.status?.trim?.().toLowerCase();
   if (normalizedStatus) return normalizedStatus === 'published';
@@ -187,6 +322,8 @@ export function AppointmentsPageContent({
 }: AppointmentsPageContentProps) {
   const { user } = useUser();
   const firestore = useFirestore();
+  const firebaseFunctions = useFunctions();
+  const storage = useStorage();
   const { activeMembership, activeStudentId, viewMode, currentTier } = useAppContext();
   const { toast } = useToast();
 
@@ -200,6 +337,22 @@ export function AppointmentsPageContent({
   const [aptTime, setAptTime] = useState('14:00');
   const [studentNote, setStudentNote] = useState('');
   const [selectedTeacherId, setSelectedTeacherId] = useState<string>('');
+  const [requestMode, setRequestMode] = useState<'general' | 'study_question'>('general');
+  const [selectedQuestionSlotId, setSelectedQuestionSlotId] = useState('');
+  const [questionSubject, setQuestionSubject] = useState<(typeof COUNSELING_QUESTION_SUBJECT_OPTIONS)[number] | ''>('');
+  const [questionWorkbook, setQuestionWorkbook] = useState('');
+  const [questionProblemNumbers, setQuestionProblemNumbers] = useState('');
+  const [questionSummary, setQuestionSummary] = useState('');
+  const [questionDetails, setQuestionDetails] = useState('');
+  const [questionAttachmentDrafts, setQuestionAttachmentDrafts] = useState<PendingQuestionAttachment[]>([]);
+  const [questionSlotDate, setQuestionSlotDate] = useState(() => getDateInputValue());
+  const [questionSlotStartTime, setQuestionSlotStartTime] = useState('19:00');
+  const [questionSlotEndTime, setQuestionSlotEndTime] = useState('19:30');
+  const [questionSlotTeacherId, setQuestionSlotTeacherId] = useState('');
+  const [questionSlotCapacity, setQuestionSlotCapacity] = useState('1');
+  const [questionSlotNote, setQuestionSlotNote] = useState('');
+  const [questionSlotPublished, setQuestionSlotPublished] = useState(true);
+  const [isSavingQuestionSlot, setIsSavingQuestionSlot] = useState(false);
   
   const [logType, setLogType] = useState<'academic' | 'life' | 'career'>('academic');
   const [logContent, setLogContent] = useState('');
@@ -229,6 +382,12 @@ export function AppointmentsPageContent({
   useEffect(() => {
     setAptDate(format(new Date(), 'yyyy-MM-dd'));
   }, []);
+
+  useEffect(() => {
+    return () => {
+      questionAttachmentDrafts.forEach((draft) => URL.revokeObjectURL(draft.previewUrl));
+    };
+  }, [questionAttachmentDrafts]);
 
   // 시즌 판별 로직
   const getSeasonName = (date: Date) => {
@@ -278,11 +437,38 @@ export function AppointmentsPageContent({
     return allStaff.filter(t => t.displayName !== '동백센터관리자');
   }, [allStaff]);
 
+  useEffect(() => {
+    if (!isStaff) return;
+    if (questionSlotTeacherId && filteredTeachers.some((teacher) => teacher.id === questionSlotTeacherId)) return;
+
+    if (!isAdmin && authUid) {
+      setQuestionSlotTeacherId(authUid);
+      return;
+    }
+
+    if (filteredTeachers[0]?.id) {
+      setQuestionSlotTeacherId(filteredTeachers[0].id);
+    }
+  }, [isStaff, isAdmin, authUid, questionSlotTeacherId, filteredTeachers]);
+
   const studentProfilesQuery = useMemoFirebase(() => {
     if (!firestore || !centerId || !isStaff) return null;
     return collection(firestore, 'centers', centerId, 'students');
   }, [firestore, centerId, isStaff]);
   const { data: studentProfiles } = useCollection<StudentProfile>(studentProfilesQuery, { enabled: isStaff && !!centerId });
+
+  const shouldLoadCounselingAvailabilitySlots = (isStaff && shouldLoadReservations) || isRequestModalOpen;
+  const counselingAvailabilitySlotsQuery = useMemoFirebase(() => {
+    if (!firestore || !centerId || !shouldLoadCounselingAvailabilitySlots) return null;
+    return query(
+      collection(firestore, 'centers', centerId, 'counselingAvailabilitySlots'),
+      orderBy('startsAt', 'asc'),
+      limit(120)
+    );
+  }, [firestore, centerId, shouldLoadCounselingAvailabilitySlots]);
+  const { data: rawCounselingAvailabilitySlots, isLoading: counselingAvailabilitySlotsLoading } = useCollection<CounselingAvailabilitySlot>(counselingAvailabilitySlotsQuery, {
+    enabled: !!centerId && shouldLoadCounselingAvailabilitySlots,
+  });
 
   const studentNameById = useMemo(() => {
     const map = new Map<string, string>();
@@ -293,6 +479,28 @@ export function AppointmentsPageContent({
     });
     return map;
   }, [studentProfiles]);
+
+  const counselingAvailabilitySlots = useMemo(() => {
+    if (!rawCounselingAvailabilitySlots) return [];
+    return [...rawCounselingAvailabilitySlots]
+      .filter((slot) => !slot.slotType || slot.slotType === 'study_question')
+      .sort((a, b) => (a.startsAt?.toMillis?.() || 0) - (b.startsAt?.toMillis?.() || 0));
+  }, [rawCounselingAvailabilitySlots]);
+
+  const upcomingCounselingAvailabilitySlots = useMemo(() => {
+    const nowMs = Date.now();
+    return counselingAvailabilitySlots.filter((slot) => (slot.endsAt?.toMillis?.() || 0) > nowMs);
+  }, [counselingAvailabilitySlots]);
+
+  const openStudyQuestionSlots = useMemo(() => {
+    return upcomingCounselingAvailabilitySlots.filter((slot) => slot.isPublished !== false && getCounselingSlotHasCapacity(slot));
+  }, [upcomingCounselingAvailabilitySlots]);
+
+  useEffect(() => {
+    if (requestMode !== 'study_question') return;
+    if (selectedQuestionSlotId && openStudyQuestionSlots.some((slot) => slot.id === selectedQuestionSlotId)) return;
+    setSelectedQuestionSlotId(openStudyQuestionSlots[0]?.id || '');
+  }, [requestMode, selectedQuestionSlotId, openStudyQuestionSlots]);
 
   // 예약 내역 쿼리
   const reservationsQuery = useMemoFirebase(() => {
@@ -371,11 +579,29 @@ export function AppointmentsPageContent({
   const reservationQuestionById = useMemo(() => {
     const map = new Map<string, string>();
     reservations.forEach((reservation) => {
-      const question = reservation.studentNote?.trim();
+      const question = isStudyQuestionReservation(reservation)
+        ? [
+            buildStudyQuestionReservationPreview({
+              subject: reservation.questionSubject,
+              workbook: reservation.questionWorkbook,
+              problemNumbers: reservation.questionProblemNumbers,
+              summary: reservation.questionSummary,
+            }),
+            reservation.questionDetails?.trim() || '',
+          ].filter(Boolean).join('\n')
+        : reservation.studentNote?.trim();
       if (reservation.id && question) map.set(reservation.id, question);
     });
     return map;
   }, [reservations]);
+
+  const counselingAvailabilitySlotById = useMemo(() => {
+    const map = new Map<string, CounselingAvailabilitySlot>();
+    counselingAvailabilitySlots.forEach((slot) => {
+      if (slot.id) map.set(slot.id, slot);
+    });
+    return map;
+  }, [counselingAvailabilitySlots]);
 
   const parentCommunications = useMemo(() => {
     if (!rawParentCommunications) return [];
@@ -582,19 +808,202 @@ export function AppointmentsPageContent({
     );
   }, [firestore, centerId, user, isStaff, showAll, activeTab, visibleLogs, isParent]);
 
-  const handleRequestAppointment = async () => {
-    if (!firestore || !centerId || !user) return;
-    if (!aptDate) {
-      toast({ variant: "destructive", title: "날짜를 선택해 주세요." });
-      return;
+  const clearQuestionAttachmentDrafts = (drafts: PendingQuestionAttachment[] = questionAttachmentDrafts) => {
+    drafts.forEach((draft) => URL.revokeObjectURL(draft.previewUrl));
+    setQuestionAttachmentDrafts([]);
+  };
+
+  const resetCounselingRequestForm = () => {
+    setRequestMode('general');
+    setAptDate(getDateInputValue());
+    setAptTime('14:00');
+    setStudentNote('');
+    setSelectedTeacherId('');
+    setSelectedQuestionSlotId('');
+    setQuestionSubject('');
+    setQuestionWorkbook('');
+    setQuestionProblemNumbers('');
+    setQuestionSummary('');
+    setQuestionDetails('');
+    clearQuestionAttachmentDrafts();
+  };
+
+  const handleRequestModalOpenChange = (open: boolean) => {
+    setIsRequestModalOpen(open);
+    if (!open) {
+      resetCounselingRequestForm();
     }
-    if (!selectedTeacherId) {
-      toast({ variant: "destructive", title: "선생님을 선택해 주세요." });
+  };
+
+  const uploadQuestionAttachments = async (studentId: string) => {
+    if (!centerId || !questionAttachmentDrafts.length) return [] as UploadedQuestionAttachmentPayload[];
+
+    const bucketName = storage.app.options.storageBucket || '';
+    if (!bucketName) {
+      throw new Error('스토리지 버킷 설정을 찾지 못했습니다.');
+    }
+
+    const uploadBatchId = crypto.randomUUID();
+    const uploadedRefs: string[] = [];
+
+    try {
+      const uploadedAttachments: UploadedQuestionAttachmentPayload[] = [];
+      for (const [index, draft] of questionAttachmentDrafts.entries()) {
+        const processed = await compressCounselingQuestionImage(draft.file);
+        const downloadToken = crypto.randomUUID();
+        const filePath = `centers/${centerId}/counseling-question-attachments/${studentId}/${uploadBatchId}/${draft.id || `attachment-${index + 1}`}.jpg`;
+        const attachmentRef = storageRef(storage, filePath);
+
+        await uploadBytes(attachmentRef, processed.blob, {
+          contentType: processed.contentType,
+          customMetadata: {
+            firebaseStorageDownloadTokens: downloadToken,
+          },
+        });
+
+        uploadedRefs.push(filePath);
+        uploadedAttachments.push({
+          id: draft.id,
+          name: draft.file.name || `question-${index + 1}.jpg`,
+          path: filePath,
+          downloadToken,
+          contentType: processed.contentType,
+          sizeBytes: processed.blob.size,
+          width: processed.width,
+          height: processed.height,
+        });
+      }
+
+      return uploadedAttachments;
+    } catch (error) {
+      await Promise.all(
+        uploadedRefs.map((path) =>
+          deleteObject(storageRef(storage, path)).catch(() => undefined)
+        )
+      );
+      throw error;
+    }
+  };
+
+  const handleQuestionAttachmentInputChange = (event: ChangeEvent<HTMLInputElement>) => {
+    const nextFiles = Array.from(event.target.files || []).filter((file) => file.type.startsWith('image/'));
+    event.target.value = '';
+
+    if (!nextFiles.length) return;
+
+    const remaining = Math.max(0, COUNSELING_QUESTION_ATTACHMENT_LIMIT - questionAttachmentDrafts.length);
+    if (remaining <= 0) {
+      toast({
+        variant: 'destructive',
+        title: `사진은 최대 ${COUNSELING_QUESTION_ATTACHMENT_LIMIT}장까지 첨부할 수 있습니다.`,
+      });
       return;
     }
 
+    const acceptedFiles = nextFiles.slice(0, remaining);
+    if (acceptedFiles.length < nextFiles.length) {
+      toast({
+        title: `최대 ${COUNSELING_QUESTION_ATTACHMENT_LIMIT}장만 업로드됩니다.`,
+        description: '남은 사진은 제외하고 추가했습니다.',
+      });
+    }
+
+    const nextDrafts = acceptedFiles.map((file) => ({
+      id: crypto.randomUUID(),
+      file,
+      previewUrl: URL.createObjectURL(file),
+    }));
+
+    setQuestionAttachmentDrafts((previous) => [...previous, ...nextDrafts]);
+  };
+
+  const handleRemoveQuestionAttachment = (attachmentId: string) => {
+    setQuestionAttachmentDrafts((previous) => {
+      const target = previous.find((attachment) => attachment.id === attachmentId);
+      if (target) {
+        URL.revokeObjectURL(target.previewUrl);
+      }
+      return previous.filter((attachment) => attachment.id !== attachmentId);
+    });
+  };
+
+  const handleRequestAppointment = async () => {
+    if (!firestore || !centerId || !user) return;
+    if (requestMode === 'study_question') {
+      if (!studentUid) {
+        toast({ variant: 'destructive', title: '학생 정보를 다시 확인해 주세요.' });
+        return;
+      }
+      if (!selectedQuestionSlotId) {
+        toast({ variant: 'destructive', title: '질의 상담 시간을 선택해 주세요.' });
+        return;
+      }
+      if (!questionSubject) {
+        toast({ variant: 'destructive', title: '과목을 선택해 주세요.' });
+        return;
+      }
+      if (!questionWorkbook.trim()) {
+        toast({ variant: 'destructive', title: '문제집 또는 자료명을 입력해 주세요.' });
+        return;
+      }
+      if (!questionProblemNumbers.trim()) {
+        toast({ variant: 'destructive', title: '질문할 문제 번호나 범위를 입력해 주세요.' });
+        return;
+      }
+      if (questionSummary.trim().length < 4) {
+        toast({ variant: 'destructive', title: '질문 요약은 4자 이상 입력해 주세요.' });
+        return;
+      }
+    } else {
+      if (!aptDate) {
+        toast({ variant: "destructive", title: "날짜를 선택해 주세요." });
+        return;
+      }
+      if (!selectedTeacherId) {
+        toast({ variant: "destructive", title: "선생님을 선택해 주세요." });
+        return;
+      }
+    }
+
     setIsSubmitting(true);
+    let uploadedAttachments: UploadedQuestionAttachmentPayload[] = [];
+
     try {
+      if (requestMode === 'study_question') {
+        uploadedAttachments = await uploadQuestionAttachments(studentUid!);
+        const requestReservation = httpsCallable<
+          {
+            centerId: string;
+            slotId: string;
+            questionSubject: string;
+            questionWorkbook: string;
+            questionProblemNumbers: string;
+            questionSummary: string;
+            questionDetails: string;
+            questionAttachments: UploadedQuestionAttachmentPayload[];
+          },
+          RequestCounselingReservationSecureResponse
+        >(firebaseFunctions, 'requestCounselingReservationSecure');
+
+        await requestReservation({
+          centerId,
+          slotId: selectedQuestionSlotId,
+          questionSubject,
+          questionWorkbook: questionWorkbook.trim(),
+          questionProblemNumbers: questionProblemNumbers.trim(),
+          questionSummary: questionSummary.trim(),
+          questionDetails: questionDetails.trim(),
+          questionAttachments: uploadedAttachments,
+        });
+
+        toast({
+          title: '학습 질의 상담 신청 완료',
+          description: `사진은 상담 완료 후 ${COUNSELING_QUESTION_ATTACHMENT_RETENTION_DAYS}일 뒤 자동 삭제됩니다.`,
+        });
+        handleRequestModalOpenChange(false);
+        return;
+      }
+
       const scheduledAt = new Date(`${aptDate}T${aptTime}`);
       if (scheduledAt < new Date()) {
         toast({ variant: "destructive", title: "예약 불가", description: "현재 시간보다 이전으로는 신청할 수 없습니다." });
@@ -613,29 +1022,52 @@ export function AppointmentsPageContent({
         scheduledAt: Timestamp.fromDate(scheduledAt),
         status: 'requested',
         studentNote: studentNote.trim(),
+        requestMode: 'general',
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
       });
 
       toast({ title: "상담 신청 완료" });
-      setIsRequestModalOpen(false);
-      setStudentNote('');
-      setSelectedTeacherId('');
+      handleRequestModalOpenChange(false);
     } catch (e: any) {
-      toast({ variant: "destructive", title: "신청 실패", description: e.message });
+      if (uploadedAttachments.length) {
+        await Promise.all(
+          uploadedAttachments.map((attachment) =>
+            deleteObject(storageRef(storage, attachment.path)).catch(() => undefined)
+          )
+        );
+      }
+
+      toast({
+        variant: "destructive",
+        title: "신청 실패",
+        description: e?.message || '상담 신청 중 오류가 발생했습니다.',
+      });
     } finally {
       setIsSubmitting(false);
     }
   };
 
-  const handleUpdateStatus = async (resId: string, status: CounselingReservation['status']) => {
+  const handleUpdateStatus = async (reservation: CounselingReservation, status: CounselingReservation['status']) => {
     if (!firestore || !centerId) return;
     setIsSubmitting(true);
     try {
-      await updateDoc(doc(firestore, 'centers', centerId, 'counselingReservations', resId), {
-        status,
-        updatedAt: serverTimestamp()
-      });
+      if (status === 'canceled' && reservation.availabilitySlotId) {
+        const cancelReservation = httpsCallable<
+          { centerId: string; reservationId: string },
+          CancelCounselingReservationSecureResponse
+        >(firebaseFunctions, 'cancelCounselingReservationSecure');
+
+        await cancelReservation({
+          centerId,
+          reservationId: reservation.id,
+        });
+      } else {
+        await updateDoc(doc(firestore, 'centers', centerId, 'counselingReservations', reservation.id), {
+          status,
+          updatedAt: serverTimestamp()
+        });
+      }
       
       let message = "";
       if (status === 'confirmed') message = "상담 승인 완료";
@@ -643,7 +1075,7 @@ export function AppointmentsPageContent({
       
       toast({ title: message });
     } catch (e: any) {
-      toast({ variant: "destructive", title: "처리 실패" });
+      toast({ variant: "destructive", title: "처리 실패", description: e?.message || '상담 상태를 변경하지 못했습니다.' });
     } finally {
       setIsSubmitting(false);
     }
@@ -661,6 +1093,10 @@ export function AppointmentsPageContent({
     if (!firestore || !centerId || !user || !selectedResForLog || !logContent.trim()) return;
     setIsSubmitting(true);
     try {
+      const hasQuestionAttachments = getVisibleCounselingQuestionAttachments(selectedResForLog.questionAttachments).length > 0;
+      const cleanupDate = Timestamp.fromDate(
+        new Date(Date.now() + COUNSELING_QUESTION_ATTACHMENT_RETENTION_DAYS * 24 * 60 * 60 * 1000)
+      );
       const logData = {
         studentId: selectedResForLog.studentId,
         studentName: selectedResForLog.studentName || '학생',
@@ -678,6 +1114,8 @@ export function AppointmentsPageContent({
       await addDoc(collection(firestore, 'centers', centerId, 'counselingLogs'), logData);
       await updateDoc(doc(firestore, 'centers', centerId, 'counselingReservations', selectedResForLog.id), {
         status: 'done',
+        doneAt: serverTimestamp(),
+        questionAttachmentCleanupAt: hasQuestionAttachments ? cleanupDate : null,
         updatedAt: serverTimestamp()
       });
 
@@ -857,6 +1295,110 @@ export function AppointmentsPageContent({
       toast({ variant: 'destructive', title: '답변 저장에 실패했습니다.', description: e?.message });
     } finally {
       setIsSubmitting(false);
+    }
+  };
+
+  const handleCreateQuestionSlot = async () => {
+    if (!firestore || !centerId || !user || !isStaff) return;
+    if (!questionSlotTeacherId) {
+      toast({ variant: 'destructive', title: '담당 선생님을 선택해 주세요.' });
+      return;
+    }
+
+    const startsAt = new Date(`${questionSlotDate}T${questionSlotStartTime}:00`);
+    const endsAt = new Date(`${questionSlotDate}T${questionSlotEndTime}:00`);
+    if (Number.isNaN(startsAt.getTime()) || Number.isNaN(endsAt.getTime())) {
+      toast({ variant: 'destructive', title: '시간 정보를 다시 확인해 주세요.' });
+      return;
+    }
+    if (endsAt <= startsAt) {
+      toast({ variant: 'destructive', title: '종료 시간은 시작 시간보다 뒤여야 합니다.' });
+      return;
+    }
+
+    const teacher = filteredTeachers.find((item) => item.id === questionSlotTeacherId);
+    const teacherName = teacher?.displayName || user.displayName || '선생님';
+    const capacity = Math.max(1, Math.round(Number(questionSlotCapacity) || 1));
+
+    setIsSavingQuestionSlot(true);
+    try {
+      await addDoc(collection(firestore, 'centers', centerId, 'counselingAvailabilitySlots'), {
+        centerId,
+        teacherId: questionSlotTeacherId,
+        teacherName,
+        startsAt: Timestamp.fromDate(startsAt),
+        endsAt: Timestamp.fromDate(endsAt),
+        slotType: 'study_question',
+        note: questionSlotNote.trim() || null,
+        capacity,
+        reservedCount: 0,
+        activeReservationIds: [],
+        isPublished: questionSlotPublished,
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+        createdByUid: user.uid,
+        updatedByUid: user.uid,
+      });
+
+      toast({ title: '학습 질의 상담 시간이 등록되었습니다.' });
+      const nextSlotStart = format(endsAt, 'HH:mm');
+      const nextSlotEndDate = new Date(endsAt);
+      nextSlotEndDate.setMinutes(nextSlotEndDate.getMinutes() + 30);
+      setQuestionSlotStartTime(nextSlotStart);
+      setQuestionSlotEndTime(format(nextSlotEndDate, 'HH:mm'));
+      setQuestionSlotCapacity('1');
+      setQuestionSlotNote('');
+      setQuestionSlotPublished(true);
+    } catch (error: any) {
+      toast({
+        variant: 'destructive',
+        title: '시간 등록 실패',
+        description: error?.message || '질의 상담 시간을 저장하지 못했습니다.',
+      });
+    } finally {
+      setIsSavingQuestionSlot(false);
+    }
+  };
+
+  const handleToggleQuestionSlotPublished = async (slot: CounselingAvailabilitySlot) => {
+    if (!firestore || !centerId || !user) return;
+
+    try {
+      await updateDoc(doc(firestore, 'centers', centerId, 'counselingAvailabilitySlots', slot.id), {
+        isPublished: !(slot.isPublished !== false),
+        updatedAt: serverTimestamp(),
+        updatedByUid: user.uid,
+      });
+      toast({ title: slot.isPublished !== false ? '슬롯을 비공개로 전환했습니다.' : '슬롯을 공개했습니다.' });
+    } catch (error: any) {
+      toast({
+        variant: 'destructive',
+        title: '공개 상태를 바꾸지 못했습니다.',
+        description: error?.message || '잠시 후 다시 시도해 주세요.',
+      });
+    }
+  };
+
+  const handleDeleteQuestionSlot = async (slot: CounselingAvailabilitySlot) => {
+    if (!firestore || !centerId) return;
+    if (getReservedCounselingSlotCount(slot) > 0) {
+      toast({
+        variant: 'destructive',
+        title: '이미 예약된 슬롯은 삭제할 수 없습니다.',
+        description: '비공개로 전환한 뒤 예약을 모두 정리해 주세요.',
+      });
+      return;
+    }
+
+    try {
+      await deleteDoc(doc(firestore, 'centers', centerId, 'counselingAvailabilitySlots', slot.id));
+      toast({ title: '질의 상담 슬롯을 삭제했습니다.' });
+    } catch (error: any) {
+      toast({
+        variant: 'destructive',
+        title: '슬롯 삭제 실패',
+        description: error?.message || '잠시 후 다시 시도해 주세요.',
+      });
     }
   };
 
@@ -1432,6 +1974,301 @@ export function AppointmentsPageContent({
     );
   };
 
+  const selectedQuestionSlot = selectedQuestionSlotId
+    ? counselingAvailabilitySlotById.get(selectedQuestionSlotId) || null
+    : null;
+
+  const renderStudentRequestDialog = () => (
+    <Dialog open={isRequestModalOpen} onOpenChange={handleRequestModalOpenChange}>
+      <DialogTrigger asChild>
+        <Button
+          size="lg"
+          className={cn(
+            "student-cta rounded-2xl font-black gap-2 shadow-xl interactive-button border-none text-white",
+            isMobile ? "w-full max-w-full min-h-[3.75rem]" : "h-14 px-8",
+            counselingCtaClass
+          )}
+        >
+          <CalendarPlus className="h-5 w-5" /> 새 상담 신청
+        </Button>
+      </DialogTrigger>
+      <DialogContent
+        className={cn(
+          "rounded-[3rem] p-0 overflow-hidden border-none shadow-2xl transition-all duration-500",
+          isMobile ? "w-[min(94vw,25rem)] max-h-[86svh] rounded-[2rem]" : requestMode === 'study_question' ? "sm:max-w-2xl" : "sm:max-w-md"
+        )}
+      >
+        <div className={cn("text-white relative bg-[linear-gradient(180deg,var(--accent-orange-soft)_0%,var(--accent-orange)_100%)]", isMobile ? "p-6" : "p-10")}>
+          <Sparkles className="absolute top-0 right-0 p-10 h-40 w-40 opacity-10 rotate-12" />
+          <DialogHeader>
+            <DialogTitle className={cn("font-black tracking-tighter text-left break-keep", isMobile ? "text-[1.7rem]" : "text-3xl")}>
+              상담 신청
+            </DialogTitle>
+            <DialogDescription className="text-white/80 font-bold mt-1 text-left">
+              {requestMode === 'study_question'
+                ? '센터에서 열어 둔 질의 시간을 고르고, 질문할 문제 사진과 내용을 같이 보내 주세요.'
+                : '상담 일시와 선생님을 선택해 주세요.'}
+            </DialogDescription>
+          </DialogHeader>
+        </div>
+        <div className={cn("space-y-6 bg-white overflow-y-auto custom-scrollbar", isMobile ? "max-h-[calc(86svh-9rem)] p-5" : "p-8 max-h-[68vh]")}>
+          <div className="space-y-2">
+            <label className="text-[10px] font-black uppercase text-muted-foreground ml-1">상담 유형</label>
+            <Select value={requestMode} onValueChange={(value) => setRequestMode(value as 'general' | 'study_question')}>
+              <SelectTrigger className="h-12 rounded-xl border-2 font-bold">
+                <SelectValue placeholder="상담 유형을 선택하세요" />
+              </SelectTrigger>
+              <SelectContent className="rounded-xl border-none shadow-2xl">
+                <SelectItem value="general" className="font-bold py-2.5">일반 상담</SelectItem>
+                <SelectItem value="study_question" className="font-bold py-2.5">학습 질의 상담</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          {requestMode === 'general' ? (
+            <>
+              <div className={cn("grid gap-4", isMobile ? "grid-cols-1" : "grid-cols-2")}>
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black uppercase text-muted-foreground ml-1">희망 날짜</label>
+                  <Input type="date" value={aptDate} onChange={(e) => setAptDate(e.target.value)} className="rounded-xl h-12 border-2" />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black uppercase text-muted-foreground ml-1">희망 시간</label>
+                  <Input type="time" value={aptTime} onChange={(e) => setAptTime(e.target.value)} className="rounded-xl h-12 border-2" />
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-[10px] font-black uppercase text-muted-foreground ml-1 flex items-center gap-1.5">
+                  <UserCheck className="h-3 w-3" /> 상담 희망 선생님
+                </label>
+                <Select value={selectedTeacherId} onValueChange={setSelectedTeacherId}>
+                  <SelectTrigger className="h-12 rounded-xl border-2 font-bold">
+                    <SelectValue placeholder="선생님을 선택하세요" />
+                  </SelectTrigger>
+                  <SelectContent className="rounded-xl border-none shadow-2xl">
+                    {filteredTeachers.map((t) => (
+                      <SelectItem key={t.id} value={t.id} className="font-bold py-2.5">
+                        {t.displayName} (선생님)
+                      </SelectItem>
+                    ))}
+                    {!filteredTeachers.length && <p className="p-4 text-center text-xs font-bold opacity-40">선택 가능한 선생님이 없습니다.</p>}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-[10px] font-black uppercase text-muted-foreground ml-1">상담 요청 내용 (선택)</label>
+                <Textarea
+                  placeholder="고민이나 질문하고 싶은 내용을 자유롭게 적어주세요."
+                  value={studentNote}
+                  onChange={(e) => setStudentNote(e.target.value)}
+                  className="rounded-xl min-h-[100px] resize-none text-sm font-bold border-2"
+                />
+              </div>
+            </>
+          ) : (
+            <>
+              <div className="space-y-2">
+                <label className="text-[10px] font-black uppercase text-muted-foreground ml-1 flex items-center gap-1.5">
+                  <Calendar className="h-3 w-3" /> 센터 확인 질의 시간
+                </label>
+                {counselingAvailabilitySlotsLoading ? (
+                  <div className="flex min-h-[96px] items-center justify-center rounded-2xl border border-dashed border-muted-foreground/20 bg-muted/20">
+                    <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+                  </div>
+                ) : openStudyQuestionSlots.length === 0 ? (
+                  <div className="rounded-2xl border border-dashed border-muted-foreground/20 bg-muted/10 px-4 py-5 text-sm font-bold text-muted-foreground">
+                    지금은 예약 가능한 학습 질의 시간이 없습니다. 센터에서 슬롯을 열어 주면 여기에서 바로 선택할 수 있어요.
+                  </div>
+                ) : (
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    {openStudyQuestionSlots.map((slot) => {
+                      const isSelected = slot.id === selectedQuestionSlotId;
+                      const reservedCount = getReservedCounselingSlotCount(slot);
+                      const capacity = getCounselingSlotCapacity(slot);
+                      return (
+                        <button
+                          key={slot.id}
+                          type="button"
+                          onClick={() => setSelectedQuestionSlotId(slot.id)}
+                          className={cn(
+                            'rounded-2xl border-2 px-4 py-4 text-left transition-all',
+                            isSelected ? 'border-[#FF7A16] bg-[#fff4eb] shadow-[0_14px_30px_-24px_rgba(255,122,22,0.45)]' : 'border-[#e6edf7] bg-[#f9fbff] hover:border-[#c8d8f5]'
+                          )}
+                        >
+                          <div className="flex items-start justify-between gap-3">
+                            <div>
+                              <p className="text-[10px] font-black uppercase tracking-[0.2em] text-[#5c6e97]">학습 질의 슬롯</p>
+                              <p className="mt-2 text-base font-black text-[#14295F]">
+                                {slot.startsAt ? format(slot.startsAt.toDate(), 'M월 d일 HH:mm') : '-'}
+                              </p>
+                              <p className="mt-1 text-[11px] font-semibold text-[#5c6e97]">
+                                {slot.startsAt && slot.endsAt ? `${format(slot.startsAt.toDate(), 'HH:mm')} - ${format(slot.endsAt.toDate(), 'HH:mm')}` : ''}
+                              </p>
+                            </div>
+                            <Badge variant="outline" className={cn('rounded-full px-2.5 text-[10px] font-black', isSelected ? 'border-[#ffd8bf] bg-white text-[#FF7A16]' : 'border-[#dbe5ff] bg-white text-[#14295F]')}>
+                              {slot.teacherName || '선생님'}
+                            </Badge>
+                          </div>
+                          <div className="mt-3 flex items-center justify-between text-[11px] font-semibold text-[#5c6e97]">
+                            <span className="inline-flex items-center gap-1.5">
+                              <Users className="h-3.5 w-3.5" />
+                              {reservedCount}/{capacity}명 예약
+                            </span>
+                            <span className="truncate">{slot.note?.trim() || '센터 확정 일정'}</span>
+                          </div>
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+                {selectedQuestionSlot && (
+                  <div className="rounded-2xl border border-[#ffe1c8] bg-[#fff7ef] px-4 py-3 text-[11px] font-semibold leading-5 text-[#a95c1d]">
+                    선택한 시간: {selectedQuestionSlot.startsAt ? format(selectedQuestionSlot.startsAt.toDate(), 'M월 d일 HH:mm') : '-'} · {selectedQuestionSlot.teacherName || '선생님'}
+                  </div>
+                )}
+              </div>
+
+              <div className={cn('grid gap-4', isMobile ? 'grid-cols-1' : 'grid-cols-3')}>
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black uppercase text-muted-foreground ml-1">과목</label>
+                  <Select value={questionSubject} onValueChange={(value) => setQuestionSubject(value as (typeof COUNSELING_QUESTION_SUBJECT_OPTIONS)[number])}>
+                    <SelectTrigger className="h-12 rounded-xl border-2 font-bold">
+                      <SelectValue placeholder="과목 선택" />
+                    </SelectTrigger>
+                    <SelectContent className="rounded-xl border-none shadow-2xl">
+                      {COUNSELING_QUESTION_SUBJECT_OPTIONS.map((subject) => (
+                        <SelectItem key={subject} value={subject} className="font-bold py-2.5">
+                          {subject}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black uppercase text-muted-foreground ml-1 flex items-center gap-1.5">
+                    <BookOpen className="h-3 w-3" /> 문제집/자료명
+                  </label>
+                  <Input
+                    value={questionWorkbook}
+                    onChange={(e) => setQuestionWorkbook(e.target.value)}
+                    placeholder="예: 쎈 수학 2-1"
+                    className="rounded-xl h-12 border-2 font-bold"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black uppercase text-muted-foreground ml-1">문항 번호/범위</label>
+                  <Input
+                    value={questionProblemNumbers}
+                    onChange={(e) => setQuestionProblemNumbers(e.target.value)}
+                    placeholder="예: 13, 15, 18번"
+                    className="rounded-xl h-12 border-2 font-bold"
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-[10px] font-black uppercase text-muted-foreground ml-1">질문 요약</label>
+                <Textarea
+                  value={questionSummary}
+                  onChange={(e) => setQuestionSummary(e.target.value)}
+                  placeholder="어떤 부분이 막히는지 한 줄로 먼저 적어 주세요."
+                  className="rounded-xl min-h-[96px] resize-none text-sm font-bold border-2"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-[10px] font-black uppercase text-muted-foreground ml-1">상세 설명 (선택)</label>
+                <Textarea
+                  value={questionDetails}
+                  onChange={(e) => setQuestionDetails(e.target.value)}
+                  placeholder="선생님이 미리 풀어볼 수 있게, 헷갈린 풀이 과정이나 궁금한 포인트를 적어 주세요."
+                  className="rounded-xl min-h-[120px] resize-none text-sm font-bold border-2"
+                />
+              </div>
+
+              <div className="space-y-3">
+                <div className="flex items-center justify-between gap-3">
+                  <div>
+                    <label className="text-[10px] font-black uppercase text-muted-foreground ml-1 flex items-center gap-1.5">
+                      <ImageIcon className="h-3 w-3" /> 문제 사진 첨부
+                    </label>
+                    <p className="mt-1 ml-1 text-[11px] font-semibold text-muted-foreground">
+                      최대 {COUNSELING_QUESTION_ATTACHMENT_LIMIT}장, 업로드 전에 자동으로 압축됩니다.
+                    </p>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#5c6e97]">
+                      {questionAttachmentDrafts.length}/{COUNSELING_QUESTION_ATTACHMENT_LIMIT}
+                    </p>
+                    <label
+                      htmlFor="counseling-question-attachments"
+                      className={cn(
+                        'mt-1 inline-flex h-10 cursor-pointer items-center gap-1.5 rounded-xl px-4 text-sm font-black',
+                        questionAttachmentDrafts.length >= COUNSELING_QUESTION_ATTACHMENT_LIMIT ? 'bg-muted text-muted-foreground' : 'bg-[#14295F] text-white'
+                      )}
+                    >
+                      <ImagePlus className="h-4 w-4" /> 사진 추가
+                    </label>
+                    <input
+                      id="counseling-question-attachments"
+                      type="file"
+                      accept="image/*"
+                      multiple
+                      className="sr-only"
+                      onChange={handleQuestionAttachmentInputChange}
+                      disabled={questionAttachmentDrafts.length >= COUNSELING_QUESTION_ATTACHMENT_LIMIT}
+                    />
+                  </div>
+                </div>
+
+                {questionAttachmentDrafts.length > 0 ? (
+                  <div className="grid gap-3 sm:grid-cols-3">
+                    {questionAttachmentDrafts.map((attachment) => (
+                      <div key={attachment.id} className="relative overflow-hidden rounded-2xl border border-[#dbe5ff] bg-[#f8fbff]">
+                        <img src={attachment.previewUrl} alt={attachment.file.name} className="h-28 w-full object-cover" />
+                        <div className="space-y-2 px-3 py-3">
+                          <p className="truncate text-xs font-black text-[#14295F]">{attachment.file.name}</p>
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="outline"
+                            onClick={() => handleRemoveQuestionAttachment(attachment.id)}
+                            className="h-8 w-full rounded-xl border-[#dbe5ff] text-[#14295F] hover:bg-white"
+                          >
+                            <Trash2 className="mr-1.5 h-3.5 w-3.5" /> 제거
+                          </Button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="rounded-2xl border border-dashed border-[#dbe5ff] bg-[#f8fbff] px-4 py-5 text-sm font-semibold text-[#5c6e97]">
+                    문제집 페이지나 풀이 중인 화면을 찍어 올리면, 선생님이 상담 전에 미리 확인할 수 있어요.
+                  </div>
+                )}
+
+                <div className="rounded-2xl border border-[#ffe1c8] bg-[#fff7ef] px-4 py-3 text-[11px] font-semibold leading-5 text-[#a95c1d]">
+                  첨부 사진은 상담 완료 후 {COUNSELING_QUESTION_ATTACHMENT_RETENTION_DAYS}일이 지나면 자동으로 삭제됩니다.
+                </div>
+              </div>
+            </>
+          )}
+        </div>
+        <DialogFooter className={cn("bg-muted/30", isMobile ? "p-5" : "p-8")}>
+          <Button onClick={handleRequestAppointment} disabled={isSubmitting} className={cn("w-full h-14 rounded-2xl font-black text-lg", counselingCtaClass)}>
+            {isSubmitting
+              ? <Loader2 className="animate-spin h-5 w-5" />
+              : requestMode === 'study_question'
+                ? '학습 질의 상담 신청'
+                : '상담 신청 완료'}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+
   return (
     <div
       className={cn(
@@ -1457,68 +2294,7 @@ export function AppointmentsPageContent({
                   <p className="mt-1 text-[11px] font-semibold text-[var(--text-on-dark-soft)]">중요한 흐름만 빠르게 확인해요.</p>
                 </div>
               </div>
-              <Dialog open={isRequestModalOpen} onOpenChange={setIsRequestModalOpen}>
-                <DialogTrigger asChild>
-                  <Button size="lg" className={cn("student-cta rounded-2xl font-black gap-2 interactive-button border-none", isMobile ? "w-full max-w-full min-h-[3.75rem]" : "h-14 w-fit px-8", counselingCtaClass)}>
-                    <CalendarPlus className="h-5 w-5" /> 새 상담 신청
-                  </Button>
-                </DialogTrigger>
-                <DialogContent className={cn("rounded-[3rem] p-0 overflow-hidden border-none shadow-2xl transition-all duration-500", isMobile ? "w-[min(94vw,25rem)] max-h-[86svh] rounded-[2rem]" : "sm:max-w-md")}>
-          <div className={cn("text-white relative bg-[linear-gradient(180deg,var(--accent-orange-soft)_0%,var(--accent-orange)_100%)]", isMobile ? "p-6" : "p-10")}>
-                    <Sparkles className="absolute top-0 right-0 p-10 h-40 w-40 opacity-10 rotate-12" />
-                    <DialogHeader>
-                      <DialogTitle className={cn("font-black tracking-tighter text-left break-keep", isMobile ? "text-[1.7rem]" : "text-3xl")}>상담 신청</DialogTitle>
-                      <DialogDescription className="text-white/80 font-bold mt-1 text-left">상담 일시와 선생님을 선택해 주세요.</DialogDescription>
-                    </DialogHeader>
-                  </div>
-                  <div className={cn("space-y-6 bg-white overflow-y-auto custom-scrollbar", isMobile ? "max-h-[calc(86svh-9rem)] p-5" : "p-8 max-h-[60vh]")}>
-                    <div className={cn("grid gap-4", isMobile ? "grid-cols-1" : "grid-cols-2")}>
-                      <div className="space-y-2">
-                        <label className="text-[10px] font-black uppercase text-muted-foreground ml-1">희망 날짜</label>
-                        <Input type="date" value={aptDate} onChange={(e) => setAptDate(e.target.value)} className="rounded-xl h-12 border-2" />
-                      </div>
-                      <div className="space-y-2">
-                        <label className="text-[10px] font-black uppercase text-muted-foreground ml-1">희망 시간</label>
-                        <Input type="time" value={aptTime} onChange={(e) => setAptTime(e.target.value)} className="rounded-xl h-12 border-2" />
-                      </div>
-                    </div>
-
-                    <div className="space-y-2">
-                      <label className="text-[10px] font-black uppercase text-muted-foreground ml-1 flex items-center gap-1.5">
-                        <UserCheck className="h-3 w-3" /> 상담 희망 선생님
-                      </label>
-                      <Select value={selectedTeacherId} onValueChange={setSelectedTeacherId}>
-                        <SelectTrigger className="h-12 rounded-xl border-2 font-bold">
-                          <SelectValue placeholder="선생님을 선택하세요" />
-                        </SelectTrigger>
-                        <SelectContent className="rounded-xl border-none shadow-2xl">
-                          {filteredTeachers.map((t) => (
-                            <SelectItem key={t.id} value={t.id} className="font-bold py-2.5">
-                              {t.displayName} (선생님)
-                            </SelectItem>
-                          ))}
-                          {!filteredTeachers.length && <p className="p-4 text-center text-xs font-bold opacity-40">선택 가능한 선생님이 없습니다.</p>}
-                        </SelectContent>
-                      </Select>
-                    </div>
-
-                    <div className="space-y-2">
-                      <label className="text-[10px] font-black uppercase text-muted-foreground ml-1">상담 요청 내용 (선택)</label>
-                      <Textarea 
-                        placeholder="고민이나 질문하고 싶은 내용을 자유롭게 적어주세요." 
-                        value={studentNote}
-                        onChange={(e) => setStudentNote(e.target.value)}
-                        className="rounded-xl min-h-[100px] resize-none text-sm font-bold border-2"
-                      />
-                    </div>
-                  </div>
-                  <DialogFooter className={cn("bg-muted/30", isMobile ? "p-5" : "p-8")}>
-                    <Button onClick={handleRequestAppointment} disabled={isSubmitting} className={cn("w-full h-14 rounded-2xl font-black text-lg", counselingCtaClass)}>
-                      {isSubmitting ? <Loader2 className="animate-spin h-5 w-5" /> : '상담 신청 완료'}
-                    </Button>
-                  </DialogFooter>
-                </DialogContent>
-              </Dialog>
+              {renderStudentRequestDialog()}
             </div>
           </section>
         </header>
@@ -1742,70 +2518,7 @@ export function AppointmentsPageContent({
                 목록으로 돌아가기 <ArrowRight className="ml-1 h-4 w-4" />
               </Link>
             </Button>
-          ) : isStudent && (
-            <Dialog open={isRequestModalOpen} onOpenChange={setIsRequestModalOpen}>
-              <DialogTrigger asChild>
-                <Button size="lg" className={cn("student-cta rounded-2xl font-black gap-2 shadow-xl interactive-button border-none text-white", isMobile ? "w-full max-w-full min-h-[3.75rem]" : "h-14 px-8", counselingCtaClass)}>
-                  <CalendarPlus className="h-5 w-5" /> 새 상담 신청
-                </Button>
-              </DialogTrigger>
-              <DialogContent className={cn("rounded-[3rem] p-0 overflow-hidden border-none shadow-2xl transition-all duration-500", isMobile ? "w-[min(94vw,25rem)] max-h-[86svh] rounded-[2rem]" : "sm:max-w-md")}>
-          <div className={cn("text-white relative bg-[linear-gradient(180deg,var(--accent-orange-soft)_0%,var(--accent-orange)_100%)]", isMobile ? "p-6" : "p-10")}>
-                  <Sparkles className="absolute top-0 right-0 p-10 h-40 w-40 opacity-10 rotate-12" />
-                  <DialogHeader>
-                    <DialogTitle className={cn("font-black tracking-tighter text-left break-keep", isMobile ? "text-[1.7rem]" : "text-3xl")}>상담 신청</DialogTitle>
-                    <DialogDescription className="text-white/80 font-bold mt-1 text-left">상담 일시와 선생님을 선택해 주세요.</DialogDescription>
-                  </DialogHeader>
-                </div>
-                <div className={cn("space-y-6 bg-white overflow-y-auto custom-scrollbar", isMobile ? "max-h-[calc(86svh-9rem)] p-5" : "p-8 max-h-[60vh]")}>
-                  <div className={cn("grid gap-4", isMobile ? "grid-cols-1" : "grid-cols-2")}>
-                    <div className="space-y-2">
-                      <label className="text-[10px] font-black uppercase text-muted-foreground ml-1">희망 날짜</label>
-                      <Input type="date" value={aptDate} onChange={(e) => setAptDate(e.target.value)} className="rounded-xl h-12 border-2" />
-                    </div>
-                    <div className="space-y-2">
-                      <label className="text-[10px] font-black uppercase text-muted-foreground ml-1">희망 시간</label>
-                      <Input type="time" value={aptTime} onChange={(e) => setAptTime(e.target.value)} className="rounded-xl h-12 border-2" />
-                    </div>
-                  </div>
-
-                  <div className="space-y-2">
-                    <label className="text-[10px] font-black uppercase text-muted-foreground ml-1 flex items-center gap-1.5">
-                      <UserCheck className="h-3 w-3" /> 상담 희망 선생님
-                    </label>
-                    <Select value={selectedTeacherId} onValueChange={setSelectedTeacherId}>
-                      <SelectTrigger className="h-12 rounded-xl border-2 font-bold">
-                        <SelectValue placeholder="선생님을 선택하세요" />
-                      </SelectTrigger>
-                      <SelectContent className="rounded-xl border-none shadow-2xl">
-                        {filteredTeachers.map((t) => (
-                          <SelectItem key={t.id} value={t.id} className="font-bold py-2.5">
-                            {t.displayName} (선생님)
-                          </SelectItem>
-                        ))}
-                        {!filteredTeachers.length && <p className="p-4 text-center text-xs font-bold opacity-40">선택 가능한 선생님이 없습니다.</p>}
-                      </SelectContent>
-                    </Select>
-                  </div>
-
-                  <div className="space-y-2">
-                    <label className="text-[10px] font-black uppercase text-muted-foreground ml-1">상담 요청 내용 (선택)</label>
-                    <Textarea 
-                      placeholder="고민이나 질문하고 싶은 내용을 자유롭게 적어주세요." 
-                      value={studentNote}
-                      onChange={(e) => setStudentNote(e.target.value)}
-                      className="rounded-xl min-h-[100px] resize-none text-sm font-bold border-2"
-                    />
-                  </div>
-                </div>
-                <DialogFooter className={cn("bg-muted/30", isMobile ? "p-5" : "p-8")}>
-                  <Button onClick={handleRequestAppointment} disabled={isSubmitting} className={cn("w-full h-14 rounded-2xl font-black text-lg", counselingCtaClass)}>
-                    {isSubmitting ? <Loader2 className="animate-spin h-5 w-5" /> : '상담 신청 완료'}
-                  </Button>
-                </DialogFooter>
-              </DialogContent>
-            </Dialog>
-          )}
+          ) : isStudent && renderStudentRequestDialog()}
         </header>
       )}
 
@@ -1869,6 +2582,159 @@ export function AppointmentsPageContent({
         <TabsContent value="reservations" className="animate-in fade-in slide-in-from-bottom-2 duration-500 w-full">
           <div className="space-y-5">
             {isAdmin && <WebsiteConsultOperations />}
+            {isStaff && (
+              <Card className={cn(studentSectionCardClass, 'overflow-hidden')}>
+                <CardHeader className={cn(studentSectionHeaderClass, !isStudentTrackTheme && 'border-b border-[#dbe5ff] bg-[linear-gradient(135deg,#ffffff_0%,#f7faff_52%,#eef4ff_100%)]')}>
+                  <div className={cn('flex gap-4', isMobile ? 'flex-col' : 'items-start justify-between')}>
+                    <div className="space-y-2">
+                      <CardTitle className={studentSectionTitleClass}>
+                        <Calendar className={cn("h-6 w-6", isStudentTrackTheme ? "text-[var(--text-accent-fixed)] opacity-100" : "text-[#14295F]")} /> 학습 질의 상담 슬롯 관리
+                      </CardTitle>
+                      <CardDescription className={studentSectionDescriptionClass}>
+                        센터에서 미리 선생님 일정을 열어 두면, 학생이 이 시간표를 보고 학습 질의 상담을 신청할 수 있습니다.
+                      </CardDescription>
+                    </div>
+                    <Badge variant="outline" className="h-7 rounded-full border-[#dbe5ff] bg-white px-3 text-[10px] font-black text-[#14295F]">
+                      공개 가능 슬롯 {openStudyQuestionSlots.length}개
+                    </Badge>
+                  </div>
+                </CardHeader>
+                <CardContent className={cn('space-y-5', isMobile ? 'p-4' : 'p-6')}>
+                  <div className={cn('grid gap-4', isMobile ? 'grid-cols-1' : 'lg:grid-cols-[1.05fr_0.95fr]')}>
+                    <div className={cn(studentGhostPanelClass, 'space-y-4 p-5')}>
+                      <div className={cn('grid gap-4', isMobile ? 'grid-cols-1' : 'sm:grid-cols-2')}>
+                        <div className="space-y-2">
+                          <label className="text-[10px] font-black uppercase text-muted-foreground">담당 선생님</label>
+                          <Select value={questionSlotTeacherId} onValueChange={setQuestionSlotTeacherId}>
+                            <SelectTrigger className={cn('h-11 rounded-xl border-[#dbe5ff] bg-white font-bold text-[#14295F]', !isStudentTrackTheme && isStaff && staffInputClass)}>
+                              <SelectValue placeholder="선생님 선택" />
+                            </SelectTrigger>
+                            <SelectContent className="rounded-xl border-[#dbe5ff] shadow-2xl">
+                              {filteredTeachers.map((teacher) => (
+                                <SelectItem key={teacher.id} value={teacher.id} className="font-bold">
+                                  {teacher.displayName}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div className="space-y-2">
+                          <label className="text-[10px] font-black uppercase text-muted-foreground">날짜</label>
+                          <Input value={questionSlotDate} onChange={(e) => setQuestionSlotDate(e.target.value)} type="date" className={cn('h-11 rounded-xl', !isStudentTrackTheme && isStaff && staffInputClass)} />
+                        </div>
+                      </div>
+                      <div className={cn('grid gap-4', isMobile ? 'grid-cols-1' : 'sm:grid-cols-3')}>
+                        <div className="space-y-2">
+                          <label className="text-[10px] font-black uppercase text-muted-foreground">시작</label>
+                          <Input value={questionSlotStartTime} onChange={(e) => setQuestionSlotStartTime(e.target.value)} type="time" className={cn('h-11 rounded-xl', !isStudentTrackTheme && isStaff && staffInputClass)} />
+                        </div>
+                        <div className="space-y-2">
+                          <label className="text-[10px] font-black uppercase text-muted-foreground">종료</label>
+                          <Input value={questionSlotEndTime} onChange={(e) => setQuestionSlotEndTime(e.target.value)} type="time" className={cn('h-11 rounded-xl', !isStudentTrackTheme && isStaff && staffInputClass)} />
+                        </div>
+                        <div className="space-y-2">
+                          <label className="text-[10px] font-black uppercase text-muted-foreground">정원</label>
+                          <Input value={questionSlotCapacity} onChange={(e) => setQuestionSlotCapacity(e.target.value)} inputMode="numeric" className={cn('h-11 rounded-xl', !isStudentTrackTheme && isStaff && staffInputClass)} />
+                        </div>
+                      </div>
+                      <div className="space-y-2">
+                        <label className="text-[10px] font-black uppercase text-muted-foreground">메모 (선택)</label>
+                        <Textarea
+                          value={questionSlotNote}
+                          onChange={(e) => setQuestionSlotNote(e.target.value)}
+                          placeholder="예: 내신 대비 수학 질의 전용"
+                          className={cn('min-h-[92px] resize-none rounded-xl', !isStudentTrackTheme && isStaff && staffInputClass)}
+                        />
+                      </div>
+                      <div className={cn('flex gap-3', isMobile ? 'flex-col' : 'items-center justify-between')}>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          onClick={() => setQuestionSlotPublished((previous) => !previous)}
+                          className={cn('rounded-xl font-black', questionSlotPublished ? 'border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100' : 'border-slate-200 bg-slate-100 text-slate-600 hover:bg-slate-200')}
+                        >
+                          {questionSlotPublished ? '공개 상태로 등록' : '비공개 상태로 등록'}
+                        </Button>
+                        <Button onClick={handleCreateQuestionSlot} disabled={isSavingQuestionSlot} className="rounded-xl bg-[var(--accent-orange)] font-black text-white hover:bg-[var(--accent-orange-strong)]">
+                          {isSavingQuestionSlot ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> : <Plus className="mr-1.5 h-4 w-4" />}
+                          질의 슬롯 추가
+                        </Button>
+                      </div>
+                    </div>
+
+                    <div className={cn(studentGhostPanelClass, 'space-y-3 p-5')}>
+                      <div className="flex items-center justify-between gap-3">
+                        <div>
+                          <p className={staffLabelClass}>예정 슬롯</p>
+                          <p className="mt-2 text-base font-black text-[#14295F]">학생에게 보이는 질의 시간표</p>
+                        </div>
+                        <Badge variant="outline" className="rounded-full border-[#dbe5ff] bg-white px-2.5 text-[10px] font-black text-[#14295F]">
+                          최근 {Math.min(upcomingCounselingAvailabilitySlots.length, 6)}개
+                        </Badge>
+                      </div>
+                      {counselingAvailabilitySlotsLoading ? (
+                        <div className="flex justify-center py-10">
+                          <Loader2 className="h-5 w-5 animate-spin text-[#5c6e97]" />
+                        </div>
+                      ) : upcomingCounselingAvailabilitySlots.length === 0 ? (
+                        <div className="rounded-[1.2rem] border border-dashed border-[#dbe5ff] bg-white p-5 text-center">
+                          <p className="text-sm font-bold text-[#14295F]">등록된 학습 질의 슬롯이 없습니다.</p>
+                          <p className="mt-1 text-[11px] font-semibold text-[#5c6e97]">왼쪽 폼에서 첫 질의 상담 시간을 추가해 주세요.</p>
+                        </div>
+                      ) : (
+                        upcomingCounselingAvailabilitySlots.slice(0, 6).map((slot) => {
+                          const reservedCount = getReservedCounselingSlotCount(slot);
+                          const capacity = getCounselingSlotCapacity(slot);
+                          return (
+                            <div key={slot.id} className="rounded-[1.2rem] border border-[#dbe5ff] bg-[linear-gradient(135deg,#ffffff_0%,#f4f8ff_100%)] px-4 py-4 shadow-[0_16px_30px_-26px_rgba(20,41,95,0.18)]">
+                              <div className="flex items-start justify-between gap-3">
+                                <div>
+                                  <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#5c6e97]">
+                                    {slot.isPublished !== false ? '공개 중' : '비공개'}
+                                  </p>
+                                  <p className="mt-2 text-sm font-black text-[#14295F]">
+                                    {slot.startsAt ? format(slot.startsAt.toDate(), 'M월 d일 HH:mm') : '-'}
+                                  </p>
+                                  <p className="mt-1 text-[11px] font-semibold text-[#5c6e97]">
+                                    {slot.teacherName || '선생님'} · {slot.startsAt && slot.endsAt ? `${format(slot.startsAt.toDate(), 'HH:mm')} - ${format(slot.endsAt.toDate(), 'HH:mm')}` : ''}
+                                  </p>
+                                </div>
+                                <Badge variant="outline" className="rounded-full border-[#dbe5ff] bg-white px-2.5 text-[10px] font-black text-[#14295F]">
+                                  {reservedCount}/{capacity}
+                                </Badge>
+                              </div>
+                              {slot.note?.trim() && (
+                                <p className="mt-3 text-[11px] font-semibold leading-5 text-[#5c6e97]">{slot.note.trim()}</p>
+                              )}
+                              <div className="mt-4 flex items-center justify-end gap-2">
+                                <Button
+                                  type="button"
+                                  size="sm"
+                                  variant="outline"
+                                  onClick={() => handleToggleQuestionSlotPublished(slot)}
+                                  className="rounded-xl border-[#dbe5ff] text-[#14295F] hover:bg-white"
+                                >
+                                  {slot.isPublished !== false ? '비공개' : '공개'}
+                                </Button>
+                                <Button
+                                  type="button"
+                                  size="sm"
+                                  variant="outline"
+                                  onClick={() => handleDeleteQuestionSlot(slot)}
+                                  className="rounded-xl border-rose-200 text-rose-600 hover:bg-rose-50"
+                                >
+                                  <Trash2 className="mr-1.5 h-3.5 w-3.5" /> 삭제
+                                </Button>
+                              </div>
+                            </div>
+                          );
+                        })
+                      )}
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
             <Card variant={isStudentTrackTheme ? 'secondary' : 'default'} className={studentSectionCardClass}>
             <CardHeader className={studentSectionHeaderClass}>
               <div className={cn('flex gap-4', isMobile ? 'flex-col' : 'items-start justify-between')}>
@@ -1899,74 +2765,131 @@ export function AppointmentsPageContent({
                 </div>
               ) : (
                 <div className={cn(isStudentTrackTheme ? "space-y-3 p-4" : "divide-y divide-muted/10")}>
-                  {visibleReservations.map((res) => (
-                    <div
-                      key={res.id}
-                      className={cn(
-                        "flex flex-col sm:flex-row sm:items-center justify-between group transition-colors gap-4",
-                        isStudentTrackTheme
-                          ? "surface-card surface-card--ghost on-dark rounded-[1.35rem] border-white/10 shadow-none"
-                          : isStaff
-                            ? "rounded-[1.5rem] border border-[#dbe5ff] bg-[linear-gradient(135deg,#ffffff_0%,#f8fbff_58%,#edf4ff_100%)] mx-4 my-4 shadow-[0_20px_42px_-34px_rgba(20,41,95,0.24)]"
-                            : "hover:bg-muted/5",
-                        isMobile ? "p-5" : "p-6 sm:p-8"
-                      )}
-                    >
-                      <div className="flex items-center gap-4 sm:gap-6 min-w-0">
-                        <div className={cn("rounded-2xl flex flex-col items-center justify-center shrink-0 transition-all duration-500", isStudentTrackTheme ? "border border-white/12 bg-white/[0.08] shadow-none" : isStaff ? "border border-[#d4e0ff] bg-[#eef4ff]" : "bg-primary/5 border-2 border-primary/10 shadow-inner", isMobile ? "h-14 w-14" : "h-16 w-16", !isStudentTrackTheme && !isStaff && (isStudent ? `group-hover:bg-gradient-to-br ${currentTier.gradient}` : "group-hover:bg-primary"))}>
-                          <span className={cn("font-black tracking-tighter", isMobile ? "text-[8px]" : "text-[10px]", isStudentTrackTheme ? "text-[var(--text-on-dark-muted)]" : isStaff ? "text-[#5c6e97]" : "text-primary/60 group-hover:text-white/60")}>{res.scheduledAt ? format(res.scheduledAt.toDate(), 'M월') : ''}</span>
-                          <span className={cn("font-black leading-none mt-0.5", isMobile ? "text-lg" : "text-xl sm:text-2xl", isStudentTrackTheme ? "text-[var(--text-on-dark)]" : isStaff ? "text-[#14295F]" : "text-primary group-hover:text-white")}>{res.scheduledAt ? format(res.scheduledAt.toDate(), 'd') : ''}</span>
-                        </div>
-                        <div className="grid gap-1 min-w-0">
-                          <div className="flex items-center gap-2 flex-wrap">
-                            <h3 className={cn("font-black tracking-tight break-keep", isMobile ? "text-sm" : "text-base sm:text-lg", studentTitleTextClass)}>{res.scheduledAt ? format(res.scheduledAt.toDate(), 'HH:mm') : ''} 상담</h3>
-                            {getStatusBadge(res.status)}
+                  {visibleReservations.map((res) => {
+                    const questionAttachments = getVisibleCounselingQuestionAttachments(res.questionAttachments);
+                    const studyQuestionPreview = buildStudyQuestionReservationPreview({
+                      subject: res.questionSubject,
+                      workbook: res.questionWorkbook,
+                      problemNumbers: res.questionProblemNumbers,
+                      summary: res.questionSummary,
+                    });
+                    const linkedSlot = res.availabilitySlotId ? counselingAvailabilitySlotById.get(res.availabilitySlotId) || null : null;
+
+                    return (
+                      <div
+                        key={res.id}
+                        className={cn(
+                          "flex flex-col sm:flex-row sm:items-center justify-between group transition-colors gap-4",
+                          isStudentTrackTheme
+                            ? "surface-card surface-card--ghost on-dark rounded-[1.35rem] border-white/10 shadow-none"
+                            : isStaff
+                              ? "rounded-[1.5rem] border border-[#dbe5ff] bg-[linear-gradient(135deg,#ffffff_0%,#f8fbff_58%,#edf4ff_100%)] mx-4 my-4 shadow-[0_20px_42px_-34px_rgba(20,41,95,0.24)]"
+                              : "hover:bg-muted/5",
+                          isMobile ? "p-5" : "p-6 sm:p-8"
+                        )}
+                      >
+                        <div className="flex items-center gap-4 sm:gap-6 min-w-0">
+                          <div className={cn("rounded-2xl flex flex-col items-center justify-center shrink-0 transition-all duration-500", isStudentTrackTheme ? "border border-white/12 bg-white/[0.08] shadow-none" : isStaff ? "border border-[#d4e0ff] bg-[#eef4ff]" : "bg-primary/5 border-2 border-primary/10 shadow-inner", isMobile ? "h-14 w-14" : "h-16 w-16", !isStudentTrackTheme && !isStaff && (isStudent ? `group-hover:bg-gradient-to-br ${currentTier.gradient}` : "group-hover:bg-primary"))}>
+                            <span className={cn("font-black tracking-tighter", isMobile ? "text-[8px]" : "text-[10px]", isStudentTrackTheme ? "text-[var(--text-on-dark-muted)]" : isStaff ? "text-[#5c6e97]" : "text-primary/60 group-hover:text-white/60")}>{res.scheduledAt ? format(res.scheduledAt.toDate(), 'M월') : ''}</span>
+                            <span className={cn("font-black leading-none mt-0.5", isMobile ? "text-lg" : "text-xl sm:text-2xl", isStudentTrackTheme ? "text-[var(--text-on-dark)]" : isStaff ? "text-[#14295F]" : "text-primary group-hover:text-white")}>{res.scheduledAt ? format(res.scheduledAt.toDate(), 'd') : ''}</span>
                           </div>
-                          <p className={cn("font-bold flex items-center gap-1.5 truncate", isMobile ? "text-[9px]" : "text-[10px] sm:text-xs", studentMetaTextClass)}>
-                            <User className="h-3.5 w-3.5 opacity-40 shrink-0" /> 
-                            {isStudent ? (res.teacherName || '담당 교사 배정 중') : `${res.studentName} 학생 (담당: ${res.teacherName})`}
-                          </p>
-                          {isStaff && res.studentNote?.trim() && (
-                            <div className="mt-2 rounded-[1rem] border border-[#dbe5ff] bg-[linear-gradient(135deg,#ffffff_0%,#f1f6ff_100%)] px-3 py-2.5 shadow-[inset_0_1px_0_rgba(255,255,255,0.82)]">
-                              <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#5c6e97]">학생 메모</p>
-                              <p className="mt-1 text-sm font-semibold leading-6 text-[#14295F]">{res.studentNote.trim()}</p>
+                          <div className="grid gap-1 min-w-0">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <h3 className={cn("font-black tracking-tight break-keep", isMobile ? "text-sm" : "text-base sm:text-lg", studentTitleTextClass)}>{res.scheduledAt ? format(res.scheduledAt.toDate(), 'HH:mm') : ''} 상담</h3>
+                              {isStudyQuestionReservation(res) && (
+                                <Badge variant="outline" className={cn("font-black text-[10px] px-2 py-0.5", isStudentTrackTheme ? "border-white/12 bg-white/10 text-white" : "border-[#ffe1c8] bg-[#fff3e7] text-[#FF7A16]")}>
+                                  학습 질의
+                                </Badge>
+                              )}
+                              {getStatusBadge(res.status)}
+                            </div>
+                            <p className={cn("font-bold flex items-center gap-1.5 truncate", isMobile ? "text-[9px]" : "text-[10px] sm:text-xs", studentMetaTextClass)}>
+                              <User className="h-3.5 w-3.5 opacity-40 shrink-0" />
+                              {isStudent ? (res.teacherName || '담당 교사 배정 중') : `${res.studentName} 학생 (담당: ${res.teacherName})`}
+                            </p>
+                            {isStudyQuestionReservation(res) ? (
+                              <div className={cn("mt-2 rounded-[1rem] border px-3 py-3", isStudentTrackTheme ? "border-white/10 bg-white/[0.06]" : "border-[#dbe5ff] bg-[linear-gradient(135deg,#ffffff_0%,#f1f6ff_100%)] shadow-[inset_0_1px_0_rgba(255,255,255,0.82)]")}>
+                                <div className="flex items-center justify-between gap-2 flex-wrap">
+                                  <p className={cn("text-[10px] font-black uppercase tracking-[0.18em]", isStudentTrackTheme ? "text-[var(--text-on-dark-muted)]" : "text-[#5c6e97]")}>학습 질문 정보</p>
+                                  <Badge variant="outline" className={cn("rounded-full px-2.5 text-[10px] font-black", isStudentTrackTheme ? "border-white/12 bg-white/10 text-white" : "border-[#dbe5ff] bg-white text-[#14295F]")}>
+                                    {getCounselingAttachmentCountLabel(questionAttachments)}
+                                  </Badge>
+                                </div>
+                                <p className={cn("mt-1 text-sm font-semibold leading-6", isStudentTrackTheme ? "text-[var(--text-on-dark)]" : "text-[#14295F]")}>{studyQuestionPreview}</p>
+                                <div className={cn("mt-2 flex flex-wrap gap-2 text-[11px] font-semibold", isStudentTrackTheme ? "text-[var(--text-on-dark-soft)]" : "text-[#5c6e97]")}>
+                                  {res.questionSubject && <span>과목 {res.questionSubject}</span>}
+                                  {res.questionWorkbook && <span>자료 {res.questionWorkbook}</span>}
+                                  {res.questionProblemNumbers && <span>문항 {res.questionProblemNumbers}</span>}
+                                  {linkedSlot?.note?.trim() && <span>{linkedSlot.note.trim()}</span>}
+                                </div>
+                                {res.questionDetails?.trim() && (
+                                  <p className={cn("mt-2 whitespace-pre-wrap text-sm font-semibold leading-6", isStudentTrackTheme ? "text-[var(--text-on-dark-soft)]" : "text-[#14295F]")}>
+                                    {res.questionDetails.trim()}
+                                  </p>
+                                )}
+                                {questionAttachments.length > 0 && (
+                                  <div className="mt-3 flex gap-2 overflow-x-auto pb-1">
+                                    {questionAttachments.map((attachment) => (
+                                      <a
+                                        key={attachment.id}
+                                        href={attachment.downloadUrl}
+                                        target="_blank"
+                                        rel="noreferrer"
+                                        className="shrink-0 overflow-hidden rounded-xl border border-[#dbe5ff] bg-white"
+                                      >
+                                        <img src={attachment.downloadUrl} alt={attachment.name} className="h-20 w-20 object-cover" />
+                                      </a>
+                                    ))}
+                                  </div>
+                                )}
+                                {res.questionAttachmentCleanupAt && !res.questionAttachmentsDeletedAt && (
+                                  <p className={cn("mt-2 text-[10px] font-semibold", isStudentTrackTheme ? "text-[var(--text-accent-soft-fixed)]" : "text-[#a95c1d]")}>
+                                    사진 자동 삭제 예정: {format(res.questionAttachmentCleanupAt.toDate(), 'yyyy.MM.dd')}
+                                  </p>
+                                )}
+                              </div>
+                            ) : isStaff && res.studentNote?.trim() && (
+                              <div className="mt-2 rounded-[1rem] border border-[#dbe5ff] bg-[linear-gradient(135deg,#ffffff_0%,#f1f6ff_100%)] px-3 py-2.5 shadow-[inset_0_1px_0_rgba(255,255,255,0.82)]">
+                                <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#5c6e97]">학생 메모</p>
+                                <p className="mt-1 text-sm font-semibold leading-6 text-[#14295F]">{res.studentNote.trim()}</p>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+
+                        <div className="flex items-center gap-2">
+                          {isStaff && res.status === 'requested' && (
+                            <div className="flex gap-2 w-full sm:w-auto">
+                              <Button size="sm" onClick={() => handleUpdateStatus(res, 'confirmed')} className="rounded-xl font-black bg-[var(--accent-orange)] hover:bg-[var(--accent-orange-strong)] gap-1.5 h-10 px-4 text-white">
+                                <Check className="h-4 w-4" /> 승인
+                              </Button>
+                              <Button size="sm" variant="outline" onClick={() => handleUpdateStatus(res, 'canceled')} className="rounded-xl font-black border-[#dbe5ff] text-[#14295F] hover:bg-[#f5f8ff] h-10 px-4">
+                                <X className="h-4 w-4" /> 거절
+                              </Button>
                             </div>
                           )}
+                          {isStaff && res.status === 'confirmed' && (
+                            <Button size="sm" onClick={() => handleOpenLogModal(res)} className="rounded-xl font-black bg-[#14295F] text-white gap-1.5 h-10 px-4 shadow-md hover:bg-[#10224e]">
+                              <FileEdit className="h-4 w-4" /> 일지 작성
+                            </Button>
+                          )}
+                          {isStudent && (res.status === 'requested' || res.status === 'confirmed') && (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => handleUpdateStatus(res, 'canceled')}
+                              className={cn("rounded-xl font-black h-10 px-4 transition-all", isStudentTrackTheme ? "border-rose-300/30 bg-rose-400/10 text-rose-100 hover:bg-rose-400/18" : "border-rose-200 text-rose-600 hover:bg-rose-50")}
+                            >
+                              <X className="h-4 w-4" /> 신청 취소
+                            </Button>
+                          )}
+                          {!isStaff && !isStudent && <div className="h-10 w-10 rounded-full bg-primary/5 flex items-center justify-center group-hover:bg-primary group-hover:text-white transition-all shadow-sm">
+                            <ChevronRight className="h-5 w-5" />
+                          </div>}
                         </div>
                       </div>
-                      
-                      <div className="flex items-center gap-2">
-                        {isStaff && res.status === 'requested' && (
-                          <div className="flex gap-2 w-full sm:w-auto">
-                  <Button size="sm" onClick={() => handleUpdateStatus(res.id, 'confirmed')} className="rounded-xl font-black bg-[var(--accent-orange)] hover:bg-[var(--accent-orange-strong)] gap-1.5 h-10 px-4 text-white">
-                              <Check className="h-4 w-4" /> 승인
-                            </Button>
-                            <Button size="sm" variant="outline" onClick={() => handleUpdateStatus(res.id, 'canceled')} className="rounded-xl font-black border-[#dbe5ff] text-[#14295F] hover:bg-[#f5f8ff] h-10 px-4">
-                              <X className="h-4 w-4" /> 거절
-                            </Button>
-                          </div>
-                        )}
-                        {isStaff && res.status === 'confirmed' && (
-                          <Button size="sm" onClick={() => handleOpenLogModal(res)} className="rounded-xl font-black bg-[#14295F] text-white gap-1.5 h-10 px-4 shadow-md hover:bg-[#10224e]">
-                            <FileEdit className="h-4 w-4" /> 일지 작성
-                          </Button>
-                        )}
-                        {isStudent && (res.status === 'requested' || res.status === 'confirmed') && (
-                          <Button 
-                            size="sm" 
-                            variant="outline" 
-                            onClick={() => handleUpdateStatus(res.id, 'canceled')} 
-                            className={cn("rounded-xl font-black h-10 px-4 transition-all", isStudentTrackTheme ? "border-rose-300/30 bg-rose-400/10 text-rose-100 hover:bg-rose-400/18" : "border-rose-200 text-rose-600 hover:bg-rose-50")}
-                          >
-                            <X className="h-4 w-4" /> 신청 취소
-                          </Button>
-                        )}
-                        {!isStaff && !isStudent && <div className="h-10 w-10 rounded-full bg-primary/5 flex items-center justify-center group-hover:bg-primary group-hover:text-white transition-all shadow-sm">
-                          <ChevronRight className="h-5 w-5" />
-                        </div>}
-                      </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               )}
                 {!showAll && reservations.length > PREVIEW_LIMIT && (

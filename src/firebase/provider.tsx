@@ -5,6 +5,7 @@ import { FirebaseApp } from 'firebase/app';
 import { Firestore } from 'firebase/firestore';
 import { Auth, User, onAuthStateChanged } from 'firebase/auth';
 import { Functions } from 'firebase/functions';
+import { type FirebaseStorage } from 'firebase/storage';
 import { FirebaseErrorListener } from '@/components/FirebaseErrorListener'
 
 interface FirebaseProviderProps {
@@ -13,6 +14,7 @@ interface FirebaseProviderProps {
   firestore: Firestore;
   auth: Auth;
   functions: Functions;
+  storage: FirebaseStorage;
 }
 
 interface UserAuthState {
@@ -27,6 +29,7 @@ export interface FirebaseContextState {
   firestore: Firestore | null;
   auth: Auth | null;
   functions: Functions | null;
+  storage: FirebaseStorage | null;
   user: User | null;
   isUserLoading: boolean;
   userError: Error | null;
@@ -37,6 +40,7 @@ export interface FirebaseServicesAndUser {
   firestore: Firestore;
   auth: Auth;
   functions: Functions;
+  storage: FirebaseStorage;
   user: User | null;
   isUserLoading: boolean;
   userError: Error | null;
@@ -59,6 +63,7 @@ export const FirebaseProvider: React.FC<FirebaseProviderProps> = ({
   firestore,
   auth,
   functions,
+  storage,
 }) => {
   const [userAuthState, setUserAuthState] = useState<UserAuthState>({
     user: null,
@@ -88,11 +93,12 @@ export const FirebaseProvider: React.FC<FirebaseProviderProps> = ({
       firestore,
       auth,
       functions,
+      storage,
       user: userAuthState.user,
       isUserLoading: userAuthState.isUserLoading,
       userError: userAuthState.userError,
     };
-  }, [firebaseApp, firestore, auth, functions, userAuthState]);
+  }, [firebaseApp, firestore, auth, functions, storage, userAuthState]);
 
   return (
     <FirebaseContext.Provider value={contextValue}>
@@ -112,6 +118,7 @@ export const useFirebase = (): FirebaseServicesAndUser => {
     firestore: context.firestore!,
     auth: context.auth!,
     functions: context.functions!,
+    storage: context.storage!,
     user: context.user,
     isUserLoading: context.isUserLoading,
     userError: context.userError,
@@ -121,6 +128,7 @@ export const useFirebase = (): FirebaseServicesAndUser => {
 export const useAuth = (): Auth => useFirebase().auth;
 export const useFirestore = (): Firestore => useFirebase().firestore;
 export const useFunctions = (): Functions => useFirebase().functions;
+export const useStorage = (): FirebaseStorage => useFirebase().storage;
 export const useFirebaseApp = (): FirebaseApp => useFirebase().firebaseApp;
 
 type MemoFirebase <T> = T & {__memo?: boolean};

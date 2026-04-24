@@ -15,6 +15,7 @@ import {
   Firestore,
 } from 'firebase/firestore';
 import { getFunctions, Functions } from 'firebase/functions';
+import { getStorage, type FirebaseStorage } from 'firebase/storage';
 
 /**
  * 프로젝트 전역 싱글톤 Firebase 서비스 인스턴스
@@ -24,6 +25,7 @@ let firebaseApp: FirebaseApp | null = null;
 let firestore: Firestore | null = null;
 let auth: Auth | null = null;
 let functions: Functions | null = null;
+let storage: FirebaseStorage | null = null;
 
 function ensureApp(): FirebaseApp {
   if (firebaseApp) return firebaseApp;
@@ -63,6 +65,12 @@ function ensureFunctions(app: FirebaseApp): Functions {
   return functions;
 }
 
+function ensureStorage(app: FirebaseApp): FirebaseStorage {
+  if (storage) return storage;
+  storage = getStorage(app);
+  return storage;
+}
+
 /**
  * Firebase 서비스를 초기화하고 싱글톤 인스턴스를 반환
  */
@@ -71,8 +79,9 @@ export function initializeFirebase() {
   const db = ensureFirestore(app);
   const a = ensureAuth(app);
   const fn = ensureFunctions(app);
+  const st = ensureStorage(app);
 
-  return { firebaseApp: app, auth: a, firestore: db, functions: fn };
+  return { firebaseApp: app, auth: a, firestore: db, functions: fn, storage: st };
 }
 
 export * from './provider';
