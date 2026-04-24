@@ -32,7 +32,15 @@ import { useCollection, useFirestore, useUser, useMemoFirebase } from '@/firebas
 import { useAppContext } from '@/contexts/app-context';
 import { collection, collectionGroup, deleteDoc, deleteField, doc, getDoc, getDocs, limit, serverTimestamp, query, where, orderBy, Timestamp, writeBatch, setDoc } from 'firebase/firestore';
 import { Loader2, CheckCircle2, XCircle, Clock, CalendarX, UserCheck, ClipboardCheck, BarChart3, Megaphone, TrendingUp, CalendarClock, LogIn, MapPinned, ShieldAlert, Plus, Pencil, Trash2 } from 'lucide-react';
-import { CenterMembership, AttendanceRequest, AttendanceCurrent, StudentScheduleDoc, StudyRoomClassScheduleTemplate, StudyRoomPeriodBlock } from '@/lib/types';
+import {
+  AttendanceCurrent,
+  AttendanceRequest,
+  CenterMembership,
+  StudentScheduleDoc,
+  StudentScheduleTemplate,
+  StudyRoomClassScheduleTemplate,
+  StudyRoomPeriodBlock,
+} from '@/lib/types';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
@@ -107,6 +115,34 @@ type TodayScheduleInfo = {
   actualArrivalAt: Date | null;
 };
 
+function getScheduleTemplateTimestampMs(template: StudentScheduleTemplate) {
+  const raw = template.updatedAt || template.createdAt;
+  if (!raw) return 0;
+  if (raw instanceof Date) return raw.getTime();
+  if (typeof (raw as any).toDate === 'function') return (raw as any).toDate().getTime();
+  return 0;
+}
+
+function buildTodayScheduleInfoFromTemplate(template: StudentScheduleTemplate): TodayScheduleInfo {
+  const hasExcursion = Boolean(
+    template.hasExcursionDefault &&
+    template.defaultExcursionStartAt &&
+    template.defaultExcursionEndAt
+  );
+
+  return {
+    hasRoutine: true,
+    isNoAttendanceDay: false,
+    expectedArrivalTime: template.arrivalPlannedAt || null,
+    plannedDepartureTime: template.departurePlannedAt || null,
+    hasExcursion,
+    excursionStartAt: hasExcursion ? template.defaultExcursionStartAt : null,
+    excursionEndAt: hasExcursion ? template.defaultExcursionEndAt : null,
+    scheduleStatus: 'scheduled',
+    actualArrivalAt: null,
+  };
+}
+
 function createPeriodBlock(overrides?: Partial<StudyRoomPeriodBlock>): StudyRoomPeriodBlock {
   return {
     id: `block-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
@@ -165,6 +201,7 @@ export default function AttendancePage() {
   );
   const dateKey = selectedDate ? format(selectedDate, 'yyyy-MM-dd') : '';
   const weekKey = selectedDate ? format(selectedDate, "yyyy-'W'II") : '';
+  const selectedWeekdayValue = selectedDate ? selectedDate.getDay() : null;
   const centerId = classroomMembership?.id;
   const isTeacherOrAdmin = Boolean(classroomMembership);
   const canOpenSettings = canManageSettings(activeMembership?.role);
@@ -220,12 +257,13 @@ export default function AttendancePage() {
   const classSchedulesLoading = false;
 
   useEffect(() => {
-    if (!firestore || !centerId || !isTeacherOrAdmin || !dateKey || !weekKey || !students) {
+    if (!firestore || !centerId || !isTeacherOrAdmin || !dateKey || !weekKey || selectedWeekdayValue === null || !students) {
       setAttendanceRoutineMap({});
       return;
     }
 
     let cancelled = false;
+    const weekday = selectedWeekdayValue;
     const loadRoutineMap = async () => {
       setRoutineLoading(true);
       try {
@@ -234,31 +272,50 @@ export default function AttendancePage() {
           students
             .filter((student) => !scheduledIds.has(student.id))
             .map(async (student) => {
-            const routineQuery = query(
-              collection(firestore, 'centers', centerId, 'plans', student.id, 'weeks', weekKey, 'items'),
-              where('dateKey', '==', dateKey),
-              where('category', '==', 'schedule'),
-              limit(5)
-            );
-            const snap = await getDocs(routineQuery);
-            const scheduleTitles = snap.docs.map((docSnap) => String(docSnap.data()?.title || ''));
-            const routineInfo = buildAttendanceRoutineInfo(scheduleTitles);
+              try {
+                const templateSnap = await getDocs(query(
+                  collection(firestore, 'users', student.id, 'scheduleTemplates'),
+                  where('centerId', '==', centerId)
+                ));
+                const matchingTemplate = templateSnap.docs
+                  .map((docSnap) => ({ ...(docSnap.data() as StudentScheduleTemplate), id: docSnap.id }))
+                  .filter((template) => template.active !== false)
+                  .filter((template) => !template.centerId || template.centerId === centerId)
+                  .filter((template) => Array.isArray(template.weekdays) && template.weekdays.includes(weekday))
+                  .sort((left, right) => getScheduleTemplateTimestampMs(right) - getScheduleTemplateTimestampMs(left))[0];
 
-            return [
-              student.id,
-              {
-                hasRoutine: routineInfo.hasRoutine,
-                isNoAttendanceDay: routineInfo.isNoAttendanceDay,
-                expectedArrivalTime: routineInfo.expectedArrivalTime,
-                plannedDepartureTime: null,
-                hasExcursion: false,
-                excursionStartAt: null,
-                excursionEndAt: null,
-                scheduleStatus: null,
-                actualArrivalAt: null,
-              },
-            ] as const;
-          })
+                if (matchingTemplate) {
+                  return [student.id, buildTodayScheduleInfoFromTemplate(matchingTemplate)] as const;
+                }
+              } catch (templateError) {
+                logHandledClientIssue('[attendance] schedule template fallback failed', templateError);
+              }
+
+              const routineQuery = query(
+                collection(firestore, 'centers', centerId, 'plans', student.id, 'weeks', weekKey, 'items'),
+                where('dateKey', '==', dateKey),
+                where('category', '==', 'schedule'),
+                limit(5)
+              );
+              const snap = await getDocs(routineQuery);
+              const scheduleTitles = snap.docs.map((docSnap) => String(docSnap.data()?.title || ''));
+              const routineInfo = buildAttendanceRoutineInfo(scheduleTitles);
+
+              return [
+                student.id,
+                {
+                  hasRoutine: routineInfo.hasRoutine,
+                  isNoAttendanceDay: routineInfo.isNoAttendanceDay,
+                  expectedArrivalTime: routineInfo.expectedArrivalTime,
+                  plannedDepartureTime: null,
+                  hasExcursion: false,
+                  excursionStartAt: null,
+                  excursionEndAt: null,
+                  scheduleStatus: null,
+                  actualArrivalAt: null,
+                },
+              ] as const;
+            })
         );
 
         if (!cancelled) {
@@ -276,7 +333,7 @@ export default function AttendancePage() {
     return () => {
       cancelled = true;
     };
-  }, [firestore, centerId, isTeacherOrAdmin, dateKey, weekKey, students, todaySchedules]);
+  }, [firestore, centerId, isTeacherOrAdmin, dateKey, weekKey, selectedWeekdayValue, students, todaySchedules]);
 
   useEffect(() => {
     if (!firestore || !centerId || !isTeacherOrAdmin || !dateKey || !students) {

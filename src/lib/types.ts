@@ -340,6 +340,7 @@ export interface StudentScheduleSettings {
 
 export interface StudentScheduleTemplate {
   id?: string;
+  centerId?: string | null;
   name: string;
   weekdays: number[];
   arrivalPlannedAt: string;
@@ -356,6 +357,7 @@ export interface StudentScheduleTemplate {
   classScheduleName?: string | null;
   active: boolean;
   timezone: string;
+  source?: string | null;
   createdAt?: Timestamp;
   updatedAt?: Timestamp;
 }

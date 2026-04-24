@@ -254,7 +254,9 @@ service cloud.firestore {
       }
 
       match /scheduleTemplates/{templateId} {
-        allow read, write: if isSignedIn() && request.auth.uid == userId;
+        allow read: if (isSignedIn() && request.auth.uid == userId)
+          || (resource.data.centerId != null && isTeacherOrAdmin(resource.data.centerId));
+        allow write: if isSignedIn() && request.auth.uid == userId;
       }
 
       match /plannerDiagnostics/{diagnosisId} {

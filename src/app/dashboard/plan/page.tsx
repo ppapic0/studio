@@ -158,7 +158,7 @@ import {
   getAttendanceRequestTypeLabel,
 } from '@/lib/attendance-request';
 import {
-  buildSharedStudyRoomClassSchedules,
+  buildStudyRoomClassSchedulesForClassName,
   getStudyRoomClassScheduleDisplayName,
 } from '@/lib/study-room-class-schedule';
 import { compressAttendanceRequestProofImage } from '@/lib/attendance-proof-upload';
@@ -936,6 +936,7 @@ export default function StudyPlanPage() {
   const { data: studentProfile, isLoading: isStudentProfileLoading } = useDoc<StudentProfile>(studentProfileRef, {
     enabled: isStudent,
   });
+  const studentClassName = studentProfile?.className || activeMembership?.className || null;
   const currentStudyPlanRef = useMemoFirebase(() => {
     if (!firestore || !user || !weekKey) return null;
     return doc(firestore, 'users', user.uid, 'studyPlans', weekKey);
@@ -969,8 +970,8 @@ export default function StudyPlanPage() {
     enabled: isStudent,
   });
   const classScheduleTemplates = useMemo(
-    () => buildSharedStudyRoomClassSchedules(activeMembership?.id),
-    [activeMembership?.id]
+    () => buildStudyRoomClassSchedulesForClassName(activeMembership?.id, studentClassName),
+    [activeMembership?.id, studentClassName]
   );
   const effectiveRoutineProfile = studentProfile?.studyRoutineProfile || userProfile?.studyRoutineProfile;
   const routineOnboardingState = studentProfile?.studyRoutineOnboarding || userProfile?.studyRoutineOnboarding;
@@ -993,8 +994,9 @@ export default function StudyPlanPage() {
     () =>
       [...(scheduleTemplates || [])]
         .filter((template) => template.active !== false)
+        .filter((template) => !template.centerId || template.centerId === activeMembership?.id)
         .sort((left, right) => getScheduleTemplateTimestampMs(right) - getScheduleTemplateTimestampMs(left)),
-    [scheduleTemplates]
+    [activeMembership?.id, scheduleTemplates]
   );
   const matchingWeekdayTemplate = useMemo(
     () =>
@@ -3161,6 +3163,7 @@ export default function StudyPlanPage() {
       batch.set(
         doc(firestore, 'users', user.uid, 'scheduleTemplates', templateId),
         {
+          centerId: activeMembership?.id || null,
           name: presetName.trim() || `${selectedRecurringWeekdayLabel} 기본 루틴`,
           weekdays: targetWeekdays,
           arrivalPlannedAt: weekdayDraft.inTime,
@@ -3220,7 +3223,7 @@ export default function StudyPlanPage() {
     } finally {
       setIsSubmitting(false);
     }
-  }, [activeScheduleTemplates, clearSchedulePrefillCache, firestore, matchingRecurringTemplate, presetName, scheduleNote, selectedRecurringWeekdayLabel, selectedRecurringWeekdays, syncWeekdayTemplateToVisibleSchedules, user, weekdayDraft]);
+  }, [activeMembership?.id, activeScheduleTemplates, clearSchedulePrefillCache, firestore, matchingRecurringTemplate, presetName, scheduleNote, selectedRecurringWeekdayLabel, selectedRecurringWeekdays, syncWeekdayTemplateToVisibleSchedules, user, weekdayDraft]);
 
   const handleSaveSchedulePreset = useCallback(async () => {
     if (!firestore || !user) return;
@@ -3235,6 +3238,7 @@ export default function StudyPlanPage() {
     setIsSubmitting(true);
     try {
       await addDoc(collection(firestore, 'users', user.uid, 'scheduleTemplates'), {
+        centerId: activeMembership?.id || null,
         name: presetName.trim(),
         weekdays: selectedRecurringWeekdays.length > 0 ? selectedRecurringWeekdays : [selectedWeekdayValue],
         arrivalPlannedAt: inTime,
@@ -3267,7 +3271,7 @@ export default function StudyPlanPage() {
     } finally {
       setIsSubmitting(false);
     }
-  }, [academyEndTime, academyName, academyStartTime, appliedClassScheduleId, appliedClassScheduleName, awayEndTime, awayReason, awayStartTime, firestore, inTime, outTime, presetName, selectedRecurringWeekdays, selectedWeekdayValue, toast, user]);
+  }, [academyEndTime, academyName, academyStartTime, activeMembership?.id, appliedClassScheduleId, appliedClassScheduleName, awayEndTime, awayReason, awayStartTime, firestore, inTime, outTime, presetName, selectedRecurringWeekdays, selectedWeekdayValue, toast, user]);
 
   const handleDeleteScheduleTemplate = useCallback(async (templateId: string) => {
     if (!firestore || !user) return;

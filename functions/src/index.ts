@@ -3724,6 +3724,88 @@ function assertInviteUsable(inv: InviteDoc, expectedRole?: AllowedRole) {
   }
 }
 
+const defaultStudyRoomScheduleWeekdays = [1, 2, 3, 4, 5, 6, 0];
+const defaultStudyRoomArrivalTime = "17:00";
+const defaultStudyRoomDepartureTime = "01:00";
+const defaultStudyRoomScheduleTemplateId = "default-shared-study-room-schedule";
+const nsuStudyRoomScheduleTemplateId = "default-nsu-study-room-schedule";
+const sharedStudyRoomClassScheduleId = "shared-study-room-schedule";
+const nsuStudyRoomClassScheduleId = "nsu-study-room-schedule";
+
+function isNsuStudyRoomClassName(className: unknown): boolean {
+  const normalized = String(className || "")
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g, "")
+    .replace(/[._-]/g, "");
+
+  return (
+    normalized.includes("n수") ||
+    normalized.includes("엔수") ||
+    normalized.includes("재수") ||
+    normalized.includes("nstudent") ||
+    normalized.includes("n반")
+  );
+}
+
+function buildDefaultStudyRoomScheduleTemplateData(params: {
+  centerId: string;
+  className: string | null;
+  timestamp: admin.firestore.Timestamp;
+}) {
+  const isNsu = isNsuStudyRoomClassName(params.className);
+  const classScheduleName = isNsu ? "N수반 교시제" : "센터 공통 교시제";
+
+  return {
+    id: isNsu ? nsuStudyRoomScheduleTemplateId : defaultStudyRoomScheduleTemplateId,
+    data: {
+      centerId: params.centerId,
+      name: `${classScheduleName} 기본 등하원`,
+      weekdays: defaultStudyRoomScheduleWeekdays,
+      arrivalPlannedAt: defaultStudyRoomArrivalTime,
+      departurePlannedAt: defaultStudyRoomDepartureTime,
+      academyNameDefault: null,
+      academyStartAtDefault: null,
+      academyEndAtDefault: null,
+      hasExcursionDefault: false,
+      defaultExcursionStartAt: null,
+      defaultExcursionEndAt: null,
+      defaultExcursionReason: null,
+      note: isNsu
+        ? "N수반은 일반 토요일·일요일 교시제를 평일에도 동일하게 적용합니다. 특이사항이 있는 학생만 학원 일정을 별도로 등록합니다."
+        : "특이사항이 없으면 이 교시제를 그대로 따르고, 학원 일정이 있는 학생만 별도로 등록합니다.",
+      classScheduleId: isNsu ? nsuStudyRoomClassScheduleId : sharedStudyRoomClassScheduleId,
+      classScheduleName,
+      active: true,
+      timezone: "Asia/Seoul",
+      source: "default-study-room-class-schedule",
+      createdAt: params.timestamp,
+      updatedAt: params.timestamp,
+    },
+  };
+}
+
+function seedDefaultStudyRoomScheduleTemplateInTransaction(params: {
+  db: admin.firestore.Firestore;
+  transaction: admin.firestore.Transaction;
+  uid: string;
+  centerId: string;
+  className: string | null;
+  timestamp: admin.firestore.Timestamp;
+}) {
+  const template = buildDefaultStudyRoomScheduleTemplateData({
+    centerId: params.centerId,
+    className: params.className,
+    timestamp: params.timestamp,
+  });
+
+  params.transaction.set(
+    params.db.doc(`users/${params.uid}/scheduleTemplates/${template.id}`),
+    template.data,
+    { merge: true }
+  );
+}
+
 export const deleteStudentAccount = functions.region(region).runWith({
   timeoutSeconds: 540,
   memory: "1GB",
@@ -4962,6 +5044,16 @@ export const redeemInviteCode = functions.region(region).https.onCall(async (dat
         displayName: callerDisplayName,
         className: inv.targetClassName || null,
       });
+      if (inv.intendedRole === "student") {
+        seedDefaultStudyRoomScheduleTemplateInTransaction({
+          db,
+          transaction: t,
+          uid,
+          centerId: inv.centerId,
+          className: inv.targetClassName || null,
+          timestamp: ts,
+        });
+      }
       t.update(inviteRef, { usedCount: admin.firestore.FieldValue.increment(1), updatedAt: ts });
       return { ok: true, message: "센터 가입이 완료되었습니다." };
     });
@@ -5499,6 +5591,15 @@ export const completeSignupWithInvite = functions.region(region).https.onCall(as
           skills: {},
           updatedAt: ts,
         }, { merge: true });
+
+        seedDefaultStudyRoomScheduleTemplateInTransaction({
+          db,
+          transaction: t,
+          uid,
+          centerId,
+          className: memberData.className || targetClassName || null,
+          timestamp: ts,
+        });
       }
 
       if (inviteRef) {
