@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { format } from 'date-fns';
-import { collection, getDocs, limit, query, where } from 'firebase/firestore';
+import { collection, collectionGroup, getDocs, limit, query, where } from 'firebase/firestore';
 
 import { useCollection, useFirestore } from '@/firebase';
 import { useMemoFirebase } from '@/hooks/use-memo-firebase';
@@ -21,6 +21,7 @@ import {
   formatAttendanceBoardClockLabel,
   formatAttendanceBoardMinutes,
   getAttendanceBoardStatusLabel,
+  resolveAttendanceOperationalException,
   resolveAttendanceBoardStatus,
   resolveAttendanceRiskLevel,
   type CenterAdminAttendanceBoardSummary,
@@ -31,6 +32,7 @@ import type {
   AttendanceCurrent,
   CenterMembership,
   DailyStudentStat,
+  StudentScheduleDoc,
   StudentProfile,
 } from '@/lib/types';
 
@@ -122,6 +124,18 @@ export function useCenterAdminAttendanceBoard({
   }, [firestore, centerId, isActive, todayKey]);
   const { data: todayRecords, isLoading: todayRecordsLoading } = useCollection<AttendanceBoardRecord>(
     todayRecordsQuery,
+    { enabled: isActive }
+  );
+  const todaySchedulesQuery = useMemoFirebase(() => {
+    if (!firestore || !centerId || !isActive) return null;
+    return query(
+      collectionGroup(firestore, 'schedules'),
+      where('centerId', '==', centerId),
+      where('dateKey', '==', todayKey)
+    );
+  }, [firestore, centerId, isActive, todayKey]);
+  const { data: todaySchedules, isLoading: todaySchedulesLoading } = useCollection<StudentScheduleDoc>(
+    todaySchedulesQuery,
     { enabled: isActive }
   );
 
@@ -226,6 +240,14 @@ export function useCenterAdminAttendanceBoard({
     () => new Map((todayStats || []).map((stat) => [stat.studentId, stat])),
     [todayStats]
   );
+  const todayScheduleByStudentId = useMemo(() => {
+    const mapped = new Map<string, StudentScheduleDoc>();
+    (todaySchedules || []).forEach((schedule) => {
+      if (!schedule.uid) return;
+      mapped.set(schedule.uid, schedule);
+    });
+    return mapped;
+  }, [todaySchedules]);
 
   const historySummaryByStudentId = useMemo(() => {
     const bucket = new Map<string, { lateCount: number; absentCount: number; routineMissingCount: number }>();
@@ -255,6 +277,7 @@ export function useCenterAdminAttendanceBoard({
         const member = memberById.get(studentId);
         const todayStat = todayStatsByStudentId.get(studentId);
         const routineInfo = routineInfoByStudentId[studentId];
+        const todaySchedule = todayScheduleByStudentId.get(studentId);
         const todayRecord = todayRecordByStudentId.get(studentId);
         const historySummary = historySummaryByStudentId.get(studentId) || {
           lateCount: 0,
@@ -327,6 +350,16 @@ export function useCenterAdminAttendanceBoard({
           attendanceRiskLevel,
           isLongAway,
         });
+        const operationalException = resolveAttendanceOperationalException({
+          boardStatus,
+          plannedDepartureTime: todaySchedule?.departurePlannedAt || null,
+          hasExcursion: Boolean(todaySchedule?.hasExcursion),
+          excursionStartAt: todaySchedule?.excursionStartAt || null,
+          excursionEndAt: todaySchedule?.excursionEndAt || null,
+          excursionReason: todaySchedule?.excursionReason || null,
+          currentAwayMinutes,
+          nowMs,
+        });
 
         return {
           seatId: seat.id,
@@ -343,6 +376,12 @@ export function useCenterAdminAttendanceBoard({
           todayStudyLabel: formatAttendanceBoardMinutes(totalStudyMinutes),
           liveSessionMinutes,
           routineExpectedArrivalTime: routineInfo?.expectedArrivalTime || null,
+          plannedDepartureTime: todaySchedule?.departurePlannedAt || null,
+          classScheduleName: todaySchedule?.classScheduleName || null,
+          hasExcursion: Boolean(todaySchedule?.hasExcursion),
+          excursionStartAt: todaySchedule?.excursionStartAt || null,
+          excursionEndAt: todaySchedule?.excursionEndAt || null,
+          excursionReason: todaySchedule?.excursionReason || null,
           checkedAtLabel: formatAttendanceBoardClockLabel(derived.checkedAt),
           attendanceRiskLevel,
           attendanceRiskLabel,
@@ -354,6 +393,9 @@ export function useCenterAdminAttendanceBoard({
           isReturned,
           isCheckedOut: boardStatus === 'checked_out',
           hasAttendanceEvidence,
+          operationalExceptionKind: operationalException?.kind || null,
+          operationalExceptionLabel: operationalException?.label || null,
+          operationalExceptionNote: operationalException?.note || null,
           flags,
           note: buildAttendanceBoardNote({
             boardStatus,
@@ -376,6 +418,7 @@ export function useCenterAdminAttendanceBoard({
     today,
     todayKey,
     todayRecordByStudentId,
+    todayScheduleByStudentId,
     todayStatsByStudentId,
   ]);
 
@@ -401,6 +444,7 @@ export function useCenterAdminAttendanceBoard({
     summary,
     isLoading:
       todayRecordsLoading ||
+      todaySchedulesLoading ||
       historyLoading ||
       routineLoading ||
       !students ||

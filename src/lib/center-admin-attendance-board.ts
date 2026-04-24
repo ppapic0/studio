@@ -2,6 +2,7 @@ import type { DisplayAttendanceStatus } from '@/lib/attendance-auto';
 import type { AttendanceCurrent } from '@/lib/types';
 
 export type CenterAdminAttendanceRiskLevel = 'stable' | 'warning' | 'risk';
+export type CenterAdminAttendanceOperationalExceptionKind = 'midday_leave' | 'returned' | 'early_checkout';
 
 export type CenterAdminAttendanceBoardStatus =
   | 'present'
@@ -30,6 +31,12 @@ export interface CenterAdminAttendanceSeatSignal {
   todayStudyLabel: string;
   liveSessionMinutes: number;
   routineExpectedArrivalTime: string | null;
+  plannedDepartureTime: string | null;
+  classScheduleName: string | null;
+  hasExcursion: boolean;
+  excursionStartAt: string | null;
+  excursionEndAt: string | null;
+  excursionReason: string | null;
   checkedAtLabel: string | null;
   attendanceRiskLevel: CenterAdminAttendanceRiskLevel;
   attendanceRiskLabel: '정상' | '출석주의' | '출석위험';
@@ -41,6 +48,9 @@ export interface CenterAdminAttendanceSeatSignal {
   isReturned: boolean;
   isCheckedOut: boolean;
   hasAttendanceEvidence: boolean;
+  operationalExceptionKind: CenterAdminAttendanceOperationalExceptionKind | null;
+  operationalExceptionLabel: string | null;
+  operationalExceptionNote: string | null;
   flags: string[];
   note: string;
 }
@@ -158,6 +168,22 @@ const BOARD_STATUS_LABELS: Record<CenterAdminAttendanceBoardStatus, string> = {
 function clampMinutes(value: number) {
   if (!Number.isFinite(value)) return 0;
   return Math.max(0, Math.round(value));
+}
+
+function parseBoardTimeToMinutes(value?: string | null) {
+  if (!value || typeof value !== 'string') return null;
+  const normalized = value.trim();
+  if (!/^(?:[01]\d|2[0-3]):[0-5]\d$/.test(normalized)) return null;
+  const [hourText, minuteText] = normalized.split(':');
+  const hour = Number(hourText);
+  const minute = Number(minuteText);
+  if (!Number.isFinite(hour) || !Number.isFinite(minute)) return null;
+  return hour * 60 + minute;
+}
+
+function formatBoardTimeWindow(startAt?: string | null, endAt?: string | null) {
+  if (!startAt || !endAt) return null;
+  return `${startAt} ~ ${endAt}`;
 }
 
 export function formatAttendanceBoardMinutes(minutes: number) {
@@ -280,6 +306,76 @@ export function buildAttendanceBoardNote(params: {
         ? '현재는 정상 출석 흐름으로 보입니다.'
         : `최근 7일 기준 ${attendanceRiskLabel} 학생입니다.`;
   }
+}
+
+export function resolveAttendanceOperationalException(params: {
+  boardStatus: CenterAdminAttendanceBoardStatus;
+  plannedDepartureTime?: string | null;
+  hasExcursion?: boolean;
+  excursionStartAt?: string | null;
+  excursionEndAt?: string | null;
+  excursionReason?: string | null;
+  currentAwayMinutes?: number;
+  nowMs?: number;
+}) {
+  const {
+    boardStatus,
+    plannedDepartureTime,
+    hasExcursion = false,
+    excursionStartAt,
+    excursionEndAt,
+    excursionReason,
+    currentAwayMinutes = 0,
+    nowMs = Date.now(),
+  } = params;
+
+  const timeWindow = formatBoardTimeWindow(excursionStartAt, excursionEndAt);
+  const trimmedReason = typeof excursionReason === 'string' ? excursionReason.trim() : '';
+
+  if (boardStatus === 'away') {
+    const scheduleLabel = hasExcursion
+      ? [timeWindow, trimmedReason].filter(Boolean).join(' · ')
+      : null;
+
+    return {
+      kind: 'midday_leave' as const,
+      label: '중간 외출',
+      note: scheduleLabel
+        ? `${scheduleLabel} 일정으로 현재 자리를 비우고 있어 복귀 여부만 확인하면 됩니다.`
+        : currentAwayMinutes >= 20
+          ? `현재 ${currentAwayMinutes}분째 자리를 비우고 있어 복귀 확인이 필요합니다.`
+          : '현재 자리를 비우고 있어 복귀 여부를 확인하면 됩니다.',
+    };
+  }
+
+  if (boardStatus === 'returned') {
+    const scheduleLabel = hasExcursion
+      ? [timeWindow, trimmedReason].filter(Boolean).join(' · ')
+      : null;
+
+    return {
+      kind: 'returned' as const,
+      label: '재등원 완료',
+      note: scheduleLabel
+        ? `${scheduleLabel} 이후 다시 등원해 현재 공부 중입니다.`
+        : '중간 이동 이후 다시 등원해 현재 공부 중입니다.',
+    };
+  }
+
+  if (boardStatus === 'checked_out') {
+    const departureMinutes = parseBoardTimeToMinutes(plannedDepartureTime);
+    const now = new Date(nowMs);
+    const nowMinutes = now.getHours() * 60 + now.getMinutes();
+    if (departureMinutes !== null && nowMinutes + 15 < departureMinutes) {
+      return {
+        kind: 'early_checkout' as const,
+        label: '중간 하원',
+        note: `${plannedDepartureTime} 기본 하원 전이라 중간 하원으로 보고 확인이 필요합니다.`,
+      };
+    }
+  }
+
+  return null;
 }
 
 export function getAttendanceBoardPresentation(signal: CenterAdminAttendanceSeatSignal) {

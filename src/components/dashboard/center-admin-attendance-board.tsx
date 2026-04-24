@@ -1,5 +1,6 @@
 'use client';
 
+import { useMemo } from 'react';
 import Link from 'next/link';
 import { ClipboardCheck, Loader2 } from 'lucide-react';
 
@@ -83,6 +84,19 @@ function getSeatDisplayLabel(seat: AttendanceCurrent, fallbackRoomSeatNo: number
   return customLabel || String(fallbackRoomSeatNo);
 }
 
+function getOperationalSignalPriority(signal: CenterAdminAttendanceSeatSignal) {
+  switch (signal.operationalExceptionKind) {
+    case 'midday_leave':
+      return 0;
+    case 'early_checkout':
+      return 1;
+    case 'returned':
+      return 2;
+    default:
+      return 99;
+  }
+}
+
 export function CenterAdminAttendanceBoard({
   roomConfigs,
   selectedRoomView,
@@ -106,6 +120,35 @@ export function CenterAdminAttendanceBoard({
   const scopeLabel = selectedClass === 'all' ? '센터 전체' : selectedClass;
   const selectedRoom =
     selectedRoomView === 'all' ? null : roomConfigs.find((room) => room.id === selectedRoomView) || null;
+  const roomById = useMemo(() => new Map(roomConfigs.map((room) => [room.id, room])), [roomConfigs]);
+  const operationalSignals = useMemo(() => {
+    return Array.from(seatSignalsBySeatId.values())
+      .filter(
+        (signal) =>
+          Boolean(signal.operationalExceptionKind) &&
+          (selectedRoomView === 'all' || !selectedRoom || signal.roomId === selectedRoom.id)
+      )
+      .sort((left, right) => {
+        const priorityDiff = getOperationalSignalPriority(left) - getOperationalSignalPriority(right);
+        if (priorityDiff !== 0) return priorityDiff;
+        if ((left.roomId || '') !== (right.roomId || '')) {
+          return (left.roomId || '').localeCompare(right.roomId || '');
+        }
+        if ((left.roomSeatNo || 0) !== (right.roomSeatNo || 0)) {
+          return Number(left.roomSeatNo || 0) - Number(right.roomSeatNo || 0);
+        }
+        return left.studentName.localeCompare(right.studentName, 'ko');
+      });
+  }, [seatSignalsBySeatId, selectedRoom, selectedRoomView]);
+  const operationalSummary = useMemo(
+    () => ({
+      total: operationalSignals.length,
+      away: operationalSignals.filter((signal) => signal.operationalExceptionKind === 'midday_leave').length,
+      returned: operationalSignals.filter((signal) => signal.operationalExceptionKind === 'returned').length,
+      earlyCheckout: operationalSignals.filter((signal) => signal.operationalExceptionKind === 'early_checkout').length,
+    }),
+    [operationalSignals]
+  );
 
   const summaryItems: SummaryItem[] = [
     {
@@ -462,6 +505,141 @@ export function CenterAdminAttendanceBoard({
     );
   };
 
+  const renderOperationalQueue = () => (
+    <div className="overflow-hidden rounded-[2.15rem] border border-[#D7E4FF] bg-[linear-gradient(180deg,#FFFFFF_0%,#F7FAFF_100%)] shadow-[0_24px_54px_-46px_rgba(20,41,95,0.28)]">
+      <div className="border-b border-[#E5ECFA] px-5 py-5 text-[#14295F] sm:px-6">
+        <div className={cn('flex gap-4', isMobile ? 'flex-col' : 'items-start justify-between')}>
+          <div className="space-y-2">
+            <Badge className="h-6 rounded-full border-none bg-[#FFF1E4] px-2.5 text-[10px] font-black uppercase tracking-[0.16em] text-[#C95A08]">
+              교시제 예외 관리
+            </Badge>
+            <h3 className="text-[1.35rem] font-black tracking-tight text-[#14295F] sm:text-[1.55rem]">
+              중간 하원과 재등원 학생만 따로 봅니다
+            </h3>
+            <p className="max-w-[46rem] text-xs font-bold leading-5 text-slate-500 sm:text-sm">
+              미입실·지각은 위 출석 카드에서 보고, 여기서는 교시제 중간 이동이 생긴 학생만 빠르게 확인하면 됩니다.
+            </p>
+          </div>
+          <div className={cn('grid gap-2', isMobile ? 'grid-cols-2' : 'grid-cols-4')}>
+            <div className="rounded-[1.2rem] border border-[#DCE7FF] bg-white px-3.5 py-3">
+              <p className="text-[10px] font-black uppercase tracking-[0.16em] text-slate-500">이동 관리</p>
+              <p className="dashboard-number mt-1.5 text-[1.45rem] leading-none text-[#14295F]">{operationalSummary.total}</p>
+            </div>
+            <div className="rounded-[1.2rem] border border-[#D9F2E7] bg-[#F3FCF8] px-3.5 py-3">
+              <p className="text-[10px] font-black uppercase tracking-[0.16em] text-[#2D8C6B]">외출 중</p>
+              <p className="dashboard-number mt-1.5 text-[1.45rem] leading-none text-[#1F9E7A]">{operationalSummary.away}</p>
+            </div>
+            <div className="rounded-[1.2rem] border border-[#DCE7FF] bg-[#F5F9FF] px-3.5 py-3">
+              <p className="text-[10px] font-black uppercase tracking-[0.16em] text-[#2554D7]">재등원</p>
+              <p className="dashboard-number mt-1.5 text-[1.45rem] leading-none text-[#2554D7]">{operationalSummary.returned}</p>
+            </div>
+            <div className="rounded-[1.2rem] border border-[#FFE0CF] bg-[#FFF6F0] px-3.5 py-3">
+              <p className="text-[10px] font-black uppercase tracking-[0.16em] text-[#D7652C]">중간 하원</p>
+              <p className="dashboard-number mt-1.5 text-[1.45rem] leading-none text-[#D7652C]">{operationalSummary.earlyCheckout}</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div className="p-4 sm:p-5">
+        {operationalSignals.length === 0 ? (
+          <div className="rounded-[1.6rem] border border-dashed border-[#DCE7FF] bg-[#F8FBFF] px-5 py-8 text-center text-[#14295F]">
+            <p className="text-sm font-black">현재 중간 이동 관리 대상이 없습니다.</p>
+            <p className="mt-2 text-xs font-bold leading-5 text-slate-500 sm:text-sm">
+              미입실·지각 신호 외에는 나머지 학생을 교시제 기준 흐름으로 보면 됩니다.
+            </p>
+          </div>
+        ) : (
+          <div className="grid gap-3">
+            {operationalSignals.map((signal) => {
+              const room = signal.roomId ? roomById.get(signal.roomId) || null : null;
+              const seat =
+                room && signal.roomSeatNo
+                  ? getSeatForRoom(room, signal.roomSeatNo)
+                  : null;
+              const scheduleRange =
+                signal.routineExpectedArrivalTime && signal.plannedDepartureTime
+                  ? `${signal.routineExpectedArrivalTime} ~ ${signal.plannedDepartureTime}`
+                  : null;
+              const excursionRange =
+                signal.excursionStartAt && signal.excursionEndAt
+                  ? `${signal.excursionStartAt} ~ ${signal.excursionEndAt}`
+                  : null;
+
+              return (
+                <button
+                  key={`${signal.seatId}_${signal.operationalExceptionKind}`}
+                  type="button"
+                  onClick={() => {
+                    if (seat) onSeatClick(seat);
+                  }}
+                  disabled={!seat}
+                  className={cn(
+                    'rounded-[1.4rem] border border-[#E3EBF9] bg-white p-4 text-left shadow-[0_18px_36px_-34px_rgba(20,41,95,0.28)] transition-[transform,border-color,box-shadow] duration-200',
+                    seat
+                      ? 'hover:-translate-y-0.5 hover:border-[#FFB67B] hover:shadow-[0_24px_42px_-30px_rgba(20,41,95,0.24)]'
+                      : 'cursor-default'
+                  )}
+                >
+                  <div className={cn('flex gap-4', isMobile ? 'flex-col' : 'items-start justify-between')}>
+                    <div className="min-w-0">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <p className="text-base font-black tracking-tight text-[#14295F]">{signal.studentName}</p>
+                        {signal.className ? (
+                          <Badge className="h-6 rounded-full border border-[#DCE7FF] bg-[#F7FAFF] px-2.5 text-[10px] font-black text-[#5F739F]">
+                            {signal.className}
+                          </Badge>
+                        ) : null}
+                        <Badge className="h-6 rounded-full border-none bg-[#14295F] px-2.5 text-[10px] font-black text-white">
+                          {signal.operationalExceptionLabel}
+                        </Badge>
+                      </div>
+                      <p className="mt-2 text-sm font-bold leading-6 text-[#4C618F]">
+                        {signal.operationalExceptionNote || signal.note}
+                      </p>
+                      <div className="mt-3 flex flex-wrap gap-2">
+                        {room && signal.roomSeatNo ? (
+                          <Badge className="h-6 rounded-full border border-[#DCE7FF] bg-white px-2.5 text-[10px] font-black text-[#14295F]">
+                            {room.name} · {signal.roomSeatNo}번
+                          </Badge>
+                        ) : null}
+                        {signal.classScheduleName?.trim() ? (
+                          <Badge className="h-6 rounded-full border border-[#DCE7FF] bg-white px-2.5 text-[10px] font-black text-[#5F739F]">
+                            {signal.classScheduleName.trim()}
+                          </Badge>
+                        ) : null}
+                        {scheduleRange ? (
+                          <Badge className="h-6 rounded-full border border-[#DCE7FF] bg-white px-2.5 text-[10px] font-black text-[#5F739F]">
+                            등하원 {scheduleRange}
+                          </Badge>
+                        ) : null}
+                        {excursionRange ? (
+                          <Badge className="h-6 rounded-full border border-[#DCE7FF] bg-[#FFF8F2] px-2.5 text-[10px] font-black text-[#C95A08]">
+                            이동 {excursionRange}
+                          </Badge>
+                        ) : null}
+                        {signal.currentAwayMinutes > 0 && signal.operationalExceptionKind === 'midday_leave' ? (
+                          <Badge className="h-6 rounded-full border border-[#D9F2E7] bg-[#F3FCF8] px-2.5 text-[10px] font-black text-[#1F9E7A]">
+                            이탈 {signal.currentAwayMinutes}분
+                          </Badge>
+                        ) : null}
+                      </div>
+                    </div>
+                    {seat ? (
+                      <span className="inline-flex h-9 items-center rounded-full border border-[#DCE7FF] bg-[#F7FAFF] px-3 text-[11px] font-black text-[#14295F]">
+                        좌석 열기
+                      </span>
+                    ) : null}
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+
   const renderAllRoomsCanvas = () => (
     <div className="overflow-hidden rounded-[2.35rem] border border-[#D7E4FF] bg-[linear-gradient(180deg,#FFFFFF_0%,#F6FAFF_100%)] shadow-[0_28px_70px_-54px_rgba(20,41,95,0.3)]">
       <div className="border-b border-[#E5ECFA] px-5 py-5 text-[#14295F] sm:px-6">
@@ -598,6 +776,7 @@ export function CenterAdminAttendanceBoard({
     <div className="space-y-5 text-[#14295F]">
       {renderHeader()}
       {renderSummaryRail()}
+      {renderOperationalQueue()}
 
       {isLoading ? (
         <div className="flex items-center justify-center rounded-[2.1rem] border border-dashed border-[#D7E4FF] bg-[#F7FAFF] py-20">
