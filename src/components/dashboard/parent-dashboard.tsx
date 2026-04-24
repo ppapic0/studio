@@ -679,6 +679,7 @@ function ParentAnalyticsCard({
   badge,
   insight,
   className,
+  compact = false,
   children,
 }: {
   tone: ParentAnalyticsTone;
@@ -688,6 +689,7 @@ function ParentAnalyticsCard({
   badge: string;
   insight: string;
   className?: string;
+  compact?: boolean;
   children: ReactNode;
 }) {
   const toneStyle = PARENT_ANALYTICS_TONE_STYLES[tone];
@@ -703,20 +705,22 @@ function ParentAnalyticsCard({
       <div className={cn('pointer-events-none absolute inset-x-0 top-0 h-1.5 bg-gradient-to-r', toneStyle.ribbon)} />
       <div className={cn('pointer-events-none absolute -right-8 top-0 h-24 w-24 rounded-full blur-3xl', toneStyle.glow)} />
       <div className="relative z-10">
-        <div className="flex items-start justify-between gap-3">
+        <div className={cn('flex gap-3', compact ? 'flex-col' : 'items-start justify-between')}>
           <div className="flex min-w-0 items-start gap-3">
             <div className={cn('flex h-10 w-10 shrink-0 items-center justify-center rounded-[1.1rem] border shadow-[inset_0_1px_0_rgba(255,255,255,0.96),0_16px_26px_-22px_rgba(255,122,22,0.16)]', toneStyle.iconWrap, toneStyle.icon)}>
               {icon}
             </div>
             <div className="min-w-0">
-              <p className={cn('text-[10px] font-black uppercase tracking-[0.18em]', toneStyle.eyebrow)}>Parent Analytics</p>
-              <h3 className="mt-1 text-[1.02rem] font-black tracking-tight text-[#14295F]">{title}</h3>
+              <p className={cn('text-[10px] font-black uppercase tracking-[0.14em]', toneStyle.eyebrow)}>
+                {compact ? '학부모 분석' : 'Parent Analytics'}
+              </p>
+              <h3 className="mt-1 break-keep text-[1.02rem] font-black leading-[1.25] tracking-tight text-[#14295F]">{title}</h3>
               <p className="mt-1 break-keep text-[12px] font-bold leading-[1.6] text-slate-500 sm:text-[12.5px]">
                 {description}
               </p>
             </div>
           </div>
-          <span className={cn('shrink-0 rounded-full border px-3 py-1 text-[10px] font-black tracking-tight shadow-sm', toneStyle.badge)}>
+          <span className={cn('w-fit max-w-full rounded-full border px-3 py-1 text-[10px] font-black tracking-tight shadow-sm', !compact && 'shrink-0', toneStyle.badge)}>
             {badge}
           </span>
         </div>
@@ -3523,7 +3527,7 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
         ) : null}
 
         <TabsContent value="home" className="parent-tab-panel mt-0 space-y-4 sm:space-y-5">
-          <div className="grid grid-cols-2 gap-3 xl:gap-4">
+          <div className={cn('grid gap-3 xl:gap-4', isCompactAppMode ? 'grid-cols-1' : 'grid-cols-2')}>
             <ParentHomeMetricCardShell
               tone="study"
               className={cn(
@@ -4304,7 +4308,7 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
                 </div>
               </Card>
 
-              <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+              <div className={cn('grid grid-cols-1 gap-3', !isCompactAppMode && 'md:grid-cols-2')}>
                 <ParentAnalyticsCard
                   tone="growth"
                   icon={<BarChart3 className="h-[18px] w-[18px]" />}
@@ -4313,6 +4317,7 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
                   badge={hasWeeklyGrowthData ? `이번 주 ${toSignedPercentLabel(latestWeeklyLearningGrowthPercent)}` : '데이터 대기'}
                   insight={weeklyGrowthInsight.trend}
                   className={showEntryMotion ? 'parent-card-enter parent-entry-delay-3' : undefined}
+                  compact={isCompactAppMode}
                 >
                   {hasWeeklyGrowthData ? (
                     <div className="h-[220px] w-full">
@@ -4349,6 +4354,7 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
                   badge={hasRhythmScoreOnlyTrend ? `평균 ${averageRhythmScore}점` : '기록 대기'}
                   insight={rhythmInsight.trend}
                   className={showEntryMotion ? 'parent-card-enter parent-entry-delay-3' : undefined}
+                  compact={isCompactAppMode}
                 >
                   {hasRhythmScoreOnlyTrend ? (
                     <div className="h-[220px] w-full">
@@ -4387,6 +4393,7 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
                   badge={hasStartEndTimeData ? `평균 시작 ${analyticsAverageStartLabel}` : '기록 대기'}
                   insight={startEndInsight.trend}
                   className={showEntryMotion ? 'parent-card-enter parent-entry-delay-4' : undefined}
+                  compact={isCompactAppMode}
                 >
                   {hasStartEndTimeData ? (
                     <div className="h-[220px] w-full">
@@ -4422,6 +4429,7 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
                   badge={hasStartEndTimeData ? (hasAwayTimeData ? `평균 ${analyticsAverageAwayMinutes}분` : '안정적') : '기록 대기'}
                   insight={hasStartEndTimeData ? awayTimeInsight.trend : '학습 세션 기록이 더 쌓이면 이탈시간 흐름을 함께 볼 수 있습니다.'}
                   className={showEntryMotion ? 'parent-card-enter parent-entry-delay-4' : undefined}
+                  compact={isCompactAppMode}
                 >
                   {hasStartEndTimeData ? (
                     <div className="h-[220px] w-full">
