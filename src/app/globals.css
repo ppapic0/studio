@@ -2910,17 +2910,20 @@ select {
   --parent-app-nav-extra-clearance: 1.2rem;
   --parent-app-nav-clearance: calc(var(--parent-app-nav-base-clearance) + var(--parent-app-nav-extra-clearance));
   --parent-app-scroll-tail: 1.9rem;
-  width: min(100%, calc(100vw - 0.5rem));
-  max-width: calc(100vw - 0.5rem);
-  height: min(54.5rem, calc(100svh - 0.5rem));
-  min-height: min(44rem, calc(100svh - 0.5rem));
-  max-height: calc(100svh - 0.5rem);
+  width: min(100%, clamp(21.5rem, 92vw, 25.25rem));
+  max-width: calc(100vw - 0.75rem);
+  height: min(53.25rem, calc(100svh - 0.75rem));
+  min-height: min(43rem, calc(100svh - 0.75rem));
+  max-height: calc(100svh - 0.75rem);
 }
 
 .parent-app-shell .parent-app-main {
   min-height: 0;
   padding: 1rem 0.92rem calc(var(--parent-app-nav-clearance) + var(--parent-app-scroll-tail));
   gap: 0.95rem;
+  background:
+    radial-gradient(circle at 50% 0%, rgba(255, 122, 22, 0.08), transparent 30%),
+    linear-gradient(180deg, rgba(236, 243, 246, 0.52) 0%, rgba(245, 239, 229, 0.58) 46%, rgba(232, 240, 246, 0.48) 100%);
   overscroll-behavior: contain;
   -webkit-overflow-scrolling: touch;
   scrollbar-gutter: stable;
@@ -2940,12 +2943,23 @@ select {
 
 .parent-app-shell .parent-app-main [data-slot="card"] {
   border-radius: 1.5rem;
-  border-color: rgba(20, 41, 95, 0.09);
-  background-image: linear-gradient(180deg, rgba(255,255,255,0.99) 0%, rgba(248,250,255,0.98) 100%);
+  border-color: rgba(20, 41, 95, 0.13);
+  background-image: linear-gradient(180deg, rgba(252, 250, 244, 0.99) 0%, rgba(238, 245, 246, 0.98) 100%);
   box-shadow:
-    0 1px 0 0 rgba(255,255,255,0.95) inset,
-    0 -1px 0 0 rgba(20,41,95,0.03) inset,
-    0 10px 24px -14px rgba(20,41,95,0.18);
+    0 1px 0 0 rgba(255,255,255,0.82) inset,
+    0 -1px 0 0 rgba(20,41,95,0.05) inset,
+    0 14px 30px -18px rgba(20,41,95,0.22);
+}
+
+.parent-app-shell .parent-tab-panel .on-dark {
+  border-color: rgba(47, 70, 121, 0.92) !important;
+  background:
+    radial-gradient(circle at top right, rgba(255, 122, 22, 0.16), transparent 34%),
+    linear-gradient(155deg, #183463 0%, #102755 56%, #0c1b3d 100%) !important;
+}
+
+.parent-app-shell .parent-tab-panel .soft-glow {
+  opacity: 0.74;
 }
 
 .parent-app-shell .parent-app-main .text-slate-400 {
@@ -2989,13 +3003,13 @@ select {
     width: 100%;
     min-height: 0;
     border-width: 8px;
-    border-radius: 2.5rem;
-    margin-top: 0.25rem;
+    border-radius: 2.6rem;
+    margin-top: 0.375rem;
   }
 
   .parent-app-notch {
-    width: 6.75rem;
-    height: 1.2rem;
+    width: 7rem;
+    height: 1.35rem;
   }
 
   .experience-phone-shell {
@@ -3025,9 +3039,9 @@ select {
     --parent-app-nav-base-clearance: calc(6.85rem + env(safe-area-inset-bottom, 0px));
     --parent-app-nav-extra-clearance: 1rem;
     --parent-app-scroll-tail: 1.75rem;
-    max-width: calc(100vw - 0.18rem);
-    border-width: 6px;
-    border-radius: 2rem;
+    max-width: calc(100vw - 0.4rem);
+    border-width: 7px;
+    border-radius: 2.25rem;
   }
 
   .dashboard-mobile-main {
@@ -3082,6 +3096,8 @@ select {
     --parent-app-nav-base-clearance: calc(6.45rem + env(safe-area-inset-bottom, 0px));
     --parent-app-nav-extra-clearance: 0.92rem;
     --parent-app-scroll-tail: 1.55rem;
+    height: min(calc(100svh - 0.35rem), 49rem);
+    margin-top: 0.15rem;
   }
 
   .dashboard-mobile-main {
@@ -3097,19 +3113,19 @@ select {
 
 @media (min-width: 768px) {
   .parent-app-shell {
-    width: min(100%, 48rem);
-    max-width: min(100vw - 2.25rem, 48rem);
-    height: min(58rem, calc(100svh - 1.25rem));
-    min-height: min(48rem, calc(100svh - 1.25rem));
-    max-height: calc(100svh - 1.25rem);
+    width: min(100%, clamp(21.5rem, 92vw, 25.25rem));
+    max-width: calc(100vw - 0.75rem);
+    height: min(53.25rem, calc(100svh - 0.75rem));
+    min-height: min(43rem, calc(100svh - 0.75rem));
+    max-height: calc(100svh - 0.75rem);
     border-width: 10px;
-    border-radius: 3rem;
-    margin-top: 0.9rem;
+    border-radius: 3.25rem;
+    margin-top: 0.75rem;
   }
 
   .parent-app-main {
-    padding: 1.15rem 1.15rem calc(6.35rem + env(safe-area-inset-bottom, 0px));
-    gap: 1.05rem;
+    padding: 1rem 0.95rem calc(var(--parent-app-nav-clearance) + var(--parent-app-scroll-tail));
+    gap: 0.95rem;
   }
 
   .parent-app-shell .parent-app-main [data-slot="card"] {
@@ -3136,8 +3152,8 @@ select {
 
 @media (min-width: 1280px) {
   .parent-app-shell {
-    width: min(100%, 60rem);
-    max-width: min(100vw - 3rem, 60rem);
+    width: min(100%, clamp(21.5rem, 92vw, 25.25rem));
+    max-width: calc(100vw - 0.75rem);
   }
 }
 

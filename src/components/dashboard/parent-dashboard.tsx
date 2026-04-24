@@ -1678,8 +1678,10 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
   const { toast } = useToast();
   const prefersReducedMotion = usePrefersReducedMotion();
 
-  const isMobile = activeMembership?.role === 'parent' || viewMode === 'mobile';
-  const isAppMode = viewMode === 'mobile';
+  const isParentMode = activeMembership?.role === 'parent';
+  const isMobile = viewMode === 'mobile';
+  const isCompactAppMode = isParentMode || isMobile;
+  const isAppMode = isCompactAppMode;
   const [today, setToday] = useState<Date | null>(null);
   const [liveNowMs, setLiveNowMs] = useState(0);
   const [tab, setTab] = useState<ParentPortalTab>('home');
@@ -3533,7 +3535,7 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
   if (!isActive) return null;
 
   return (
-    <div className={cn("relative isolate space-y-4 pb-[calc(6.2rem+env(safe-area-inset-bottom))] md:space-y-5", isMobile ? "px-0" : "mx-auto max-w-5xl px-4")}>
+    <div className={cn("relative isolate space-y-4 pb-[calc(6.2rem+env(safe-area-inset-bottom))] md:space-y-5", isCompactAppMode ? "px-0" : "mx-auto max-w-5xl px-4")}>
       {growthCelebration && (
         <ParentGrowthCelebration
           celebration={growthCelebration}
@@ -3543,7 +3545,7 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
       )}
 
       <Tabs value={tab} onValueChange={handleTabChange} className="w-full">
-        {!isMobile ? (
+        {!isCompactAppMode ? (
           <ParentDashboardTabRail
             tab={tab}
             activeStudentLabel={activeStudentLabel}
@@ -4063,7 +4065,7 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
                     showEntryMotion && 'parent-card-enter parent-entry-delay-2'
                   )}
                 >
-                  <div className={cn('grid gap-4 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-end', isMobile && 'gap-3')}>
+                  <div className={cn('grid gap-4 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-end', isCompactAppMode && 'gap-3')}>
                     <ParentSectionHeader
                       icon={<History className="h-3.5 w-3.5" />}
                       eyebrow="Study Timeline"
@@ -4125,13 +4127,13 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
                 )}
               >
                 <CardContent className="relative p-0">
-                  <div className={cn('border-b border-primary/10', isAppMode ? 'px-4 py-4' : isMobile ? 'px-3 py-3' : 'px-5 py-4')}>
+                  <div className={cn('border-b border-primary/10', isAppMode ? 'px-4 py-4' : isCompactAppMode ? 'px-3 py-3' : 'px-5 py-4')}>
                     {isAppMode ? (
-                      <div className={cn(isMobile ? 'space-y-3' : 'flex items-end justify-between gap-6')}>
+                      <div className={cn(isCompactAppMode ? 'space-y-3' : 'flex items-end justify-between gap-6')}>
                         <div className="space-y-2">
                           <div>
-                            <h3 className={cn('font-black tracking-[-0.03em] text-[#14295F]', isMobile ? 'text-[1.3rem]' : 'text-[1.62rem]')}>학습 캘린더</h3>
-                            <p className={cn('mt-1 font-semibold text-[#71819C]', isMobile ? 'text-[12px] leading-5' : 'text-sm leading-6')}>
+                            <h3 className={cn('font-black tracking-[-0.03em] text-[#14295F]', isCompactAppMode ? 'text-[1.3rem]' : 'text-[1.62rem]')}>학습 캘린더</h3>
+                            <p className={cn('mt-1 font-semibold text-[#71819C]', isCompactAppMode ? 'text-[12px] leading-5' : 'text-sm leading-6')}>
                               공부시간 중심으로 빠르게 확인해요.
                             </p>
                           </div>
@@ -4139,26 +4141,26 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
                         <div
                           className={cn(
                             'rounded-[1.45rem] border border-[#D8E5DE] bg-[linear-gradient(180deg,#FBFEFC_0%,#F1FAF4_100%)] shadow-[inset_0_1px_0_rgba(255,255,255,0.96),0_18px_34px_-26px_rgba(46,117,74,0.1)]',
-                            isMobile ? 'px-3 py-3' : 'min-w-[24rem] px-4 py-3.5'
+                            isCompactAppMode ? 'px-3 py-3' : 'min-w-[24rem] px-4 py-3.5'
                           )}
                         >
-                          <div className={cn('grid gap-1.5', isMobile ? 'grid-cols-2' : 'grid-cols-4')}>
+                          <div className={cn('grid gap-1.5', isCompactAppMode ? 'grid-cols-2' : 'grid-cols-4')}>
                             {PARENT_CALENDAR_LEGEND.map((item) => (
                               <div
                                 key={item.label}
                                 className={cn('inline-flex items-center justify-center gap-2 rounded-[1rem] border px-2 py-2', getParentLegendChipClass(item.level))}
                               >
                                 <span className={cn('h-2.5 w-2.5 shrink-0 rounded-full ring-1', item.swatch)} />
-                                <span className={cn('text-center font-black tracking-tight', isMobile ? 'text-[9px]' : 'text-[10px]')}>{item.label}</span>
+                                <span className={cn('text-center font-black tracking-tight', isCompactAppMode ? 'text-[9px]' : 'text-[10px]')}>{item.label}</span>
                               </div>
                             ))}
                           </div>
                         </div>
                       </div>
                     ) : (
-                      <div className={cn("flex flex-wrap items-center justify-between gap-3", isMobile ? "px-0 py-0" : "")}>
+                      <div className={cn("flex flex-wrap items-center justify-between gap-3", isCompactAppMode ? "px-0 py-0" : "")}>
                         <span className="font-aggro-display text-[10px] uppercase tracking-[0.22em] text-[#2d6d47]">월간 흐름 요약</span>
-                        <div className={cn("grid gap-1.5", isMobile ? "grid-cols-2" : "grid-cols-4")}>
+                        <div className={cn("grid gap-1.5", isCompactAppMode ? "grid-cols-2" : "grid-cols-4")}>
                           {PARENT_CALENDAR_LEGEND.map((item) => (
                             <div
                               key={item.level}
@@ -4174,14 +4176,14 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
                       </div>
                     )}
                   </div>
-                  <div className={cn("grid grid-cols-7 border-b border-primary/10", isAppMode ? "gap-1.5 px-2 py-2" : isMobile ? "gap-1 px-1.5 py-1.5" : "gap-2 px-5 py-3.5")}>
+                  <div className={cn("grid grid-cols-7 border-b border-primary/10", isAppMode ? "gap-1.5 px-2 py-2" : isCompactAppMode ? "gap-1 px-1.5 py-1.5" : "gap-2 px-5 py-3.5")}>
                     {['월', '화', '수', '목', '금', '토', '일'].map((day, i) => (
                       <div
                         key={day}
                         className={cn(
                           isAppMode
                             ? 'py-1.5 text-[8px]'
-                            : isMobile
+                            : isCompactAppMode
                               ? "py-1.5 text-[8px]"
                               : "rounded-[1rem] border py-2.5 text-[10px] shadow-[inset_0_1px_0_rgba(255,255,255,0.88)]",
                           isAppMode
@@ -4204,7 +4206,7 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
                       </div>
                     ))}
                   </div>
-                  <div className={cn("grid grid-cols-7", isAppMode ? "auto-rows-fr gap-2 px-3 pb-3 pt-4.5" : isMobile ? "auto-rows-fr gap-1 px-1.5 pb-1.5 pt-3" : "auto-rows-fr gap-3.5 px-5 pb-5 pt-6")}>
+                  <div className={cn("grid grid-cols-7", isAppMode ? "auto-rows-fr gap-2 px-3 pb-3 pt-4.5" : isCompactAppMode ? "auto-rows-fr gap-1 px-1.5 pb-1.5 pt-3" : "auto-rows-fr gap-3.5 px-5 pb-5 pt-6")}>
                     {logsLoading ? (
                       <div className="col-span-7 h-[400px] flex items-center justify-center">
                         <Loader2 className="animate-spin h-10 w-10 text-primary opacity-20" />
@@ -4276,7 +4278,7 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
                           aria-label={`${format(day, 'M월 d일 (EEEE)', { locale: ko })} · ${calendarAriaTimeLabel}`}
                           className={cn(
                             "group relative flex flex-col overflow-hidden rounded-[1.35rem] text-left transition-all duration-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/35",
-                            isMobile ? "aspect-square min-h-0 p-1" : "aspect-square min-h-0 p-3.5",
+                            isCompactAppMode ? "aspect-square min-h-0 p-1" : "aspect-square min-h-0 p-3.5",
                             !isCurrentMonth ? "bg-[linear-gradient(180deg,rgba(248,250,252,0.9)_0%,rgba(255,255,255,0.96)_100%)] opacity-[0.38] grayscale-[0.05] ring-1 ring-slate-200/75" : getHeatmapColor(minutes),
                             isCurrentMonth && "hover:-translate-y-[1px] hover:shadow-[0_18px_36px_-24px_rgba(15,23,42,0.32)] active:translate-y-0",
                             isTodayCalendar && "z-10 -translate-y-[1px] ring-2 ring-inset ring-[#1f9d57]/45 shadow-[0_20px_40px_-22px_rgba(34,197,94,0.24)]"
@@ -4286,18 +4288,18 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
                           <div className="pointer-events-none absolute inset-x-3 top-0 h-px bg-white/90" />
 
                           {!isAppMode ? (
-                            <div className={cn("relative z-10 flex items-start justify-between gap-1.5", isMobile ? "mb-auto" : "mb-3")}>
+                            <div className={cn("relative z-10 flex items-start justify-between gap-1.5", isCompactAppMode ? "mb-auto" : "mb-3")}>
                               <span
                                 className={cn(
                                   "inline-flex items-center justify-center rounded-full border font-semibold tracking-tighter tabular-nums shadow-[inset_0_1px_0_rgba(255,255,255,0.8)]",
-                                  isMobile ? "min-w-[1.45rem] px-1.5 py-0.5 text-[9px]" : "min-w-[2rem] px-2 py-1 text-xs",
+                                  isCompactAppMode ? "min-w-[1.45rem] px-1.5 py-0.5 text-[9px]" : "min-w-[2rem] px-2 py-1 text-xs",
                                   idx % 7 === 5 && isCurrentMonth ? "border-blue-100 bg-blue-50 text-blue-700" : idx % 7 === 6 && isCurrentMonth ? "border-rose-100 bg-rose-50 text-rose-700" : "border-slate-200 bg-white text-slate-700",
                                   isTodayCalendar && "border-[#9cd6b0] text-[#178244]"
                                 )}
                               >
                                 {format(day, 'd')}
                               </span>
-                              <span className={cn(isMobile ? "h-5 w-5" : "h-6 w-6")} aria-hidden="true" />
+                              <span className={cn(isCompactAppMode ? "h-5 w-5" : "h-6 w-6")} aria-hidden="true" />
                             </div>
                           ) : null}
 
@@ -4305,7 +4307,7 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
                             "flex",
                             isAppMode
                               ? "relative z-10 h-full flex-1 items-center justify-center"
-                              : isMobile
+                              : isCompactAppMode
                                 ? "mt-auto justify-center pb-1"
                                 : "mt-auto justify-center px-1 pt-4"
                           )}>
@@ -4315,7 +4317,7 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
                                   "inline-flex w-full max-w-full items-center justify-center rounded-[0.95rem] border text-center shadow-[0_14px_26px_-20px_rgba(15,23,42,0.2)]",
                                   isAppMode
                                     ? "min-h-[3.2rem] px-1.5 py-2.5"
-                                    : isMobile
+                                    : isCompactAppMode
                                       ? "min-h-[2.15rem] px-1 py-2"
                                       : "min-h-[3.25rem] px-2.5 py-3",
                                   getParentCalendarTimeCapsuleClass(minutes, isCurrentMonth)
@@ -4331,7 +4333,7 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
                                         : isLongTimeLabel
                                           ? "text-[0.8rem] tracking-[-0.06em]"
                                           : "text-[0.92rem] tracking-[-0.05em]"
-                                      : isMobile
+                                      : isCompactAppMode
                                       ? isVeryLongTimeLabel
                                         ? "text-[0.48rem] tracking-[-0.1em]"
                                         : isLongTimeLabel
@@ -4348,7 +4350,7 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
                                 </span>
                               </div>
                             ) : (
-                              <span className={cn(isMobile ? "h-[1.35rem]" : "h-[2rem]")} aria-hidden="true" />
+                              <span className={cn(isCompactAppMode ? "h-[1.35rem]" : "h-[2rem]")} aria-hidden="true" />
                             )}
                           </div>
                         </button>

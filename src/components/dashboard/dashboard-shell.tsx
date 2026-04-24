@@ -169,7 +169,7 @@ export function DashboardShell({
           'dashboard-shell min-h-screen w-full transition-all duration-500 relative overflow-x-hidden font-body flex items-start justify-center',
           isMobileView
             ? isParentMode
-              ? 'bg-[radial-gradient(circle_at_top,#ffd7b6_0%,#eef4ff_48%,#e6efff_100%)] px-1.5 pb-4 sm:px-3 sm:pb-5 md:px-4'
+              ? 'bg-[radial-gradient(circle_at_50%_0%,#d6e2ee_0%,#efe4d4_44%,#dce7ef_100%)] px-1.5 pb-4 sm:px-3 sm:pb-5 md:px-4'
               : 'px-2.5 pb-5 sm:px-3 sm:pb-6'
             : isStudentMode
               ? 'md:grid md:grid-cols-[240px_1fr] lg:grid-cols-[280px_1fr]'
@@ -214,7 +214,7 @@ export function DashboardShell({
           className={cn(
             'flex flex-col transition-all duration-700 relative z-10',
             isParentMode
-              ? 'parent-app-shell overflow-hidden rounded-[3rem] border-[8px] border-[#10295f] bg-[linear-gradient(180deg,#fff7ef_0%,#ffffff_38%,#f4f9ff_100%)] shadow-[0_35px_90px_-25px_rgba(20,41,95,0.52)] ring-2 ring-[#ffb985]/40 relative mt-2 sm:mt-3'
+              ? 'parent-app-shell overflow-hidden rounded-[3rem] border-[8px] border-[#10295f] bg-[linear-gradient(180deg,#eaf1f5_0%,#f5efe4_42%,#e8f0f6_100%)] shadow-[0_35px_90px_-25px_rgba(20,41,95,0.52)] ring-2 ring-[#d7c2a8]/45 relative mt-2 sm:mt-3'
               : isMobileView
                 ? 'student-night-shell dashboard-mobile-shell overflow-hidden rounded-[3.25rem] border-[10px] shadow-[0_42px_95px_-28px_rgba(4,10,32,0.42)] relative mt-3 sm:mt-4'
                 : isStudentMode
