@@ -157,6 +157,10 @@ import {
   ATTENDANCE_REQUEST_PROOF_LIMIT,
   getAttendanceRequestTypeLabel,
 } from '@/lib/attendance-request';
+import {
+  buildSharedStudyRoomClassSchedules,
+  getStudyRoomClassScheduleDisplayName,
+} from '@/lib/study-room-class-schedule';
 import { compressAttendanceRequestProofImage } from '@/lib/attendance-proof-upload';
 
 const SAME_DAY_ROUTINE_PENALTY_POINTS = 1;
@@ -249,7 +253,7 @@ function buildAttendanceDraftFromClassSchedule(schedule: StudyRoomClassScheduleT
     inTime: schedule.arrivalTime,
     outTime: schedule.departureTime,
     classScheduleId: schedule.id || null,
-    classScheduleName: `${schedule.className} 반 교시제`,
+    classScheduleName: getStudyRoomClassScheduleDisplayName(schedule),
   };
 }
 
@@ -964,13 +968,10 @@ export default function StudyPlanPage() {
   const { data: scheduleTemplates } = useCollection<StudentScheduleTemplate>(scheduleTemplatesQuery, {
     enabled: isStudent,
   });
-  const classSchedulesQuery = useMemoFirebase(() => {
-    if (!firestore || !activeMembership?.id) return null;
-    return collection(firestore, 'centers', activeMembership.id, 'studyRoomClassSchedules');
-  }, [activeMembership?.id, firestore]);
-  const { data: classScheduleTemplates } = useCollection<StudyRoomClassScheduleTemplate>(classSchedulesQuery, {
-    enabled: isStudent,
-  });
+  const classScheduleTemplates = useMemo(
+    () => buildSharedStudyRoomClassSchedules(activeMembership?.id),
+    [activeMembership?.id]
+  );
   const effectiveRoutineProfile = studentProfile?.studyRoutineProfile || userProfile?.studyRoutineProfile;
   const routineOnboardingState = studentProfile?.studyRoutineOnboarding || userProfile?.studyRoutineOnboarding;
   const effectivePlannerDiagnostic = studentProfile?.studyPlannerDiagnostic || userProfile?.studyPlannerDiagnostic || null;
@@ -987,7 +988,6 @@ export default function StudyPlanPage() {
   const routineGuideTitle = '저장된 학습 기준';
   const routineGuideSummary =
     '처음 한 번 답한 설문 기준이에요. 이제는 이 기준을 바탕으로 학생이 직접 쓴 오늘 계획을 읽고 부족한 점과 보강 포인트를 보여줍니다.';
-  const studentClassName = studentProfile?.className || activeMembership?.className || null;
   const selectedWeekdayValue = selectedDate ? getDay(selectedDate) : 1;
   const activeScheduleTemplates = useMemo(
     () =>
@@ -1017,17 +1017,14 @@ export default function StudyPlanPage() {
   const hasSelectedWeekdayTemplate = Boolean(matchingWeekdayTemplate);
   const availableClassSchedules = useMemo(
     () =>
-      [...(classScheduleTemplates || [])]
+      [...classScheduleTemplates]
         .filter((schedule) => schedule.active !== false)
-        .filter((schedule) => !studentClassName || schedule.className === studentClassName)
         .sort((left, right) => {
-          const classCompare = String(left.className || '').localeCompare(String(right.className || ''), 'ko');
-          if (classCompare !== 0) return classCompare;
           const leftWeekday = Math.min(...(left.weekdays || [0]));
           const rightWeekday = Math.min(...(right.weekdays || [0]));
           return leftWeekday - rightWeekday;
         }),
-    [classScheduleTemplates, studentClassName]
+    [classScheduleTemplates]
   );
   const matchedClassSchedule = useMemo(
     () =>
@@ -1533,7 +1530,9 @@ export default function StudyPlanPage() {
       areWeekdaySetsEqual(previous, nextWeekdays) ? previous : nextWeekdays
     );
     setWeekdayDraft(nextDraft);
-    setPresetName((previous) => (previous.trim() ? previous : `${preferredClassScheduleForWeek.className} 반 교시제`));
+    setPresetName((previous) =>
+      previous.trim() ? previous : getStudyRoomClassScheduleDisplayName(preferredClassScheduleForWeek)
+    );
     setScheduleNote(preferredClassScheduleForWeek.note?.trim() || '');
   }, [isWeekdayDraftUntouched, matchingRecurringTemplate, preferredClassScheduleForWeek]);
 
@@ -3292,7 +3291,7 @@ export default function StudyPlanPage() {
   const handleApplyClassScheduleToWeekday = useCallback((schedule: StudyRoomClassScheduleTemplate) => {
     setSelectedRecurringWeekdays(normalizeWeekdayValues(schedule.weekdays || []));
     setWeekdayDraft(buildAttendanceDraftFromClassSchedule(schedule));
-    setPresetName(`${schedule.className} 반 교시제`);
+    setPresetName(getStudyRoomClassScheduleDisplayName(schedule));
     setScheduleNote(schedule.note?.trim() || '');
   }, []);
 
@@ -4543,7 +4542,6 @@ export default function StudyPlanPage() {
         hasSelectedWeekdayTemplate={hasSelectedWeekdayTemplate}
         selectedDateWeekdayLabel={matchingWeekdayLabel}
         onApplySelectedWeekdayTemplateToToday={handleApplySelectedWeekdayTemplateToToday}
-        studentClassName={studentClassName}
         matchedClassSchedule={matchedClassSchedule}
         classSchedules={availableClassSchedules}
         onApplyMatchedClassScheduleToToday={handleApplyMatchedClassScheduleToToday}

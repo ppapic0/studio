@@ -60,6 +60,10 @@ import {
   getScheduleChangeReasonLabel,
 } from '@/lib/attendance-request';
 import {
+  buildSharedStudyRoomClassSchedules,
+  getStudyRoomClassScheduleDisplayName,
+} from '@/lib/study-room-class-schedule';
+import {
   canManageSettings,
   canReadFinance,
   isActiveMembershipStatus,
@@ -209,13 +213,11 @@ export default function AttendancePage() {
     );
   }, [firestore, centerId]);
   const { data: requests, isLoading: requestsLoading } = useCollection<AttendanceRequest>(requestsQuery, { enabled: isTeacherOrAdmin });
-  const classSchedulesQuery = useMemoFirebase(() => {
-    if (!firestore || !centerId) return null;
-    return query(collection(firestore, 'centers', centerId, 'studyRoomClassSchedules'), orderBy('className', 'asc'));
-  }, [centerId, firestore]);
-  const { data: classSchedules, isLoading: classSchedulesLoading } = useCollection<StudyRoomClassScheduleTemplate>(classSchedulesQuery, {
-    enabled: isTeacherOrAdmin,
-  });
+  const classSchedules = useMemo(
+    () => buildSharedStudyRoomClassSchedules(centerId),
+    [centerId]
+  );
+  const classSchedulesLoading = false;
 
   useEffect(() => {
     if (!firestore || !centerId || !isTeacherOrAdmin || !dateKey || !weekKey || !students) {
@@ -1145,7 +1147,7 @@ export default function AttendancePage() {
           <Card className="rounded-[2.5rem] border-none shadow-xl bg-white overflow-hidden ring-1 ring-border/50">
             <CardHeader className="bg-muted/5 border-b p-8">
               <CardTitle className="text-xl font-black tracking-tight">교시제 및 출결 변경 신청 관리</CardTitle>
-              <CardDescription className="text-xs font-bold text-muted-foreground">반별 교시제를 등록하고 학생들이 제출한 당일 변경 사유를 함께 검토합니다.</CardDescription>
+              <CardDescription className="text-xs font-bold text-muted-foreground">센터 공통 교시제를 기준으로 학생들의 당일 변경 사유를 함께 검토합니다.</CardDescription>
             </CardHeader>
             <CardContent className="p-0">
               {requestsLoading ? <div className='flex justify-center py-20'><Loader2 className="h-8 w-8 animate-spin text-primary opacity-20"/></div> :
@@ -1154,210 +1156,28 @@ export default function AttendancePage() {
                   <div className="rounded-[1.8rem] border border-[#DCE6F7] bg-white p-5 shadow-sm">
                     <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
                       <div>
-                        <p className="text-[11px] font-black uppercase tracking-[0.18em] text-[#5F739F]">반별 교시제 설정</p>
-                        <h3 className="mt-1 text-lg font-black tracking-tight text-[#17326B]">독서실 교시제를 반마다 다르게 운영</h3>
+                        <p className="text-[11px] font-black uppercase tracking-[0.18em] text-[#5F739F]">센터 공통 교시제</p>
+                        <h3 className="mt-1 text-lg font-black tracking-tight text-[#17326B]">전달해주신 독서실 교시제를 기본값으로 적용</h3>
                         <p className="mt-1 text-[11px] font-semibold leading-5 text-[#5F739F]">
-                          학생 일정 설정 화면에서 바로 불러올 수 있도록 반별 교시제와 등하원 기본 시간을 등록해 주세요.
+                          선생님이 반마다 따로 등록하지 않아도 학생 출석정보 수정 화면에서 이 공통 교시제가 기본값으로 바로 적용됩니다.
                         </p>
                       </div>
-                      <div className="flex gap-2">
-                        <Button
-                          type="button"
-                          variant="outline"
-                          onClick={resetClassScheduleForm}
-                          className="h-10 rounded-xl border-[#DCE6F7] bg-white font-black text-[#17326B]"
-                        >
-                          새로 작성
-                        </Button>
-                        <Button
-                          type="button"
-                          onClick={handleSaveClassSchedule}
-                          disabled={isProcessing}
-                          className="h-10 rounded-xl bg-[linear-gradient(135deg,#FF9A2B_0%,#FF7A16_100%)] font-black text-white"
-                        >
-                          {isProcessing ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Plus className="mr-2 h-4 w-4" />}
-                          {editingClassScheduleId ? '교시제 수정' : '교시제 저장'}
-                        </Button>
-                      </div>
+                      <Badge className="h-10 rounded-full border border-[#DCE6F7] bg-[#F8FBFF] px-4 text-[11px] font-black text-[#17326B] shadow-none">
+                        학생 기본값 적용 중
+                      </Badge>
                     </div>
 
-                    <div className="mt-4 grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
-                      <div className="space-y-4">
-                        <div className="space-y-1.5">
-                          <Label className="text-[10px] font-black uppercase tracking-[0.18em] text-[#5F739F]">반 이름</Label>
-                          <Input
-                            value={classScheduleClassName}
-                            onChange={(event) => setClassScheduleClassName(event.target.value)}
-                            placeholder="예: 고3 심화반"
-                            className="h-11 rounded-xl border-[#DCE6F7] font-black"
-                          />
-                          {classNameOptions.length > 0 ? (
-                            <div className="flex flex-wrap gap-2">
-                              {classNameOptions.map((className) => (
-                                <Button
-                                  key={className}
-                                  type="button"
-                                  variant="outline"
-                                  onClick={() => setClassScheduleClassName(className)}
-                                  className={cn(
-                                    'h-8 rounded-full px-3 text-[10px] font-black',
-                                    classScheduleClassName === className
-                                      ? 'border-[#FFB168] bg-[#FFF0DD] text-[#FF8A1F]'
-                                      : 'border-[#DCE6F7] bg-white text-[#5F739F]'
-                                  )}
-                                >
-                                  {className}
-                                </Button>
-                              ))}
-                            </div>
-                          ) : null}
-                        </div>
-
-                        <div className="grid gap-3 sm:grid-cols-2">
-                          <div className="space-y-1.5">
-                            <Label className="text-[10px] font-black uppercase tracking-[0.18em] text-[#5F739F]">기본 등원</Label>
-                            <Input type="time" value={classScheduleArrivalTime} onChange={(event) => setClassScheduleArrivalTime(event.target.value)} className="h-11 rounded-xl border-[#DCE6F7] font-black" />
-                          </div>
-                          <div className="space-y-1.5">
-                            <Label className="text-[10px] font-black uppercase tracking-[0.18em] text-[#5F739F]">기본 하원</Label>
-                            <Input type="time" value={classScheduleDepartureTime} onChange={(event) => setClassScheduleDepartureTime(event.target.value)} className="h-11 rounded-xl border-[#DCE6F7] font-black" />
-                          </div>
-                        </div>
-
-                        <div className="space-y-1.5">
-                          <Label className="text-[10px] font-black uppercase tracking-[0.18em] text-[#5F739F]">적용 요일</Label>
-                          <div className="flex flex-wrap gap-2">
-                            {WEEKDAY_OPTIONS.map((option) => (
-                              <Button
-                                key={option.value}
-                                type="button"
-                                variant="outline"
-                                onClick={() =>
-                                  setClassScheduleWeekdays((previous) =>
-                                    previous.includes(option.value)
-                                      ? previous.filter((value) => value !== option.value)
-                                      : [...previous, option.value].sort((left, right) => left - right)
-                                  )
-                                }
-                                className={cn(
-                                  'h-8 rounded-full px-3 text-[10px] font-black',
-                                  classScheduleWeekdays.includes(option.value)
-                                    ? 'border-[#FFB168] bg-[#FFF0DD] text-[#FF8A1F]'
-                                    : 'border-[#DCE6F7] bg-white text-[#5F739F]'
-                                )}
-                              >
-                                {option.label}
-                              </Button>
-                            ))}
-                          </div>
-                        </div>
-
-                        <div className="space-y-1.5">
-                          <Label className="text-[10px] font-black uppercase tracking-[0.18em] text-[#5F739F]">운영 메모</Label>
-                          <Input
-                            value={classScheduleNote}
-                            onChange={(event) => setClassScheduleNote(event.target.value)}
-                            placeholder="예: 학원 다녀오는 학생은 학원 시간 먼저 등록"
-                            className="h-11 rounded-xl border-[#DCE6F7] font-black"
-                          />
-                        </div>
-                      </div>
-
-                      <div className="space-y-3">
-                        <div className="flex items-center justify-between gap-2">
-                          <div>
-                            <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#5F739F]">교시 블록</p>
-                            <p className="mt-1 text-[11px] font-semibold leading-5 text-[#5F739F]">쉬는 시간, 의무관리, 질의응답까지 시간표 단위로 적어주세요.</p>
-                          </div>
-                          <Button
-                            type="button"
-                            variant="outline"
-                            onClick={() => setClassScheduleBlocks((previous) => [...previous, createPeriodBlock()])}
-                            className="h-9 rounded-full border-[#DCE6F7] bg-white px-3 text-[10px] font-black text-[#17326B]"
-                          >
-                            <Plus className="mr-1.5 h-3.5 w-3.5" />
-                            블록 추가
-                          </Button>
-                        </div>
-                        <div className="space-y-3">
-                          {classScheduleBlocks.map((block) => (
-                            <div key={block.id} className="rounded-[1rem] border border-[#E4ECF9] bg-[#F9FBFF] p-3">
-                              <div className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_7rem_7rem_auto]">
-                                <Input
-                                  value={block.label}
-                                  onChange={(event) =>
-                                    setClassScheduleBlocks((previous) =>
-                                      previous.map((item) => item.id === block.id ? { ...item, label: event.target.value } : item)
-                                    )
-                                  }
-                                  placeholder="예: 1교시"
-                                  className="h-10 rounded-xl border-[#DCE6F7] bg-white font-black"
-                                />
-                                <Input
-                                  type="time"
-                                  value={block.startTime}
-                                  onChange={(event) =>
-                                    setClassScheduleBlocks((previous) =>
-                                      previous.map((item) => item.id === block.id ? { ...item, startTime: event.target.value } : item)
-                                    )
-                                  }
-                                  className="h-10 rounded-xl border-[#DCE6F7] bg-white font-black"
-                                />
-                                <Input
-                                  type="time"
-                                  value={block.endTime}
-                                  onChange={(event) =>
-                                    setClassScheduleBlocks((previous) =>
-                                      previous.map((item) => item.id === block.id ? { ...item, endTime: event.target.value } : item)
-                                    )
-                                  }
-                                  className="h-10 rounded-xl border-[#DCE6F7] bg-white font-black"
-                                />
-                                <Button
-                                  type="button"
-                                  variant="ghost"
-                                  onClick={() => setClassScheduleBlocks((previous) => previous.filter((item) => item.id !== block.id))}
-                                  className="h-10 rounded-xl text-rose-500 hover:bg-rose-50"
-                                >
-                                  <Trash2 className="h-4 w-4" />
-                                </Button>
-                              </div>
-                              <Input
-                                value={block.description || ''}
-                                onChange={(event) =>
-                                  setClassScheduleBlocks((previous) =>
-                                    previous.map((item) => item.id === block.id ? { ...item, description: event.target.value } : item)
-                                  )
-                                }
-                                placeholder="예: 자율등원 / 상담 / 숙제체크"
-                                className="mt-2 h-10 rounded-xl border-[#DCE6F7] bg-white font-semibold"
-                              />
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="rounded-[1.8rem] border border-[#DCE6F7] bg-white p-5 shadow-sm">
-                    <div className="flex items-center justify-between gap-2">
-                      <div>
-                        <p className="text-[11px] font-black uppercase tracking-[0.18em] text-[#5F739F]">등록된 교시제</p>
-                        <p className="mt-1 text-[11px] font-semibold leading-5 text-[#5F739F]">학생 일정 설정에서 바로 보이는 반별 시간표입니다.</p>
-                      </div>
-                      {classSchedulesLoading ? <Loader2 className="h-4 w-4 animate-spin text-[#8AA0C7]" /> : null}
-                    </div>
                     <div className="mt-4 space-y-3">
                       {visibleClassSchedules.length === 0 ? (
                         <div className="rounded-[1rem] border border-dashed border-[#DCE6F7] bg-[#F8FBFF] px-4 py-6 text-center text-[11px] font-semibold text-[#5F739F]">
-                          등록된 교시제가 아직 없습니다.
+                          공통 교시제 정보를 아직 불러오지 못했어요.
                         </div>
                       ) : visibleClassSchedules.map((schedule) => (
                         <div key={schedule.id} className="rounded-[1.1rem] border border-[#E4ECF9] bg-[#F9FBFF] p-4">
                           <div className="flex flex-wrap items-start justify-between gap-3">
                             <div className="min-w-0">
                               <div className="flex items-center gap-2 flex-wrap">
-                                <p className="text-sm font-black text-[#17326B]">{schedule.className}</p>
+                                <p className="text-sm font-black text-[#17326B]">{getStudyRoomClassScheduleDisplayName(schedule)}</p>
                                 <Badge variant="outline" className="rounded-full border-[#DCE6F7] bg-white text-[10px] font-black text-[#5F739F]">
                                   {formatStudyRoomWeekdays(schedule.weekdays)}
                                 </Badge>
@@ -1367,16 +1187,9 @@ export default function AttendancePage() {
                                 <p className="mt-1 text-[11px] font-semibold leading-5 text-[#5F739F]">{schedule.note.trim()}</p>
                               ) : null}
                             </div>
-                            <div className="flex items-center gap-2">
-                              <Button type="button" variant="outline" onClick={() => handleEditClassSchedule(schedule)} className="h-9 rounded-full border-[#DCE6F7] bg-white px-3 text-[10px] font-black text-[#17326B]">
-                                <Pencil className="mr-1.5 h-3.5 w-3.5" />
-                                수정
-                              </Button>
-                              <Button type="button" variant="outline" onClick={() => handleDeleteClassSchedule(schedule.id)} className="h-9 rounded-full border-rose-200 bg-white px-3 text-[10px] font-black text-rose-600 hover:bg-rose-50">
-                                <Trash2 className="mr-1.5 h-3.5 w-3.5" />
-                                삭제
-                              </Button>
-                            </div>
+                            <Badge className="rounded-full border border-[#DCE6F7] bg-white px-3 py-1 text-[10px] font-black text-[#17326B] shadow-none">
+                              학생 일정 기본값
+                            </Badge>
                           </div>
                           {schedule.blocks?.length ? (
                             <div className="mt-3 grid gap-2 md:grid-cols-2">
