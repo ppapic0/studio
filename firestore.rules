@@ -501,6 +501,11 @@ service cloud.firestore {
         allow delete: if isCenterAdmin(centerId);
       }
 
+      match /studyRoomClassSchedules/{scheduleId} {
+        allow read: if isActiveMember(centerId);
+        allow create, update, delete: if isTeacherOrAdmin(centerId);
+      }
+
       match /penaltyLogs/{logId} {
         allow read: if isTeacherOrAdmin(centerId)
           || (isStudent(centerId) && resource.data.studentId == request.auth.uid)

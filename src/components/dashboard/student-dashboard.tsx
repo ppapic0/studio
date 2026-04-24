@@ -122,6 +122,7 @@ import {
   getDailyRankWindowState,
 } from '@/lib/student-ranking-policy';
 import { submitAttendanceRequestSecure } from '@/lib/penalty-actions';
+import { getAttendanceRequestTypeLabel } from '@/lib/attendance-request';
 import { openStudyRewardBoxSecure } from '@/lib/study-box-actions';
 import { stopStudentStudySessionSecure } from '@/lib/study-session-actions';
 import {
@@ -207,7 +208,7 @@ const REQUEST_TYPE_LABEL: Record<'late' | 'absence', string> = {
 };
 
 const PENALTY_SOURCE_LABEL: Record<PenaltyLog['source'], string> = {
-  attendance_request: '지각/결석 신청',
+  attendance_request: '출결 변경 신청',
   manual: '수동/규정 부여',
   reset: '초기화',
   routine_missing: '루틴 미실행',
@@ -3940,7 +3941,7 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
                   <h4 className="text-[10px] font-black uppercase text-primary/60 tracking-widest ml-1 flex items-center gap-2"><History className="h-3.5 w-3.5" /> 최근 신청 내역</h4>
                   <div className="grid gap-2">
                     {myRequests.length === 0 ? <div className="py-10 text-center rounded-2xl border-2 border-dashed border-muted-foreground/10 italic text-[10px]">내역이 없습니다.</div> : myRequests.map(req => (
-                      <div key={req.id} className="p-4 rounded-2xl bg-white border border-border/50 flex items-center justify-between"><div className="flex items-center gap-3"><div className={cn("h-9 w-9 rounded-xl flex items-center justify-center", req.type === 'late' ? "bg-amber-50" : "bg-rose-50")}>{req.type === 'late' ? <Clock className="h-4 w-4 text-amber-600" /> : <CalendarX className="h-4 w-4 text-rose-600" />}</div><div className="grid leading-tight"><span className="font-black text-xs">{req.date} {req.type === 'late' ? '지각' : '결석'}</span><span className="text-[9px] font-bold text-muted-foreground line-clamp-1 max-w-[150px]">{req.reason}</span></div></div><Badge variant="outline" className={cn("font-black text-[9px] border-none px-2", req.status === 'requested' ? "bg-muted text-muted-foreground" : req.status === 'approved' ? "bg-emerald-500 text-white" : "bg-rose-500 text-white")}>{req.status === 'requested' ? '승인대기' : req.status === 'approved' ? '승인완료' : '반려'}</Badge></div>
+                      <div key={req.id} className="p-4 rounded-2xl bg-white border border-border/50 flex items-center justify-between"><div className="flex items-center gap-3"><div className={cn("h-9 w-9 rounded-xl flex items-center justify-center", req.type === 'late' ? "bg-amber-50" : req.type === 'schedule_change' ? "bg-sky-50" : "bg-rose-50")}>{req.type === 'late' ? <Clock className="h-4 w-4 text-amber-600" /> : req.type === 'schedule_change' ? <CalendarClock className="h-4 w-4 text-sky-600" /> : <CalendarX className="h-4 w-4 text-rose-600" />}</div><div className="grid leading-tight"><span className="font-black text-xs">{req.date} {getAttendanceRequestTypeLabel(req.type)}</span><span className="text-[9px] font-bold text-muted-foreground line-clamp-1 max-w-[150px]">{req.reason}</span></div></div><Badge variant="outline" className={cn("font-black text-[9px] border-none px-2", req.status === 'requested' ? "bg-muted text-muted-foreground" : req.status === 'approved' ? "bg-emerald-500 text-white" : "bg-rose-500 text-white")}>{req.status === 'requested' ? '승인대기' : req.status === 'approved' ? '승인완료' : '반려'}</Badge></div>
                     ))}
                   </div>
                 </div>

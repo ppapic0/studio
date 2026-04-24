@@ -198,7 +198,7 @@ function getPenaltyLogSourceMeta(log: Pick<PenaltyLog, 'source' | 'requestType'>
   }
   if (log.source === 'attendance_request') {
     return {
-      label: log.requestType === 'absence' ? '결석 처리' : '지각 처리',
+      label: log.requestType === 'absence' ? '결석 처리' : log.requestType === 'schedule_change' ? '등하원 변경 처리' : '지각 처리',
       className: 'border-rose-200 bg-rose-50 text-rose-700',
     };
   }
@@ -2824,8 +2824,8 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
       .slice(0, 5)
       .map((request) => ({
         id: request.id,
-        reason: request.reason || (request.type === 'late' ? '지각 신청 처리' : '결석 신청 처리'),
-        points: request.type === 'absence' ? REQUEST_PENALTY_POINTS.absence : REQUEST_PENALTY_POINTS.late,
+        reason: request.reason || (request.type === 'late' ? '지각 신청 처리' : request.type === 'schedule_change' ? '등하원 변경 처리' : '결석 신청 처리'),
+        points: request.type === 'absence' ? REQUEST_PENALTY_POINTS.absence : request.type === 'schedule_change' ? 1 : REQUEST_PENALTY_POINTS.late,
         dateLabel: formatDateLabel(request.date, (request as any).createdAt),
       }));
   }, [attendance요청]);

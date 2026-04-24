@@ -31,11 +31,16 @@ export type RecentStudyOption = {
 export type AttendanceScheduleDraft = {
   inTime: string;
   outTime: string;
+  academyName: string;
+  academyStartTime: string;
+  academyEndTime: string;
   awayStartTime: string;
   awayEndTime: string;
   awayReason: string;
   awaySlots?: AttendanceAwaySlot[];
   isAbsent?: boolean;
+  classScheduleId?: string | null;
+  classScheduleName?: string | null;
 };
 
 export type AttendanceAwaySlot = {
@@ -55,11 +60,16 @@ export type SavedAttendanceRoutine = AttendanceScheduleDraft & {
 export const EMPTY_ATTENDANCE_SCHEDULE_DRAFT: AttendanceScheduleDraft = {
   inTime: '09:00',
   outTime: '22:00',
+  academyName: '',
+  academyStartTime: '',
+  academyEndTime: '',
   awayStartTime: '',
   awayEndTime: '',
   awayReason: '',
   awaySlots: [],
   isAbsent: false,
+  classScheduleId: null,
+  classScheduleName: null,
 };
 
 export const ROUTINE_TEMPLATE_OPTIONS: RoutineTemplateOption[] = [

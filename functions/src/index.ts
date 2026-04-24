@@ -199,9 +199,29 @@ const PARENT_LINK_FAILED_ATTEMPT_LIMIT = 5;
 const PARENT_LINK_FAILED_ATTEMPT_WINDOW_MS = 30 * 60 * 1000;
 const PARENT_LINK_FAILED_ATTEMPT_LOCK_MS = 30 * 60 * 1000;
 const PARENT_LINK_LOOKUP_COLLECTION = "parentLinkCodeLookup";
-const ATTENDANCE_REQUEST_PENALTY_POINTS: Record<"late" | "absence", number> = {
+const ATTENDANCE_REQUEST_PENALTY_POINTS: Record<"late" | "absence" | "schedule_change", number> = {
   late: 1,
   absence: 2,
+  schedule_change: 1,
+};
+const ATTENDANCE_REQUEST_PROOF_LIMIT = 2;
+const ATTENDANCE_REQUEST_PROOF_MAX_ATTACHMENT_BYTES = 700 * 1024;
+const ATTENDANCE_REQUEST_REASON_CATEGORIES = new Set([
+  "disaster",
+  "emergency",
+  "surgery",
+  "hospital",
+  "other",
+]);
+const ATTENDANCE_REQUEST_REASON_LABELS: Record<
+  "disaster" | "emergency" | "surgery" | "hospital" | "other",
+  string
+> = {
+  disaster: "천재지변",
+  emergency: "긴급",
+  surgery: "수술",
+  hospital: "병원",
+  other: "기타",
 };
 const SECURE_PENALTY_SOURCE_POINTS: Record<"manual" | "routine_missing", number> = {
   manual: 1,
@@ -1150,6 +1170,12 @@ function parseHourMinute(value: unknown): { hour: number; minute: number } | nul
   return { hour, minute };
 }
 
+function parseTimeToMinutes(value: unknown): number {
+  const parsed = parseHourMinute(value);
+  if (!parsed) return Number.NaN;
+  return parsed.hour * 60 + parsed.minute;
+}
+
 function normalizeMembershipStatus(value: unknown): string {
   if (typeof value !== "string") return "";
   return value.trim().toLowerCase().replace(/[\s_-]+/g, "");
@@ -1858,6 +1884,79 @@ function normalizeCounselingQuestionAttachments(params: {
       deletedAt: null,
     };
   });
+}
+
+function normalizeAttendanceRequestProofAttachments(params: {
+  attachments: unknown;
+  centerId: string;
+  studentId: string;
+  uploadedAt: admin.firestore.Timestamp;
+}) {
+  const expectedPathPrefix = `centers/${params.centerId}/attendance-request-proofs/${params.studentId}/`;
+  if (!Array.isArray(params.attachments) || params.attachments.length === 0) return [];
+  if (params.attachments.length > ATTENDANCE_REQUEST_PROOF_LIMIT) {
+    throw new functions.https.HttpsError("invalid-argument", "Too many proof attachments.", {
+      userMessage: `병원 증빙 사진은 최대 ${ATTENDANCE_REQUEST_PROOF_LIMIT}장까지 첨부할 수 있습니다.`,
+    });
+  }
+
+  const uniquePaths = new Set<string>();
+  return params.attachments.map((rawAttachment, index) => {
+    const attachment = (rawAttachment || {}) as Record<string, unknown>;
+    const id = asTrimmedString(attachment.id, `proof-${index + 1}`);
+    const name = asTrimmedString(attachment.name, `proof-${index + 1}.jpg`);
+    const path = asTrimmedString(attachment.path);
+    const downloadToken = asTrimmedString(attachment.downloadToken);
+    const contentType = asTrimmedString(attachment.contentType, "image/jpeg");
+    const sizeBytes = Math.round(parseFiniteNumber(attachment.sizeBytes) ?? Number.NaN);
+    const width = Math.round(parseFiniteNumber(attachment.width) ?? Number.NaN);
+    const height = Math.round(parseFiniteNumber(attachment.height) ?? Number.NaN);
+
+    if (!path || !path.startsWith(expectedPathPrefix)) {
+      throw new functions.https.HttpsError("invalid-argument", "Proof attachment path is invalid.", {
+        userMessage: "병원 증빙 사진 경로가 올바르지 않습니다. 다시 업로드해 주세요.",
+      });
+    }
+    if (!downloadToken || downloadToken.length < 8) {
+      throw new functions.https.HttpsError("invalid-argument", "Proof attachment token is invalid.", {
+        userMessage: "병원 증빙 사진 정보를 다시 확인해 주세요.",
+      });
+    }
+    if (!Number.isFinite(sizeBytes) || sizeBytes <= 0 || sizeBytes > ATTENDANCE_REQUEST_PROOF_MAX_ATTACHMENT_BYTES) {
+      throw new functions.https.HttpsError("invalid-argument", "Proof attachment size is invalid.", {
+        userMessage: "병원 증빙 사진 용량이 너무 크거나 올바르지 않습니다. 다시 업로드해 주세요.",
+      });
+    }
+    if (uniquePaths.has(path)) {
+      throw new functions.https.HttpsError("invalid-argument", "Duplicate proof attachment path.", {
+        userMessage: "같은 병원 증빙 사진이 중복 첨부되었습니다. 다시 확인해 주세요.",
+      });
+    }
+    uniquePaths.add(path);
+
+    return {
+      id,
+      name,
+      path,
+      downloadUrl: buildFirebaseStorageDownloadUrl(path, downloadToken),
+      contentType,
+      sizeBytes,
+      width: Number.isFinite(width) && width > 0 ? width : null,
+      height: Number.isFinite(height) && height > 0 ? height : null,
+      uploadedAt: params.uploadedAt,
+      deletedAt: null,
+    };
+  });
+}
+
+function shouldWaiveSameDayScheduleChangePenalty(
+  category: "disaster" | "emergency" | "surgery" | "hospital" | "other" | ""
+  ,
+  proofCount: number
+) {
+  if (category === "disaster" || category === "emergency" || category === "surgery") return true;
+  if (category === "hospital") return proofCount > 0;
+  return false;
 }
 
 function isTeacherOrAdminMembership(role: unknown): boolean {
@@ -7665,26 +7764,97 @@ export const submitAttendanceRequestSecure = functions.region(region).https.onCa
   const authUid = context.auth.uid;
 
   const centerId = asTrimmedString(data?.centerId);
-  const requestType = asTrimmedString(data?.requestType) as "late" | "absence";
+  const requestType = asTrimmedString(data?.requestType) as "late" | "absence" | "schedule_change";
   const requestDate = asTrimmedString(data?.requestDate);
   const reason = asTrimmedString(data?.reason);
+  const reasonCategory = asTrimmedString(data?.reasonCategory) as
+    | "disaster"
+    | "emergency"
+    | "surgery"
+    | "hospital"
+    | "other"
+    | "";
+  const requestedArrivalTime = asTrimmedString(data?.requestedArrivalTime);
+  const requestedDepartureTime = asTrimmedString(data?.requestedDepartureTime);
+  const requestedAcademyName = asTrimmedString(data?.requestedAcademyName);
+  const requestedAcademyStartTime = asTrimmedString(data?.requestedAcademyStartTime);
+  const requestedAcademyEndTime = asTrimmedString(data?.requestedAcademyEndTime);
+  const scheduleChangeAction = asTrimmedString(data?.scheduleChangeAction) as "save" | "absent" | "reset" | "";
+  const classScheduleId = asTrimmedString(data?.classScheduleId);
+  const classScheduleName = asTrimmedString(data?.classScheduleName);
 
   if (!centerId) {
     throw new functions.https.HttpsError("invalid-argument", "centerId is required.", {
       userMessage: "센터 정보가 누락되었습니다.",
     });
   }
-  if (requestType !== "late" && requestType !== "absence") {
+  if (requestType !== "late" && requestType !== "absence" && requestType !== "schedule_change") {
     throw new functions.https.HttpsError("invalid-argument", "requestType is invalid.", {
       userMessage: "출결 신청 유형이 올바르지 않습니다.",
     });
   }
-  if (!requestDate) {
+  if (!isValidDateKey(requestDate)) {
     throw new functions.https.HttpsError("invalid-argument", "requestDate is required.", {
       userMessage: "요청 날짜를 선택해 주세요.",
     });
   }
-  if (reason.length < 10) {
+  if (requestType === "schedule_change") {
+    if (!ATTENDANCE_REQUEST_REASON_CATEGORIES.has(reasonCategory)) {
+      throw new functions.https.HttpsError("invalid-argument", "reasonCategory is invalid.", {
+        userMessage: "당일 변경 사유 유형을 다시 선택해 주세요.",
+      });
+    }
+    if (scheduleChangeAction !== "save" && scheduleChangeAction !== "absent" && scheduleChangeAction !== "reset") {
+      throw new functions.https.HttpsError("invalid-argument", "scheduleChangeAction is invalid.", {
+        userMessage: "변경 유형을 다시 확인해 주세요.",
+      });
+    }
+    if (reason.length < 5) {
+      throw new functions.https.HttpsError("invalid-argument", "Reason is too short.", {
+        userMessage: "변경 사유는 5자 이상 입력해 주세요.",
+      });
+    }
+
+    const todayDateKey = toDateKey(toKstDate(new Date()));
+    if (requestDate !== todayDateKey) {
+      throw new functions.https.HttpsError("failed-precondition", "Schedule change requests are same-day only.", {
+        userMessage: "당일 등하원 변경만 이 신청서로 접수할 수 있습니다.",
+      });
+    }
+    if (scheduleChangeAction === "save") {
+      if (!requestedArrivalTime || !requestedDepartureTime) {
+        throw new functions.https.HttpsError("invalid-argument", "Requested arrival/departure time is required.", {
+          userMessage: "등원 예정 시간과 하원 예정 시간을 모두 입력해 주세요.",
+        });
+      }
+      const arrivalMinutes = parseTimeToMinutes(requestedArrivalTime);
+      const departureMinutes = parseTimeToMinutes(requestedDepartureTime);
+      if (!Number.isFinite(arrivalMinutes) || !Number.isFinite(departureMinutes) || arrivalMinutes >= departureMinutes) {
+        throw new functions.https.HttpsError("invalid-argument", "Requested arrival/departure time is invalid.", {
+          userMessage: "등원 예정 시간은 하원 예정 시간보다 빨라야 합니다.",
+        });
+      }
+      if (requestedAcademyStartTime || requestedAcademyEndTime) {
+        if (!requestedAcademyStartTime || !requestedAcademyEndTime) {
+          throw new functions.https.HttpsError("invalid-argument", "Academy time is incomplete.", {
+            userMessage: "학원 시작 시간과 종료 시간을 모두 입력해 주세요.",
+          });
+        }
+        const academyStartMinutes = parseTimeToMinutes(requestedAcademyStartTime);
+        const academyEndMinutes = parseTimeToMinutes(requestedAcademyEndTime);
+        if (!Number.isFinite(academyStartMinutes) || !Number.isFinite(academyEndMinutes) || academyStartMinutes >= academyEndMinutes) {
+          throw new functions.https.HttpsError("invalid-argument", "Academy time is invalid.", {
+            userMessage: "학원 시작 시간은 종료 시간보다 빨라야 합니다.",
+          });
+        }
+        if (academyStartMinutes < arrivalMinutes || academyEndMinutes > departureMinutes) {
+          throw new functions.https.HttpsError("invalid-argument", "Academy time is outside attendance range.", {
+            userMessage: "학원 시간은 등원부터 하원 사이에서만 등록할 수 있습니다.",
+          });
+        }
+      }
+    }
+  } else if (reason.length < 10) {
     throw new functions.https.HttpsError("invalid-argument", "Reason is too short.", {
       userMessage: "사유는 10자 이상 입력해 주세요.",
     });
@@ -7711,12 +7881,47 @@ export const submitAttendanceRequestSecure = functions.region(region).https.onCa
     studentMemberData?.displayName || studentMemberData?.name || studentProfileData?.displayName || studentProfileData?.name || context.auth.token.name,
     "학생"
   );
+  const uploadedAt = admin.firestore.Timestamp.now();
+  const proofAttachments = requestType === "schedule_change"
+    ? normalizeAttendanceRequestProofAttachments({
+        attachments: data?.proofAttachments,
+        centerId,
+        studentId,
+        uploadedAt,
+      })
+    : [];
   const penaltyPointsDelta = ATTENDANCE_REQUEST_PENALTY_POINTS[requestType];
+  const penaltyShouldBeWaived = requestType === "schedule_change"
+    ? shouldWaiveSameDayScheduleChangePenalty(reasonCategory, proofAttachments.length)
+    : false;
+  const penaltyKey = requestType === "schedule_change" ? `same_day_routine:${requestDate}` : "";
+  const penaltyDateKey = requestType === "schedule_change" ? requestDate : "";
   const requestRef = db.collection(`centers/${centerId}/attendanceRequests`).doc();
-  const penaltyLogRef = db.doc(`centers/${centerId}/penaltyLogs/attendance_request_${requestRef.id}`);
+  const penaltyLogRef = requestType === "schedule_change"
+    ? db.doc(`centers/${centerId}/penaltyLogs/${buildPenaltyEventLogId(studentId, "attendance_request", `schedule_change:${requestDate}`)}`)
+    : db.doc(`centers/${centerId}/penaltyLogs/attendance_request_${requestRef.id}`);
   const progressRef = db.doc(`centers/${centerId}/growthProgress/${studentId}`);
+  const existingSameDayPenaltyLog = requestType === "schedule_change" && !penaltyShouldBeWaived
+    ? await findExistingPenaltyEventLog({
+        db,
+        centerId,
+        studentId,
+        source: "manual",
+        penaltyKey,
+        penaltyDateKey,
+      })
+    : null;
+
+  let penaltyApplied = false;
+  let duplicatePenalty = false;
 
   await db.runTransaction(async (transaction) => {
+    const existingPenaltySnap = requestType === "schedule_change" && !penaltyShouldBeWaived
+      ? await transaction.get(penaltyLogRef)
+      : null;
+    penaltyApplied = requestType !== "schedule_change" || (!penaltyShouldBeWaived && !existingSameDayPenaltyLog && !existingPenaltySnap?.exists);
+    duplicatePenalty = requestType === "schedule_change" && !penaltyShouldBeWaived && (Boolean(existingSameDayPenaltyLog) || Boolean(existingPenaltySnap?.exists));
+
     transaction.set(requestRef, {
       studentId,
       studentName,
@@ -7724,46 +7929,77 @@ export const submitAttendanceRequestSecure = functions.region(region).https.onCa
       type: requestType,
       date: requestDate,
       reason,
+      reasonCategory: reasonCategory || null,
       status: "requested",
-      penaltyApplied: true,
-      penaltyPointsDelta,
+      penaltyApplied: requestType === "schedule_change" ? !penaltyShouldBeWaived : true,
+      penaltyPointsDelta: penaltyApplied ? penaltyPointsDelta : 0,
+      penaltyWaived: requestType === "schedule_change" ? penaltyShouldBeWaived : false,
+      proofRequired: requestType === "schedule_change" ? reasonCategory === "hospital" && proofAttachments.length === 0 : false,
+      proofAttachments,
+      requestedArrivalTime: requestedArrivalTime || null,
+      requestedDepartureTime: requestedDepartureTime || null,
+      requestedAcademyName: requestedAcademyName || null,
+      requestedAcademyStartTime: requestedAcademyStartTime || null,
+      requestedAcademyEndTime: requestedAcademyEndTime || null,
+      scheduleChangeAction: scheduleChangeAction || null,
+      classScheduleId: classScheduleId || null,
+      classScheduleName: classScheduleName || null,
       createdAt: admin.firestore.FieldValue.serverTimestamp(),
       updatedAt: admin.firestore.FieldValue.serverTimestamp(),
     });
 
-    transaction.set(
-      progressRef,
-      {
-        penaltyPoints: admin.firestore.FieldValue.increment(penaltyPointsDelta),
-        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-      },
-      { merge: true }
-    );
+    if (penaltyApplied) {
+      transaction.set(
+        progressRef,
+        {
+          penaltyPoints: admin.firestore.FieldValue.increment(penaltyPointsDelta),
+          updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        },
+        { merge: true }
+      );
+    }
 
-    transaction.set(
-      penaltyLogRef,
-      {
-        centerId,
-        studentId,
-        studentName,
-        pointsDelta: penaltyPointsDelta,
-        reason: `${requestType === "absence" ? "결석" : "지각"} 신청 - ${reason}`,
-        source: "attendance_request",
-        requestId: requestRef.id,
-        requestType,
-        createdByUserId: authUid,
-        createdByName: studentName,
-        createdAt: admin.firestore.FieldValue.serverTimestamp(),
-      },
-      { merge: true }
-    );
+    if (penaltyApplied) {
+      const requestTypeLabel = requestType === "absence"
+        ? "결석"
+        : requestType === "late"
+          ? "지각"
+          : "당일 등하원 변경";
+      const reasonLabel = requestType === "schedule_change"
+        ? ATTENDANCE_REQUEST_REASON_LABELS[reasonCategory as "disaster" | "emergency" | "surgery" | "hospital" | "other"]
+        : requestTypeLabel;
+      transaction.set(
+        penaltyLogRef,
+        {
+          centerId,
+          studentId,
+          studentName,
+          pointsDelta: penaltyPointsDelta,
+          reason: requestType === "schedule_change"
+            ? `${requestTypeLabel} - ${reasonLabel} - ${reason}`
+            : `${requestTypeLabel} 신청 - ${reason}`,
+          source: "attendance_request",
+          requestId: requestRef.id,
+          requestType,
+          penaltyKey: penaltyKey || null,
+          penaltyDateKey: penaltyDateKey || null,
+          createdByUserId: authUid,
+          createdByName: studentName,
+          createdAt: admin.firestore.FieldValue.serverTimestamp(),
+        },
+        { merge: true }
+      );
+    }
   });
 
   return {
     ok: true,
     requestId: requestRef.id,
-    penaltyLogId: penaltyLogRef.id,
-    penaltyPointsDelta,
+    penaltyLogId: existingSameDayPenaltyLog?.id || (penaltyApplied ? penaltyLogRef.id : undefined),
+    penaltyPointsDelta: penaltyApplied ? penaltyPointsDelta : 0,
+    penaltyApplied,
+    penaltyWaived: requestType === "schedule_change" ? penaltyShouldBeWaived : false,
+    duplicatePenalty,
   };
 });
 

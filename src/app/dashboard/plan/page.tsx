@@ -1,7 +1,7 @@
 
 'use client';
 
-import { useState, useMemo, useEffect, useCallback, useRef } from 'react';
+import { useState, useMemo, useEffect, useCallback, useRef, type ChangeEvent } from 'react';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import { 
@@ -40,7 +40,7 @@ import {
   BrainCircuit,
   ArrowRight,
 } from 'lucide-react';
-import { useCollection, useFirestore, useUser, useDoc } from '@/firebase';
+import { useCollection, useFirestore, useUser, useDoc, useStorage } from '@/firebase';
 import { useAppContext } from '@/contexts/app-context';
 import { useMemoFirebase } from '@/hooks/use-memo-firebase';
 import { 
@@ -59,6 +59,7 @@ import {
   limit,
   arrayUnion,
 } from 'firebase/firestore';
+import { deleteObject, ref as storageRef, uploadBytes } from 'firebase/storage';
 import { 
   format, 
   addDays, 
@@ -80,6 +81,8 @@ import {
   type StudentProfile,
   type StudentScheduleDoc,
   type StudentScheduleTemplate,
+  type StudyRoomClassScheduleTemplate,
+  type AttendanceRequestReasonCategory,
   type User as UserType,
   type UserStudyProfile,
   type WithId,
@@ -87,7 +90,11 @@ import {
 import { useToast } from '@/hooks/use-toast';
 import { getSafeErrorMessage } from '@/lib/exposed-error';
 import { logHandledClientIssue } from '@/lib/handled-client-log';
-import { applyPenaltyEventSecure } from '@/lib/penalty-actions';
+import {
+  applyPenaltyEventSecure,
+  submitAttendanceRequestSecure,
+  type AttendanceRequestProofUploadPayload,
+} from '@/lib/penalty-actions';
 import {
   claimPlannerCompletionRewardSecure,
   PLANNER_COMPLETION_DAILY_REWARD_LIMIT,
@@ -121,6 +128,7 @@ import { RecentStudySheet } from '@/components/dashboard/student-planner/recent-
 import { StudyPlanSheet } from '@/components/dashboard/student-planner/study-plan-sheet';
 import { RoutineOnboardingFlow } from '@/components/dashboard/student-planner/routine-onboarding-flow';
 import { AttendanceScheduleSheet } from '@/components/dashboard/student-planner/attendance-schedule-sheet';
+import { SameDayScheduleChangeDialog } from '@/components/dashboard/student-planner/same-day-schedule-change-dialog';
 import {
   BUILTIN_PLANNER_TEMPLATES,
   PLAN_DEFAULT_START_TIME,
@@ -145,6 +153,11 @@ import {
 } from '@/features/schedules/lib/scheduleModel';
 import { buildMainPlanRecommendations, type MainPlanRecommendation } from '@/features/planner/lib/buildMainPlanRecommendations';
 import { resolveStudentTargetDailyMinutesOrFallback } from '@/lib/student-target-minutes';
+import {
+  ATTENDANCE_REQUEST_PROOF_LIMIT,
+  getAttendanceRequestTypeLabel,
+} from '@/lib/attendance-request';
+import { compressAttendanceRequestProofImage } from '@/lib/attendance-proof-upload';
 
 const SAME_DAY_ROUTINE_PENALTY_POINTS = 1;
 
@@ -194,6 +207,14 @@ type PersistStudentScheduleResult = {
   legacySyncWarning: boolean;
 };
 
+type SameDayScheduleChangeAction = 'save' | 'absent' | 'reset';
+
+type AttendanceProofDraft = {
+  id: string;
+  file: File;
+  previewUrl: string;
+};
+
 function createAwaySlot(overrides?: Partial<AttendanceAwaySlot>): AttendanceAwaySlot {
   return {
     id: `away-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
@@ -212,6 +233,14 @@ function parseAwayScheduleTitle(title: string): AttendanceAwaySlot | null {
     startTime: matched[2] || '',
     endTime: matched[3] || '',
   });
+}
+
+function createAttendanceProofDraft(file: File): AttendanceProofDraft {
+  return {
+    id: `proof-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+    file,
+    previewUrl: URL.createObjectURL(file),
+  };
 }
 
 const SUBJECTS = [
@@ -555,13 +584,19 @@ export default function StudyPlanPage() {
     [newStudyCustomSubject]
   );
 
+  const storage = useStorage();
   const [inTime, setInTime] = useState('09:00');
   const [outTime, setOutTime] = useState('22:00');
+  const [academyName, setAcademyName] = useState('');
+  const [academyStartTime, setAcademyStartTime] = useState('');
+  const [academyEndTime, setAcademyEndTime] = useState('');
   const [awayStartTime, setAwayStartTime] = useState('');
   const [awayEndTime, setAwayEndTime] = useState('');
   const [awayReason, setAwayReason] = useState('');
   const [extraAwayPlans, setExtraAwayPlans] = useState<AttendanceAwaySlot[]>([]);
   const [isScheduleAbsent, setIsScheduleAbsent] = useState(false);
+  const [appliedClassScheduleId, setAppliedClassScheduleId] = useState<string | null>(null);
+  const [appliedClassScheduleName, setAppliedClassScheduleName] = useState<string | null>(null);
   const [scheduleNote, setScheduleNote] = useState('');
   const [scheduleSaveFeedback, setScheduleSaveFeedback] = useState<ScheduleSaveFeedback | null>(null);
   const [isAttendanceScheduleSheetOpen, setIsAttendanceScheduleSheetOpen] = useState(false);
@@ -592,12 +627,25 @@ export default function StudyPlanPage() {
   const [isGoalTargetSaving, setIsGoalTargetSaving] = useState(false);
   const [goalTargetSaveError, setGoalTargetSaveError] = useState<InlineMessage | null>(null);
   const [attendanceSaveError, setAttendanceSaveError] = useState<InlineMessage | null>(null);
+  const [isSameDayChangeDialogOpen, setIsSameDayChangeDialogOpen] = useState(false);
+  const [pendingSameDayChangeAction, setPendingSameDayChangeAction] = useState<SameDayScheduleChangeAction>('save');
+  const [sameDayReasonCategory, setSameDayReasonCategory] = useState<AttendanceRequestReasonCategory>('other');
+  const [sameDayReason, setSameDayReason] = useState('');
+  const [sameDayProofDrafts, setSameDayProofDrafts] = useState<AttendanceProofDraft[]>([]);
 
   useEffect(() => {
     if (!scheduleSaveFeedback) return;
     const timeout = window.setTimeout(() => setScheduleSaveFeedback(null), 4500);
     return () => window.clearTimeout(timeout);
   }, [scheduleSaveFeedback]);
+
+  useEffect(() => {
+    return () => {
+      sameDayProofDrafts.forEach((proof) => {
+        URL.revokeObjectURL(proof.previewUrl);
+      });
+    };
+  }, [sameDayProofDrafts]);
 
   const userProfileRef = useMemoFirebase(() => {
     if (!firestore || !user) return null;
@@ -894,6 +942,13 @@ export default function StudyPlanPage() {
   const { data: scheduleTemplates } = useCollection<StudentScheduleTemplate>(scheduleTemplatesQuery, {
     enabled: isStudent,
   });
+  const classSchedulesQuery = useMemoFirebase(() => {
+    if (!firestore || !activeMembership?.id) return null;
+    return collection(firestore, 'centers', activeMembership.id, 'studyRoomClassSchedules');
+  }, [activeMembership?.id, firestore]);
+  const { data: classScheduleTemplates } = useCollection<StudyRoomClassScheduleTemplate>(classSchedulesQuery, {
+    enabled: isStudent,
+  });
   const effectiveRoutineProfile = studentProfile?.studyRoutineProfile || userProfile?.studyRoutineProfile;
   const routineOnboardingState = studentProfile?.studyRoutineOnboarding || userProfile?.studyRoutineOnboarding;
   const effectivePlannerDiagnostic = studentProfile?.studyPlannerDiagnostic || userProfile?.studyPlannerDiagnostic || null;
@@ -910,6 +965,7 @@ export default function StudyPlanPage() {
   const routineGuideTitle = '저장된 학습 기준';
   const routineGuideSummary =
     '처음 한 번 답한 설문 기준이에요. 이제는 이 기준을 바탕으로 학생이 직접 쓴 오늘 계획을 읽고 부족한 점과 보강 포인트를 보여줍니다.';
+  const studentClassName = studentProfile?.className || activeMembership?.className || null;
   const selectedWeekdayValue = selectedDate ? getDay(selectedDate) : 1;
   const activeScheduleTemplates = useMemo(
     () =>
@@ -937,6 +993,27 @@ export default function StudyPlanPage() {
     );
   }, [activeScheduleTemplates, selectedRecurringWeekdays]);
   const hasSelectedWeekdayTemplate = Boolean(matchingWeekdayTemplate);
+  const availableClassSchedules = useMemo(
+    () =>
+      [...(classScheduleTemplates || [])]
+        .filter((schedule) => schedule.active !== false)
+        .filter((schedule) => !studentClassName || schedule.className === studentClassName)
+        .sort((left, right) => {
+          const classCompare = String(left.className || '').localeCompare(String(right.className || ''), 'ko');
+          if (classCompare !== 0) return classCompare;
+          const leftWeekday = Math.min(...(left.weekdays || [0]));
+          const rightWeekday = Math.min(...(right.weekdays || [0]));
+          return leftWeekday - rightWeekday;
+        }),
+    [classScheduleTemplates, studentClassName]
+  );
+  const matchedClassSchedule = useMemo(
+    () =>
+      availableClassSchedules.find((schedule) =>
+        Array.isArray(schedule.weekdays) && schedule.weekdays.includes(selectedWeekdayValue)
+      ) || null,
+    [availableClassSchedules, selectedWeekdayValue]
+  );
   const selectedRecurringWeekdayLabel = useMemo(() => {
     const labels = WEEKDAY_OPTIONS.filter((option) => selectedRecurringWeekdays.includes(option.value)).map((option) => option.label);
     if (labels.length === 0) return '요일 미선택';
@@ -953,11 +1030,16 @@ export default function StudyPlanPage() {
         name: template.name,
         inTime: template.arrivalPlannedAt,
         outTime: template.departurePlannedAt,
+        academyName: template.academyNameDefault || '',
+        academyStartTime: template.academyStartAtDefault || '',
+        academyEndTime: template.academyEndAtDefault || '',
         awayStartTime: template.defaultExcursionStartAt || '',
         awayEndTime: template.defaultExcursionEndAt || '',
         awayReason: template.defaultExcursionReason || '',
         awaySlots: [],
         isAbsent: false,
+        classScheduleId: template.classScheduleId || null,
+        classScheduleName: template.classScheduleName || null,
         active: template.active !== false,
         weekdays: template.weekdays,
       })),
@@ -1288,39 +1370,62 @@ export default function StudyPlanPage() {
             inTime: matchingWeekdayTemplate.arrivalPlannedAt,
             outTime: matchingWeekdayTemplate.departurePlannedAt,
             isAbsent: false,
+            classScheduleId: matchingWeekdayTemplate.classScheduleId || null,
+            classScheduleName: matchingWeekdayTemplate.classScheduleName || null,
             outings:
-              matchingWeekdayTemplate.hasExcursionDefault &&
-              matchingWeekdayTemplate.defaultExcursionStartAt &&
-              matchingWeekdayTemplate.defaultExcursionEndAt
-                ? [
-                    {
+              [
+                matchingWeekdayTemplate.academyStartAtDefault &&
+                matchingWeekdayTemplate.academyEndAtDefault
+                  ? {
+                      id: 'weekday-template-academy',
+                      kind: 'academy' as const,
+                      title: matchingWeekdayTemplate.academyNameDefault || '학원',
+                      startTime: matchingWeekdayTemplate.academyStartAtDefault,
+                      endTime: matchingWeekdayTemplate.academyEndAtDefault,
+                      reason: matchingWeekdayTemplate.academyNameDefault || '학원',
+                    }
+                  : null,
+                matchingWeekdayTemplate.hasExcursionDefault &&
+                matchingWeekdayTemplate.defaultExcursionStartAt &&
+                matchingWeekdayTemplate.defaultExcursionEndAt
+                  ? {
                       id: 'weekday-template',
                       startTime: matchingWeekdayTemplate.defaultExcursionStartAt,
                       endTime: matchingWeekdayTemplate.defaultExcursionEndAt,
                       reason: matchingWeekdayTemplate.defaultExcursionReason || '',
-                    },
-                  ]
-                : [],
+                    }
+                  : null,
+              ].filter(Boolean) as any[],
           })
         : null;
 
     const draft = scheduleSource || {
       inTime: fallbackArrival?.title.split(': ')[1] || '09:00',
       outTime: fallbackDismissal?.title.split(': ')[1] || '22:00',
+      academyName: '',
+      academyStartTime: '',
+      academyEndTime: '',
       awayStartTime: fallbackAwayItems[0]?.startTime || '',
       awayEndTime: fallbackAwayItems[0]?.endTime || '',
       awayReason: fallbackAwayItems[0]?.reason || '',
       awaySlots: fallbackAwayItems.slice(1),
       isAbsent: scheduleItems.some((item) => item.title.includes('등원하지 않습니다')),
+      classScheduleId: null,
+      classScheduleName: null,
     };
 
     setInTime(draft.inTime || '09:00');
     setOutTime(draft.outTime || '22:00');
+    setAcademyName(draft.academyName || '');
+    setAcademyStartTime(draft.academyStartTime || '');
+    setAcademyEndTime(draft.academyEndTime || '');
     setAwayStartTime(draft.awayStartTime || '');
     setAwayEndTime(draft.awayEndTime || '');
     setAwayReason(draft.awayReason || '');
     setExtraAwayPlans(draft.awaySlots || []);
     setIsScheduleAbsent(Boolean(draft.isAbsent));
+    setAppliedClassScheduleId(draft.classScheduleId || null);
+    setAppliedClassScheduleName(draft.classScheduleName || null);
     setScheduleNote((selectedScheduleDoc as any)?.note || '');
   }, [matchingWeekdayTemplate, scheduleItems, selectedScheduleDoc]);
 
@@ -1331,19 +1436,32 @@ export default function StudyPlanPage() {
           inTime: matchingRecurringTemplate.arrivalPlannedAt,
           outTime: matchingRecurringTemplate.departurePlannedAt,
           isAbsent: false,
+          classScheduleId: matchingRecurringTemplate.classScheduleId || null,
+          classScheduleName: matchingRecurringTemplate.classScheduleName || null,
           outings:
-            matchingRecurringTemplate.hasExcursionDefault &&
-            matchingRecurringTemplate.defaultExcursionStartAt &&
-            matchingRecurringTemplate.defaultExcursionEndAt
-              ? [
-                  {
+            [
+              matchingRecurringTemplate.academyStartAtDefault &&
+              matchingRecurringTemplate.academyEndAtDefault
+                ? {
+                    id: `${matchingRecurringTemplate.id || 'weekday-template'}-academy`,
+                    kind: 'academy' as const,
+                    title: matchingRecurringTemplate.academyNameDefault || '학원',
+                    startTime: matchingRecurringTemplate.academyStartAtDefault,
+                    endTime: matchingRecurringTemplate.academyEndAtDefault,
+                    reason: matchingRecurringTemplate.academyNameDefault || '학원',
+                  }
+                : null,
+              matchingRecurringTemplate.hasExcursionDefault &&
+              matchingRecurringTemplate.defaultExcursionStartAt &&
+              matchingRecurringTemplate.defaultExcursionEndAt
+                ? {
                     id: matchingRecurringTemplate.id || 'weekday-template',
                     startTime: matchingRecurringTemplate.defaultExcursionStartAt,
                     endTime: matchingRecurringTemplate.defaultExcursionEndAt,
                     reason: matchingRecurringTemplate.defaultExcursionReason || '',
-                  },
-                ]
-              : [],
+                  }
+                : null,
+            ].filter(Boolean) as any[],
         })
       );
     }
@@ -2123,6 +2241,115 @@ export default function StudyPlanPage() {
     return Boolean(result.applied);
   };
 
+  const resetSameDayChangeDrafts = useCallback(() => {
+    setSameDayProofDrafts((previous) => {
+      previous.forEach((proof) => {
+        URL.revokeObjectURL(proof.previewUrl);
+      });
+      return [];
+    });
+  }, []);
+
+  const resetSameDayChangeRequestState = useCallback(() => {
+    setSameDayReasonCategory('other');
+    setSameDayReason('');
+    resetSameDayChangeDrafts();
+  }, [resetSameDayChangeDrafts]);
+
+  const openSameDayChangeDialog = useCallback((action: SameDayScheduleChangeAction) => {
+    resetSameDayChangeRequestState();
+    setPendingSameDayChangeAction(action);
+    setIsSameDayChangeDialogOpen(true);
+  }, [resetSameDayChangeRequestState]);
+
+  const handleSameDayProofInputChange = useCallback((event: ChangeEvent<HTMLInputElement>) => {
+    const nextFiles = Array.from(event.target.files || []).filter((file) => file.type.startsWith('image/'));
+    event.target.value = '';
+    if (!nextFiles.length) return;
+
+    setSameDayProofDrafts((previous) => {
+      if (previous.length >= ATTENDANCE_REQUEST_PROOF_LIMIT) {
+        toast({
+          variant: 'destructive',
+          title: '증빙 사진 개수 초과',
+          description: `증빙 사진은 최대 ${ATTENDANCE_REQUEST_PROOF_LIMIT}장까지 첨부할 수 있어요.`,
+        });
+        return previous;
+      }
+
+      const availableCount = ATTENDANCE_REQUEST_PROOF_LIMIT - previous.length;
+      const acceptedFiles = nextFiles.slice(0, availableCount);
+      if (acceptedFiles.length < nextFiles.length) {
+        toast({
+          variant: 'destructive',
+          title: '일부 사진만 추가했어요',
+          description: `증빙 사진은 최대 ${ATTENDANCE_REQUEST_PROOF_LIMIT}장까지 첨부할 수 있어요.`,
+        });
+      }
+      return [...previous, ...acceptedFiles.map((file) => createAttendanceProofDraft(file))];
+    });
+  }, [toast]);
+
+  const handleRemoveSameDayProof = useCallback((proofId: string) => {
+    setSameDayProofDrafts((previous) => {
+      const target = previous.find((proof) => proof.id === proofId);
+      if (target) {
+        URL.revokeObjectURL(target.previewUrl);
+      }
+      return previous.filter((proof) => proof.id !== proofId);
+    });
+  }, []);
+
+  const uploadSameDayProofAttachments = useCallback(async () => {
+    if (!activeMembership?.id || !studentUid || !sameDayProofDrafts.length) {
+      return [] as AttendanceRequestProofUploadPayload[];
+    }
+
+    const bucketName = storage.app.options.storageBucket || '';
+    if (!bucketName) {
+      throw new Error('스토리지 버킷 설정을 찾지 못했습니다.');
+    }
+
+    const uploadBatchId = crypto.randomUUID();
+    const uploadedRefs: string[] = [];
+
+    try {
+      const uploadedAttachments: AttendanceRequestProofUploadPayload[] = [];
+      for (const draft of sameDayProofDrafts) {
+        const processed = await compressAttendanceRequestProofImage(draft.file);
+        const downloadToken = crypto.randomUUID();
+        const filePath = `centers/${activeMembership.id}/attendance-request-proofs/${studentUid}/${uploadBatchId}/${draft.id}.jpg`;
+        const attachmentRef = storageRef(storage, filePath);
+
+        await uploadBytes(attachmentRef, processed.blob, {
+          contentType: processed.contentType,
+          customMetadata: {
+            firebaseStorageDownloadTokens: downloadToken,
+          },
+        });
+
+        uploadedRefs.push(filePath);
+        uploadedAttachments.push({
+          id: draft.id,
+          name: draft.file.name || `${draft.id}.jpg`,
+          path: filePath,
+          downloadToken,
+          contentType: processed.contentType,
+          sizeBytes: processed.blob.size,
+          width: processed.width,
+          height: processed.height,
+        });
+      }
+
+      return uploadedAttachments;
+    } catch (error) {
+      await Promise.all(
+        uploadedRefs.map((path) => deleteObject(storageRef(storage, path)).catch(() => undefined))
+      );
+      throw error;
+    }
+  }, [activeMembership?.id, sameDayProofDrafts, storage, studentUid]);
+
   const to24h = (time12h: string, period: '오전' | '오후') => {
     if (!time12h || !time12h.includes(':')) return time12h;
     let [hours, mins] = time12h.split(':').map(Number);
@@ -2318,12 +2545,30 @@ export default function StudyPlanPage() {
   const buildCurrentAttendanceDraft = useCallback((): AttendanceScheduleDraft => ({
     inTime,
     outTime,
+    academyName,
+    academyStartTime,
+    academyEndTime,
     awayStartTime,
     awayEndTime,
     awayReason,
     awaySlots: extraAwayPlans,
     isAbsent: isScheduleAbsent,
-  }), [awayEndTime, awayReason, awayStartTime, extraAwayPlans, inTime, isScheduleAbsent, outTime]);
+    classScheduleId: appliedClassScheduleId,
+    classScheduleName: appliedClassScheduleName,
+  }), [
+    academyEndTime,
+    academyName,
+    academyStartTime,
+    appliedClassScheduleId,
+    appliedClassScheduleName,
+    awayEndTime,
+    awayReason,
+    awayStartTime,
+    extraAwayPlans,
+    inTime,
+    isScheduleAbsent,
+    outTime,
+  ]);
 
   const syncLegacyScheduleItems = useCallback(async (dateKey: string, scheduleDoc: StudentScheduleDoc | null) => {
     if (!firestore || !user || !activeMembership || !studentUid) return;
@@ -2520,11 +2765,16 @@ export default function StudyPlanPage() {
   const applyAttendanceDraftToState = useCallback((draft: AttendanceScheduleDraft) => {
     setInTime(draft.inTime || '09:00');
     setOutTime(draft.outTime || '22:00');
+    setAcademyName(draft.academyName || '');
+    setAcademyStartTime(draft.academyStartTime || '');
+    setAcademyEndTime(draft.academyEndTime || '');
     setAwayStartTime(draft.awayStartTime || '');
     setAwayEndTime(draft.awayEndTime || '');
     setAwayReason(draft.awayReason || '');
     setExtraAwayPlans(draft.awaySlots || []);
     setIsScheduleAbsent(Boolean(draft.isAbsent));
+    setAppliedClassScheduleId(draft.classScheduleId || null);
+    setAppliedClassScheduleName(draft.classScheduleName || null);
   }, []);
 
   const handleTodayScheduleChange = useCallback((patch: Partial<AttendanceScheduleDraft>) => {
@@ -2550,15 +2800,13 @@ export default function StudyPlanPage() {
     setScheduleNote(value);
   }, []);
 
-  const handleSaveTodaySchedule = useCallback(async () => {
+  const executeSaveTodaySchedule = useCallback(async (draft: AttendanceScheduleDraft) => {
     if (!selectedDateKey) return false;
-    setIsSubmitting(true);
-    setAttendanceSaveError(null);
     try {
       const persistResult = await persistStudentSchedule({
         dateKey: selectedDateKey,
-        draft: buildCurrentAttendanceDraft(),
-        awaySlots: extraAwayPlans,
+        draft,
+        awaySlots: draft.awaySlots || [],
         note: scheduleNote,
         source: scheduleRecommendationPrefill ? 'planner-diagnostic' : 'manual',
         recommendedStudyMinutes: scheduleRecommendationPrefill?.recommendedDailyStudyMinutes || null,
@@ -2566,10 +2814,14 @@ export default function StudyPlanPage() {
       });
       setScheduleSaveFeedback({
         variant: persistResult.legacySyncWarning ? 'warning' : 'success',
-        title: '날짜별 일정 저장 완료',
-        description: persistResult.legacySyncWarning
-          ? '선택한 날짜의 등하원·외출 일정을 저장했어요. 일부 일정 카드는 잠시 늦게 갱신될 수 있어요.'
-          : '선택한 날짜의 등하원·외출 일정을 저장했어요.',
+        title: draft.isAbsent ? '미등원 일정 저장 완료' : '날짜별 일정 저장 완료',
+        description: draft.isAbsent
+          ? persistResult.legacySyncWarning
+            ? '선택한 날짜를 미등원 일정으로 저장했어요. 일부 일정 카드는 잠시 늦게 갱신될 수 있어요.'
+            : '선택한 날짜를 미등원 일정으로 저장했어요.'
+          : persistResult.legacySyncWarning
+            ? '선택한 날짜의 등하원·외출 일정을 저장했어요. 일부 일정 카드는 잠시 늦게 갱신될 수 있어요.'
+            : '선택한 날짜의 등하원·외출 일정을 저장했어요.',
       });
       clearSchedulePrefillCache();
       setIsAttendanceScheduleSheetOpen(false);
@@ -2580,47 +2832,11 @@ export default function StudyPlanPage() {
         description: getSafeErrorMessage(error, '일정을 저장하지 못했어요.'),
       });
       return false;
-    } finally {
-      setIsSubmitting(false);
     }
-  }, [buildCurrentAttendanceDraft, clearSchedulePrefillCache, extraAwayPlans, persistStudentSchedule, scheduleNote, scheduleRecommendationPrefill, selectedDateKey]);
+  }, [clearSchedulePrefillCache, persistStudentSchedule, scheduleNote, scheduleRecommendationPrefill, selectedDateKey]);
 
-  const handleSetTodayAbsent = useCallback(async () => {
-    if (!selectedDateKey) return;
-    setIsSubmitting(true);
-    setAttendanceSaveError(null);
-    try {
-      const persistResult = await persistStudentSchedule({
-        dateKey: selectedDateKey,
-        draft: {
-          ...buildCurrentAttendanceDraft(),
-          isAbsent: true,
-        },
-        note: scheduleNote,
-      });
-      setScheduleSaveFeedback({
-        variant: persistResult.legacySyncWarning ? 'warning' : 'success',
-        title: '미등원 일정 저장 완료',
-        description: persistResult.legacySyncWarning
-          ? '선택한 날짜를 미등원 일정으로 저장했어요. 일부 일정 카드는 잠시 늦게 갱신될 수 있어요.'
-          : '선택한 날짜를 미등원 일정으로 저장했어요.',
-      });
-      clearSchedulePrefillCache();
-      setIsAttendanceScheduleSheetOpen(false);
-    } catch (error: any) {
-      setAttendanceSaveError({
-        title: '일정 저장 실패',
-        description: getSafeErrorMessage(error, '일정을 저장하지 못했어요.'),
-      });
-    } finally {
-      setIsSubmitting(false);
-    }
-  }, [buildCurrentAttendanceDraft, clearSchedulePrefillCache, persistStudentSchedule, scheduleNote, selectedDateKey]);
-
-  const handleResetTodaySchedule = useCallback(async () => {
-    if (!firestore || !user || !selectedDateKey) return;
-    setIsSubmitting(true);
-    setAttendanceSaveError(null);
+  const executeResetTodaySchedule = useCallback(async () => {
+    if (!firestore || !user || !selectedDateKey) return false;
     try {
       await deleteDoc(doc(firestore, 'users', user.uid, 'schedules', selectedDateKey));
       let legacySyncWarning = false;
@@ -2641,15 +2857,177 @@ export default function StudyPlanPage() {
           : '저장된 날짜별 일정을 비웠어요.',
       });
       setIsAttendanceScheduleSheetOpen(false);
+      return true;
     } catch (error: any) {
       setAttendanceSaveError({
         title: '초기화 실패',
         description: getSafeErrorMessage(error, '일정을 초기화하지 못했어요.'),
       });
+      return false;
+    }
+  }, [applyAttendanceDraftToState, clearSchedulePrefillCache, firestore, selectedDateKey, syncLegacyScheduleItems, user]);
+
+  const handleSaveTodaySchedule = useCallback(async () => {
+    if (!selectedDateKey) return false;
+    if (isToday) {
+      openSameDayChangeDialog(buildCurrentAttendanceDraft().isAbsent ? 'absent' : 'save');
+      return false;
+    }
+
+    setIsSubmitting(true);
+    setAttendanceSaveError(null);
+    try {
+      return await executeSaveTodaySchedule(buildCurrentAttendanceDraft());
     } finally {
       setIsSubmitting(false);
     }
-  }, [applyAttendanceDraftToState, clearSchedulePrefillCache, firestore, selectedDateKey, syncLegacyScheduleItems, user]);
+  }, [buildCurrentAttendanceDraft, executeSaveTodaySchedule, isToday, openSameDayChangeDialog, selectedDateKey]);
+
+  const handleSetTodayAbsent = useCallback(async () => {
+    if (!selectedDateKey) return;
+    if (isToday) {
+      openSameDayChangeDialog('absent');
+      return;
+    }
+
+    setIsSubmitting(true);
+    setAttendanceSaveError(null);
+    try {
+      await executeSaveTodaySchedule({
+        ...buildCurrentAttendanceDraft(),
+        isAbsent: true,
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
+  }, [buildCurrentAttendanceDraft, executeSaveTodaySchedule, isToday, openSameDayChangeDialog, selectedDateKey]);
+
+  const handleResetTodaySchedule = useCallback(async () => {
+    if (!selectedDateKey) return;
+    if (isToday) {
+      openSameDayChangeDialog('reset');
+      return;
+    }
+
+    setIsSubmitting(true);
+    setAttendanceSaveError(null);
+    try {
+      await executeResetTodaySchedule();
+    } finally {
+      setIsSubmitting(false);
+    }
+  }, [executeResetTodaySchedule, isToday, openSameDayChangeDialog, selectedDateKey]);
+
+  const handleConfirmSameDayScheduleChange = useCallback(async () => {
+    if (!activeMembership?.id || !selectedDateKey) return;
+
+    const trimmedReason = sameDayReason.trim();
+    if (trimmedReason.length < 5) {
+      toast({
+        variant: 'destructive',
+        title: '사유를 조금 더 적어주세요',
+        description: '당일 변경 사유는 5자 이상 입력해야 해요.',
+      });
+      return;
+    }
+
+    setIsSubmitting(true);
+    setAttendanceSaveError(null);
+
+    let uploadedAttachments: AttendanceRequestProofUploadPayload[] = [];
+
+    try {
+      if (sameDayProofDrafts.length > 0) {
+        uploadedAttachments = await uploadSameDayProofAttachments();
+      }
+
+      const draft =
+        pendingSameDayChangeAction === 'absent'
+          ? {
+              ...buildCurrentAttendanceDraft(),
+              isAbsent: true,
+            }
+          : buildCurrentAttendanceDraft();
+
+      const scheduleSaved = pendingSameDayChangeAction === 'reset'
+        ? await executeResetTodaySchedule()
+        : await executeSaveTodaySchedule(draft);
+
+      if (!scheduleSaved) {
+        if (uploadedAttachments.length > 0) {
+          await Promise.all(
+            uploadedAttachments.map((attachment) =>
+              deleteObject(storageRef(storage, attachment.path)).catch(() => undefined)
+            )
+          );
+        }
+        return;
+      }
+
+      const requestResult = await submitAttendanceRequestSecure({
+        centerId: activeMembership.id,
+        requestType: 'schedule_change',
+        requestDate: selectedDateKey,
+        reason: trimmedReason,
+        reasonCategory: sameDayReasonCategory,
+        requestedArrivalTime: pendingSameDayChangeAction === 'save' ? draft.inTime : null,
+        requestedDepartureTime: pendingSameDayChangeAction === 'save' ? draft.outTime : null,
+        requestedAcademyName: pendingSameDayChangeAction === 'save' ? draft.academyName || null : null,
+        requestedAcademyStartTime: pendingSameDayChangeAction === 'save' ? draft.academyStartTime || null : null,
+        requestedAcademyEndTime: pendingSameDayChangeAction === 'save' ? draft.academyEndTime || null : null,
+        scheduleChangeAction: pendingSameDayChangeAction,
+        classScheduleId: draft.classScheduleId || null,
+        classScheduleName: draft.classScheduleName || null,
+        proofAttachments: uploadedAttachments,
+      });
+
+      setIsSameDayChangeDialogOpen(false);
+      resetSameDayChangeRequestState();
+
+      const requestLabel = getAttendanceRequestTypeLabel('schedule_change');
+      const penaltyDescription = requestResult.penaltyWaived
+        ? '예외 사유 기준을 충족해 벌점은 면제되었어요.'
+        : requestResult.penaltyApplied
+          ? `벌점 ${requestResult.penaltyPointsDelta ?? SAME_DAY_ROUTINE_PENALTY_POINTS}점이 반영되었어요.`
+          : requestResult.duplicatePenalty
+            ? '오늘 벌점은 이미 반영되어 있어 추가 벌점은 없어요.'
+            : '원칙상 벌점 대상이지만 이번 요청에서는 추가 반영이 없었어요.';
+
+      toast({
+        title: `${requestLabel} 사유가 접수되었습니다.`,
+        description: penaltyDescription,
+      });
+    } catch (error: any) {
+      if (uploadedAttachments.length > 0) {
+        await Promise.all(
+          uploadedAttachments.map((attachment) =>
+            deleteObject(storageRef(storage, attachment.path)).catch(() => undefined)
+          )
+        );
+      }
+      toast({
+        variant: 'destructive',
+        title: '당일 변경 사유를 저장하지 못했어요',
+        description: getSafeErrorMessage(error, '잠시 뒤 다시 시도해 주세요.'),
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
+  }, [
+    activeMembership?.id,
+    buildCurrentAttendanceDraft,
+    executeResetTodaySchedule,
+    executeSaveTodaySchedule,
+    pendingSameDayChangeAction,
+    resetSameDayChangeRequestState,
+    sameDayProofDrafts.length,
+    sameDayReason,
+    sameDayReasonCategory,
+    selectedDateKey,
+    storage,
+    toast,
+    uploadSameDayProofAttachments,
+  ]);
 
   const handleToggleRecurringWeekday = useCallback((weekday: number) => {
     setAttendanceSaveError(null);
@@ -2715,10 +3093,16 @@ export default function StudyPlanPage() {
           weekdays: targetWeekdays,
           arrivalPlannedAt: weekdayDraft.inTime,
           departurePlannedAt: weekdayDraft.outTime,
+          academyNameDefault: weekdayDraft.academyName?.trim() || null,
+          academyStartAtDefault: weekdayDraft.academyStartTime || null,
+          academyEndAtDefault: weekdayDraft.academyEndTime || null,
           hasExcursionDefault: Boolean(weekdayDraft.awayStartTime && weekdayDraft.awayEndTime),
           defaultExcursionStartAt: weekdayDraft.awayStartTime || null,
           defaultExcursionEndAt: weekdayDraft.awayEndTime || null,
           defaultExcursionReason: weekdayDraft.awayReason?.trim() || null,
+          note: scheduleNote.trim() || null,
+          classScheduleId: weekdayDraft.classScheduleId || null,
+          classScheduleName: weekdayDraft.classScheduleName || null,
           active: true,
           timezone: 'Asia/Seoul',
           createdAt: matchingRecurringTemplate?.createdAt || serverTimestamp(),
@@ -2764,7 +3148,7 @@ export default function StudyPlanPage() {
     } finally {
       setIsSubmitting(false);
     }
-  }, [activeScheduleTemplates, clearSchedulePrefillCache, firestore, matchingRecurringTemplate, presetName, selectedRecurringWeekdayLabel, selectedRecurringWeekdays, syncWeekdayTemplateToVisibleSchedules, user, weekdayDraft]);
+  }, [activeScheduleTemplates, clearSchedulePrefillCache, firestore, matchingRecurringTemplate, presetName, scheduleNote, selectedRecurringWeekdayLabel, selectedRecurringWeekdays, syncWeekdayTemplateToVisibleSchedules, user, weekdayDraft]);
 
   const handleSaveSchedulePreset = useCallback(async () => {
     if (!firestore || !user) return;
@@ -2783,10 +3167,15 @@ export default function StudyPlanPage() {
         weekdays: selectedRecurringWeekdays.length > 0 ? selectedRecurringWeekdays : [selectedWeekdayValue],
         arrivalPlannedAt: inTime,
         departurePlannedAt: outTime,
+        academyNameDefault: academyName.trim() || null,
+        academyStartAtDefault: academyStartTime || null,
+        academyEndAtDefault: academyEndTime || null,
         hasExcursionDefault: Boolean(awayStartTime && awayEndTime),
         defaultExcursionStartAt: awayStartTime || null,
         defaultExcursionEndAt: awayEndTime || null,
         defaultExcursionReason: awayReason.trim() || null,
+        classScheduleId: appliedClassScheduleId || null,
+        classScheduleName: appliedClassScheduleName || null,
         active: true,
         timezone: 'Asia/Seoul',
         createdAt: serverTimestamp(),
@@ -2806,7 +3195,7 @@ export default function StudyPlanPage() {
     } finally {
       setIsSubmitting(false);
     }
-  }, [awayEndTime, awayReason, awayStartTime, firestore, inTime, outTime, presetName, selectedRecurringWeekdays, selectedWeekdayValue, toast, user]);
+  }, [academyEndTime, academyName, academyStartTime, appliedClassScheduleId, appliedClassScheduleName, awayEndTime, awayReason, awayStartTime, firestore, inTime, outTime, presetName, selectedRecurringWeekdays, selectedWeekdayValue, toast, user]);
 
   const handleDeleteScheduleTemplate = useCallback(async (templateId: string) => {
     if (!firestore || !user) return;
@@ -2821,18 +3210,44 @@ export default function StudyPlanPage() {
     setWeekdayDraft(preset);
   }, []);
 
+  const buildDraftFromClassSchedule = useCallback((schedule: StudyRoomClassScheduleTemplate): AttendanceScheduleDraft => ({
+    ...EMPTY_ATTENDANCE_SCHEDULE_DRAFT,
+    inTime: schedule.arrivalTime,
+    outTime: schedule.departureTime,
+    classScheduleId: schedule.id || null,
+    classScheduleName: `${schedule.className} 반 교시제`,
+  }), []);
+
+  const handleApplyMatchedClassScheduleToToday = useCallback(() => {
+    if (!matchedClassSchedule) return;
+    applyAttendanceDraftToState(buildDraftFromClassSchedule(matchedClassSchedule));
+    setScheduleNote(matchedClassSchedule.note?.trim() || '');
+  }, [applyAttendanceDraftToState, buildDraftFromClassSchedule, matchedClassSchedule]);
+
+  const handleApplyClassScheduleToWeekday = useCallback((schedule: StudyRoomClassScheduleTemplate) => {
+    setSelectedRecurringWeekdays([...(schedule.weekdays || [])].sort((left, right) => left - right));
+    setWeekdayDraft(buildDraftFromClassSchedule(schedule));
+    setPresetName(`${schedule.className} 반 교시제`);
+    setScheduleNote(schedule.note?.trim() || '');
+  }, [buildDraftFromClassSchedule]);
+
   const handleApplySelectedWeekdayTemplateToToday = useCallback(() => {
     if (!matchingWeekdayTemplate) return;
     applyAttendanceDraftToState({
       inTime: matchingWeekdayTemplate.arrivalPlannedAt,
       outTime: matchingWeekdayTemplate.departurePlannedAt,
+      academyName: matchingWeekdayTemplate.academyNameDefault || '',
+      academyStartTime: matchingWeekdayTemplate.academyStartAtDefault || '',
+      academyEndTime: matchingWeekdayTemplate.academyEndAtDefault || '',
       awayStartTime: matchingWeekdayTemplate.defaultExcursionStartAt || '',
       awayEndTime: matchingWeekdayTemplate.defaultExcursionEndAt || '',
       awayReason: matchingWeekdayTemplate.defaultExcursionReason || '',
       awaySlots: [],
       isAbsent: false,
+      classScheduleId: matchingWeekdayTemplate.classScheduleId || null,
+      classScheduleName: matchingWeekdayTemplate.classScheduleName || null,
     });
-    setScheduleNote((matchingWeekdayTemplate as any)?.note || '');
+    setScheduleNote(matchingWeekdayTemplate.note || '');
   }, [applyAttendanceDraftToState, matchingWeekdayTemplate]);
 
   const handleToggleScheduleTemplateActive = useCallback(async (templateId: string, active: boolean) => {
@@ -4063,6 +4478,11 @@ export default function StudyPlanPage() {
         hasSelectedWeekdayTemplate={hasSelectedWeekdayTemplate}
         selectedDateWeekdayLabel={matchingWeekdayLabel}
         onApplySelectedWeekdayTemplateToToday={handleApplySelectedWeekdayTemplateToToday}
+        studentClassName={studentClassName}
+        matchedClassSchedule={matchedClassSchedule}
+        classSchedules={availableClassSchedules}
+        onApplyMatchedClassScheduleToToday={handleApplyMatchedClassScheduleToToday}
+        onApplyClassScheduleToWeekday={handleApplyClassScheduleToWeekday}
         selectedWeekdays={selectedRecurringWeekdays}
         onToggleWeekday={handleToggleRecurringWeekday}
         weekdayOptions={WEEKDAY_OPTIONS}
@@ -4088,6 +4508,45 @@ export default function StudyPlanPage() {
         onAddPersonalTask={() => void handleAddTask(newPersonalTask, 'personal')}
         onTogglePersonalTask={(task) => void handleToggleTask(task)}
         onDeletePersonalTask={(task) => void handleDeleteTask(task)}
+      />
+
+      <SameDayScheduleChangeDialog
+        open={isSameDayChangeDialogOpen}
+        onOpenChange={(open) => {
+          setIsSameDayChangeDialogOpen(open);
+          if (!open) {
+            resetSameDayChangeRequestState();
+          }
+        }}
+        isSubmitting={isSubmitting}
+        selectedDateLabel={format(selectedDate, 'yyyy. MM. dd', { locale: ko })}
+        scheduleSummary={
+          pendingSameDayChangeAction === 'reset'
+            ? '저장된 오늘 일정을 비우고 다시 시작합니다.'
+            : pendingSameDayChangeAction === 'absent'
+              ? '오늘을 미등원 일정으로 변경합니다.'
+              : `${buildCurrentAttendanceDraft().inTime} ~ ${buildCurrentAttendanceDraft().outTime}${buildCurrentAttendanceDraft().academyStartTime && buildCurrentAttendanceDraft().academyEndTime ? ` · 학원 ${buildCurrentAttendanceDraft().academyStartTime} ~ ${buildCurrentAttendanceDraft().academyEndTime}` : ''}`
+        }
+        actionLabel={
+          pendingSameDayChangeAction === 'reset'
+            ? '오늘 일정 초기화'
+            : pendingSameDayChangeAction === 'absent'
+              ? '오늘 미등원 처리'
+              : '오늘 등하원 일정 저장'
+        }
+        penaltyPoints={SAME_DAY_ROUTINE_PENALTY_POINTS}
+        reasonCategory={sameDayReasonCategory}
+        onReasonCategoryChange={setSameDayReasonCategory}
+        reason={sameDayReason}
+        onReasonChange={setSameDayReason}
+        proofDrafts={sameDayProofDrafts.map((proof) => ({
+          id: proof.id,
+          name: proof.file.name,
+          previewUrl: proof.previewUrl,
+        }))}
+        onProofInputChange={handleSameDayProofInputChange}
+        onRemoveProof={handleRemoveSameDayProof}
+        onConfirm={handleConfirmSameDayScheduleChange}
       />
     </div>
   );

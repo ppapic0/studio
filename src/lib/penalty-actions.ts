@@ -2,9 +2,21 @@
 
 import { initializeFirebase } from '@/firebase';
 import { httpsCallable } from 'firebase/functions';
+import type { AttendanceRequestReasonCategory } from '@/lib/types';
 
 export type SecurePenaltySource = 'manual' | 'routine_missing';
-export type AttendanceRequestType = 'late' | 'absence';
+export type AttendanceRequestType = 'late' | 'absence' | 'schedule_change';
+
+export type AttendanceRequestProofUploadPayload = {
+  id: string;
+  name: string;
+  path: string;
+  downloadToken: string;
+  contentType: string;
+  sizeBytes: number;
+  width?: number | null;
+  height?: number | null;
+};
 
 type ApplyPenaltyEventSecureInput = {
   centerId: string;
@@ -28,6 +40,16 @@ type SubmitAttendanceRequestSecureInput = {
   requestType: AttendanceRequestType;
   requestDate: string;
   reason: string;
+  reasonCategory?: AttendanceRequestReasonCategory;
+  requestedArrivalTime?: string | null;
+  requestedDepartureTime?: string | null;
+  requestedAcademyName?: string | null;
+  requestedAcademyStartTime?: string | null;
+  requestedAcademyEndTime?: string | null;
+  scheduleChangeAction?: 'save' | 'absent' | 'reset' | null;
+  classScheduleId?: string | null;
+  classScheduleName?: string | null;
+  proofAttachments?: AttendanceRequestProofUploadPayload[];
 };
 
 type SubmitAttendanceRequestSecureResult = {
@@ -35,6 +57,9 @@ type SubmitAttendanceRequestSecureResult = {
   requestId?: string;
   penaltyLogId?: string;
   penaltyPointsDelta?: number;
+  penaltyApplied?: boolean;
+  penaltyWaived?: boolean;
+  duplicatePenalty?: boolean;
 };
 
 export async function applyPenaltyEventSecure(

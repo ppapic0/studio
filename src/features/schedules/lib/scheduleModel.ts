@@ -27,18 +27,33 @@ export function addMinutesToTime(value: string, minutesToAdd: number) {
 }
 
 export function normalizeOutings(
-  primaryAway: Pick<AttendanceScheduleDraft, 'awayStartTime' | 'awayEndTime' | 'awayReason'>,
+  primaryAway: Pick<
+    AttendanceScheduleDraft,
+    'academyName' | 'academyStartTime' | 'academyEndTime' | 'awayStartTime' | 'awayEndTime' | 'awayReason'
+  >,
   extraAwaySlots: AttendanceAwaySlot[] = []
 ): StudentScheduleOuting[] {
   const outings = [
     {
+      id: 'academy',
+      kind: 'academy' as const,
+      title: primaryAway.academyName?.trim() || '학원',
+      startTime: primaryAway.academyStartTime,
+      endTime: primaryAway.academyEndTime,
+      reason: primaryAway.academyName?.trim() || '학원',
+    },
+    {
       id: 'primary',
+      kind: 'outing' as const,
+      title: null,
       startTime: primaryAway.awayStartTime,
       endTime: primaryAway.awayEndTime,
       reason: primaryAway.awayReason?.trim() || '',
     },
     ...extraAwaySlots.map((slot) => ({
       id: slot.id,
+      kind: 'outing' as const,
+      title: null,
       startTime: slot.startTime,
       endTime: slot.endTime,
       reason: slot.reason?.trim() || '',
@@ -49,6 +64,8 @@ export function normalizeOutings(
     .filter((slot) => slot.startTime && slot.endTime)
     .map((slot, index) => ({
       id: slot.id || `outing-${index + 1}`,
+      kind: slot.kind,
+      title: slot.title,
       startTime: slot.startTime,
       endTime: slot.endTime,
       reason: slot.reason || '',
@@ -74,6 +91,15 @@ export function validateScheduleDraft(
 
   if (arrivalMinutes >= departureMinutes) {
     return '등원 예정 시간은 하원 예정 시간보다 빨라야 해요.';
+  }
+
+  const hasAcademySchedule = Boolean(
+    draft.academyName?.trim() ||
+    draft.academyStartTime ||
+    draft.academyEndTime
+  );
+  if (hasAcademySchedule && (!draft.academyStartTime || !draft.academyEndTime)) {
+    return '학원 시작 시간과 종료 시간을 모두 입력해 주세요.';
   }
 
   const outings = normalizeOutings(draft, extraAwaySlots);
@@ -131,6 +157,8 @@ export function buildScheduleDocFromDraft(params: {
     outTime: params.draft.outTime,
     isAbsent: Boolean(params.draft.isAbsent),
     outings,
+    classScheduleId: params.draft.classScheduleId || null,
+    classScheduleName: params.draft.classScheduleName || null,
     recommendedStudyMinutes: params.recommendedStudyMinutes ?? null,
     recommendedWeeklyDays: params.recommendedWeeklyDays ?? null,
     source: params.source || (params.recurrenceSourceId ? 'regular-routine' : 'manual'),
@@ -138,20 +166,27 @@ export function buildScheduleDocFromDraft(params: {
 }
 
 export function buildDraftFromScheduleDoc(schedule?: Partial<StudentScheduleDoc> | null): AttendanceScheduleDraft {
-  const firstOuting = schedule?.outings?.[0];
+  const academyOuting = schedule?.outings?.find((outing) => outing.kind === 'academy') || null;
+  const regularOutings = (schedule?.outings || []).filter((outing) => outing.kind !== 'academy');
+  const firstOuting = regularOutings[0];
   return {
     inTime: schedule?.inTime || (schedule as any)?.arrivalPlannedAt || '09:00',
     outTime: schedule?.outTime || (schedule as any)?.departurePlannedAt || '22:00',
+    academyName: academyOuting?.title || academyOuting?.reason || '',
+    academyStartTime: academyOuting?.startTime || '',
+    academyEndTime: academyOuting?.endTime || '',
     awayStartTime: firstOuting?.startTime || (schedule as any)?.excursionStartAt || '',
     awayEndTime: firstOuting?.endTime || (schedule as any)?.excursionEndAt || '',
     awayReason: firstOuting?.reason || (schedule as any)?.excursionReason || '',
-    awaySlots: schedule?.outings?.slice(1).map((outing) => ({
+    awaySlots: regularOutings.slice(1).map((outing) => ({
       id: outing.id,
       startTime: outing.startTime,
       endTime: outing.endTime,
       reason: outing.reason,
     })) || [],
     isAbsent: Boolean(schedule?.isAbsent || (schedule as any)?.status === 'absent'),
+    classScheduleId: schedule?.classScheduleId || null,
+    classScheduleName: schedule?.classScheduleName || null,
   };
 }
 
@@ -161,12 +196,18 @@ export function buildLegacyScheduleTitles(schedule: StudentScheduleDoc) {
   }
 
   const titles = [`등원 예정: ${schedule.inTime}`, `하원 예정: ${schedule.outTime}`];
+  if (schedule.classScheduleName?.trim()) {
+    titles.push(`교시제 적용: ${schedule.classScheduleName.trim()}`);
+  }
   schedule.outings.forEach((outing) => {
-    titles.push(
-      outing.reason
-        ? `외출 예정 · ${outing.reason}: ${outing.startTime} ~ ${outing.endTime}`
-        : `외출 예정: ${outing.startTime} ~ ${outing.endTime}`
-    );
+    if (outing.kind === 'academy') {
+      titles.push(`학원 일정 · ${outing.title || outing.reason || '학원'}: ${outing.startTime} ~ ${outing.endTime}`);
+      return;
+    }
+
+    titles.push(outing.reason
+      ? `외출 예정 · ${outing.reason}: ${outing.startTime} ~ ${outing.endTime}`
+      : `외출 예정: ${outing.startTime} ~ ${outing.endTime}`);
   });
   return titles;
 }
@@ -175,7 +216,11 @@ export function buildScheduleSummary(schedule: AttendanceScheduleDraft, extraAwa
   if (schedule.isAbsent) return '이날은 등원하지 않아요';
   const outings = normalizeOutings(schedule, extraAwaySlots);
   if (outings.length === 0) return `${schedule.inTime} ~ ${schedule.outTime}`;
-  return `${schedule.inTime} ~ ${schedule.outTime} · 외출 ${outings[0].startTime} ~ ${outings[0].endTime}`;
+  const firstOuting = outings[0];
+  if (firstOuting.kind === 'academy') {
+    return `${schedule.inTime} ~ ${schedule.outTime} · 학원 ${firstOuting.startTime} ~ ${firstOuting.endTime}`;
+  }
+  return `${schedule.inTime} ~ ${schedule.outTime} · 외출 ${firstOuting.startTime} ~ ${firstOuting.endTime}`;
 }
 
 export function hydrateSavedRoutine(routine: SavedAttendanceRoutine) {

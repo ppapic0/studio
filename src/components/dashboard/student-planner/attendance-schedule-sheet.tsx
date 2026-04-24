@@ -27,7 +27,8 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { validateScheduleDraft } from '@/features/schedules/lib/scheduleModel';
-import type { StudyPlanItem, WithId } from '@/lib/types';
+import { buildStudyRoomClassScheduleSummary, formatStudyRoomWeekdays } from '@/lib/attendance-request';
+import type { StudyPlanItem, StudyRoomClassScheduleTemplate, WithId } from '@/lib/types';
 import { cn } from '@/lib/utils';
 
 import type { AttendanceScheduleDraft, SavedAttendanceRoutine } from './planner-constants';
@@ -69,6 +70,11 @@ type AttendanceScheduleSheetProps = {
   hasSelectedWeekdayTemplate: boolean;
   selectedDateWeekdayLabel: string;
   onApplySelectedWeekdayTemplateToToday: () => void;
+  studentClassName?: string | null;
+  matchedClassSchedule?: StudyRoomClassScheduleTemplate | null;
+  classSchedules: StudyRoomClassScheduleTemplate[];
+  onApplyMatchedClassScheduleToToday: () => void;
+  onApplyClassScheduleToWeekday: (schedule: StudyRoomClassScheduleTemplate) => void;
   selectedWeekdays: number[];
   onToggleWeekday: (weekday: number) => void;
   weekdayOptions: WeekdayOption[];
@@ -114,6 +120,11 @@ function AttendanceDraftFields({
   disabled?: boolean;
 }) {
   const isAbsent = Boolean(draft.isAbsent);
+  const hasAcademyPlanned = Boolean(
+    draft.academyName?.trim() ||
+    draft.academyStartTime ||
+    draft.academyEndTime
+  );
   const hasExcursionPlanned = Boolean(
     draft.awayStartTime ||
     draft.awayEndTime ||
@@ -155,6 +166,13 @@ function AttendanceDraftFields({
           </Button>
       </div>
 
+      {draft.classScheduleName?.trim() ? (
+        <div className="rounded-[1rem] border border-[#D8E4FB] bg-[#F6F9FF] px-4 py-3">
+          <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#5F739F]">적용된 교시제</p>
+          <p className="mt-1 text-sm font-black text-[#17326B]">{draft.classScheduleName.trim()}</p>
+        </div>
+      ) : null}
+
       <div className={cn('grid gap-3', isMobile ? 'grid-cols-1' : 'grid-cols-2')}>
         <div className="space-y-1.5">
           <Label className="ml-1 text-[10px] font-black uppercase tracking-[0.18em] text-[#5F739F]">등원 예정</Label>
@@ -178,11 +196,99 @@ function AttendanceDraftFields({
         </div>
       </div>
 
+      <div className="rounded-[1.35rem] border border-[#D7E7FF] bg-[linear-gradient(180deg,#F8FBFF_0%,#FFFFFF_100%)] p-4 shadow-[0_14px_30px_-24px_rgba(20,41,95,0.22)]">
+        <div className="flex items-center gap-2">
+          <CalendarClock className="h-4 w-4 text-[#17326B]" />
+          <Label className="text-[11px] font-black uppercase tracking-[0.18em] text-[#17326B]">학원 일정</Label>
+          <span className="text-[10px] font-bold text-[#5F739F]">학원 수업이 있는 학생만 등록</span>
+        </div>
+        <div className="mt-3 flex flex-wrap gap-2">
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() =>
+              onChange({
+                academyName: '',
+                academyStartTime: '',
+                academyEndTime: '',
+              })
+            }
+            disabled={disabled || isAbsent}
+            className={cn(
+              'h-9 rounded-full px-4 text-[11px] font-black',
+              !hasAcademyPlanned
+                ? 'border-[#17326B] bg-[#EEF4FF] text-[#17326B]'
+                : 'border-[#D7E3FA] bg-white text-[#5F739F] hover:bg-[#F7FAFF]'
+            )}
+          >
+            학원 없음
+          </Button>
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() =>
+              onChange({
+                academyName: draft.academyName || '학원',
+                academyStartTime: draft.academyStartTime || draft.inTime || '18:00',
+                academyEndTime: draft.academyEndTime || draft.outTime || '20:00',
+              })
+            }
+            disabled={disabled || isAbsent}
+            className={cn(
+              'h-9 rounded-full px-4 text-[11px] font-black',
+              hasAcademyPlanned
+                ? 'border-[#17326B] bg-[#EEF4FF] text-[#17326B]'
+                : 'border-[#D7E3FA] bg-white text-[#5F739F] hover:bg-[#F7FAFF]'
+            )}
+          >
+            학원 있음
+          </Button>
+        </div>
+        {hasAcademyPlanned ? (
+          <div className={cn('mt-3 grid gap-3', isMobile ? 'grid-cols-1' : 'grid-cols-[minmax(0,1fr)_minmax(0,0.75fr)_minmax(0,0.75fr)]')}>
+            <div className="space-y-1.5">
+              <Label className="ml-1 text-[10px] font-black uppercase tracking-[0.18em] text-[#5F739F]">학원명</Label>
+              <Input
+                value={draft.academyName}
+                onChange={(event) => onChange({ academyName: event.target.value })}
+                disabled={disabled || isAbsent}
+                placeholder="예: 대치수학, 영어단과"
+                className={cn('rounded-xl border-[#D6E1F6] bg-white font-black text-[#17326B] shadow-none placeholder:text-[#8C9BBC]', isMobile ? 'h-11 text-sm' : 'h-12 text-sm')}
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label className="ml-1 text-[10px] font-black uppercase tracking-[0.18em] text-[#5F739F]">학원 출발</Label>
+              <Input
+                type="time"
+                value={draft.academyStartTime}
+                onChange={(event) => onChange({ academyStartTime: event.target.value })}
+                disabled={disabled || isAbsent}
+                className={cn('rounded-xl border-[#D6E1F6] bg-white font-black text-[#17326B] shadow-none', isMobile ? 'h-11 text-sm' : 'h-12 text-base')}
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label className="ml-1 text-[10px] font-black uppercase tracking-[0.18em] text-[#5F739F]">독서실 복귀</Label>
+              <Input
+                type="time"
+                value={draft.academyEndTime}
+                onChange={(event) => onChange({ academyEndTime: event.target.value })}
+                disabled={disabled || isAbsent}
+                className={cn('rounded-xl border-[#D6E1F6] bg-white font-black text-[#17326B] shadow-none', isMobile ? 'h-11 text-sm' : 'h-12 text-base')}
+              />
+            </div>
+          </div>
+        ) : (
+          <p className="mt-3 text-[11px] font-semibold leading-5 text-[#5F739F]">
+            학원이 있는 날만 시간을 적어두면 선생님과 센터가 등원 흐름을 미리 확인할 수 있어요.
+          </p>
+        )}
+      </div>
+
       <div className="rounded-[1.35rem] border border-[#FFD7AE] bg-[linear-gradient(180deg,#FFF9F1_0%,#FFFFFF_100%)] p-4 shadow-[0_14px_30px_-24px_rgba(255,138,31,0.32)]">
         <div className="flex items-center gap-2">
           <Clock3 className="h-4 w-4 text-[#FF8A1F]" />
-          <Label className="text-[11px] font-black uppercase tracking-[0.18em] text-[#FF8A1F]">외출 일정</Label>
-          <span className="text-[10px] font-bold text-[#5F739F]">학원/병원/식사 등</span>
+          <Label className="text-[11px] font-black uppercase tracking-[0.18em] text-[#FF8A1F]">기타 외출 일정</Label>
+          <span className="text-[10px] font-bold text-[#5F739F]">병원/식사/개인 일정 등</span>
         </div>
         <div className="mt-3 flex flex-wrap gap-2">
           <Button
@@ -254,7 +360,7 @@ function AttendanceDraftFields({
                 value={draft.awayReason}
                 onChange={(event) => onChange({ awayReason: event.target.value })}
                 disabled={disabled || isAbsent}
-                placeholder="예: 영어학원, 병원, 저녁 식사"
+                placeholder="예: 병원, 저녁 식사, 은행"
                 className={cn('rounded-xl border-[#D6E1F6] bg-white font-black text-[#17326B] shadow-none placeholder:text-[#8C9BBC]', isMobile ? 'h-11 text-sm' : 'h-12 text-sm')}
               />
             </div>
@@ -274,11 +380,66 @@ function formatDraftSummary(draft: AttendanceScheduleDraft) {
     return '이날은 등원하지 않아요';
   }
   const range = `${draft.inTime || '--:--'} ~ ${draft.outTime || '--:--'}`;
+  if (draft.academyStartTime && draft.academyEndTime) {
+    return `${range} · 학원 ${draft.academyStartTime} ~ ${draft.academyEndTime}${draft.academyName?.trim() ? ` · ${draft.academyName.trim()}` : ''}`;
+  }
   if (draft.awayStartTime && draft.awayEndTime) {
     const reason = draft.awayReason.trim();
     return `${range} · 외출 ${draft.awayStartTime} ~ ${draft.awayEndTime}${reason ? ` · ${reason}` : ''}`;
   }
   return range;
+}
+
+function ClassSchedulePreviewCard({
+  schedule,
+  actionLabel,
+  onApply,
+}: {
+  schedule: StudyRoomClassScheduleTemplate;
+  actionLabel: string;
+  onApply: () => void;
+}) {
+  return (
+    <div className="rounded-[1.2rem] border border-[#D8E4FB] bg-[linear-gradient(180deg,#F7FAFF_0%,#FFFFFF_100%)] p-4">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div className="min-w-0">
+          <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#5F739F]">반 교시제</p>
+          <p className="mt-1 text-sm font-black text-[#17326B]">{schedule.className}</p>
+          <p className="mt-1 text-[11px] font-semibold leading-5 text-[#5F739F]">
+            {buildStudyRoomClassScheduleSummary(schedule)}
+          </p>
+          {schedule.note?.trim() ? (
+            <p className="mt-2 text-[11px] font-semibold leading-5 text-[#17326B]">{schedule.note.trim()}</p>
+          ) : null}
+        </div>
+        <Button
+          type="button"
+          variant="outline"
+          onClick={onApply}
+          className="h-9 rounded-full border-[#D8E4FB] bg-white px-4 text-[11px] font-black text-[#17326B] hover:bg-[#EEF4FF]"
+        >
+          {actionLabel}
+        </Button>
+      </div>
+      {schedule.blocks?.length ? (
+        <div className="mt-3 space-y-2">
+          {schedule.blocks.map((block) => (
+            <div key={block.id} className="rounded-[0.95rem] border border-[#E4ECF9] bg-white px-3 py-2.5">
+              <div className="flex items-center justify-between gap-2">
+                <p className="text-[11px] font-black text-[#17326B]">{block.label}</p>
+                <Badge variant="outline" className="rounded-full border-[#D8E4FB] bg-[#F8FBFF] text-[10px] font-black text-[#5F739F]">
+                  {block.startTime} ~ {block.endTime}
+                </Badge>
+              </div>
+              {block.description?.trim() ? (
+                <p className="mt-1 text-[11px] font-semibold leading-5 text-[#5F739F]">{block.description.trim()}</p>
+              ) : null}
+            </div>
+          ))}
+        </div>
+      ) : null}
+    </div>
+  );
 }
 
 export function AttendanceScheduleSheet({
@@ -302,6 +463,11 @@ export function AttendanceScheduleSheet({
   hasSelectedWeekdayTemplate,
   selectedDateWeekdayLabel,
   onApplySelectedWeekdayTemplateToToday,
+  studentClassName,
+  matchedClassSchedule,
+  classSchedules,
+  onApplyMatchedClassScheduleToToday,
+  onApplyClassScheduleToWeekday,
   selectedWeekdays,
   onToggleWeekday,
   weekdayOptions,
@@ -648,6 +814,24 @@ export function AttendanceScheduleSheet({
                 </div>
               ) : null}
 
+              {matchedClassSchedule ? (
+                <ClassSchedulePreviewCard
+                  schedule={matchedClassSchedule}
+                  actionLabel="이 날짜에 적용"
+                  onApply={() => {
+                    markAsLocallyEdited();
+                    onApplyMatchedClassScheduleToToday();
+                  }}
+                />
+              ) : studentClassName?.trim() ? (
+                <div className="rounded-[1.2rem] border border-dashed border-[#D8E4FB] bg-[#F8FBFF] px-4 py-4">
+                  <p className="text-[11px] font-black text-[#17326B]">{studentClassName.trim()} 반 교시제가 아직 없어요</p>
+                  <p className="mt-1 text-[11px] font-semibold leading-5 text-[#5F739F]">
+                    센터에서 반별 교시제를 등록하면 여기서 바로 불러와 등하원 시간을 맞출 수 있어요.
+                  </p>
+                </div>
+              ) : null}
+
               <AttendanceDraftFields
                 draft={todayDraft}
                 onChange={(patch) => {
@@ -751,6 +935,40 @@ export function AttendanceScheduleSheet({
                   저장 대상: <span className="font-black text-[#17326B]">{selectedWeekdays.length > 0 ? `매주 ${selectedWeekdaysLabel}` : '요일을 먼저 선택해 주세요'}</span>
                 </div>
               </div>
+
+              {studentClassName?.trim() ? (
+                classSchedules.length > 0 ? (
+                  <div className="rounded-[1.35rem] border border-[#D8E4FB] bg-white p-4 shadow-[0_18px_40px_-34px_rgba(15,33,73,0.16)]">
+                    <div className="mb-3">
+                      <p className="text-[11px] font-black uppercase tracking-[0.18em] text-[#5F739F]">반 교시제 불러오기</p>
+                      <h3 className="mt-1 text-lg font-black tracking-tight text-[#17326B]">{studentClassName.trim()} 반 교시제</h3>
+                      <p className="mt-1 break-keep text-[11px] font-semibold leading-5 text-[#5F739F]">
+                        반마다 교시제가 다를 수 있어서, 센터에서 등록한 반 스케줄을 그대로 가져올 수 있어요.
+                      </p>
+                    </div>
+                    <div className="space-y-3">
+                      {classSchedules.map((schedule) => (
+                        <ClassSchedulePreviewCard
+                          key={schedule.id || `${schedule.className}-${formatStudyRoomWeekdays(schedule.weekdays)}`}
+                          schedule={schedule}
+                          actionLabel="선택 요일에 적용"
+                          onApply={() => {
+                            markAsLocallyEdited();
+                            onApplyClassScheduleToWeekday(schedule);
+                          }}
+                        />
+                      ))}
+                    </div>
+                  </div>
+                ) : (
+                  <div className="rounded-[1.2rem] border border-dashed border-[#D8E4FB] bg-[#F8FBFF] px-4 py-4">
+                    <p className="text-[11px] font-black text-[#17326B]">{studentClassName.trim()} 반 교시제가 아직 없어요</p>
+                    <p className="mt-1 text-[11px] font-semibold leading-5 text-[#5F739F]">
+                      선생님이 반별 교시제를 등록하면 여기서 기본 요일과 시간을 바로 불러올 수 있어요.
+                    </p>
+                  </div>
+                )
+              ) : null}
 
               <AttendanceDraftFields
                 draft={weekdayDraft}

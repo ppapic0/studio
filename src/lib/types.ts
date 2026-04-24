@@ -267,9 +267,35 @@ export type ScheduleSubjectKey = '국어' | '수학' | '영어' | '탐구';
 
 export interface StudentScheduleOuting {
   id: string;
+  kind?: 'outing' | 'academy';
+  title?: string | null;
   startTime: string;
   endTime: string;
   reason: string;
+}
+
+export interface StudyRoomPeriodBlock {
+  id: string;
+  label: string;
+  startTime: string;
+  endTime: string;
+  description?: string | null;
+}
+
+export interface StudyRoomClassScheduleTemplate {
+  id?: string;
+  centerId: string;
+  className: string;
+  weekdays: number[];
+  arrivalTime: string;
+  departureTime: string;
+  note?: string | null;
+  blocks: StudyRoomPeriodBlock[];
+  active: boolean;
+  createdAt?: Timestamp;
+  updatedAt?: Timestamp;
+  createdByUid?: string | null;
+  updatedByUid?: string | null;
 }
 
 export interface StudentScheduleDoc {
@@ -296,6 +322,8 @@ export interface StudentScheduleDoc {
   recommendedStudyMinutes?: number | null;
   recommendedWeeklyDays?: number | null;
   source?: 'manual' | 'regular-routine' | 'planner-diagnostic';
+  classScheduleId?: string | null;
+  classScheduleName?: string | null;
   createdAt?: Timestamp;
   updatedAt?: Timestamp;
 }
@@ -316,10 +344,16 @@ export interface StudentScheduleTemplate {
   weekdays: number[];
   arrivalPlannedAt: string;
   departurePlannedAt: string;
+  academyNameDefault?: string | null;
+  academyStartAtDefault?: string | null;
+  academyEndAtDefault?: string | null;
   hasExcursionDefault: boolean;
   defaultExcursionStartAt: string | null;
   defaultExcursionEndAt: string | null;
   defaultExcursionReason?: string | null;
+  note?: string | null;
+  classScheduleId?: string | null;
+  classScheduleName?: string | null;
   active: boolean;
   timezone: string;
   createdAt?: Timestamp;
@@ -1228,17 +1262,45 @@ export interface StudySession {
   durationMinutes: number;
 }
 
+export interface AttendanceRequestProofAttachment {
+  id: string;
+  name: string;
+  path: string;
+  downloadUrl: string;
+  contentType: string;
+  sizeBytes: number;
+  width?: number | null;
+  height?: number | null;
+  uploadedAt?: Timestamp | null;
+  deletedAt?: Timestamp | null;
+}
+
+export type AttendanceRequestType = 'late' | 'absence' | 'schedule_change';
+export type AttendanceRequestReasonCategory = 'disaster' | 'emergency' | 'surgery' | 'hospital' | 'other';
+
 export interface AttendanceRequest {
   id: string;
   studentId: string;
   studentName: string;
   centerId: string;
-  type: 'late' | 'absence';
+  type: AttendanceRequestType;
   date: string;
   reason: string;
+  reasonCategory?: AttendanceRequestReasonCategory | null;
   status: 'requested' | 'approved' | 'rejected';
   penaltyApplied: boolean;
   penaltyPointsDelta?: number;
+  penaltyWaived?: boolean;
+  proofRequired?: boolean;
+  proofAttachments?: AttendanceRequestProofAttachment[];
+  requestedArrivalTime?: string | null;
+  requestedDepartureTime?: string | null;
+  requestedAcademyName?: string | null;
+  requestedAcademyStartTime?: string | null;
+  requestedAcademyEndTime?: string | null;
+  scheduleChangeAction?: 'save' | 'absent' | 'reset' | null;
+  classScheduleId?: string | null;
+  classScheduleName?: string | null;
   statusUpdatedAt?: Timestamp;
   slaDueAt?: Timestamp;
   owner?: string;
@@ -1259,7 +1321,9 @@ export interface PenaltyLog {
   reason: string;
   source: 'attendance_request' | 'manual' | 'reset' | 'routine_missing';
   requestId?: string;
-  requestType?: 'late' | 'absence';
+  requestType?: AttendanceRequestType;
+  penaltyKey?: string;
+  penaltyDateKey?: string;
   createdByUserId?: string;
   createdByName?: string;
   createdAt: Timestamp;
