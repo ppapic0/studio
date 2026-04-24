@@ -3224,46 +3224,6 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
     () => Math.max(10, Math.min(100, Math.round((penaltyRecovery.effectivePoints / 20) * 100))),
     [penaltyRecovery.effectivePoints]
   );
-  const heroTone = useMemo(() => {
-    if (growthCelebrationCandidate) {
-      return {
-        badgeLabel: '성장 상승',
-        badgeClassName: 'border-[#ffd2a2] bg-[#fff3e6] text-[#FF7A16]',
-        title: '평균보다 더 좋은 흐름을 보이고 있어요',
-        description: `오늘 공부 시간이 직전 7일 평균보다 ${growthCelebrationCandidate.increaseRate}% 높습니다. 학습 리듬이 점점 안정되고 있어요.`,
-      };
-    }
-
-    if (weeklyPlanCompletionRate >= 85 && penaltyRecovery.effectivePoints === 0) {
-      return {
-        badgeLabel: '안정 성장',
-        badgeClassName: 'border-emerald-200 bg-emerald-50 text-emerald-700',
-        title: '루틴이 안정적으로 유지되고 있어요',
-        description: '계획 이행과 생활 리듬이 모두 차분하게 이어지고 있습니다. 부모님이 보시기에도 안심되는 흐름이에요.',
-      };
-    }
-
-    if (attendanceStatus.label.includes('학습') || attendanceStatus.label.includes('귀가')) {
-      return {
-        badgeLabel: '실시간 확인',
-        badgeClassName: 'border-[#d8e5ff] bg-[#eef4ff] text-[#14295F]',
-        title: '오늘의 학습 흐름을 앱에서 바로 확인할 수 있어요',
-        description: '등원 상태, 공부 시간, 계획 달성률을 한 화면에서 빠르게 보실 수 있도록 정리했습니다.',
-      };
-    }
-
-    return {
-      badgeLabel: '안심 체크',
-      badgeClassName: 'border-slate-200 bg-white text-slate-600',
-      title: '자녀의 오늘 흐름을 차분하게 확인해 보세요',
-      description: '학습 리듬과 생활 상태를 복잡하지 않게, 앱 기준으로 보기 쉽게 모았습니다.',
-    };
-  }, [
-    growthCelebrationCandidate,
-    weeklyPlanCompletionRate,
-    penaltyRecovery.effectivePoints,
-    attendanceStatus.label,
-  ]);
   const homeStudyTone = PARENT_HOME_METRIC_TONE_STYLES.study;
   const homePlanTone = PARENT_HOME_METRIC_TONE_STYLES.plan;
   const homeAttendanceTone = PARENT_HOME_METRIC_TONE_STYLES.attendance;
@@ -3563,76 +3523,6 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
         ) : null}
 
         <TabsContent value="home" className="parent-tab-panel mt-0 space-y-4 sm:space-y-5">
-          <section
-            className={cn(
-              'on-dark relative overflow-hidden rounded-[2.45rem] border border-[#24437f] bg-[linear-gradient(155deg,#1d3d79_0%,#14295F_52%,#0d1c45_100%)] p-5 shadow-[0_30px_70px_-44px_rgba(20,41,95,0.58)] sm:p-6',
-              showEntryMotion && 'parent-hero-enter parent-entry-delay-2'
-            )}
-          >
-            <div className="soft-glow absolute -right-8 top-0 h-28 w-28 rounded-full bg-[#ffbf7d]/24 blur-3xl" />
-            <div className="soft-glow absolute -left-10 bottom-0 h-24 w-24 rounded-full bg-[#7aa6ff]/18 blur-3xl" />
-            <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(255,255,255,0.12),transparent_26%),radial-gradient(circle_at_bottom_right,rgba(255,122,22,0.24),transparent_34%)]" />
-            <div className="pointer-events-none absolute inset-x-0 bottom-0 h-24 bg-[linear-gradient(180deg,rgba(255,255,255,0)_0%,rgba(255,255,255,0.07)_100%)]" />
-
-            <div className="relative z-10 space-y-5">
-              <div className="flex flex-wrap items-center justify-between gap-2">
-                <Badge variant="outline" className="h-7 rounded-full border border-white/14 bg-white/10 px-3 text-[11px] font-black text-white shadow-[0_12px_28px_-22px_rgba(5,10,28,0.6)] backdrop-blur-sm">
-                  {today ? format(today, 'yyyy. MM. dd (EEE)', { locale: ko }) : '오늘'}
-                </Badge>
-                <div className="flex items-center gap-2 rounded-full border border-white/14 bg-white/10 px-3 py-1.5 shadow-[0_12px_28px_-22px_rgba(5,10,28,0.6)] backdrop-blur-sm">
-                  <span className="inline-flex h-2 w-2 rounded-full bg-[#FF7A16]" />
-                  <span className="text-[10px] font-black uppercase tracking-[0.18em] text-white">실시간 앱 모니터링</span>
-                </div>
-              </div>
-
-              <div className="space-y-2.5">
-                <p className="text-[10px] font-black uppercase tracking-[0.24em] text-white">Today Flow</p>
-                <div className="space-y-2">
-                  <p className="text-[12px] font-black tracking-tight text-white">{student?.name || '자녀'} 오늘 흐름</p>
-                  <h2 className="max-w-[18ch] break-keep text-[1.42rem] font-black leading-[1.14] tracking-[-0.045em] text-white sm:text-[1.82rem] md:max-w-none md:text-[2rem]">
-                    {heroTone.title}
-                  </h2>
-                  <p className="max-w-2xl break-keep text-[13px] font-bold leading-[1.72] text-white sm:text-sm md:text-[14px]">
-                    {heroTone.description}
-                  </p>
-                </div>
-              </div>
-
-              <div className="flex flex-wrap gap-2">
-                <Badge
-                  variant="outline"
-                  className={cn(
-                    'h-7 rounded-full border px-3 text-[11px] font-black shadow-[0_12px_24px_-22px_rgba(5,10,28,0.7)] backdrop-blur-sm',
-                    growthCelebrationCandidate ? 'border-[#ffb56c] bg-[#FF7A16] text-white' : 'border-white/14 bg-white/10 text-white'
-                  )}
-                >
-                  {heroTone.badgeLabel}
-                </Badge>
-                {growthCelebrationCandidate && (
-                  <Badge variant="outline" className="h-7 rounded-full border border-white/14 bg-white/10 px-3 text-[11px] font-black text-white shadow-[0_12px_24px_-22px_rgba(5,10,28,0.7)] backdrop-blur-sm">
-                    평균 대비 +{growthCelebrationCandidate.increaseRate}%
-                  </Badge>
-                )}
-                <Badge variant="outline" className="h-7 rounded-full border border-white/14 bg-white/10 px-3 text-[11px] font-black text-white shadow-[0_12px_24px_-22px_rgba(5,10,28,0.7)] backdrop-blur-sm">
-                  출결 {attendanceStatus.label.split('(')[0].trim()}
-                </Badge>
-              </div>
-
-              <div className="grid gap-3 rounded-[1.55rem] border border-white/12 bg-white/8 p-3.5 shadow-[inset_0_1px_0_rgba(255,255,255,0.08)] backdrop-blur-sm sm:grid-cols-[minmax(0,1fr)_auto]">
-                <div className="min-w-0">
-                  <p className="text-[10px] font-black uppercase tracking-[0.18em] text-white">오늘 먼저 볼 포인트</p>
-                  <p className="mt-1 break-keep text-[14px] font-black tracking-tight text-white">
-                    출결 {attendanceStatus.label.split('(')[0].trim()} · 계획 {planRate}% · 벌점 {penaltyRecovery.effectivePoints}점
-                  </p>
-                </div>
-                <div className="flex flex-wrap items-center gap-2 text-[11px] font-black text-white">
-                  <span className="rounded-full border border-white/10 bg-white/8 px-3 py-1.5">공부 {toHm(totalMinutes)}</span>
-                  <span className="rounded-full border border-white/10 bg-white/8 px-3 py-1.5">알림 {recentNotifications.length}건</span>
-                </div>
-              </div>
-            </div>
-          </section>
-
           <div className="grid grid-cols-2 gap-3 xl:gap-4">
             <ParentHomeMetricCardShell
               tone="study"
