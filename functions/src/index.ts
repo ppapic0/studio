@@ -1821,10 +1821,11 @@ function normalizeAttendanceRequestProofAttachments(params: {
 function shouldWaiveSameDayScheduleChangePenalty(
   category: "disaster" | "emergency" | "surgery" | "hospital" | "other" | ""
   ,
-  proofCount: number
+  proofCount: number,
+  parentContactConfirmed: boolean
 ) {
   if (category === "disaster" || category === "emergency" || category === "surgery") return true;
-  if (category === "hospital") return proofCount > 0;
+  if (category === "hospital") return proofCount > 0 && parentContactConfirmed;
   return false;
 }
 
@@ -7312,6 +7313,7 @@ export const submitAttendanceRequestSecure = functions.region(region).https.onCa
   const scheduleChangeAction = asTrimmedString(data?.scheduleChangeAction) as "save" | "absent" | "reset" | "";
   const classScheduleId = asTrimmedString(data?.classScheduleId);
   const classScheduleName = asTrimmedString(data?.classScheduleName);
+  const parentContactConfirmed = Boolean(data?.parentContactConfirmed);
 
   if (!centerId) {
     throw new functions.https.HttpsError("invalid-argument", "centerId is required.", {
@@ -7422,7 +7424,7 @@ export const submitAttendanceRequestSecure = functions.region(region).https.onCa
     : [];
   const penaltyPointsDelta = ATTENDANCE_REQUEST_PENALTY_POINTS[requestType];
   const penaltyShouldBeWaived = requestType === "schedule_change"
-    ? shouldWaiveSameDayScheduleChangePenalty(reasonCategory, proofAttachments.length)
+    ? shouldWaiveSameDayScheduleChangePenalty(reasonCategory, proofAttachments.length, parentContactConfirmed)
     : false;
   const penaltyKey = requestType === "schedule_change" ? `same_day_routine:${requestDate}` : "";
   const penaltyDateKey = requestType === "schedule_change" ? requestDate : "";
@@ -7465,6 +7467,8 @@ export const submitAttendanceRequestSecure = functions.region(region).https.onCa
       penaltyPointsDelta: penaltyApplied ? penaltyPointsDelta : 0,
       penaltyWaived: requestType === "schedule_change" ? penaltyShouldBeWaived : false,
       proofRequired: requestType === "schedule_change" ? reasonCategory === "hospital" && proofAttachments.length === 0 : false,
+      parentContactRequired: requestType === "schedule_change" ? reasonCategory === "hospital" && !parentContactConfirmed : false,
+      parentContactConfirmed: requestType === "schedule_change" ? parentContactConfirmed : false,
       proofAttachments,
       requestedArrivalTime: requestedArrivalTime || null,
       requestedDepartureTime: requestedDepartureTime || null,

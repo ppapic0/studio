@@ -33,7 +33,7 @@ export const SCHEDULE_CHANGE_REASON_OPTIONS: Array<{
   { value: 'disaster', label: '천재지변', description: '태풍, 폭설처럼 불가항력 상황이면 벌점이 면제됩니다.' },
   { value: 'emergency', label: '긴급', description: '가정·안전 관련 긴급 상황이면 벌점이 면제됩니다.' },
   { value: 'surgery', label: '수술', description: '수술 일정은 벌점 없이 변경 신청할 수 있습니다.' },
-  { value: 'hospital', label: '병원', description: '약봉지나 진료 자료를 첨부해야만 벌점이 면제됩니다.' },
+  { value: 'hospital', label: '병원', description: '진료 확인·처방 자료와 학부모님 연락이 모두 확인되어야 벌점이 면제됩니다.' },
   { value: 'other', label: '기타', description: '그 외 사유는 원칙대로 벌점이 반영됩니다.' },
 ];
 
@@ -51,10 +51,11 @@ export function getScheduleChangeReasonLabel(category?: AttendanceRequestReasonC
 
 export function shouldWaiveScheduleChangePenalty(
   category?: AttendanceRequestReasonCategory | null,
-  proofCount = 0
+  proofCount = 0,
+  parentContactConfirmed = false
 ) {
   if (category === 'disaster' || category === 'emergency' || category === 'surgery') return true;
-  if (category === 'hospital') return proofCount > 0;
+  if (category === 'hospital') return proofCount > 0 && parentContactConfirmed;
   return false;
 }
 

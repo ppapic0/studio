@@ -652,6 +652,7 @@ export default function StudyPlanPage() {
   const [pendingSameDayChangeAction, setPendingSameDayChangeAction] = useState<SameDayScheduleChangeAction>('save');
   const [sameDayReasonCategory, setSameDayReasonCategory] = useState<AttendanceRequestReasonCategory>('other');
   const [sameDayReason, setSameDayReason] = useState('');
+  const [sameDayParentContactConfirmed, setSameDayParentContactConfirmed] = useState(false);
   const [sameDayProofDrafts, setSameDayProofDrafts] = useState<AttendanceProofDraft[]>([]);
 
   useEffect(() => {
@@ -2322,6 +2323,7 @@ export default function StudyPlanPage() {
   const resetSameDayChangeRequestState = useCallback(() => {
     setSameDayReasonCategory('other');
     setSameDayReason('');
+    setSameDayParentContactConfirmed(false);
     resetSameDayChangeDrafts();
   }, [resetSameDayChangeDrafts]);
 
@@ -3039,6 +3041,7 @@ export default function StudyPlanPage() {
         requestDate: selectedDateKey,
         reason: trimmedReason,
         reasonCategory: sameDayReasonCategory,
+        parentContactConfirmed: sameDayParentContactConfirmed,
         requestedArrivalTime: pendingSameDayChangeAction === 'save' ? draft.inTime : null,
         requestedDepartureTime: pendingSameDayChangeAction === 'save' ? draft.outTime : null,
         requestedAcademyName: pendingSameDayChangeAction === 'save' ? draft.academyName || null : null,
@@ -3090,6 +3093,7 @@ export default function StudyPlanPage() {
     pendingSameDayChangeAction,
     resetSameDayChangeRequestState,
     sameDayProofDrafts.length,
+    sameDayParentContactConfirmed,
     sameDayReason,
     sameDayReasonCategory,
     selectedDateKey,
@@ -4600,6 +4604,8 @@ export default function StudyPlanPage() {
         onReasonCategoryChange={setSameDayReasonCategory}
         reason={sameDayReason}
         onReasonChange={setSameDayReason}
+        parentContactConfirmed={sameDayParentContactConfirmed}
+        onParentContactConfirmedChange={setSameDayParentContactConfirmed}
         proofDrafts={sameDayProofDrafts.map((proof) => ({
           id: proof.id,
           name: proof.file.name,

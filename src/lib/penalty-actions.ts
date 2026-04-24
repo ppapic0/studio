@@ -41,6 +41,7 @@ type SubmitAttendanceRequestSecureInput = {
   requestDate: string;
   reason: string;
   reasonCategory?: AttendanceRequestReasonCategory;
+  parentContactConfirmed?: boolean;
   requestedArrivalTime?: string | null;
   requestedDepartureTime?: string | null;
   requestedAcademyName?: string | null;

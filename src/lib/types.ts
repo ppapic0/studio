@@ -1248,6 +1248,8 @@ export interface AttendanceRequest {
   penaltyPointsDelta?: number;
   penaltyWaived?: boolean;
   proofRequired?: boolean;
+  parentContactRequired?: boolean;
+  parentContactConfirmed?: boolean;
   proofAttachments?: AttendanceRequestProofAttachment[];
   requestedArrivalTime?: string | null;
   requestedDepartureTime?: string | null;

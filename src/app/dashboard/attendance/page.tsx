@@ -1441,6 +1441,13 @@ export default function AttendancePage() {
                                 {getScheduleChangeReasonLabel(req.reasonCategory)}
                               </Badge>
                             ) : null}
+                            {req.reasonCategory === 'hospital' ? (
+                              req.parentContactConfirmed ? (
+                                <Badge className="bg-emerald-100 text-emerald-700 border-none font-black text-[9px]">학부모 연락 확인</Badge>
+                              ) : (
+                                <Badge className="bg-amber-100 text-amber-700 border-none font-black text-[9px]">학부모 연락 필요</Badge>
+                              )
+                            ) : null}
                           </div>
                           {req.type === 'schedule_change' ? (
                             <div className="flex flex-wrap gap-2 text-[11px] font-semibold text-[#5F739F]">
@@ -1471,8 +1478,14 @@ export default function AttendancePage() {
                               ))}
                             </div>
                           ) : null}
-                          {req.reasonCategory === 'hospital' && !req.proofAttachments?.length ? (
-                            <p className="text-[10px] font-black text-amber-600">병원 증빙이 없어 벌점 면제 조건을 충족하지 못했습니다.</p>
+                          {req.reasonCategory === 'hospital' && (!req.proofAttachments?.length || !req.parentContactConfirmed) ? (
+                            <p className="text-[10px] font-black text-amber-600">
+                              {!req.proofAttachments?.length && !req.parentContactConfirmed
+                                ? '진료 확인·처방 자료와 학부모님 연락 확인이 없어 벌점 면제 조건을 충족하지 못했습니다.'
+                                : !req.proofAttachments?.length
+                                  ? '진료 확인·처방 자료가 없어 벌점 면제 조건을 충족하지 못했습니다.'
+                                  : '학부모님 연락 확인이 없어 벌점 면제 조건을 충족하지 못했습니다.'}
+                            </p>
                           ) : null}
                           <p className="text-[10px] font-bold text-muted-foreground ml-1">신청 시각: {req.createdAt ? format(req.createdAt.toDate(), 'yyyy.MM.dd HH:mm') : '-'}</p>
                         </div>

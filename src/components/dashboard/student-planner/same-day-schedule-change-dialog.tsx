@@ -5,6 +5,7 @@ import { AlertCircle, Loader2, Upload, X } from 'lucide-react';
 
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { Checkbox } from '@/components/ui/checkbox';
 import {
   Dialog,
   DialogContent,
@@ -48,6 +49,8 @@ type SameDayScheduleChangeDialogProps = {
   onReasonCategoryChange: (value: AttendanceRequestReasonCategory) => void;
   reason: string;
   onReasonChange: (value: string) => void;
+  parentContactConfirmed: boolean;
+  onParentContactConfirmedChange: (value: boolean) => void;
   proofDrafts: ProofDraft[];
   onProofInputChange: (event: ChangeEvent<HTMLInputElement>) => void;
   onRemoveProof: (proofId: string) => void;
@@ -66,13 +69,28 @@ export function SameDayScheduleChangeDialog({
   onReasonCategoryChange,
   reason,
   onReasonChange,
+  parentContactConfirmed,
+  onParentContactConfirmedChange,
   proofDrafts,
   onProofInputChange,
   onRemoveProof,
   onConfirm,
 }: SameDayScheduleChangeDialogProps) {
   const proofRequired = reasonCategory === 'hospital';
-  const penaltyWaived = shouldWaiveScheduleChangePenalty(reasonCategory, proofDrafts.length);
+  const proofMissing = proofRequired && proofDrafts.length === 0;
+  const parentContactMissing = proofRequired && !parentContactConfirmed;
+  const penaltyWaived = shouldWaiveScheduleChangePenalty(
+    reasonCategory,
+    proofDrafts.length,
+    parentContactConfirmed
+  );
+  const hospitalRequirementMessage = proofMissing && parentContactMissing
+    ? '병원 사유인데 진료 확인·처방 자료와 학부모님 연락 확인이 아직 없어요. 지금 제출하면 변경은 저장되지만 벌점은 면제되지 않습니다.'
+    : proofMissing
+      ? '병원 사유인데 진료 확인·처방 자료가 아직 없어요. 지금 제출하면 변경은 저장되지만 벌점은 면제되지 않습니다.'
+      : parentContactMissing
+        ? '병원 사유인데 학부모님 연락 확인이 아직 없어요. 지금 제출하면 변경은 저장되지만 벌점은 면제되지 않습니다.'
+        : '';
 
   return (
     <Dialog open={open} onOpenChange={(nextOpen) => !isSubmitting && onOpenChange(nextOpen)}>
@@ -81,7 +99,7 @@ export function SameDayScheduleChangeDialog({
           <DialogHeader className="text-left">
             <DialogTitle className="text-xl font-black tracking-tight text-white">당일 등하원 변경 사유 확인</DialogTitle>
             <DialogDescription className="mt-1 break-keep text-[12px] font-semibold leading-5 text-white/72">
-              {selectedDateLabel} 일정은 당일 변경 정책에 따라 사유와 증빙을 함께 남겨야 해요.
+              {selectedDateLabel} 일정은 당일 신청 시 벌점이 부과되며, 아픈 경우에는 진료 확인·처방 자료와 학부모님 연락이 함께 필요해요.
             </DialogDescription>
           </DialogHeader>
         </div>
@@ -140,9 +158,9 @@ export function SameDayScheduleChangeDialog({
           <div className="space-y-2">
             <div className="flex items-center justify-between gap-2">
               <div>
-                <Label className="ml-1 text-[10px] font-black uppercase tracking-[0.18em] text-[#5F739F]">병원 증빙 사진</Label>
+                <Label className="ml-1 text-[10px] font-black uppercase tracking-[0.18em] text-[#5F739F]">진료 확인 / 처방 증빙</Label>
                 <p className="ml-1 mt-1 text-[11px] font-semibold leading-5 text-[#5F739F]">
-                  병원 사유는 약봉지, 처방전, 진료 확인 자료가 있어야 벌점이 면제돼요.
+                  병원 사유는 진료 확인서, 처방전, 약봉지 같은 자료가 있어야 벌점 면제 검토가 가능해요.
                 </p>
               </div>
               <Badge variant="outline" className="rounded-full border-[#D8E4FB] bg-[#F8FBFF] text-[10px] font-black text-[#5F739F]">
@@ -166,12 +184,37 @@ export function SameDayScheduleChangeDialog({
               />
             </label>
 
-            {proofRequired && proofDrafts.length === 0 ? (
+            {proofRequired ? (
+              <div className="rounded-[1rem] border border-[#D8E4FB] bg-[#F8FBFF] px-4 py-3">
+                <div className="flex items-start gap-3">
+                  <Checkbox
+                    id="same-day-parent-contact"
+                    checked={parentContactConfirmed}
+                    onCheckedChange={(checked) => onParentContactConfirmedChange(checked === true)}
+                    disabled={isSubmitting}
+                    className="mt-0.5 border-[#B9C9E8] data-[state=checked]:border-[#17326B] data-[state=checked]:bg-[#17326B]"
+                  />
+                  <div>
+                    <Label
+                      htmlFor="same-day-parent-contact"
+                      className="text-[11px] font-black text-[#17326B]"
+                    >
+                      학부모님께 연락드렸어요
+                    </Label>
+                    <p className="mt-1 text-[11px] font-semibold leading-5 text-[#5F739F]">
+                      병원 사유는 진료 확인·처방 자료와 함께 학부모님 연락 확인까지 있어야 벌점이 면제돼요.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            ) : null}
+
+            {proofRequired && hospitalRequirementMessage ? (
               <div className="rounded-[1rem] border border-amber-200 bg-amber-50 px-4 py-3">
                 <div className="flex items-start gap-2">
                   <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-amber-500" />
                   <p className="text-[11px] font-semibold leading-5 text-amber-700">
-                    병원 사유인데 증빙이 아직 없어요. 지금 제출하면 변경은 저장되지만 벌점은 면제되지 않습니다.
+                    {hospitalRequirementMessage}
                   </p>
                 </div>
               </div>
