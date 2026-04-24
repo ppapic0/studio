@@ -3749,14 +3749,20 @@ function assertInviteUsable(inv: InviteDoc, expectedRole?: AllowedRole) {
   }
 }
 
-const defaultStudyRoomScheduleWeekdays = [1, 2, 3, 4, 5, 6, 0];
+const sharedStudyRoomScheduleWeekdays = [1, 2, 3, 4, 5, 0];
+const saturdayStudyRoomScheduleWeekdays = [6];
+const nsuStudyRoomScheduleWeekdays = [1, 2, 3, 4, 5, 6, 0];
 const sharedStudyRoomArrivalTime = "18:00";
 const sharedStudyRoomDepartureTime = "23:30";
+const saturdayStudyRoomArrivalTime = "08:30";
+const saturdayStudyRoomDepartureTime = "16:40";
 const nsuStudyRoomArrivalTime = "17:00";
 const nsuStudyRoomDepartureTime = "01:00";
 const defaultStudyRoomScheduleTemplateId = "default-shared-study-room-schedule";
+const saturdayStudyRoomScheduleTemplateId = "default-saturday-mandatory-track-schedule";
 const nsuStudyRoomScheduleTemplateId = "default-nsu-study-room-schedule";
 const sharedStudyRoomClassScheduleId = "shared-study-room-schedule";
+const saturdayStudyRoomClassScheduleId = "saturday-mandatory-track-schedule";
 const nsuStudyRoomClassScheduleId = "nsu-study-room-schedule";
 
 function isNsuStudyRoomClassName(className: unknown): boolean {
@@ -3781,18 +3787,47 @@ function buildDefaultStudyRoomScheduleTemplateData(params: {
   timestamp: admin.firestore.Timestamp;
 }) {
   const isNsu = isNsuStudyRoomClassName(params.className);
-  const classScheduleName = isNsu ? "N수반 교시제" : "센터 공통 교시제";
-  const arrivalPlannedAt = isNsu ? nsuStudyRoomArrivalTime : sharedStudyRoomArrivalTime;
-  const departurePlannedAt = isNsu ? nsuStudyRoomDepartureTime : sharedStudyRoomDepartureTime;
+  const templateConfigs = isNsu
+    ? [
+        {
+          id: nsuStudyRoomScheduleTemplateId,
+          classScheduleId: nsuStudyRoomClassScheduleId,
+          classScheduleName: "N수반 트랙제",
+          weekdays: nsuStudyRoomScheduleWeekdays,
+          arrivalPlannedAt: nsuStudyRoomArrivalTime,
+          departurePlannedAt: nsuStudyRoomDepartureTime,
+          note: "N수반은 센터 공통 트랙제와 별도 기준으로 운영합니다. 특이사항이 있는 학생만 학원 일정을 별도로 등록합니다.",
+        },
+      ]
+    : [
+        {
+          id: defaultStudyRoomScheduleTemplateId,
+          classScheduleId: sharedStudyRoomClassScheduleId,
+          classScheduleName: "센터 공통 트랙제",
+          weekdays: sharedStudyRoomScheduleWeekdays,
+          arrivalPlannedAt: sharedStudyRoomArrivalTime,
+          departurePlannedAt: sharedStudyRoomDepartureTime,
+          note: "의무 등원은 18:00, 의무 하원은 23:30입니다. 특이사항이 없으면 이 트랙제를 그대로 따르고, 학원 일정이 있는 학생만 별도로 등록합니다.",
+        },
+        {
+          id: saturdayStudyRoomScheduleTemplateId,
+          classScheduleId: saturdayStudyRoomClassScheduleId,
+          classScheduleName: "토요일 의무 트랙제",
+          weekdays: saturdayStudyRoomScheduleWeekdays,
+          arrivalPlannedAt: saturdayStudyRoomArrivalTime,
+          departurePlannedAt: saturdayStudyRoomDepartureTime,
+          note: "토요일은 의무 트랙제로 운영합니다. 08:30 입실 후 16:40 기록 마감까지 토요일 전용 트랙을 따릅니다.",
+        },
+      ];
 
-  return {
-    id: isNsu ? nsuStudyRoomScheduleTemplateId : defaultStudyRoomScheduleTemplateId,
+  return templateConfigs.map((config) => ({
+    id: config.id,
     data: {
       centerId: params.centerId,
-      name: `${classScheduleName} 기본 등하원`,
-      weekdays: defaultStudyRoomScheduleWeekdays,
-      arrivalPlannedAt,
-      departurePlannedAt,
+      name: `${config.classScheduleName} 기본 등하원`,
+      weekdays: config.weekdays,
+      arrivalPlannedAt: config.arrivalPlannedAt,
+      departurePlannedAt: config.departurePlannedAt,
       academyNameDefault: null,
       academyStartAtDefault: null,
       academyEndAtDefault: null,
@@ -3800,18 +3835,16 @@ function buildDefaultStudyRoomScheduleTemplateData(params: {
       defaultExcursionStartAt: null,
       defaultExcursionEndAt: null,
       defaultExcursionReason: null,
-      note: isNsu
-        ? "N수반은 센터 공통 교시제와 별도 기준으로 운영합니다. 특이사항이 있는 학생만 학원 일정을 별도로 등록합니다."
-        : "의무 등원은 18:00, 의무 하원은 23:30입니다. 특이사항이 없으면 이 교시제를 그대로 따르고, 학원 일정이 있는 학생만 별도로 등록합니다.",
-      classScheduleId: isNsu ? nsuStudyRoomClassScheduleId : sharedStudyRoomClassScheduleId,
-      classScheduleName,
+      note: config.note,
+      classScheduleId: config.classScheduleId,
+      classScheduleName: config.classScheduleName,
       active: true,
       timezone: "Asia/Seoul",
       source: "default-study-room-class-schedule",
       createdAt: params.timestamp,
       updatedAt: params.timestamp,
     },
-  };
+  }));
 }
 
 function seedDefaultStudyRoomScheduleTemplateInTransaction(params: {
@@ -3822,17 +3855,19 @@ function seedDefaultStudyRoomScheduleTemplateInTransaction(params: {
   className: string | null;
   timestamp: admin.firestore.Timestamp;
 }) {
-  const template = buildDefaultStudyRoomScheduleTemplateData({
+  const templates = buildDefaultStudyRoomScheduleTemplateData({
     centerId: params.centerId,
     className: params.className,
     timestamp: params.timestamp,
   });
 
-  params.transaction.set(
-    params.db.doc(`users/${params.uid}/scheduleTemplates/${template.id}`),
-    template.data,
-    { merge: true }
-  );
+  templates.forEach((template) => {
+    params.transaction.set(
+      params.db.doc(`users/${params.uid}/scheduleTemplates/${template.id}`),
+      template.data,
+      { merge: true }
+    );
+  });
 }
 
 export const deleteStudentAccount = functions.region(region).runWith({

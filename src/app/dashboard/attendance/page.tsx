@@ -72,6 +72,7 @@ import {
   SHARED_STUDY_ROOM_MANDATORY_DEPARTURE_TIME,
   buildSharedStudyRoomClassSchedules,
   getStudyRoomClassScheduleDisplayName,
+  toStudyRoomTrackScheduleName,
 } from '@/lib/study-room-class-schedule';
 import {
   canManageSettings,
@@ -185,11 +186,11 @@ export default function AttendancePage() {
   const [classScheduleDepartureTime, setClassScheduleDepartureTime] = useState(SHARED_STUDY_ROOM_MANDATORY_DEPARTURE_TIME);
   const [classScheduleNote, setClassScheduleNote] = useState('');
   const [classScheduleBlocks, setClassScheduleBlocks] = useState<StudyRoomPeriodBlock[]>([
-    createPeriodBlock({ label: '1교시', startTime: '18:10', endTime: '19:30' }),
-    createPeriodBlock({ label: '2교시', startTime: '19:40', endTime: '21:00' }),
-    createPeriodBlock({ label: '3교시', startTime: '21:20', endTime: '22:40' }),
-    createPeriodBlock({ label: '의무관리', startTime: '22:50', endTime: '23:30', description: '자습 / 오답정리 / 테스트 / 질의응답' }),
-    createPeriodBlock({ label: '4교시', startTime: '23:30', endTime: '00:50', description: '심화반 / 보강 / 선택자습' }),
+    createPeriodBlock({ label: '1트랙', startTime: '18:10', endTime: '19:30' }),
+    createPeriodBlock({ label: '2트랙', startTime: '19:40', endTime: '21:00' }),
+    createPeriodBlock({ label: '3트랙', startTime: '21:20', endTime: '22:40' }),
+    createPeriodBlock({ label: '의무 트랙', startTime: '22:50', endTime: '23:30', description: '자습 / 오답정리 / 테스트 / 질의응답' }),
+    createPeriodBlock({ label: '4트랙', startTime: '23:30', endTime: '00:50', description: '심화반 / 보강 / 선택자습' }),
   ]);
 
   useEffect(() => {
@@ -590,7 +591,7 @@ export default function AttendancePage() {
       return;
     }
     if (trimmedBlocks.length === 0) {
-      toast({ variant: 'destructive', title: '최소 1개 이상의 교시 블록이 필요해요.' });
+      toast({ variant: 'destructive', title: '최소 1개 이상의 트랙 블록이 필요해요.' });
       return;
     }
 
@@ -617,13 +618,13 @@ export default function AttendancePage() {
       }, { merge: true });
 
       toast({
-        title: editingClassScheduleId ? '교시제를 수정했어요.' : '교시제를 등록했어요.',
+        title: editingClassScheduleId ? '트랙제를 수정했어요.' : '트랙제를 등록했어요.',
         description: `${trimmedClassName} 반 일정이 학생 일정 설정에 바로 반영됩니다.`,
       });
       resetClassScheduleForm();
     } catch (error) {
       logHandledClientIssue('[attendance] save class schedule failed', error);
-      toast({ variant: 'destructive', title: '교시제 저장 실패' });
+      toast({ variant: 'destructive', title: '트랙제 저장 실패' });
     } finally {
       setIsProcessing(false);
     }
@@ -631,7 +632,7 @@ export default function AttendancePage() {
 
   const handleDeleteClassSchedule = async (scheduleId?: string | null) => {
     if (!firestore || !centerId || !scheduleId) return;
-    const shouldDelete = window.confirm('이 교시제를 삭제할까요?');
+    const shouldDelete = window.confirm('이 트랙제를 삭제할까요?');
     if (!shouldDelete) return;
 
     setIsProcessing(true);
@@ -640,10 +641,10 @@ export default function AttendancePage() {
       if (editingClassScheduleId === scheduleId) {
         resetClassScheduleForm();
       }
-      toast({ title: '교시제를 삭제했어요.' });
+      toast({ title: '트랙제를 삭제했어요.' });
     } catch (error) {
       logHandledClientIssue('[attendance] delete class schedule failed', error);
-      toast({ variant: 'destructive', title: '교시제 삭제 실패' });
+      toast({ variant: 'destructive', title: '트랙제 삭제 실패' });
     } finally {
       setIsProcessing(false);
     }
@@ -864,11 +865,11 @@ export default function AttendancePage() {
     setClassScheduleDepartureTime(SHARED_STUDY_ROOM_MANDATORY_DEPARTURE_TIME);
     setClassScheduleNote('');
     setClassScheduleBlocks([
-      createPeriodBlock({ label: '1교시', startTime: '18:10', endTime: '19:30' }),
-      createPeriodBlock({ label: '2교시', startTime: '19:40', endTime: '21:00' }),
-      createPeriodBlock({ label: '3교시', startTime: '21:20', endTime: '22:40' }),
-      createPeriodBlock({ label: '의무관리', startTime: '22:50', endTime: '23:30', description: '자습 / 오답정리 / 테스트 / 질의응답' }),
-      createPeriodBlock({ label: '4교시', startTime: '23:30', endTime: '00:50', description: '심화반 / 보강 / 선택자습' }),
+      createPeriodBlock({ label: '1트랙', startTime: '18:10', endTime: '19:30' }),
+      createPeriodBlock({ label: '2트랙', startTime: '19:40', endTime: '21:00' }),
+      createPeriodBlock({ label: '3트랙', startTime: '21:20', endTime: '22:40' }),
+      createPeriodBlock({ label: '의무 트랙', startTime: '22:50', endTime: '23:30', description: '자습 / 오답정리 / 테스트 / 질의응답' }),
+      createPeriodBlock({ label: '4트랙', startTime: '23:30', endTime: '00:50', description: '심화반 / 보강 / 선택자습' }),
     ]);
   }, [classNameOptions]);
 
@@ -1205,8 +1206,8 @@ export default function AttendancePage() {
         <TabsContent value="requests" className="animate-in fade-in duration-500">
           <Card className="rounded-[2.5rem] border-none shadow-xl bg-white overflow-hidden ring-1 ring-border/50">
             <CardHeader className="bg-muted/5 border-b p-8">
-              <CardTitle className="text-xl font-black tracking-tight">교시제 및 출결 변경 신청 관리</CardTitle>
-              <CardDescription className="text-xs font-bold text-muted-foreground">센터 공통 교시제를 기준으로 학생들의 당일 변경 사유를 함께 검토합니다.</CardDescription>
+              <CardTitle className="text-xl font-black tracking-tight">트랙제 및 출결 변경 신청 관리</CardTitle>
+              <CardDescription className="text-xs font-bold text-muted-foreground">센터 공통 트랙제를 기준으로 학생들의 당일 변경 사유를 함께 검토합니다.</CardDescription>
             </CardHeader>
             <CardContent className="p-0">
               {requestsLoading ? <div className='flex justify-center py-20'><Loader2 className="h-8 w-8 animate-spin text-primary opacity-20"/></div> :
@@ -1215,10 +1216,10 @@ export default function AttendancePage() {
                   <div className="rounded-[1.8rem] border border-[#DCE6F7] bg-white p-5 shadow-sm">
                     <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
                       <div>
-                        <p className="text-[11px] font-black uppercase tracking-[0.18em] text-[#5F739F]">센터 공통 교시제</p>
-                        <h3 className="mt-1 text-lg font-black tracking-tight text-[#17326B]">전달해주신 독서실 교시제를 기본값으로 적용</h3>
+                        <p className="text-[11px] font-black uppercase tracking-[0.18em] text-[#5F739F]">센터 공통 트랙제</p>
+                        <h3 className="mt-1 text-lg font-black tracking-tight text-[#17326B]">전달해주신 독서실 트랙제를 기본값으로 적용</h3>
                         <p className="mt-1 text-[11px] font-semibold leading-5 text-[#5F739F]">
-                          선생님이 반마다 따로 등록하지 않아도 학생 출석정보 수정 화면에서 이 공통 교시제가 기본값으로 바로 적용됩니다.
+                          선생님이 반마다 따로 등록하지 않아도 학생 출석정보 수정 화면에서 이 공통 트랙제가 기본값으로 바로 적용됩니다.
                         </p>
                       </div>
                       <Badge className="h-10 rounded-full border border-[#DCE6F7] bg-[#F8FBFF] px-4 text-[11px] font-black text-[#17326B] shadow-none">
@@ -1229,7 +1230,7 @@ export default function AttendancePage() {
                     <div className="mt-4 space-y-3">
                       {visibleClassSchedules.length === 0 ? (
                         <div className="rounded-[1rem] border border-dashed border-[#DCE6F7] bg-[#F8FBFF] px-4 py-6 text-center text-[11px] font-semibold text-[#5F739F]">
-                          공통 교시제 정보를 아직 불러오지 못했어요.
+                          공통 트랙제 정보를 아직 불러오지 못했어요.
                         </div>
                       ) : visibleClassSchedules.map((schedule) => (
                         <div key={schedule.id} className="rounded-[1.1rem] border border-[#E4ECF9] bg-[#F9FBFF] p-4">
@@ -1329,7 +1330,7 @@ export default function AttendancePage() {
                               {req.requestedAcademyStartTime && req.requestedAcademyEndTime ? (
                                 <span>학원 {req.requestedAcademyStartTime} ~ {req.requestedAcademyEndTime}{req.requestedAcademyName ? ` · ${req.requestedAcademyName}` : ''}</span>
                               ) : null}
-                              {req.classScheduleName?.trim() ? <span>{req.classScheduleName.trim()}</span> : null}
+                              {req.classScheduleName?.trim() ? <span>{toStudyRoomTrackScheduleName(req.classScheduleName)}</span> : null}
                             </div>
                           ) : null}
                           <div className="p-4 rounded-2xl bg-[#fafafa] border shadow-inner">

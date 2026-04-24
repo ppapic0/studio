@@ -159,6 +159,7 @@ import {
   getAttendanceRequestTypeLabel,
 } from '@/lib/attendance-request';
 import {
+  SHARED_STUDY_ROOM_CLASS_SCHEDULE_ID,
   buildStudyRoomClassSchedulesForClassName,
   getStudyRoomClassScheduleDisplayName,
 } from '@/lib/study-room-class-schedule';
@@ -1002,7 +1003,13 @@ export default function StudyPlanPage() {
   const matchingWeekdayTemplate = useMemo(
     () =>
       activeScheduleTemplates.find((template) =>
-        Array.isArray(template.weekdays) && template.weekdays.includes(selectedWeekdayValue)
+        Array.isArray(template.weekdays) &&
+        template.weekdays.includes(selectedWeekdayValue) &&
+        !(
+          selectedWeekdayValue === 6 &&
+          template.source === 'default-study-room-class-schedule' &&
+          template.classScheduleId === SHARED_STUDY_ROOM_CLASS_SCHEDULE_ID
+        )
       ),
     [activeScheduleTemplates, selectedWeekdayValue]
   );

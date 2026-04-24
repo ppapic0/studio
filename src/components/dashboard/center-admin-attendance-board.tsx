@@ -13,6 +13,7 @@ import {
   type CenterAdminAttendanceBoardSummary,
   type CenterAdminAttendanceSeatSignal,
 } from '@/lib/center-admin-attendance-board';
+import { toStudyRoomTrackScheduleName } from '@/lib/study-room-class-schedule';
 import type { AttendanceCurrent, CenterMembership, LayoutRoomConfig, StudentProfile } from '@/lib/types';
 import { cn } from '@/lib/utils';
 
@@ -519,13 +520,13 @@ export function CenterAdminAttendanceBoard({
         <div className={cn('flex gap-4', isMobile ? 'flex-col' : 'items-start justify-between')}>
           <div className="space-y-2">
             <Badge className="h-6 rounded-full border-none bg-[#FFF1E4] px-2.5 text-[10px] font-black uppercase tracking-[0.16em] text-[#C95A08]">
-              교시제 예외 관리
+              트랙제 예외 관리
             </Badge>
             <h3 className="text-[1.35rem] font-black tracking-tight text-[#14295F] sm:text-[1.55rem]">
               중간 하원과 재등원 학생만 따로 봅니다
             </h3>
             <p className="max-w-[46rem] text-xs font-bold leading-5 text-slate-500 sm:text-sm">
-              미입실·지각은 위 출석 카드에서 보고, 여기서는 교시제 중간 이동이 생긴 학생만 빠르게 확인하면 됩니다.
+              미입실·지각은 위 출석 카드에서 보고, 여기서는 트랙제 중간 이동이 생긴 학생만 빠르게 확인하면 됩니다.
             </p>
           </div>
           <div className={cn('grid gap-2', isMobile ? 'grid-cols-2' : 'grid-cols-4')}>
@@ -554,7 +555,7 @@ export function CenterAdminAttendanceBoard({
           <div className="rounded-[1.6rem] border border-dashed border-[#DCE7FF] bg-[#F8FBFF] px-5 py-8 text-center text-[#14295F]">
             <p className="text-sm font-black">현재 중간 이동 관리 대상이 없습니다.</p>
             <p className="mt-2 text-xs font-bold leading-5 text-slate-500 sm:text-sm">
-              미입실·지각 신호 외에는 나머지 학생을 교시제 기준 흐름으로 보면 됩니다.
+              미입실·지각 신호 외에는 나머지 학생을 트랙제 기준 흐름으로 보면 됩니다.
             </p>
           </div>
         ) : (
@@ -613,7 +614,7 @@ export function CenterAdminAttendanceBoard({
                         ) : null}
                         {signal.classScheduleName?.trim() ? (
                           <Badge className="h-6 rounded-full border border-[#DCE7FF] bg-white px-2.5 text-[10px] font-black text-[#5F739F]">
-                            {signal.classScheduleName.trim()}
+                            {toStudyRoomTrackScheduleName(signal.classScheduleName)}
                           </Badge>
                         ) : null}
                         {scheduleRange ? (

@@ -28,7 +28,10 @@ import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { validateScheduleDraft } from '@/features/schedules/lib/scheduleModel';
 import { buildStudyRoomClassScheduleSummary, formatStudyRoomWeekdays } from '@/lib/attendance-request';
-import { getStudyRoomClassScheduleDisplayName } from '@/lib/study-room-class-schedule';
+import {
+  getStudyRoomClassScheduleDisplayName,
+  toStudyRoomTrackScheduleName,
+} from '@/lib/study-room-class-schedule';
 import type { StudyPlanItem, StudyRoomClassScheduleTemplate, WithId } from '@/lib/types';
 import { cn } from '@/lib/utils';
 
@@ -168,10 +171,10 @@ function AttendanceDraftFields({
 
       {draft.classScheduleName?.trim() ? (
         <div className="rounded-[1rem] border border-[#D8E4FB] bg-[#F6F9FF] px-4 py-3">
-          <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#5F739F]">적용된 교시제</p>
-          <p className="mt-1 text-sm font-black text-[#17326B]">{draft.classScheduleName.trim()}</p>
+          <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#5F739F]">적용된 트랙제</p>
+          <p className="mt-1 text-sm font-black text-[#17326B]">{toStudyRoomTrackScheduleName(draft.classScheduleName)}</p>
           <p className="mt-1 text-[11px] font-semibold leading-5 text-[#5F739F]">
-            특이사항이 없으면 이 교시제대로 가고, 학원 수업이 있는 날만 아래에 추가해요.
+            특이사항이 없으면 이 트랙제대로 가고, 학원 수업이 있는 날만 아래에 추가해요.
           </p>
         </div>
       ) : null}
@@ -406,7 +409,7 @@ function ClassSchedulePreviewCard({
     <div className="rounded-[1.2rem] border border-[#D8E4FB] bg-[linear-gradient(180deg,#F7FAFF_0%,#FFFFFF_100%)] p-4">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0">
-          <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#5F739F]">센터 공통 교시제</p>
+          <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#5F739F]">센터 공통 트랙제</p>
           <p className="mt-1 text-sm font-black text-[#17326B]">{getStudyRoomClassScheduleDisplayName(schedule)}</p>
           <p className="mt-1 text-[11px] font-semibold leading-5 text-[#5F739F]">
             {buildStudyRoomClassScheduleSummary(schedule)}
@@ -660,7 +663,7 @@ export function AttendanceScheduleSheet({
                   출석 정보 수정
                 </DialogTitle>
                 <DialogDescription className="mt-1 text-[11px] font-semibold text-[#5F739F]">
-                  센터 공통 교시제를 기본으로 두고, 필요한 날만 예외를 정리해요.
+                  센터 공통 트랙제를 기본으로 두고, 필요한 날만 예외를 정리해요.
                 </DialogDescription>
               </div>
             </div>
@@ -770,7 +773,7 @@ export function AttendanceScheduleSheet({
                       : hasSelectedWeekdayTemplate
                         ? '기본 일정 적용 중'
                         : selectedDayUsesClassScheduleDefault
-                          ? '공통 교시제 기본값 적용 중'
+                          ? '공통 트랙제 기본값 적용 중'
                           : '아직 일정 없음'}
                   </p>
                   <p className="mt-1 text-[11px] font-semibold leading-5 opacity-80">
@@ -779,7 +782,7 @@ export function AttendanceScheduleSheet({
                       : hasSelectedWeekdayTemplate
                         ? `${selectedDateWeekdayLabel} 기본값이 이 날짜에도 적용돼요.`
                         : selectedDayUsesClassScheduleDefault
-                          ? `${selectedDateWeekdayLabel}에는 센터 공통 교시제를 기본으로 보고, 학원 같은 특이사항만 추가하면 돼요.`
+                          ? `${selectedDateWeekdayLabel}에는 센터 공통 트랙제를 기본으로 보고, 학원 같은 특이사항만 추가하면 돼요.`
                           : '이 날짜는 아직 저장된 기본 일정이나 예외가 없어요.'}
                   </p>
                 </div>
@@ -828,7 +831,7 @@ export function AttendanceScheduleSheet({
               {matchedClassSchedule ? (
                 <ClassSchedulePreviewCard
                   schedule={matchedClassSchedule}
-                  actionLabel="교시제 다시 적용"
+                  actionLabel="트랙제 다시 적용"
                   onApply={() => {
                     markAsLocallyEdited();
                     onApplyMatchedClassScheduleToToday();
@@ -836,9 +839,9 @@ export function AttendanceScheduleSheet({
                 />
               ) : (
                 <div className="rounded-[1.2rem] border border-dashed border-[#D8E4FB] bg-[#F8FBFF] px-4 py-4">
-                  <p className="text-[11px] font-black text-[#17326B]">센터 공통 교시제를 아직 불러오지 못했어요</p>
+                  <p className="text-[11px] font-black text-[#17326B]">센터 공통 트랙제를 아직 불러오지 못했어요</p>
                   <p className="mt-1 text-[11px] font-semibold leading-5 text-[#5F739F]">
-                    공통 교시제 정보가 준비되면 여기서 바로 불러와 등하원 기본값으로 적용돼요.
+                    공통 트랙제 정보가 준비되면 여기서 바로 불러와 등하원 기본값으로 적용돼요.
                   </p>
                 </div>
               )}
@@ -874,7 +877,7 @@ export function AttendanceScheduleSheet({
                   <p className="text-[11px] font-black uppercase tracking-[0.18em] text-[#5F739F]">주간 등원 일정</p>
                   <h3 className="mt-1 text-lg font-black tracking-tight text-[#17326B]">월~일 기본 일정을 간단히 정해두세요</h3>
                   <p className="mt-1 break-keep text-[11px] font-semibold leading-5 text-[#5F739F]">
-                    센터 공통 교시제를 기본으로 보고, 학원처럼 달라지는 학생만 추가로 조정해요.
+                    센터 공통 트랙제를 기본으로 보고, 학원처럼 달라지는 학생만 추가로 조정해요.
                   </p>
                 </div>
 
@@ -950,10 +953,10 @@ export function AttendanceScheduleSheet({
               {classSchedules.length > 0 ? (
                   <div className="rounded-[1.35rem] border border-[#D8E4FB] bg-white p-4 shadow-[0_18px_40px_-34px_rgba(15,33,73,0.16)]">
                     <div className="mb-3">
-                      <p className="text-[11px] font-black uppercase tracking-[0.18em] text-[#5F739F]">센터 공통 교시제</p>
+                      <p className="text-[11px] font-black uppercase tracking-[0.18em] text-[#5F739F]">센터 공통 트랙제</p>
                       <h3 className="mt-1 text-lg font-black tracking-tight text-[#17326B]">독서실 기본 운영 시간표</h3>
                       <p className="mt-1 break-keep text-[11px] font-semibold leading-5 text-[#5F739F]">
-                        특이사항이 없으면 이 교시제를 그대로 따르면 되고, 다른 학생만 학원 계획을 추가하면 돼요.
+                        특이사항이 없으면 이 트랙제를 그대로 따르면 되고, 다른 학생만 학원 계획을 추가하면 돼요.
                       </p>
                     </div>
                     <div className="space-y-3">
@@ -961,7 +964,7 @@ export function AttendanceScheduleSheet({
                         <ClassSchedulePreviewCard
                           key={schedule.id || `${schedule.className}-${formatStudyRoomWeekdays(schedule.weekdays)}`}
                           schedule={schedule}
-                          actionLabel="교시제 다시 불러오기"
+                          actionLabel="트랙제 다시 불러오기"
                           onApply={() => {
                             markAsLocallyEdited();
                             onApplyClassScheduleToWeekday(schedule);
@@ -972,9 +975,9 @@ export function AttendanceScheduleSheet({
                   </div>
                 ) : (
                 <div className="rounded-[1.2rem] border border-dashed border-[#D8E4FB] bg-[#F8FBFF] px-4 py-4">
-                  <p className="text-[11px] font-black text-[#17326B]">센터 공통 교시제를 아직 불러오지 못했어요</p>
+                  <p className="text-[11px] font-black text-[#17326B]">센터 공통 트랙제를 아직 불러오지 못했어요</p>
                   <p className="mt-1 text-[11px] font-semibold leading-5 text-[#5F739F]">
-                    공통 교시제 정보가 준비되면 여기서 기본 요일과 시간을 바로 불러올 수 있어요.
+                    공통 트랙제 정보가 준비되면 여기서 기본 요일과 시간을 바로 불러올 수 있어요.
                   </p>
                 </div>
               )}
