@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useId, useMemo, useRef, useState, type ComponentPropsWithoutRef, type ReactNode } from 'react';
+import { useEffect, useId, useMemo, useRef, useState, type ComponentPropsWithoutRef, type KeyboardEvent, type ReactNode } from 'react';
 import {
   Bell,
   CalendarCheck,
@@ -667,6 +667,70 @@ function ParentHomeMetricCardShell({
       <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(180deg,rgba(255,255,255,0.92)_0%,rgba(255,255,255,0.12)_38%,rgba(255,255,255,0)_100%)]" />
       <div className="pointer-events-none absolute inset-x-5 bottom-0 h-px bg-[#fff1df]" />
       <div className="relative z-10 h-full">{children}</div>
+    </Card>
+  );
+}
+
+function ParentHomeSimpleActionCard({
+  icon,
+  eyebrow,
+  title,
+  description,
+  badge,
+  actionLabel = '보기',
+  className,
+  onOpen,
+}: {
+  icon: ReactNode;
+  eyebrow: string;
+  title: string;
+  description: string;
+  badge?: ReactNode;
+  actionLabel?: string;
+  className?: string;
+  onOpen: () => void;
+}) {
+  const handleKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
+    if (event.key !== 'Enter' && event.key !== ' ') return;
+    event.preventDefault();
+    onOpen();
+  };
+
+  return (
+    <Card
+      role="button"
+      tabIndex={0}
+      onClick={onOpen}
+      onKeyDown={handleKeyDown}
+      className={cn(
+        'group relative min-w-0 cursor-pointer overflow-hidden rounded-[1.8rem] border border-[#ffd8b1] bg-[linear-gradient(180deg,#fffdf9_0%,#ffffff_50%,#fff5eb_100%)] p-4 text-left shadow-[0_22px_42px_-32px_rgba(255,122,22,0.18)] ring-1 ring-[#fff2e2] transition-[transform,box-shadow,border-color,filter] duration-300 active:scale-[0.99] md:hover:-translate-y-1 md:hover:border-[#ffbf7a] md:hover:shadow-[0_30px_48px_-30px_rgba(255,122,22,0.24)] md:hover:brightness-[1.01] sm:p-5',
+        className
+      )}
+    >
+      <div className="pointer-events-none absolute inset-x-0 top-0 h-1.5 bg-[linear-gradient(90deg,#ffd18d_0%,#FF7A16_55%,#d45c09_100%)]" />
+      <div className="pointer-events-none absolute -right-8 top-0 h-24 w-24 rounded-full bg-[#ffb56a]/18 blur-3xl transition-transform duration-500 group-hover:scale-110" />
+      <div className="relative z-10 flex h-full min-h-[8.5rem] flex-col gap-4">
+        <div className="flex items-start justify-between gap-3">
+          <div className="flex min-w-0 items-start gap-3">
+            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[1rem] border border-[#ffd5aa] bg-[#fff4e8] text-[#FF7A16] shadow-[inset_0_1px_0_rgba(255,255,255,0.92),0_12px_22px_-18px_rgba(255,122,22,0.26)]">
+              {icon}
+            </div>
+            <div className="min-w-0">
+              <p className="text-[10px] font-black uppercase tracking-[0.14em] text-[#c56a14]">{eyebrow}</p>
+              <h3 className="mt-1 break-keep text-[1rem] font-black leading-[1.25] tracking-tight text-[#14295F]">{title}</h3>
+            </div>
+          </div>
+          {badge ? <div className="shrink-0">{badge}</div> : null}
+        </div>
+        <p className="break-keep text-[12.5px] font-bold leading-[1.65] text-[#6b5847]">{description}</p>
+        <div className="mt-auto flex items-center justify-between border-t border-[#ffe1c4] pt-3">
+          <span className="text-[10px] font-black uppercase tracking-[0.16em] text-[#c56a14]">팝업으로 확인</span>
+          <span className="inline-flex items-center gap-1 text-[11px] font-black text-[#FF7A16]">
+            {actionLabel}
+            <ChevronRight className="h-3.5 w-3.5 transition-transform duration-300 group-hover:translate-x-0.5" />
+          </span>
+        </div>
+      </div>
     </Card>
   );
 }
@@ -1702,6 +1766,8 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
 
   const [readMap, setReadMap] = useState<Record<string, boolean>>({});
   const [selectedNotification, setSelectedNotification] = useState<ParentNotificationItem | null>(null);
+  const [isNotificationListOpen, setIsNotificationListOpen] = useState(false);
+  const [isLearningInsightOpen, setIsLearningInsightOpen] = useState(false);
   const [isReportArchiveOpen, setIsReportArchiveOpen] = useState(false);
   const [selectedChildReport, setSelectedChildReport] = useState<DailyReport | null>(null);
   const [selectedCalendarDate, setSelectedCalendarDate] = useState<Date | null>(null);
@@ -1901,6 +1967,8 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
     reportReadLoggedRef.current = {};
     setReadMap({});
     setSelectedNotification(null);
+    setIsNotificationListOpen(false);
+    setIsLearningInsightOpen(false);
     setSelectedChildReport(null);
     setSelectedCalendarDate(null);
     setCheckInByDateKey({});
@@ -3337,6 +3405,16 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
     setSelectedNotification(notification);
   };
 
+  const handleOpenNotificationList = () => {
+    setIsNotificationListOpen(true);
+    void logParentActivity('app_visit', { source: 'notification_summary_open', unreadCount: unreadRecentCount });
+  };
+
+  const handleOpenLearningInsight = () => {
+    setIsLearningInsightOpen(true);
+    void logParentActivity('app_visit', { source: 'learning_insight_open' });
+  };
+
   const handleTabChange = (value: string) => {
     const nextTab = normalizeParentPortalTab(value);
     setTab(nextTab);
@@ -3722,188 +3800,58 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
             </ParentHomeMetricCardShell>
           </div>
 
-          <div className="grid gap-4 xl:grid-cols-[1.06fr_0.94fr]">
-            <Card
-              role="button"
-              tabIndex={0}
-              onClick={handleOpenReportsArchive}
-              onKeyDown={(event) => {
-                if (event.key === 'Enter' || event.key === ' ') {
-                  event.preventDefault();
-                  handleOpenReportsArchive();
-                }
-              }}
-              className={cn(
-                'group relative overflow-hidden rounded-[2.1rem] border border-[#ffd8b1] bg-[linear-gradient(180deg,#fffdf9_0%,#ffffff_42%,#fff3e7_100%)] p-5 shadow-[0_28px_48px_-34px_rgba(255,122,22,0.18)] ring-1 ring-[#fff1e0] transition-[transform,box-shadow,border-color,filter] duration-300 active:scale-[0.99] md:hover:-translate-y-1.5 md:hover:border-[#ffbf7a] md:hover:shadow-[0_36px_56px_-30px_rgba(255,122,22,0.24)] md:hover:brightness-[1.01] sm:p-6',
-                showEntryMotion && 'parent-card-enter parent-entry-delay-4'
-              )}
-            >
-              <div className="soft-glow absolute right-0 top-0 h-28 w-28 rounded-full bg-[#ffb56a]/22 blur-3xl" />
-              <div className="absolute right-0 top-0 p-4 opacity-[0.05] transition-transform duration-700 group-hover:translate-x-1 group-hover:-translate-y-1">
-                <MessageCircle className="h-20 w-20 text-[#FF7A16]" />
-              </div>
-              <div className="relative z-10 space-y-4">
-                <div className="flex flex-wrap items-center justify-between gap-2">
-                  <div className="flex items-center gap-2">
-                    <div className="flex h-8 w-8 items-center justify-center rounded-full bg-[linear-gradient(135deg,#ff9339_0%,#FF7A16_100%)] text-white shadow-[0_14px_26px_-18px_rgba(255,122,22,0.42)]">
-                      <Sparkles className="h-4 w-4" />
-                    </div>
-                    <div>
-                      <span className="text-[10px] font-black uppercase tracking-[0.2em] text-[#c56a14]">우리 아이 리포트</span>
-                      <p className="mt-0.5 text-[13px] font-black tracking-tight text-[#14295F]">가장 먼저 읽을 요약</p>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    {report?.viewedAt ? (
-                      <Badge variant="outline" className="h-6 rounded-full border border-emerald-200 bg-emerald-50 px-2.5 text-[10px] font-black text-emerald-700">
-                        읽음
-                      </Badge>
-                    ) : (
-                      <Badge variant="outline" className="h-6 rounded-full border border-[#ffd1a2] bg-[#fff3e8] px-2.5 text-[10px] font-black text-[#FF7A16]">
-                        새 리포트
-                      </Badge>
-                    )}
-                    <ChevronRight className="h-4 w-4 text-[#FF7A16] transition-transform duration-300 group-hover:translate-x-0.5" />
-                  </div>
-                </div>
-                <div className="overflow-hidden rounded-[1.7rem] border border-[#ffd7ab] bg-[linear-gradient(180deg,#fffaf4_0%,#ffffff_44%,#ffefe0_100%)] p-4 text-[#14295F] shadow-[0_24px_40px_-28px_rgba(255,122,22,0.18)]">
-                  <div className="pointer-events-none absolute inset-x-0 top-0 h-1.5 bg-[linear-gradient(90deg,#ffd18d_0%,#FF7A16_55%,#d45c09_100%)]" />
-                  <div className="flex items-center justify-between gap-2">
-                    <p className="text-[10px] font-black uppercase tracking-[0.2em] text-[#c76810]">Today Summary</p>
-                    <span className="rounded-full border border-[#ffd4a6] bg-white/92 px-2.5 py-1 text-[10px] font-black text-[#c25d08] shadow-sm">바로 보기</span>
-                  </div>
-                  <p className="mt-3 line-clamp-4 break-keep text-[13px] font-bold leading-relaxed text-[#173164]">
-                    {report?.content || '카드를 누르면 자녀의 최근 학습 리포트와 선생님 피드백을 바로 확인할 수 있습니다.'}
-                  </p>
-                </div>
-                <div className="flex items-center justify-between gap-3 rounded-[1.1rem] border border-[#ffe0bf] bg-[linear-gradient(180deg,#fffaf3_0%,#fff1e4_100%)] px-3.5 py-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.88)]">
-                  <p className="text-[12px] font-bold text-[#805227]">선생님 피드백과 오늘 흐름을 한 번에 확인합니다.</p>
-                  <span className="shrink-0 text-[11px] font-black text-[#FF7A16]">열기</span>
-                </div>
-              </div>
-            </Card>
-
-            <Card
-              className={cn(
-                'rounded-[2.1rem] border border-[#ffd8af] bg-[linear-gradient(180deg,#fffdf9_0%,#ffffff_44%,#fff4e9_100%)] p-5 shadow-[0_28px_48px_-36px_rgba(255,122,22,0.16)] ring-1 ring-[#fff3e3] sm:p-6',
-                showEntryMotion && 'parent-card-enter parent-entry-delay-5'
-              )}
-            >
-              <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
-                <div className="flex items-center gap-2">
-                  <div className="flex h-8 w-8 items-center justify-center rounded-full bg-[linear-gradient(135deg,#fff3e6_0%,#ffd3aa_100%)] text-[#FF7A16] shadow-[0_14px_24px_-18px_rgba(255,122,22,0.28)]">
-                    <Bell className="h-4 w-4" />
-                  </div>
-                  <div>
-                    <span className="text-[10px] font-black uppercase tracking-[0.2em] text-[#c56b15]">최근 알림 3개</span>
-                    <p className="mt-0.5 text-[13px] font-black tracking-tight text-[#14295F]">센터 소식과 자녀 알림</p>
-                  </div>
-                </div>
-                <div className="flex items-center gap-2">
-                  {unreadRecentCount > 0 && (
-                    <Badge variant="outline" className="h-6 rounded-full border border-[#ffd1a2] bg-[#fff3e8] px-2.5 text-[10px] font-black text-[#FF7A16]">
-                      미읽음 {unreadRecentCount}
-                    </Badge>
-                  )}
-                  <Badge variant="outline" className="h-6 rounded-full border border-[#ffe0bf] bg-white px-2.5 text-[10px] font-black text-[#9f6a37]">
-                    {recentNotifications.length}건
+          <div className={cn('grid gap-3', isCompactAppMode ? 'grid-cols-1' : 'lg:grid-cols-3')}>
+            <ParentHomeSimpleActionCard
+              icon={<Sparkles className="h-4 w-4" />}
+              eyebrow="우리 아이 리포트"
+              title="오늘 리포트"
+              description="오늘 흐름과 선생님 피드백을 팝업에서 간단히 확인해요."
+              badge={
+                report?.viewedAt ? (
+                  <Badge variant="outline" className="h-6 rounded-full border border-emerald-200 bg-emerald-50 px-2.5 text-[10px] font-black text-emerald-700">
+                    읽음
                   </Badge>
-                </div>
-              </div>
-              <p className="mb-3 text-[11px] font-bold text-[#8a6744]">센터 공지와 자녀 알림을 홈에서 빠르게 훑어볼 수 있어요.</p>
+                ) : (
+                  <Badge variant="outline" className="h-6 rounded-full border border-[#ffd1a2] bg-[#fff3e8] px-2.5 text-[10px] font-black text-[#FF7A16]">
+                    새 리포트
+                  </Badge>
+                )
+              }
+              actionLabel="열기"
+              className={showEntryMotion ? 'parent-card-enter parent-entry-delay-4' : undefined}
+              onOpen={handleOpenReportsArchive}
+            />
 
-              {recentNotifications.length === 0 ? (
-                <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50/60 px-4 py-6 text-center text-[11px] font-bold text-slate-400">
-                  최근 알림이 없습니다.
-                </div>
-              ) : (
-                <div className="space-y-2.5">
-                  {recentNotifications.map((notification) => {
-                    const isRead = notification.isRead || !!readMap[notification.id];
+            <ParentHomeSimpleActionCard
+              icon={<Bell className="h-4 w-4" />}
+              eyebrow="최근 알림"
+              title="센터 소식"
+              description="센터 공지와 자녀 알림을 한 곳에서 모아 확인해요."
+              badge={
+                <Badge variant="outline" className="h-6 rounded-full border border-[#ffd1a2] bg-[#fff3e8] px-2.5 text-[10px] font-black text-[#FF7A16]">
+                  {unreadRecentCount > 0 ? `미읽음 ${unreadRecentCount}` : `${recentNotifications.length}건`}
+                </Badge>
+              }
+              actionLabel="목록"
+              className={showEntryMotion ? 'parent-card-enter parent-entry-delay-5' : undefined}
+              onOpen={handleOpenNotificationList}
+            />
 
-                    return (
-                      <button
-                        type="button"
-                        key={notification.id}
-                        className={cn(
-                          'relative w-full overflow-hidden rounded-[1.45rem] border p-4 text-left transition-[transform,box-shadow,border-color] duration-300 md:hover:-translate-y-0.5',
-                          isRead
-                            ? 'border-[#ffe2c5] bg-[linear-gradient(180deg,#ffffff_0%,#fff8f0_100%)] md:hover:border-[#ffc98f] md:hover:shadow-[0_22px_34px_-24px_rgba(255,122,22,0.2)]'
-                            : 'border-[#ffcc99] bg-[linear-gradient(135deg,#fff6ec_0%,#fff0df_100%)] shadow-sm ring-1 ring-[#ffd5a9]/80 md:hover:shadow-[0_20px_34px_-22px_rgba(255,122,22,0.22)]'
-                        )}
-                        onClick={() => void openNotificationDetail(notification)}
-                      >
-                        {!isRead && (
-                          <>
-                            <div className="pointer-events-none absolute -right-5 -top-5 h-16 w-16 rounded-full bg-[#FF7A16]/18 blur-xl" />
-                          </>
-                        )}
-                        <div className="relative z-10 flex items-start justify-between gap-3">
-                          <div className="min-w-0 flex-1">
-                            <p className="truncate text-sm font-black tracking-tight text-[#14295F]">{notification.title}</p>
-                            <p className="mt-1 text-[10px] font-black uppercase tracking-[0.16em] text-[#99724c]">
-                              {notification.createdAtLabel} · {isRead ? '읽음' : '미확인'}
-                            </p>
-                          </div>
-                          <div className="flex shrink-0 items-center gap-1">
-                            {!isRead && (
-                              <span className="relative inline-flex h-2.5 w-2.5">
-                                <span className="absolute inline-flex h-full w-full rounded-full bg-[#FF7A16] opacity-70 animate-ping" />
-                                <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-[#FF7A16]" />
-                              </span>
-                            )}
-                            {notification.isImportant && (
-                              <Badge variant="outline" className="h-5 rounded-full border-none bg-orange-100 px-2 text-[10px] font-black text-[#FF7A16]">
-                                중요
-                              </Badge>
-                            )}
-                          </div>
-                        </div>
-                      </button>
-                    );
-                  })}
-                </div>
-              )}
-            </Card>
+            <ParentHomeSimpleActionCard
+              icon={<TrendingUp className="h-4 w-4" />}
+              eyebrow="학습 인사이트"
+              title="핵심 요약"
+              description="학습 패턴에서 바로 볼 부분만 팝업으로 짧게 정리해요."
+              badge={
+                <Badge variant="outline" className="h-6 rounded-full border border-[#ffe0bf] bg-white px-2.5 text-[10px] font-black text-[#9f6a37]">
+                  {aiInsights.length}개
+                </Badge>
+              }
+              actionLabel="보기"
+              className={showEntryMotion ? 'parent-card-enter parent-entry-delay-5' : undefined}
+              onOpen={handleOpenLearningInsight}
+            />
           </div>
-
-          <Dialog>
-            <DialogTrigger asChild>
-              <Button
-                className={cn(
-                  'group parent-home-cta-glow h-14 w-full rounded-[1.8rem] border border-[#ffbf81] bg-[linear-gradient(135deg,#ff9a3c_0%,#FF7A16_55%,#d45c08_100%)] text-base font-black text-white shadow-[0_22px_40px_-22px_rgba(255,122,22,0.38)] transition-[transform,box-shadow,filter] duration-300 active:scale-[0.98] hover:brightness-[1.04]',
-                  showEntryMotion && 'parent-card-enter parent-entry-delay-5'
-                )}
-              >
-                <TrendingUp className="mr-2 h-5 w-5" />
-                트랙 러닝시스템 학습 인사이트 보기
-                <ChevronRight className="ml-auto h-4 w-4 opacity-60 transition-transform duration-300 group-hover:translate-x-0.5" />
-              </Button>
-            </DialogTrigger>
-            <DialogContent className="parent-font-dialog rounded-[3rem] border-none p-0 shadow-2xl overflow-x-hidden overflow-y-auto sm:max-w-md">
-              <div className="relative overflow-hidden bg-[linear-gradient(155deg,#1d3d79_0%,#14295F_56%,#0f214d_100%)] p-10 text-white">
-                <div className="soft-glow absolute -right-6 top-0 h-24 w-24 rounded-full bg-[#ffbf7d]/24 blur-3xl" />
-                <Sparkles className="absolute right-0 top-0 h-32 w-32 p-8 opacity-20" />
-                <DialogTitle className="text-2xl font-black tracking-tighter text-white">트랙 러닝시스템 학습 인사이트</DialogTitle>
-                <DialogDescription className="mt-1 text-xs font-bold text-white/72">
-                  자녀의 학습 패턴을 차분하고 보기 쉽게 정리했습니다.
-                </DialogDescription>
-              </div>
-              <div className="space-y-3 bg-[linear-gradient(180deg,#f8fbff_0%,#ffffff_100%)] p-6">
-                {aiInsights.map((insight, i) => (
-                  <div key={i} className="flex items-start gap-4 rounded-2xl border border-[#dbe6fb] bg-white p-5 shadow-[0_18px_28px_-24px_rgba(20,41,95,0.22)] transition-all hover:border-[#ffd2a2]">
-                    <div className="mt-2 h-2 w-2 shrink-0 rounded-full bg-[#FF7A16]" />
-                    <p className="text-sm font-bold leading-relaxed text-slate-700">{insight}</p>
-                  </div>
-                ))}
-              </div>
-              <DialogFooter className="border-t bg-white p-6">
-                <DialogClose asChild>
-                  <Button className="h-14 w-full rounded-2xl bg-[#14295F] text-lg font-black text-white shadow-[0_18px_28px_-20px_rgba(20,41,95,0.34)]">확인했습니다</Button>
-                </DialogClose>
-              </DialogFooter>
-            </DialogContent>
-          </Dialog>
         </TabsContent>
 
             <TabsContent value="studyDetail" className="parent-tab-panel mt-0 space-y-4 sm:space-y-5">
@@ -5179,6 +5127,32 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
         </DialogContent>
       </Dialog>
 
+      <Dialog open={isLearningInsightOpen} onOpenChange={setIsLearningInsightOpen}>
+        <DialogContent className="parent-font-dialog rounded-[2rem] border-none p-0 shadow-2xl overflow-x-hidden overflow-y-auto sm:max-w-md">
+          <div className="relative overflow-hidden bg-[linear-gradient(155deg,#1d3d79_0%,#14295F_56%,#0f214d_100%)] p-7 text-white">
+            <div className="soft-glow absolute -right-6 top-0 h-24 w-24 rounded-full bg-[#ffbf7d]/24 blur-3xl" />
+            <Sparkles className="absolute right-0 top-0 h-28 w-28 p-7 opacity-20" />
+            <DialogTitle className="text-xl font-black tracking-tight text-white">학습 인사이트</DialogTitle>
+            <DialogDescription className="mt-1 text-xs font-bold text-white/72">
+              자녀의 학습 패턴에서 핵심만 짧게 정리했습니다.
+            </DialogDescription>
+          </div>
+          <div className="space-y-3 bg-[linear-gradient(180deg,#f8fbff_0%,#ffffff_100%)] p-5">
+            {aiInsights.map((insight, i) => (
+              <div key={i} className="flex items-start gap-3 rounded-2xl border border-[#dbe6fb] bg-white p-4 shadow-[0_18px_28px_-24px_rgba(20,41,95,0.22)]">
+                <div className="mt-2 h-2 w-2 shrink-0 rounded-full bg-[#FF7A16]" />
+                <p className="text-sm font-bold leading-relaxed text-slate-700">{insight}</p>
+              </div>
+            ))}
+          </div>
+          <DialogFooter className="border-t bg-white p-4">
+            <DialogClose asChild>
+              <Button className="h-11 w-full rounded-xl bg-[#14295F] text-sm font-black text-white hover:text-white">확인</Button>
+            </DialogClose>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       <Dialog open={isPenaltyGuideOpen} onOpenChange={setIsPenaltyGuideOpen}>
         <DialogContent className="parent-font-dialog overflow-x-hidden overflow-y-auto rounded-[2rem] border-none p-0 shadow-2xl sm:max-w-lg">
           <div className="bg-gradient-to-r from-rose-600 to-rose-500 p-6 text-white">
@@ -5299,6 +5273,67 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
           <DialogFooter className="border-t bg-white p-4">
             <DialogClose asChild>
               <Button className="h-11 w-full rounded-xl bg-[#14295F] text-sm font-black text-white hover:text-white">확인</Button>
+            </DialogClose>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={isNotificationListOpen} onOpenChange={setIsNotificationListOpen}>
+        <DialogContent className="parent-font-dialog overflow-x-hidden overflow-y-auto rounded-[2rem] border-none p-0 shadow-2xl sm:max-w-md">
+          <div className="bg-[#14295F] p-6 text-white">
+            <DialogTitle className="text-xl font-black tracking-tight">최근 알림</DialogTitle>
+            <DialogDescription className="mt-1 text-xs font-bold text-white/70">
+              센터 소식과 자녀 알림을 팝업에서 확인합니다.
+            </DialogDescription>
+          </div>
+          <div className="space-y-3 bg-white p-5">
+            {recentNotifications.length === 0 ? (
+              <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50/70 px-4 py-6 text-center text-sm font-bold text-slate-400">
+                최근 알림이 없습니다.
+              </div>
+            ) : (
+              recentNotifications.map((notification) => {
+                const isRead = notification.isRead || !!readMap[notification.id];
+
+                return (
+                  <button
+                    type="button"
+                    key={notification.id}
+                    className={cn(
+                      'w-full rounded-[1.25rem] border p-4 text-left transition-[transform,box-shadow,border-color] duration-200 active:scale-[0.99] md:hover:-translate-y-0.5',
+                      isRead
+                        ? 'border-[#ffe2c5] bg-[linear-gradient(180deg,#ffffff_0%,#fff8f0_100%)] md:hover:border-[#ffc98f]'
+                        : 'border-[#ffcc99] bg-[linear-gradient(135deg,#fff6ec_0%,#fff0df_100%)] shadow-sm ring-1 ring-[#ffd5a9]/80'
+                    )}
+                    onClick={() => {
+                      setIsNotificationListOpen(false);
+                      void openNotificationDetail(notification);
+                    }}
+                  >
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <p className="truncate text-sm font-black tracking-tight text-[#14295F]">{notification.title}</p>
+                        <p className="mt-1 text-[10px] font-black uppercase tracking-[0.16em] text-[#99724c]">
+                          {notification.createdAtLabel} · {isRead ? '읽음' : '미확인'}
+                        </p>
+                      </div>
+                      <div className="flex shrink-0 items-center gap-1">
+                        {notification.isImportant && (
+                          <Badge variant="outline" className="h-5 rounded-full border-none bg-orange-100 px-2 text-[10px] font-black text-[#FF7A16]">
+                            중요
+                          </Badge>
+                        )}
+                        <ChevronRight className="h-4 w-4 text-[#FF7A16]" />
+                      </div>
+                    </div>
+                  </button>
+                );
+              })
+            )}
+          </div>
+          <DialogFooter className="border-t bg-white p-4">
+            <DialogClose asChild>
+              <Button className="h-11 w-full rounded-xl bg-[#14295F] text-sm font-black text-white hover:text-white">닫기</Button>
             </DialogClose>
           </DialogFooter>
         </DialogContent>
