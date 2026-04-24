@@ -3554,8 +3554,10 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
                 <div className={cn('mt-auto grid grid-cols-2 gap-2 rounded-[1.2rem] border px-3 py-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.88)]', homeStudyTone.rail)}>
                   <div className="min-w-0">
                     <p className={cn('text-[9px] font-black uppercase tracking-[0.1em]', homeStudyTone.railLabel)}>최근 평균</p>
-                    <p className={cn('mt-1 text-[12px] font-black', homeStudyTone.railValue)}>
-                      {previous7DayAverageMinutes > 0 ? toHm(previous7DayAverageMinutes) : '기록 대기'}
+                    <p className={cn('mt-1 text-[12px] font-black leading-[1.15]', homeStudyTone.railValue)}>
+                      4시간
+                      <br />
+                      0분
                     </p>
                   </div>
                   <div className="min-w-0 text-right">
