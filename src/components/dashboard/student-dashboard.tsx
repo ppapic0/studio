@@ -1595,15 +1595,15 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
   }, [teacherReportsRaw]);
 
   const wifiRequestsQuery = useMemoFirebase(() => {
-    if (!firestore || !activeMembership || !studentUid || !authUid) return null;
+    if (!firestore || !activeMembership || !authUid) return null;
     return query(
       collection(firestore, 'centers', activeMembership.id, 'parentCommunications'),
-      where('studentId', '==', studentUid),
+      where('studentId', '==', authUid),
       where('senderRole', '==', 'student'),
       where('senderUid', '==', authUid),
       limit(20)
     );
-  }, [firestore, activeMembership?.id, authUid, studentUid]);
+  }, [firestore, activeMembership?.id, authUid]);
   const { data: wifiRequestsRaw } = useCollection<StudentWifiRequestRecord>(wifiRequestsQuery, { enabled: isActive });
 
   const wifiRequests = useMemo(() => {
@@ -1619,6 +1619,20 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
 
   const latestWifiRequest = wifiRequests[0] || null;
   const latestWifiRequestStatusMeta = getWifiRequestStatusMeta(latestWifiRequest?.status);
+  const wifiRequestMacHexLength = wifiRequestMacAddress.trim()
+    ? wifiRequestMacAddress.replace(/[^0-9a-f]/gi, '').length
+    : 0;
+  const isWifiRequestMacComplete = wifiRequestMacHexLength === 12;
+  const wifiRequestMacStatusLabel = !wifiRequestMacAddress.trim()
+    ? '필수'
+    : isWifiRequestMacComplete
+      ? '형식 확인'
+      : `${wifiRequestMacHexLength}/12자리`;
+  const wifiRequestMacStatusClass = !wifiRequestMacAddress.trim()
+    ? 'text-rose-500'
+    : isWifiRequestMacComplete
+      ? 'text-emerald-600'
+      : 'text-amber-600';
 
   const attendanceCurrentQuery = useMemoFirebase(() => {
     if (!firestore || !activeMembership || !studentUid) return null;
@@ -2329,8 +2343,9 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
       const defaultTitle = '와이파이 방화벽 해제 요청';
       const trimmedTitle = wifiRequestTitle.trim();
       const requestBody = `사용 이유: ${trimmedReason}\nMAC 주소: ${normalizedMacAddress}`;
+      const requestStudentId = authUid || user.uid;
       const requestRef = await addDoc(collection(firestore, 'centers', activeMembership.id, 'parentCommunications'), {
-        studentId: studentUid,
+        studentId: requestStudentId,
         senderRole: 'student',
         senderUid: user.uid,
         senderName: user.displayName || activeMembership.displayName || '학생',
@@ -2350,7 +2365,7 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
       await addDoc(collection(firestore, 'centers', activeMembership.id, 'supportMessages'), {
         centerId: activeMembership.id,
         communicationId: requestRef.id,
-        studentId: studentUid,
+        studentId: requestStudentId,
         parentUid: null,
         senderRole: 'student',
         senderUid: user.uid,
@@ -4187,8 +4202,8 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
                     <div className="space-y-1.5">
                       <div className="flex items-center justify-between gap-3 ml-1">
                         <Label className="text-[10px] font-black uppercase text-muted-foreground">기기 MAC 주소</Label>
-                        <span className={cn("text-[9px] font-bold", wifiRequestMacAddress.trim().length === 0 ? "text-rose-500" : "text-emerald-600")}>
-                          {wifiRequestMacAddress.trim().length > 0 ? '작성됨' : '필수'}
+                        <span className={cn("text-[9px] font-bold", wifiRequestMacStatusClass)}>
+                          {wifiRequestMacStatusLabel}
                         </span>
                       </div>
                       <Input
@@ -4218,7 +4233,7 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
                     </div>
                     <Button
                       onClick={handleWifiRequestSubmit}
-                      disabled={isWifiRequestSubmitting || !wifiRequestUrl.trim() || !wifiRequestMacAddress.trim() || !wifiRequestReason.trim()}
+                      disabled={isWifiRequestSubmitting || !wifiRequestUrl.trim() || !isWifiRequestMacComplete || !wifiRequestReason.trim()}
                       className="h-14 rounded-2xl bg-[#FF7A16] font-black text-white hover:bg-[#E86C10]"
                     >
                       {isWifiRequestSubmitting ? <Loader2 className="h-5 w-5 animate-spin" /> : '해제 요청 보내기'}

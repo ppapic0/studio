@@ -72,6 +72,7 @@ import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 import Link from 'next/link';
 import { isAdminRole, isTeacherOrAdminRole } from '@/lib/dashboard-access';
+import { getSafeErrorMessage } from '@/lib/exposed-error';
 import { WebsiteConsultOperations } from '@/components/dashboard/website-consult-operations';
 
 type ParentCommunicationRecord = {
@@ -339,29 +340,36 @@ export function AppointmentsPageContent({
   });
 
   const parentCommunicationsQuery = useMemoFirebase(() => {
-    if (!firestore || !centerId || !studentUid || !canAccessCommunications || !shouldLoadCommunications) return null;
+    if (!firestore || !centerId || !canAccessCommunications || !shouldLoadCommunications) return null;
     const baseRef = collection(firestore, 'centers', centerId, 'parentCommunications');
 
     if (isStaff) return query(baseRef);
-    if (isStudent && studentSenderUid) return query(baseRef, where('senderUid', '==', studentSenderUid));
+    if (isStudent && studentSenderUid) {
+      return query(
+        baseRef,
+        where('studentId', '==', studentSenderUid),
+        where('senderRole', '==', 'student'),
+        where('senderUid', '==', studentSenderUid)
+      );
+    }
 
     return null;
-  }, [firestore, centerId, studentUid, studentSenderUid, canAccessCommunications, isStaff, isStudent, shouldLoadCommunications]);
+  }, [firestore, centerId, studentSenderUid, canAccessCommunications, isStaff, isStudent, shouldLoadCommunications]);
   const { data: rawParentCommunications, isLoading: parentCommsLoading } = useCollection<ParentCommunicationRecord>(parentCommunicationsQuery, {
     enabled: canAccessCommunications && !!centerId && !!(isStudent ? studentSenderUid : studentUid) && shouldLoadCommunications,
   });
 
   const supportMessagesQuery = useMemoFirebase(() => {
-    if (!firestore || !centerId || !studentUid || !canAccessCommunications || !shouldLoadCommunications) return null;
+    if (!firestore || !centerId || !canAccessCommunications || !shouldLoadCommunications) return null;
     const baseRef = collection(firestore, 'centers', centerId, 'supportMessages');
 
     if (isStaff) return query(baseRef);
-    if (isStudent) return query(baseRef, where('studentId', '==', studentUid));
+    if (isStudent && studentSenderUid) return query(baseRef, where('studentId', '==', studentSenderUid));
 
     return null;
-  }, [firestore, centerId, studentUid, canAccessCommunications, isStaff, isStudent, shouldLoadCommunications]);
+  }, [firestore, centerId, studentSenderUid, canAccessCommunications, isStaff, isStudent, shouldLoadCommunications]);
   const { data: rawSupportMessages } = useCollection<SupportThreadMessage>(supportMessagesQuery, {
-    enabled: canAccessCommunications && !!centerId && !!studentUid && shouldLoadCommunications,
+    enabled: canAccessCommunications && !!centerId && !!(isStudent ? studentSenderUid : studentUid) && shouldLoadCommunications,
   });
 
   const reservations = useMemo(() => {
@@ -739,8 +747,9 @@ export function AppointmentsPageContent({
         inquiryType === 'firewall' && normalizedMacAddress
           ? `사용 이유: ${inquiryBody.trim()}\nMAC 주소: ${normalizedMacAddress}`
           : inquiryBody.trim();
+      const requestStudentId = authUid || user.uid;
       const communicationRef = await addDoc(collection(firestore, 'centers', centerId, 'parentCommunications'), {
-        studentId: studentUid,
+        studentId: requestStudentId,
         senderRole: 'student',
         senderUid: user.uid,
         senderName: user.displayName || '학생',
@@ -765,7 +774,7 @@ export function AppointmentsPageContent({
         await addDoc(collection(firestore, 'centers', centerId, 'supportMessages'), {
           centerId,
           communicationId: communicationRef.id,
-          studentId: studentUid,
+          studentId: requestStudentId,
           parentUid: null,
           senderRole: 'student',
           senderUid: user.uid,
@@ -778,7 +787,7 @@ export function AppointmentsPageContent({
         });
         setSelectedSupportThread({
           id: communicationRef.id,
-          studentId: studentUid || user.uid,
+          studentId: requestStudentId,
           senderRole: 'student',
           senderUid: user.uid,
           senderName: user.displayName || '학생',
@@ -805,7 +814,11 @@ export function AppointmentsPageContent({
       setFirewallMacAddress('');
       setInquiryType('question');
     } catch (e: any) {
-      toast({ variant: 'destructive', title: '문의 등록에 실패했습니다.', description: e?.message });
+      toast({
+        variant: 'destructive',
+        title: '문의 등록에 실패했습니다.',
+        description: getSafeErrorMessage(e, '문의 내용을 저장하지 못했습니다.'),
+      });
     } finally {
       setIsSubmitting(false);
     }
