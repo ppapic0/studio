@@ -145,7 +145,7 @@ export default function AssignedStudentsPage() {
     setIsSaving(true);
     try {
       const trackMeta = INVOICE_TRACK_META[trackCategory];
-      const title = trackCategory === 'academy' ? '28일 정기 트랙 분석지 이용료' : '28일 정기 독서실 이용료';
+      const title = `28일 정기 ${trackMeta.label} 이용료`;
       await issueInvoice(firestore, centerId, studentId, 390000, title, { trackCategory });
       toast({ title: `${trackMeta.label} 인보이스가 추가 발급되었습니다.` });
     } catch (e: any) {
@@ -332,7 +332,7 @@ export default function AssignedStudentsPage() {
                             variant="outline"
                             className="h-11 rounded-xl font-black px-4 border-blue-200 text-blue-700 bg-blue-50 hover:bg-blue-100"
                           >
-                            {isSaving ? <Loader2 className="animate-spin h-4 w-4 mr-1" /> : <PlusCircle className="h-4 w-4 mr-1" />} 독서실 추가 발급
+                            {isSaving ? <Loader2 className="animate-spin h-4 w-4 mr-1" /> : <PlusCircle className="h-4 w-4 mr-1" />} 트랙 스터디센터 추가 발급
                           </Button>
                           <Button
                             onClick={() => handleCreateInvoice(seat.studentId!, student?.displayName || '학생', 'academy')}
@@ -340,7 +340,7 @@ export default function AssignedStudentsPage() {
                             variant="outline"
                             className="h-11 rounded-xl font-black px-4 border-emerald-200 text-emerald-700 bg-emerald-50 hover:bg-emerald-100"
                           >
-                            {isSaving ? <Loader2 className="animate-spin h-4 w-4 mr-1" /> : <PlusCircle className="h-4 w-4 mr-1" />} 트랙 분석지 추가 발급
+                            {isSaving ? <Loader2 className="animate-spin h-4 w-4 mr-1" /> : <PlusCircle className="h-4 w-4 mr-1" />} 트랙 국어 추가 발급
                           </Button>
                         </div>
                       </div>

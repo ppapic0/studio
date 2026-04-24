@@ -36,8 +36,8 @@ export const BUSINESS_LEDGER_DIRECTION_META: Record<BusinessLedgerDirection, Lab
 
 export const BUSINESS_LEDGER_TRACK_SCOPE_META: Record<BusinessLedgerTrackScope, LabelMeta> = {
   center: { label: '센터 공통', badgeClass: 'border-slate-200 bg-slate-50 text-slate-600' },
-  studyRoom: { label: '독서실', badgeClass: 'border-blue-200 bg-blue-50 text-blue-700' },
-  academy: { label: '트랙 분석지', badgeClass: 'border-emerald-200 bg-emerald-50 text-emerald-700' },
+  studyRoom: { label: '트랙 스터디센터', badgeClass: 'border-blue-200 bg-blue-50 text-blue-700' },
+  academy: { label: '트랙 국어', badgeClass: 'border-emerald-200 bg-emerald-50 text-emerald-700' },
 };
 
 export const BUSINESS_LEDGER_PAYMENT_METHOD_META: Record<BusinessLedgerPaymentMethod, LabelMeta> = {

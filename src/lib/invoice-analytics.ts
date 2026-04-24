@@ -9,12 +9,12 @@ export const INVOICE_TRACK_META: Record<
   { label: string; badgeClass: string; accentClass: string }
 > = {
   studyRoom: {
-    label: '독서실',
+    label: '트랙 스터디센터',
     badgeClass: 'bg-blue-50 text-blue-700 border-blue-200',
     accentClass: 'text-blue-700',
   },
   academy: {
-    label: '트랙 분석지',
+    label: '트랙 국어',
     badgeClass: 'bg-emerald-50 text-emerald-700 border-emerald-200',
     accentClass: 'text-emerald-700',
   },

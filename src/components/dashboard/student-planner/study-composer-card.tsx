@@ -247,7 +247,7 @@ export function StudyComposerCard({
                 <Input
                   value={taskValue}
                   onChange={(event) => onTaskChange(event.target.value)}
-                  placeholder="예: 트랙 분석지 1강 보기"
+                  placeholder="예: 트랙 국어 1강 보기"
                   disabled={disabled || isSubmitting}
                   className="h-12 rounded-[1rem] border-[#D7E1F2] bg-white text-sm font-black text-[#14295F] shadow-none placeholder:text-[#7E93BB]"
                 />
@@ -349,7 +349,7 @@ export function StudyComposerCard({
                 <Input
                   value={taskValue}
                   onChange={(event) => onTaskChange(event.target.value)}
-                  placeholder="예: 트랙 분석지 1강 보기"
+                  placeholder="예: 트랙 국어 1강 보기"
                   disabled={disabled || isSubmitting}
                   className="h-12 rounded-[1rem] border-[#D7E1F2] bg-white text-sm font-black text-[#14295F] shadow-none placeholder:text-[#7E93BB]"
                 />

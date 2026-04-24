@@ -597,8 +597,7 @@ export default function RevenuePage() {
 
   const timelineTrackLabel = useMemo(() => {
     if (timelineTrackFilter === 'all') return '전체 트랙';
-    if (timelineTrackFilter === 'studyRoom') return '독서실';
-    return '트랙 분석지';
+    return INVOICE_TRACK_META[timelineTrackFilter].label;
   }, [timelineTrackFilter]);
 
   const financeCutoffDateValue = useMemo(() => parseLedgerDate(financeCutoffDate), [financeCutoffDate]);
@@ -1050,7 +1049,7 @@ export default function RevenuePage() {
     setIsSaving(true);
     try {
       const trackMeta = INVOICE_TRACK_META[trackCategory];
-      const title = trackCategory === 'academy' ? '28일 정기 트랙 분석지 이용료' : '28일 정기 독서실 이용료';
+      const title = `28일 정기 ${trackMeta.label} 이용료`;
       await issueInvoice(firestore, centerId, studentId, amount, title, { trackCategory });
       toast({ title: `${trackMeta.label} 인보이스가 추가 발급되었습니다.` });
     } catch (e: any) {
@@ -1244,7 +1243,7 @@ export default function RevenuePage() {
                     variant="outline"
                     className="h-11 rounded-xl font-black border-blue-200 text-blue-700 bg-blue-50 hover:bg-blue-100 gap-2"
                   >
-                    {isSaving ? <Loader2 className="animate-spin h-4 w-4" /> : <PlusCircle className="h-4 w-4" />} 독서실 인보이스 추가 발행
+                    {isSaving ? <Loader2 className="animate-spin h-4 w-4" /> : <PlusCircle className="h-4 w-4" />} 트랙 스터디센터 인보이스 추가 발행
                   </Button>
                   <Button
                     type="button"
@@ -1260,7 +1259,7 @@ export default function RevenuePage() {
                     variant="outline"
                     className="h-11 rounded-xl font-black border-emerald-200 text-emerald-700 bg-emerald-50 hover:bg-emerald-100 gap-2"
                   >
-                    {isSaving ? <Loader2 className="animate-spin h-4 w-4" /> : <PlusCircle className="h-4 w-4" />} 트랙 분석지 인보이스 추가 발행
+                    {isSaving ? <Loader2 className="animate-spin h-4 w-4" /> : <PlusCircle className="h-4 w-4" />} 트랙 국어 인보이스 추가 발행
                   </Button>
                 </div>
               </CardContent>
@@ -1366,7 +1365,7 @@ export default function RevenuePage() {
                     className="rounded-lg font-black"
                     onClick={() => setTimelineTrackFilter('studyRoom')}
                   >
-                    독서실
+                    트랙 스터디센터
                   </Button>
                   <Button
                     type="button"
@@ -1375,7 +1374,7 @@ export default function RevenuePage() {
                     className="rounded-lg font-black"
                     onClick={() => setTimelineTrackFilter('academy')}
                   >
-                    트랙 분석지
+                    트랙 국어
                   </Button>
                 </div>
                 <div className="flex flex-wrap gap-1.5">
@@ -1614,8 +1613,8 @@ export default function RevenuePage() {
                                   <SelectValue />
                                 </SelectTrigger>
                                   <SelectContent className="rounded-xl border-none shadow-2xl">
-                                  <SelectItem value="studyRoom" className="font-bold">독서실</SelectItem>
-                                  <SelectItem value="academy" className="font-bold">트랙 분석지</SelectItem>
+                                  <SelectItem value="studyRoom" className="font-bold">트랙 스터디센터</SelectItem>
+                                  <SelectItem value="academy" className="font-bold">트랙 국어</SelectItem>
                                 </SelectContent>
                               </Select>
                             </div>
@@ -2041,7 +2040,7 @@ export default function RevenuePage() {
                                 variant="outline"
                                 className="h-10 rounded-xl font-black text-xs border-blue-200 text-blue-700 bg-blue-50 hover:bg-blue-100 gap-2"
                               >
-                                {isSaving ? <Loader2 className="animate-spin h-4 w-4" /> : <PlusCircle className="h-4 w-4" />} 독서실
+                                {isSaving ? <Loader2 className="animate-spin h-4 w-4" /> : <PlusCircle className="h-4 w-4" />} 트랙 스터디센터
                               </Button>
                               <Button
                                 size="sm"
@@ -2050,7 +2049,7 @@ export default function RevenuePage() {
                                 variant="outline"
                                 className="h-10 rounded-xl font-black text-xs border-emerald-200 text-emerald-700 bg-emerald-50 hover:bg-emerald-100 gap-2"
                               >
-                                {isSaving ? <Loader2 className="animate-spin h-4 w-4" /> : <PlusCircle className="h-4 w-4" />} 트랙 분석지
+                                {isSaving ? <Loader2 className="animate-spin h-4 w-4" /> : <PlusCircle className="h-4 w-4" />} 트랙 국어
                               </Button>
                             </div>
                           </div>
@@ -2272,7 +2271,7 @@ export default function RevenuePage() {
                       variant="outline"
                       className="h-11 rounded-xl font-black border-blue-200 text-blue-700 bg-blue-50 hover:bg-blue-100 gap-2"
                     >
-                      {isSaving ? <Loader2 className="animate-spin h-4 w-4" /> : <PlusCircle className="h-4 w-4" />} 독서실 추가 발행
+                      {isSaving ? <Loader2 className="animate-spin h-4 w-4" /> : <PlusCircle className="h-4 w-4" />} 트랙 스터디센터 추가 발행
                     </Button>
                     <Button
                       type="button"
@@ -2289,7 +2288,7 @@ export default function RevenuePage() {
                       variant="outline"
                       className="h-11 rounded-xl font-black border-emerald-200 text-emerald-700 bg-emerald-50 hover:bg-emerald-100 gap-2"
                     >
-                      {isSaving ? <Loader2 className="animate-spin h-4 w-4" /> : <PlusCircle className="h-4 w-4" />} 트랙 분석지 추가 발행
+                      {isSaving ? <Loader2 className="animate-spin h-4 w-4" /> : <PlusCircle className="h-4 w-4" />} 트랙 국어 추가 발행
                     </Button>
                   </div>
 
@@ -2377,8 +2376,8 @@ export default function RevenuePage() {
                                 <SelectValue />
                               </SelectTrigger>
                               <SelectContent className="rounded-xl border-none shadow-2xl">
-                                <SelectItem value="studyRoom" className="font-bold">독서실</SelectItem>
-                                <SelectItem value="academy" className="font-bold">트랙 분석지</SelectItem>
+                                <SelectItem value="studyRoom" className="font-bold">트랙 스터디센터</SelectItem>
+                                <SelectItem value="academy" className="font-bold">트랙 국어</SelectItem>
                               </SelectContent>
                             </Select>
                           </div>
@@ -2460,7 +2459,7 @@ export default function RevenuePage() {
             </div>
 
             <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 text-xs font-semibold text-slate-600">
-              상세 관리 버튼으로 진입하면 이미 인보이스가 있는 학생도 독서실/트랙 분석지 인보이스를 추가 발행할 수 있습니다.
+              상세 관리 버튼으로 진입하면 이미 인보이스가 있는 학생도 트랙 스터디센터/트랙 국어 인보이스를 추가 발행할 수 있습니다.
             </div>
           </div>
 

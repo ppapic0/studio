@@ -1605,8 +1605,8 @@ function getInvoiceStatusMeta(status: Invoice['status']): InvoiceStatusMeta | nu
 }
 
 function getInvoiceTrackLabel(category?: Invoice['trackCategory']) {
-  if (category === 'academy') return '학원 수납';
-  if (category === 'studyRoom') return '독서실 수납';
+  if (category === 'academy') return '트랙 국어 수납';
+  if (category === 'studyRoom') return '트랙 스터디센터 수납';
   return '센터 수납';
 }
 
