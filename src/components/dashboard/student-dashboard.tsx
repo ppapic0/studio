@@ -4196,6 +4196,10 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
                         placeholder="예: AA:BB:CC:DD:EE:FF"
                         className="h-12 rounded-xl border-2 font-bold uppercase"
                       />
+                      <p className="ml-1 text-[11px] font-medium leading-4 text-[#6781AE]">
+                        확인 방법: 설정 &gt; Wi-Fi &gt; 현재 연결된 와이파이 &gt; 상세 정보에서 확인할 수 있어요. 기종에 따라
+                        Wi-Fi 주소로 표시될 수 있어요.
+                      </p>
                     </div>
                     <div className="space-y-1.5">
                       <div className="flex items-center justify-between gap-3 ml-1">

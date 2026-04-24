@@ -2195,6 +2195,10 @@ export function AppointmentsPageContent({
                         placeholder="기기 MAC 주소 예: AA:BB:CC:DD:EE:FF"
                         className={cn("h-11 rounded-xl border-2 font-bold uppercase", isStudentTrackTheme && studentTrackInputClass)}
                       />
+                      <p className={cn("px-1 text-[11px] font-medium leading-4", isStudentTrackTheme ? "text-white/70" : "text-[#6781AE]")}>
+                        확인 방법: 설정 &gt; Wi-Fi &gt; 현재 연결된 와이파이 &gt; 상세 정보에서 확인할 수 있어요. 기종에 따라
+                        Wi-Fi 주소로 표시될 수 있어요.
+                      </p>
                     </div>
                   )}
                   <Textarea
