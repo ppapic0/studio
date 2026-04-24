@@ -267,7 +267,15 @@ export function CenterAdminAttendanceBoard({
                   const isAisle = seat.type === 'aisle';
                   const isFilteredOut = selectedClass !== 'all' && member?.className !== selectedClass;
                   const displayName = signal?.studentName || student?.name || member?.displayName || '학생';
-                  const studyTimeLabel = (signal?.todayStudyLabel || '0h 0m').replace(/\s+/g, '');
+                  const attendanceTimeLabel = signal
+                    ? signal.attendanceDisplayStatus === 'confirmed_late' && signal.checkedAtLabel
+                      ? `지각 ${signal.checkedAtLabel}`
+                      : signal.checkedAtLabel
+                        ? `입실 ${signal.checkedAtLabel}`
+                        : signal.routineExpectedArrivalTime
+                          ? `예정 ${signal.routineExpectedArrivalTime}`
+                          : signal.boardLabel
+                    : '확인중';
 
                   if (isAisle) {
                     return <div key={`${room.id}_${roomSeatNo}`} className="aspect-square rounded-[1.35rem] bg-transparent" />;
@@ -317,7 +325,7 @@ export function CenterAdminAttendanceBoard({
                               isMobile ? 'text-[9px]' : 'text-[10px]'
                             )}
                           >
-                            {studyTimeLabel}
+                            {attendanceTimeLabel}
                           </span>
                         )}
                       </div>

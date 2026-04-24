@@ -33,6 +33,7 @@ import type {
   CenterMembership,
   DailyStudentStat,
   StudentScheduleDoc,
+  StudentScheduleTemplate,
   StudentProfile,
 } from '@/lib/types';
 
@@ -62,6 +63,34 @@ type UseCenterAdminAttendanceBoardOptions = {
   nowMs?: number;
 };
 
+function getScheduleTemplateTimestampMs(template: StudentScheduleTemplate) {
+  const raw = template.updatedAt || template.createdAt;
+  if (!raw) return 0;
+  if (raw instanceof Date) return raw.getTime();
+  if (typeof (raw as any).toDate === 'function') return (raw as any).toDate().getTime();
+  return 0;
+}
+
+function buildRoutineInfoFromSchedule(schedule: StudentScheduleDoc): AttendanceRoutineInfo {
+  return {
+    hasRoutine: true,
+    isNoAttendanceDay: Boolean(schedule.isAbsent || schedule.status === 'absent'),
+    expectedArrivalTime: schedule.arrivalPlannedAt || schedule.inTime || null,
+    plannedDepartureTime: schedule.departurePlannedAt || schedule.outTime || null,
+    classScheduleName: schedule.classScheduleName || null,
+  };
+}
+
+function buildRoutineInfoFromTemplate(template: StudentScheduleTemplate): AttendanceRoutineInfo {
+  return {
+    hasRoutine: true,
+    isNoAttendanceDay: false,
+    expectedArrivalTime: template.arrivalPlannedAt || null,
+    plannedDepartureTime: template.departurePlannedAt || null,
+    classScheduleName: template.classScheduleName || null,
+  };
+}
+
 export function useCenterAdminAttendanceBoard({
   centerId,
   isActive,
@@ -77,6 +106,7 @@ export function useCenterAdminAttendanceBoard({
   const today = useMemo(() => (referenceDate ? new Date(referenceDate) : new Date()), [referenceDate]);
   const todayKey = format(today, 'yyyy-MM-dd');
   const weekKey = format(today, "yyyy-'W'II");
+  const weekday = today.getDay();
   const historyKeys = useMemo(
     () =>
       Array.from({ length: 7 }, (_, index) => {
@@ -195,8 +225,37 @@ export function useCenterAdminAttendanceBoard({
     const loadRoutineInfo = async () => {
       setRoutineLoading(true);
       try {
+        const scheduleByStudentId = new Map<string, StudentScheduleDoc>();
+        (todaySchedules || []).forEach((schedule) => {
+          if (!schedule.uid) return;
+          scheduleByStudentId.set(schedule.uid, schedule);
+        });
         const entries = await Promise.all(
           activeMembers.map(async (member) => {
+            const directSchedule = scheduleByStudentId.get(member.id);
+            if (directSchedule) {
+              return [member.id, buildRoutineInfoFromSchedule(directSchedule)] as const;
+            }
+
+            try {
+              const templateSnap = await getDocs(query(
+                collection(firestore, 'users', member.id, 'scheduleTemplates'),
+                where('centerId', '==', centerId)
+              ));
+              const matchingTemplate = templateSnap.docs
+                .map((docSnap) => ({ ...(docSnap.data() as StudentScheduleTemplate), id: docSnap.id }))
+                .filter((template) => template.active !== false)
+                .filter((template) => !template.centerId || template.centerId === centerId)
+                .filter((template) => Array.isArray(template.weekdays) && template.weekdays.includes(weekday))
+                .sort((left, right) => getScheduleTemplateTimestampMs(right) - getScheduleTemplateTimestampMs(left))[0];
+
+              if (matchingTemplate) {
+                return [member.id, buildRoutineInfoFromTemplate(matchingTemplate)] as const;
+              }
+            } catch (templateError) {
+              logHandledClientIssue('[center-admin-attendance-board] schedule template fallback failed', templateError);
+            }
+
             const routineQuery = query(
               collection(firestore, 'centers', centerId, 'plans', member.id, 'weeks', weekKey, 'items'),
               where('dateKey', '==', todayKey),
@@ -228,7 +287,7 @@ export function useCenterAdminAttendanceBoard({
     return () => {
       cancelled = true;
     };
-  }, [activeMembers, centerId, firestore, isActive, todayKey, weekKey]);
+  }, [activeMembers, centerId, firestore, isActive, todayKey, todaySchedules, weekday, weekKey]);
 
   const studentById = useMemo(() => new Map((students || []).map((student) => [student.id, student])), [students]);
   const memberById = useMemo(() => new Map((studentMembers || []).map((member) => [member.id, member])), [studentMembers]);
@@ -276,8 +335,9 @@ export function useCenterAdminAttendanceBoard({
         const student = studentById.get(studentId);
         const member = memberById.get(studentId);
         const todayStat = todayStatsByStudentId.get(studentId);
-        const routineInfo = routineInfoByStudentId[studentId];
+        const rawRoutineInfo = routineInfoByStudentId[studentId];
         const todaySchedule = todayScheduleByStudentId.get(studentId);
+        const routineInfo = rawRoutineInfo || (todaySchedule ? buildRoutineInfoFromSchedule(todaySchedule) : undefined);
         const todayRecord = todayRecordByStudentId.get(studentId);
         const historySummary = historySummaryByStudentId.get(studentId) || {
           lateCount: 0,
@@ -352,7 +412,7 @@ export function useCenterAdminAttendanceBoard({
         });
         const operationalException = resolveAttendanceOperationalException({
           boardStatus,
-          plannedDepartureTime: todaySchedule?.departurePlannedAt || null,
+          plannedDepartureTime: routineInfo?.plannedDepartureTime || todaySchedule?.departurePlannedAt || null,
           hasExcursion: Boolean(todaySchedule?.hasExcursion),
           excursionStartAt: todaySchedule?.excursionStartAt || null,
           excursionEndAt: todaySchedule?.excursionEndAt || null,
@@ -376,8 +436,8 @@ export function useCenterAdminAttendanceBoard({
           todayStudyLabel: formatAttendanceBoardMinutes(totalStudyMinutes),
           liveSessionMinutes,
           routineExpectedArrivalTime: routineInfo?.expectedArrivalTime || null,
-          plannedDepartureTime: todaySchedule?.departurePlannedAt || null,
-          classScheduleName: todaySchedule?.classScheduleName || null,
+          plannedDepartureTime: routineInfo?.plannedDepartureTime || todaySchedule?.departurePlannedAt || null,
+          classScheduleName: todaySchedule?.classScheduleName || routineInfo?.classScheduleName || null,
           hasExcursion: Boolean(todaySchedule?.hasExcursion),
           excursionStartAt: todaySchedule?.excursionStartAt || null,
           excursionEndAt: todaySchedule?.excursionEndAt || null,

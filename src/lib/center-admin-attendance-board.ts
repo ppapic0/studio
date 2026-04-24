@@ -268,7 +268,7 @@ export function buildAttendanceBoardNote(params: {
     case 'present':
       if (displayStatus === 'confirmed_late') {
         return expectedArrivalTime
-          ? `현재 공부중이며 오늘은 루틴 예정 ${expectedArrivalTime}보다 늦게 입실했습니다.`
+          ? `현재 공부중이며 오늘은 예정 등원 ${expectedArrivalTime}보다 늦게 입실했습니다.`
           : '현재 공부중이며 오늘은 지각 입실로 기록돼 있습니다.';
       }
       if (displayStatus === 'missing_routine' || displayStatus === 'confirmed_present_missing_routine') {
@@ -279,7 +279,7 @@ export function buildAttendanceBoardNote(params: {
         : `현재는 공부중이지만 최근 7일 기준 ${attendanceRiskLabel} 학생입니다.`;
     case 'late':
       return expectedArrivalTime
-        ? `루틴 예정 ${expectedArrivalTime} 대비 늦게 입실한 상태입니다.`
+        ? `예정 등원 ${expectedArrivalTime} 대비 늦게 입실한 상태입니다.`
         : '오늘 지각 입실로 확인된 상태입니다.';
     case 'routine_missing':
       return '오늘 루틴 기록이 없어 출석 확인 전에 먼저 점검이 필요합니다.';
@@ -295,7 +295,7 @@ export function buildAttendanceBoardNote(params: {
       return '오늘 출석 증거는 있으나 현재는 퇴실 상태입니다.';
     case 'absent':
       return expectedArrivalTime
-        ? `루틴 예정 ${expectedArrivalTime} 이후에도 오늘 입실 증거가 없습니다.`
+        ? `예정 등원 ${expectedArrivalTime} 이후에도 오늘 입실 증거가 없습니다.`
         : '오늘 입실 증거가 없어 미입실로 보고 있습니다.';
     case 'excused_absent':
       return '오늘은 루틴상 등원하지 않는 날로 기록되어 있습니다.';

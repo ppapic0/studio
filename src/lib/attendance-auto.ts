@@ -16,6 +16,7 @@ import {
 } from 'firebase/firestore';
 import { applyPenaltyEventSecure } from '@/lib/penalty-actions';
 import { getStudyDayDate, getStudyDayKey } from '@/lib/study-day';
+import type { StudentScheduleDoc, StudentScheduleTemplate } from '@/lib/types';
 
 export type AttendanceRecordStatus =
   | 'requested'
@@ -35,6 +36,8 @@ export interface AttendanceRoutineInfo {
   hasRoutine: boolean;
   isNoAttendanceDay: boolean;
   expectedArrivalTime: string | null;
+  plannedDepartureTime?: string | null;
+  classScheduleName?: string | null;
 }
 
 export interface AttendanceRecordLike {
@@ -104,14 +107,61 @@ export const buildAttendanceRoutineInfo = (scheduleTitles: string[]): Attendance
   );
   const isNoAttendanceDay = scheduleTitles.some((title) => title.includes(ATTENDANCE_ROUTINE_KEYWORDS.off));
   const arrivalTitle = scheduleTitles.find((title) => title.includes(ATTENDANCE_ROUTINE_KEYWORDS.arrive));
+  const departureTitle = scheduleTitles.find((title) => title.includes(ATTENDANCE_ROUTINE_KEYWORDS.leave));
   const expectedArrivalTime = arrivalTitle ? extractTimeFromRoutineTitle(arrivalTitle) : null;
+  const plannedDepartureTime = departureTitle ? extractTimeFromRoutineTitle(departureTitle) : null;
 
   return {
     hasRoutine,
     isNoAttendanceDay,
     expectedArrivalTime,
+    plannedDepartureTime,
   };
 };
+
+function getScheduleTemplateTimestampMs(template: StudentScheduleTemplate) {
+  const raw = template.updatedAt || template.createdAt;
+  if (!raw) return 0;
+  if (raw instanceof Date) return raw.getTime();
+  if (typeof (raw as any).toDate === 'function') return (raw as any).toDate().getTime();
+  return 0;
+}
+
+export function buildAttendanceRoutineInfoFromScheduleDoc(
+  schedule: Pick<
+    StudentScheduleDoc,
+    | 'arrivalPlannedAt'
+    | 'departurePlannedAt'
+    | 'inTime'
+    | 'outTime'
+    | 'isAbsent'
+    | 'status'
+    | 'classScheduleName'
+  >
+): AttendanceRoutineInfo {
+  return {
+    hasRoutine: true,
+    isNoAttendanceDay: Boolean(schedule.isAbsent || schedule.status === 'absent'),
+    expectedArrivalTime: schedule.arrivalPlannedAt || schedule.inTime || null,
+    plannedDepartureTime: schedule.departurePlannedAt || schedule.outTime || null,
+    classScheduleName: schedule.classScheduleName || null,
+  };
+}
+
+export function buildAttendanceRoutineInfoFromScheduleTemplate(
+  template: Pick<
+    StudentScheduleTemplate,
+    'arrivalPlannedAt' | 'departurePlannedAt' | 'classScheduleName'
+  >
+): AttendanceRoutineInfo {
+  return {
+    hasRoutine: true,
+    isNoAttendanceDay: false,
+    expectedArrivalTime: template.arrivalPlannedAt || null,
+    plannedDepartureTime: template.departurePlannedAt || null,
+    classScheduleName: template.classScheduleName || null,
+  };
+}
 
 export function deriveAttendanceDisplayState(params: {
   selectedDate: Date;
@@ -250,8 +300,38 @@ async function fetchAttendanceRoutineInfo(
   centerId: string,
   studentId: string,
   dateKey: string,
-  weekKey: string
+  weekKey: string,
+  targetDate: Date
 ): Promise<AttendanceRoutineInfo> {
+  const directScheduleRef = doc(firestore, 'users', studentId, 'schedules', dateKey);
+  const directScheduleSnap = await getDoc(directScheduleRef);
+  if (directScheduleSnap.exists()) {
+    const schedule = directScheduleSnap.data() as StudentScheduleDoc;
+    if (!schedule.centerId || schedule.centerId === centerId) {
+      return buildAttendanceRoutineInfoFromScheduleDoc(schedule);
+    }
+  }
+
+  try {
+    const templateSnap = await getDocs(query(
+      collection(firestore, 'users', studentId, 'scheduleTemplates'),
+      where('centerId', '==', centerId)
+    ));
+    const weekday = targetDate.getDay();
+    const matchingTemplate = templateSnap.docs
+      .map((docSnap) => ({ ...(docSnap.data() as StudentScheduleTemplate), id: docSnap.id }))
+      .filter((template) => template.active !== false)
+      .filter((template) => !template.centerId || template.centerId === centerId)
+      .filter((template) => Array.isArray(template.weekdays) && template.weekdays.includes(weekday))
+      .sort((left, right) => getScheduleTemplateTimestampMs(right) - getScheduleTemplateTimestampMs(left))[0];
+
+    if (matchingTemplate) {
+      return buildAttendanceRoutineInfoFromScheduleTemplate(matchingTemplate);
+    }
+  } catch {
+    // Legacy plan items below are still enough to derive attendance in older accounts.
+  }
+
   const routineQuery = query(
     collection(firestore, 'centers', centerId, 'plans', studentId, 'weeks', weekKey, 'items'),
     where('dateKey', '==', dateKey),
@@ -296,7 +376,7 @@ export async function syncAutoAttendanceRecord(params: {
     return { status: existing.status || 'requested', wrote: false, reason: 'manual_override' };
   }
 
-  const routine = await fetchAttendanceRoutineInfo(firestore, centerId, studentId, dateKey, weekKey);
+  const routine = await fetchAttendanceRoutineInfo(firestore, centerId, studentId, dateKey, weekKey, studyDayDate);
   const studyLogInfo = await fetchStudyLogInfo(firestore, centerId, studentId, dateKey);
   const existingCheckedAt = toDateSafe(existing?.checkInAt || existing?.updatedAt);
   const accessCheckedAt = checkInAt || existingCheckedAt;

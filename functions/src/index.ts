@@ -3750,8 +3750,10 @@ function assertInviteUsable(inv: InviteDoc, expectedRole?: AllowedRole) {
 }
 
 const defaultStudyRoomScheduleWeekdays = [1, 2, 3, 4, 5, 6, 0];
-const defaultStudyRoomArrivalTime = "17:00";
-const defaultStudyRoomDepartureTime = "01:00";
+const sharedStudyRoomArrivalTime = "18:00";
+const sharedStudyRoomDepartureTime = "23:30";
+const nsuStudyRoomArrivalTime = "17:00";
+const nsuStudyRoomDepartureTime = "01:00";
 const defaultStudyRoomScheduleTemplateId = "default-shared-study-room-schedule";
 const nsuStudyRoomScheduleTemplateId = "default-nsu-study-room-schedule";
 const sharedStudyRoomClassScheduleId = "shared-study-room-schedule";
@@ -3780,6 +3782,8 @@ function buildDefaultStudyRoomScheduleTemplateData(params: {
 }) {
   const isNsu = isNsuStudyRoomClassName(params.className);
   const classScheduleName = isNsu ? "N수반 교시제" : "센터 공통 교시제";
+  const arrivalPlannedAt = isNsu ? nsuStudyRoomArrivalTime : sharedStudyRoomArrivalTime;
+  const departurePlannedAt = isNsu ? nsuStudyRoomDepartureTime : sharedStudyRoomDepartureTime;
 
   return {
     id: isNsu ? nsuStudyRoomScheduleTemplateId : defaultStudyRoomScheduleTemplateId,
@@ -3787,8 +3791,8 @@ function buildDefaultStudyRoomScheduleTemplateData(params: {
       centerId: params.centerId,
       name: `${classScheduleName} 기본 등하원`,
       weekdays: defaultStudyRoomScheduleWeekdays,
-      arrivalPlannedAt: defaultStudyRoomArrivalTime,
-      departurePlannedAt: defaultStudyRoomDepartureTime,
+      arrivalPlannedAt,
+      departurePlannedAt,
       academyNameDefault: null,
       academyStartAtDefault: null,
       academyEndAtDefault: null,
@@ -3797,8 +3801,8 @@ function buildDefaultStudyRoomScheduleTemplateData(params: {
       defaultExcursionEndAt: null,
       defaultExcursionReason: null,
       note: isNsu
-        ? "N수반은 일반 토요일·일요일 교시제를 평일에도 동일하게 적용합니다. 특이사항이 있는 학생만 학원 일정을 별도로 등록합니다."
-        : "특이사항이 없으면 이 교시제를 그대로 따르고, 학원 일정이 있는 학생만 별도로 등록합니다.",
+        ? "N수반은 센터 공통 교시제와 별도 기준으로 운영합니다. 특이사항이 있는 학생만 학원 일정을 별도로 등록합니다."
+        : "의무 등원은 18:00, 의무 하원은 23:30입니다. 특이사항이 없으면 이 교시제를 그대로 따르고, 학원 일정이 있는 학생만 별도로 등록합니다.",
       classScheduleId: isNsu ? nsuStudyRoomClassScheduleId : sharedStudyRoomClassScheduleId,
       classScheduleName,
       active: true,

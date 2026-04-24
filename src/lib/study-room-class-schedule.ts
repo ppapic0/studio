@@ -11,6 +11,10 @@ export const NSU_STUDY_ROOM_CLASS_SCHEDULE_ID = 'nsu-study-room-schedule';
 export const NSU_STUDY_ROOM_CLASS_SCHEDULE_NAME = 'N수반 교시제';
 export const DEFAULT_STUDY_ROOM_SCHEDULE_TEMPLATE_ID = 'default-shared-study-room-schedule';
 export const NSU_STUDY_ROOM_SCHEDULE_TEMPLATE_ID = 'default-nsu-study-room-schedule';
+export const SHARED_STUDY_ROOM_MANDATORY_ARRIVAL_TIME = '18:00';
+export const SHARED_STUDY_ROOM_MANDATORY_DEPARTURE_TIME = '23:30';
+export const NSU_STUDY_ROOM_MANDATORY_ARRIVAL_TIME = '17:00';
+export const NSU_STUDY_ROOM_MANDATORY_DEPARTURE_TIME = '01:00';
 
 export type StudyRoomScheduleTrack = 'regular' | 'nsu';
 
@@ -139,9 +143,9 @@ export function buildSharedStudyRoomClassSchedule(
     centerId,
     className: SHARED_STUDY_ROOM_CLASS_SCHEDULE_NAME,
     weekdays: [...SHARED_STUDY_ROOM_CLASS_SCHEDULE_WEEKDAYS],
-    arrivalTime: '17:00',
-    departureTime: '01:00',
-    note: '특이사항이 없으면 이 교시제를 그대로 따르고, 학원 일정이 있는 학생만 별도로 등록합니다.',
+    arrivalTime: SHARED_STUDY_ROOM_MANDATORY_ARRIVAL_TIME,
+    departureTime: SHARED_STUDY_ROOM_MANDATORY_DEPARTURE_TIME,
+    note: '의무 등원은 18:00, 의무 하원은 23:30입니다. 특이사항이 없으면 이 교시제를 그대로 따르고, 학원 일정이 있는 학생만 별도로 등록합니다.',
     blocks: SHARED_STUDY_ROOM_PERIOD_BLOCKS.map((block) => ({ ...block })),
     active: true,
     createdByUid: null,
@@ -159,9 +163,9 @@ export function buildNsuStudyRoomClassSchedule(
     centerId,
     className: NSU_STUDY_ROOM_CLASS_SCHEDULE_NAME,
     weekdays: [...SHARED_STUDY_ROOM_CLASS_SCHEDULE_WEEKDAYS],
-    arrivalTime: '17:00',
-    departureTime: '01:00',
-    note: 'N수반은 일반 토요일·일요일 교시제를 평일에도 동일하게 적용합니다. 특이사항이 있는 학생만 학원 일정을 별도로 등록합니다.',
+    arrivalTime: NSU_STUDY_ROOM_MANDATORY_ARRIVAL_TIME,
+    departureTime: NSU_STUDY_ROOM_MANDATORY_DEPARTURE_TIME,
+    note: 'N수반은 센터 공통 교시제와 별도 기준으로 운영합니다. 특이사항이 있는 학생만 학원 일정을 별도로 등록합니다.',
     blocks: clonePeriodBlocks('nsu'),
     active: true,
     createdByUid: null,

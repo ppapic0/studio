@@ -68,6 +68,8 @@ import {
   getScheduleChangeReasonLabel,
 } from '@/lib/attendance-request';
 import {
+  SHARED_STUDY_ROOM_MANDATORY_ARRIVAL_TIME,
+  SHARED_STUDY_ROOM_MANDATORY_DEPARTURE_TIME,
   buildSharedStudyRoomClassSchedules,
   getStudyRoomClassScheduleDisplayName,
 } from '@/lib/study-room-class-schedule';
@@ -179,8 +181,8 @@ export default function AttendancePage() {
   const [editingClassScheduleId, setEditingClassScheduleId] = useState<string | null>(null);
   const [classScheduleClassName, setClassScheduleClassName] = useState('');
   const [classScheduleWeekdays, setClassScheduleWeekdays] = useState<number[]>([1, 2, 3, 4, 5]);
-  const [classScheduleArrivalTime, setClassScheduleArrivalTime] = useState('18:10');
-  const [classScheduleDepartureTime, setClassScheduleDepartureTime] = useState('01:00');
+  const [classScheduleArrivalTime, setClassScheduleArrivalTime] = useState(SHARED_STUDY_ROOM_MANDATORY_ARRIVAL_TIME);
+  const [classScheduleDepartureTime, setClassScheduleDepartureTime] = useState(SHARED_STUDY_ROOM_MANDATORY_DEPARTURE_TIME);
   const [classScheduleNote, setClassScheduleNote] = useState('');
   const [classScheduleBlocks, setClassScheduleBlocks] = useState<StudyRoomPeriodBlock[]>([
     createPeriodBlock({ label: '1교시', startTime: '18:10', endTime: '19:30' }),
@@ -858,8 +860,8 @@ export default function AttendancePage() {
     setEditingClassScheduleId(null);
     setClassScheduleClassName(classNameOptions[0] || '');
     setClassScheduleWeekdays([1, 2, 3, 4, 5]);
-    setClassScheduleArrivalTime('18:10');
-    setClassScheduleDepartureTime('01:00');
+    setClassScheduleArrivalTime(SHARED_STUDY_ROOM_MANDATORY_ARRIVAL_TIME);
+    setClassScheduleDepartureTime(SHARED_STUDY_ROOM_MANDATORY_DEPARTURE_TIME);
     setClassScheduleNote('');
     setClassScheduleBlocks([
       createPeriodBlock({ label: '1교시', startTime: '18:10', endTime: '19:30' }),
@@ -874,8 +876,8 @@ export default function AttendancePage() {
     setEditingClassScheduleId(schedule.id || null);
     setClassScheduleClassName(schedule.className || '');
     setClassScheduleWeekdays([...(schedule.weekdays || [])].sort((left, right) => left - right));
-    setClassScheduleArrivalTime(schedule.arrivalTime || '18:10');
-    setClassScheduleDepartureTime(schedule.departureTime || '01:00');
+    setClassScheduleArrivalTime(schedule.arrivalTime || SHARED_STUDY_ROOM_MANDATORY_ARRIVAL_TIME);
+    setClassScheduleDepartureTime(schedule.departureTime || SHARED_STUDY_ROOM_MANDATORY_DEPARTURE_TIME);
     setClassScheduleNote(schedule.note || '');
     setClassScheduleBlocks(
       (schedule.blocks || []).length
