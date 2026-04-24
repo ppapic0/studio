@@ -1,12 +1,11 @@
 ﻿'use client';
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { StudentDashboard } from '@/components/dashboard/student-dashboard';
 import { TeacherDashboard } from '@/components/dashboard/teacher-dashboard';
 import { AdminDashboard } from '@/components/dashboard/admin-dashboard';
 import { ParentDashboard } from '@/components/dashboard/parent-dashboard';
-import { RoutineOnboardingFlow } from '@/components/dashboard/student-planner/routine-onboarding-flow';
 import { useUser, useFunctions, useFirestore, useMemoFirebase, useDoc } from '@/firebase';
 import { useAppContext } from '@/contexts/app-context';
 import { Loader2, RefreshCw, Compass, Sparkles, Link2, Phone } from 'lucide-react';
@@ -31,8 +30,7 @@ import { useToast } from '@/hooks/use-toast';
 import { httpsCallable } from 'firebase/functions';
 import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
 import { cn } from '@/lib/utils';
-import { type StudentProfile, type User as UserType, type UserStudyProfile } from '@/lib/types';
-import { resolveStudentTargetDailyMinutesOrFallback } from '@/lib/student-target-minutes';
+import { type StudentProfile, type User as UserType } from '@/lib/types';
 import {
   buildClientConsentSnapshot,
   LEGAL_CURRENT_DATA_CATEGORIES,
@@ -55,8 +53,6 @@ const parentLinkFormSchema = z.object({
   parentPhoneNumber: z.string().trim().optional(),
 });
 
-const PLAN_TRACK_ONBOARDING_VERSION = 1;
-
 type LegalConsentFormState = {
   termsConsent: boolean;
   privacyConsent: boolean;
@@ -72,30 +68,6 @@ function hasAcceptedCurrentConsent(
   version: string
 ): boolean {
   return consent?.agreed === true && consent?.version === version;
-}
-
-function isPlainObject(value: unknown): value is Record<string, unknown> {
-  if (!value || typeof value !== 'object') return false;
-  const prototype = Object.getPrototypeOf(value);
-  return prototype === Object.prototype || prototype === null;
-}
-
-function stripUndefinedDeep<T>(value: T): T {
-  if (Array.isArray(value)) {
-    return value
-      .filter((entry) => entry !== undefined)
-      .map((entry) => stripUndefinedDeep(entry)) as T;
-  }
-
-  if (isPlainObject(value)) {
-    const nextEntries = Object.entries(value)
-      .filter(([, entryValue]) => entryValue !== undefined)
-      .map(([entryKey, entryValue]) => [entryKey, stripUndefinedDeep(entryValue)]);
-
-    return Object.fromEntries(nextEntries) as T;
-  }
-
-  return value;
 }
 
 function normalizePhone(raw: string): string {
@@ -181,8 +153,6 @@ export default function DashboardPage() {
     age14Consent: false,
     marketingEmailConsent: false,
   });
-  const [hasFinishedStudentOnboarding, setHasFinishedStudentOnboarding] = useState(false);
-  const studentOnboardingPresentationRef = useRef(false);
   const isMobile = activeMembership?.role === 'parent' || viewMode === 'mobile';
   const isStudentRole = activeMembership?.role === 'student';
   const isParentRole = activeMembership?.role === 'parent';
@@ -237,30 +207,6 @@ export default function DashboardPage() {
   }, [activeMembership, studentProfile, userProfile?.phoneNumber]);
 
   const effectiveSelfPhone = savedPhoneFallback || resolvedSelfPhone;
-  const studentRoutineOnboarding =
-    studentProfile?.studyRoutineOnboarding || userProfile?.studyRoutineOnboarding;
-  const studentRoutineProfile =
-    studentProfile?.studyRoutineProfile || userProfile?.studyRoutineProfile;
-  const resolvedTargetDailyMinutes = useMemo(
-    () => resolveStudentTargetDailyMinutesOrFallback(studentProfile, userProfile, 240),
-    [
-      studentProfile?.targetDailyMinutes,
-      studentProfile?.targetDailyMinutesSource,
-      userProfile?.targetDailyMinutes,
-      userProfile?.targetDailyMinutesSource,
-    ]
-  );
-  const shouldForceStudentOnboarding =
-    isStudentRole &&
-    !isStudentProfileLoading &&
-    !isUserProfileLoading &&
-    !hasFinishedStudentOnboarding &&
-    !Boolean(
-      studentRoutineProfile ||
-      studentRoutineOnboarding?.completedAt ||
-      studentRoutineOnboarding?.dismissedAt ||
-      studentRoutineOnboarding?.status
-    );
   const isPhoneLookupReady = useMemo(() => {
     if (!activeMembership || !user) return false;
     if (activeMembership.role === 'student') {
@@ -309,28 +255,6 @@ export default function DashboardPage() {
     setPhoneCaptureValue((prev) => prev || '');
     setIsPhoneCaptureOpen(true);
   }, [activeMembership, user, effectiveSelfPhone, isPhoneLookupReady, needsLegalConsentPrompt, isLegalConsentSaving]);
-
-  useEffect(() => {
-    if (!shouldForceStudentOnboarding || !userProfileRef || studentOnboardingPresentationRef.current) return;
-    studentOnboardingPresentationRef.current = true;
-
-    const onboardingPayload = {
-      studyRoutineOnboarding: {
-        presentedAt: studentRoutineOnboarding?.presentedAt || serverTimestamp(),
-        version: PLAN_TRACK_ONBOARDING_VERSION,
-        updatedAt: serverTimestamp(),
-      },
-    };
-
-    void Promise.allSettled([
-      setDoc(userProfileRef, onboardingPayload, { merge: true }),
-      studentProfileRef ? setDoc(studentProfileRef, onboardingPayload, { merge: true }) : Promise.resolve(),
-    ]).then((results) => {
-      if (results.every((result) => result.status === 'rejected')) {
-        console.error('[dashboard] failed to persist onboarding presentation state');
-      }
-    });
-  }, [shouldForceStudentOnboarding, studentProfileRef, studentRoutineOnboarding?.presentedAt, userProfileRef]);
 
   const buildDashboardLegalConsentsPayload = useCallback(() => {
     return {
@@ -525,83 +449,6 @@ export default function DashboardPage() {
       { merge: true }
     );
   };
-
-  const handleSaveStudentRoutineProfile = useCallback(
-    async (profile: UserStudyProfile) => {
-      if (!firestore || !user || !activeMembership || !userProfileRef) return;
-
-      const onboardingPayload = {
-        presentedAt: studentRoutineOnboarding?.presentedAt || serverTimestamp(),
-        status: 'completed' as const,
-        completedAt: serverTimestamp(),
-        version: PLAN_TRACK_ONBOARDING_VERSION,
-        updatedAt: serverTimestamp(),
-      };
-      const studyProfilePayload = stripUndefinedDeep({
-        ...profile,
-        createdAt: studentRoutineProfile?.createdAt || serverTimestamp(),
-        updatedAt: serverTimestamp(),
-      });
-
-      const writeResults = await Promise.allSettled([
-        setDoc(
-          userProfileRef,
-          {
-            updatedAt: serverTimestamp(),
-            studyRoutineOnboarding: onboardingPayload,
-            studyRoutineProfile: studyProfilePayload,
-          },
-          { merge: true }
-        ),
-        studentProfileRef
-          ? setDoc(
-              studentProfileRef,
-              {
-                id: authUid || user.uid,
-                name: studentProfile?.name || activeMembership.displayName || user.displayName || '학생',
-                schoolName: studentProfile?.schoolName || userProfile?.schoolName || '학교 미정',
-                grade: studentProfile?.grade || '학년 미정',
-                seatNo: studentProfile?.seatNo || 0,
-                targetDailyMinutes: resolvedTargetDailyMinutes.minutes,
-                parentUids: studentProfile?.parentUids || [],
-                createdAt: studentProfile?.createdAt || serverTimestamp(),
-                updatedAt: serverTimestamp(),
-                studyRoutineOnboarding: onboardingPayload,
-                studyRoutineProfile: studyProfilePayload,
-                studyRoutineWorkspace: null,
-              },
-              { merge: true }
-            )
-          : Promise.resolve(),
-      ]);
-
-      if (writeResults.every((result) => result.status === 'rejected')) {
-        throw (writeResults.find((result) => result.status === 'rejected') as PromiseRejectedResult | undefined)?.reason;
-      }
-
-      if (writeResults.some((result) => result.status === 'rejected')) {
-        console.warn('[dashboard] mirrored student profile write partially failed', writeResults);
-      }
-
-      toast({
-        title: '학습 기준 저장 완료',
-        description: '이제부터는 직접 쓴 계획을 바탕으로 더 잘 맞는 코칭과 추천을 보여드릴게요.',
-      });
-    },
-    [
-      activeMembership,
-      firestore,
-      studentProfile,
-      studentProfileRef,
-      studentRoutineOnboarding?.presentedAt,
-      studentRoutineProfile?.createdAt,
-      toast,
-      user,
-      userProfile?.schoolName,
-      userProfileRef,
-      resolvedTargetDailyMinutes.minutes,
-    ]
-  );
 
   const handleSavePhoneCapture = async () => {
     if (!user || !activeMembership || !firestore) {
@@ -904,21 +751,6 @@ export default function DashboardPage() {
               </DialogFooter>
             </DialogContent>
           </Dialog>
-        </>
-      );
-    }
-
-    if (userRole === 'student' && shouldForceStudentOnboarding) {
-      return (
-        <>
-          <RoutineOnboardingFlow
-            studentName={studentProfile?.name || activeMembership.displayName || user?.displayName || '학생'}
-            onSaveRoutineProfile={handleSaveStudentRoutineProfile}
-            onContinueToPlanner={() => setHasFinishedStudentOnboarding(true)}
-            autoContinueOnSave
-            allowSkip={false}
-          />
-          {legalConsentDialog}
         </>
       );
     }
