@@ -4660,7 +4660,7 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
                 <ParentSectionHeader
                   icon={<MessageCircle className="h-3.5 w-3.5" />}
                   eyebrow="Inquiry"
-                  title="건의사항 · 질의 · 요청사항"
+                  title="건의 및 요청사항"
                   description="남겨주신 내용은 선생님 또는 센터관리자가 확인하고 답변드립니다."
                 />
                 <div className="space-y-4">
