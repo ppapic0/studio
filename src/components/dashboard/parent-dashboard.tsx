@@ -4793,7 +4793,6 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
                     icon={<CreditCard className="h-3.5 w-3.5" />}
                     eyebrow="Billing"
                     title="수납"
-                    description="결제 현황과 대표 청구서를 한 번에 확인할 수 있도록 안심형 청구서 센터로 정리했습니다."
                     badges={
                       <>
                         <Badge variant="outline" className="h-7 rounded-full border border-[#ffe0bf] bg-white px-3 text-[10px] font-black text-[#9f6b39] shadow-sm">
@@ -4909,9 +4908,6 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
                                 <CreditCard className="h-4 w-4" />
                                 추후 오픈
                               </div>
-                              <p className="text-center text-[11px] font-bold text-slate-500">
-                                앱 내 결제 기능은 추후 오픈 예정입니다. 현재는 청구 내용만 먼저 확인할 수 있어요.
-                              </p>
                             </div>
                           ) : (
                             <div className="rounded-[1.4rem] border border-emerald-200 bg-[linear-gradient(180deg,#f8fffb_0%,#effcf5_100%)] px-4 py-4 text-center shadow-[inset_0_1px_0_rgba(255,255,255,0.9)]">
@@ -4995,9 +4991,6 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
                     <CreditCard className="h-6 w-6 text-[#FF7A16]" />
                   </div>
                   <p className="mt-4 text-base font-black text-[#14295F]">현재 발행된 청구서가 없습니다.</p>
-                  <p className="mt-2 text-sm font-bold leading-relaxed text-slate-500">
-                    새 청구서가 발행되면 이 화면에서 바로 확인할 수 있어요. 결제 기능은 추후 오픈 예정입니다.
-                  </p>
                 </Card>
               )}
 
