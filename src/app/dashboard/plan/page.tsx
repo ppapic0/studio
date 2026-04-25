@@ -3370,8 +3370,15 @@ export default function StudyPlanPage() {
       return;
     }
 
-    const actualDurationMinutes = Math.max(0, Math.round(Number(completionActualDurationDraft) || 0));
-    if (actualDurationMinutes <= 0) {
+    const targetMinutes = Math.max(0, Number(completionReviewItem.targetMinutes || 0));
+    const parsedActualDurationMinutes = Math.max(0, Math.round(Number(completionActualDurationDraft) || 0));
+    const actualDurationMinutes = parsedActualDurationMinutes > 0
+      ? parsedActualDurationMinutes
+      : completionMarkedDone
+        ? targetMinutes
+        : 0;
+    const hasActualDuration = actualDurationMinutes > 0;
+    if (!completionMarkedDone && !hasActualDuration) {
       toast({
         variant: 'destructive',
         title: '걸린 시간을 적어주세요',
@@ -3416,11 +3423,10 @@ export default function StudyPlanPage() {
         completionReviewItem.id
       );
 
-      const targetMinutes = Math.max(0, Number(completionReviewItem.targetMinutes || 0));
       const overtimeMinutes = targetMinutes > 0
         ? Math.max(0, actualDurationMinutes - targetMinutes)
         : 0;
-      const completedWithinPlannedTime = targetMinutes > 0
+      const completedWithinPlannedTime = targetMinutes > 0 && hasActualDuration
         ? actualDurationMinutes <= targetMinutes
         : null;
       const isVolumeTask = resolveStudyPlanMode(completionReviewItem) === 'volume';
@@ -3436,7 +3442,7 @@ export default function StudyPlanPage() {
         done: completionMarkedDone,
         completedAt: completionMarkedDone ? serverTimestamp() : null,
         completionPercent,
-        actualDurationMinutes,
+        actualDurationMinutes: hasActualDuration ? actualDurationMinutes : null,
         completedWithinPlannedTime,
         completionOvertimeMinutes: completedWithinPlannedTime === null ? null : overtimeMinutes,
         updatedAt: serverTimestamp(),
@@ -3455,7 +3461,11 @@ export default function StudyPlanPage() {
             rewardErrorMessage: null as string | null,
           };
 
-      const completionToastDescriptionParts = [`완수 ${completionPercent}% · ${actualDurationMinutes}분 기록됐어요.`];
+      const completionToastDescriptionParts = [
+        hasActualDuration
+          ? `완수 ${completionPercent}% · ${actualDurationMinutes}분 기록됐어요.`
+          : `완수 ${completionPercent}%로 기록됐어요.`,
+      ];
       if (rewardFeedback.awardedPoints > 0) {
         completionToastDescriptionParts.push(`포인트 ${rewardFeedback.awardedPoints}P도 적립했어요.`);
       } else if (completionMarkedDone && rewardFeedback.dailyLimitReached) {
