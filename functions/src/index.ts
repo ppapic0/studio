@@ -3796,7 +3796,7 @@ function buildDefaultStudyRoomScheduleTemplateData(params: {
           weekdays: nsuStudyRoomScheduleWeekdays,
           arrivalPlannedAt: nsuStudyRoomArrivalTime,
           departurePlannedAt: nsuStudyRoomDepartureTime,
-          note: "N수반은 센터 공통 트랙제와 별도 기준으로 운영합니다. 특이사항이 있는 학생만 학원 일정을 별도로 등록합니다.",
+          note: "N수반은 센터 공통 트랙제와 별도 기준으로 운영합니다. 특이사항이 있는 학생만 학원 및 외출 일정을 별도로 등록합니다.",
         },
       ]
     : [
@@ -3807,7 +3807,7 @@ function buildDefaultStudyRoomScheduleTemplateData(params: {
           weekdays: sharedStudyRoomScheduleWeekdays,
           arrivalPlannedAt: sharedStudyRoomArrivalTime,
           departurePlannedAt: sharedStudyRoomDepartureTime,
-          note: "의무 등원은 18:00, 의무 하원은 23:30입니다. 특이사항이 없으면 이 트랙제를 그대로 따르고, 학원 일정이 있는 학생만 별도로 등록합니다.",
+          note: "의무 등원은 18:00, 의무 하원은 23:30입니다. 특이사항이 없으면 이 트랙제를 그대로 따르고, 학원 및 외출 일정이 있는 학생만 별도로 등록합니다.",
         },
         {
           id: saturdayStudyRoomScheduleTemplateId,

@@ -26,31 +26,67 @@ export function addMinutesToTime(value: string, minutesToAdd: number) {
   return formatMinutesAsTime(totalMinutes + minutesToAdd);
 }
 
-export function normalizeOutings(
-  primaryAway: Pick<
-    AttendanceScheduleDraft,
-    'academyName' | 'academyStartTime' | 'academyEndTime' | 'awayStartTime' | 'awayEndTime' | 'awayReason'
-  >,
-  extraAwaySlots: AttendanceAwaySlot[] = []
-): StudentScheduleOuting[] {
-  const outings = [
-    {
+function hasAwaySlotValue(slot: Pick<AttendanceAwaySlot, 'startTime' | 'endTime' | 'reason'>) {
+  return Boolean(slot.startTime || slot.endTime || slot.reason?.trim());
+}
+
+export function mergeAcademyIntoAwayDraft(draft: AttendanceScheduleDraft): AttendanceScheduleDraft {
+  const slots: AttendanceAwaySlot[] = [];
+  const academyReason = draft.academyName?.trim() || '학원';
+
+  if (draft.academyStartTime || draft.academyEndTime) {
+    slots.push({
       id: 'academy',
-      kind: 'academy' as const,
-      title: primaryAway.academyName?.trim() || '학원',
-      startTime: primaryAway.academyStartTime,
-      endTime: primaryAway.academyEndTime,
-      reason: primaryAway.academyName?.trim() || '학원',
-    },
+      startTime: draft.academyStartTime,
+      endTime: draft.academyEndTime,
+      reason: academyReason,
+    });
+  }
+
+  if (draft.awayStartTime || draft.awayEndTime || draft.awayReason?.trim()) {
+    slots.push({
+      id: 'primary',
+      startTime: draft.awayStartTime,
+      endTime: draft.awayEndTime,
+      reason: draft.awayReason?.trim() || '',
+    });
+  }
+
+  slots.push(...(draft.awaySlots || []));
+
+  const [primarySlot, ...extraSlots] = slots.filter(hasAwaySlotValue);
+
+  return {
+    ...draft,
+    academyName: '',
+    academyStartTime: '',
+    academyEndTime: '',
+    awayStartTime: primarySlot?.startTime || '',
+    awayEndTime: primarySlot?.endTime || '',
+    awayReason: primarySlot?.reason || '',
+    awaySlots: extraSlots,
+  };
+}
+
+export function normalizeOutings(
+  primaryAway: AttendanceScheduleDraft,
+  extraAwaySlots?: AttendanceAwaySlot[]
+): StudentScheduleOuting[] {
+  const sourceExtraAwaySlots = extraAwaySlots ?? primaryAway.awaySlots ?? [];
+  const mergedDraft = mergeAcademyIntoAwayDraft({
+    ...primaryAway,
+    awaySlots: sourceExtraAwaySlots,
+  });
+  const outings = [
     {
       id: 'primary',
       kind: 'outing' as const,
       title: null,
-      startTime: primaryAway.awayStartTime,
-      endTime: primaryAway.awayEndTime,
-      reason: primaryAway.awayReason?.trim() || '',
+      startTime: mergedDraft.awayStartTime,
+      endTime: mergedDraft.awayEndTime,
+      reason: mergedDraft.awayReason?.trim() || '',
     },
-    ...extraAwaySlots.map((slot) => ({
+    ...(mergedDraft.awaySlots || []).map((slot) => ({
       id: slot.id,
       kind: 'outing' as const,
       title: null,
@@ -74,7 +110,7 @@ export function normalizeOutings(
 
 export function validateScheduleDraft(
   draft: AttendanceScheduleDraft,
-  extraAwaySlots: AttendanceAwaySlot[] = []
+  extraAwaySlots?: AttendanceAwaySlot[]
 ) {
   if (draft.isAbsent) return null;
 
@@ -93,27 +129,37 @@ export function validateScheduleDraft(
     return '등원 예정 시간은 하원 예정 시간보다 빨라야 해요.';
   }
 
-  const hasAcademySchedule = Boolean(
-    draft.academyName?.trim() ||
-    draft.academyStartTime ||
-    draft.academyEndTime
-  );
-  if (hasAcademySchedule && (!draft.academyStartTime || !draft.academyEndTime)) {
-    return '학원 시작 시간과 종료 시간을 모두 입력해 주세요.';
+  const mergedDraft = mergeAcademyIntoAwayDraft({
+    ...draft,
+    awaySlots: extraAwaySlots ?? draft.awaySlots ?? [],
+  });
+  const rawOutings = [
+    {
+      startTime: mergedDraft.awayStartTime,
+      endTime: mergedDraft.awayEndTime,
+      reason: mergedDraft.awayReason,
+    },
+    ...(mergedDraft.awaySlots || []),
+  ].filter(hasAwaySlotValue);
+
+  for (const outing of rawOutings) {
+    if (!outing.startTime || !outing.endTime) {
+      return '학원 및 외출 시작 시간과 복귀 예정 시간을 모두 입력해 주세요.';
+    }
   }
 
-  const outings = normalizeOutings(draft, extraAwaySlots);
+  const outings = normalizeOutings(mergedDraft, mergedDraft.awaySlots || []);
   for (const outing of outings) {
     const excursionStart = parseTimeToMinutes(outing.startTime);
     const excursionEnd = parseTimeToMinutes(outing.endTime);
     if (excursionStart === null || excursionEnd === null) {
-      return '외출 시간 형식이 올바르지 않아요.';
+      return '학원 및 외출 시간 형식이 올바르지 않아요.';
     }
     if (excursionStart >= excursionEnd) {
-      return '외출 시작 시간은 복귀 예정 시간보다 빨라야 해요.';
+      return '시작 시간은 복귀 예정 시간보다 빨라야 해요.';
     }
     if (excursionStart < arrivalMinutes || excursionEnd > departureMinutes) {
-      return '외출 시간은 등원~하원 예정 시간 안에서만 입력할 수 있어요.';
+      return '학원 및 외출 시간은 등원~하원 예정 시간 안에서만 입력할 수 있어요.';
     }
   }
 
@@ -166,19 +212,33 @@ export function buildScheduleDocFromDraft(params: {
 }
 
 export function buildDraftFromScheduleDoc(schedule?: Partial<StudentScheduleDoc> | null): AttendanceScheduleDraft {
-  const academyOuting = schedule?.outings?.find((outing) => outing.kind === 'academy') || null;
-  const regularOutings = (schedule?.outings || []).filter((outing) => outing.kind !== 'academy');
-  const firstOuting = regularOutings[0];
+  const outingSlots =
+    schedule?.outings?.map((outing) => ({
+      id: outing.id,
+      startTime: outing.startTime,
+      endTime: outing.endTime,
+      reason: outing.reason || outing.title || (outing.kind === 'academy' ? '학원' : ''),
+    })) || [];
+  const fallbackOuting =
+    !outingSlots.length && ((schedule as any)?.excursionStartAt || (schedule as any)?.excursionEndAt || (schedule as any)?.excursionReason)
+      ? [{
+          id: 'legacy-excursion',
+          startTime: (schedule as any)?.excursionStartAt || '',
+          endTime: (schedule as any)?.excursionEndAt || '',
+          reason: (schedule as any)?.excursionReason || '',
+        }]
+      : [];
+  const [firstOuting, ...extraOutings] = [...outingSlots, ...fallbackOuting].filter(hasAwaySlotValue);
   return {
     inTime: schedule?.inTime || (schedule as any)?.arrivalPlannedAt || '09:00',
     outTime: schedule?.outTime || (schedule as any)?.departurePlannedAt || '22:00',
-    academyName: academyOuting?.title || academyOuting?.reason || '',
-    academyStartTime: academyOuting?.startTime || '',
-    academyEndTime: academyOuting?.endTime || '',
-    awayStartTime: firstOuting?.startTime || (schedule as any)?.excursionStartAt || '',
-    awayEndTime: firstOuting?.endTime || (schedule as any)?.excursionEndAt || '',
-    awayReason: firstOuting?.reason || (schedule as any)?.excursionReason || '',
-    awaySlots: regularOutings.slice(1).map((outing) => ({
+    academyName: '',
+    academyStartTime: '',
+    academyEndTime: '',
+    awayStartTime: firstOuting?.startTime || '',
+    awayEndTime: firstOuting?.endTime || '',
+    awayReason: firstOuting?.reason || '',
+    awaySlots: extraOutings.map((outing) => ({
       id: outing.id,
       startTime: outing.startTime,
       endTime: outing.endTime,
@@ -200,14 +260,9 @@ export function buildLegacyScheduleTitles(schedule: StudentScheduleDoc) {
     titles.push(`교시제 적용: ${schedule.classScheduleName.trim()}`);
   }
   schedule.outings.forEach((outing) => {
-    if (outing.kind === 'academy') {
-      titles.push(`학원 일정 · ${outing.title || outing.reason || '학원'}: ${outing.startTime} ~ ${outing.endTime}`);
-      return;
-    }
-
     titles.push(outing.reason
-      ? `외출 예정 · ${outing.reason}: ${outing.startTime} ~ ${outing.endTime}`
-      : `외출 예정: ${outing.startTime} ~ ${outing.endTime}`);
+      ? `학원/외출 예정 · ${outing.reason}: ${outing.startTime} ~ ${outing.endTime}`
+      : `학원/외출 예정: ${outing.startTime} ~ ${outing.endTime}`);
   });
   return titles;
 }
@@ -217,10 +272,7 @@ export function buildScheduleSummary(schedule: AttendanceScheduleDraft, extraAwa
   const outings = normalizeOutings(schedule, extraAwaySlots);
   if (outings.length === 0) return `${schedule.inTime} ~ ${schedule.outTime}`;
   const firstOuting = outings[0];
-  if (firstOuting.kind === 'academy') {
-    return `${schedule.inTime} ~ ${schedule.outTime} · 학원 ${firstOuting.startTime} ~ ${firstOuting.endTime}`;
-  }
-  return `${schedule.inTime} ~ ${schedule.outTime} · 외출 ${firstOuting.startTime} ~ ${firstOuting.endTime}`;
+  return `${schedule.inTime} ~ ${schedule.outTime} · 학원/외출 ${firstOuting.startTime} ~ ${firstOuting.endTime}`;
 }
 
 export function hydrateSavedRoutine(routine: SavedAttendanceRoutine) {
