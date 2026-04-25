@@ -889,7 +889,7 @@ export function AttendanceScheduleSheet({
                 disabled={isSubmitting}
               />
 
-              <div className={cn('grid gap-2', isMobile ? 'grid-cols-1' : 'grid-cols-2')}>
+              <div className="grid gap-2">
                 <Button
                   type="button"
                   variant="outline"
@@ -902,15 +902,6 @@ export function AttendanceScheduleSheet({
                 >
                   <Copy className="mr-2 h-4 w-4" />
                   이 날짜 예외값 불러오기
-                </Button>
-                <Button
-                  type="button"
-                  onClick={() => void handleSaveWeekdayAction()}
-                  disabled={isSubmitting || selectedWeekdays.length === 0 || Boolean(validateScheduleDraft(weekdayDraft, weekdayDraft.awaySlots || []))}
-                  className="h-11 rounded-xl bg-[linear-gradient(135deg,#FF9A2B_0%,#FF7A16_100%)] font-black text-white shadow-[0_18px_30px_-20px_rgba(255,122,22,0.36)]"
-                >
-                  {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
-                  주간 기본 일정 저장
                 </Button>
               </div>
 
