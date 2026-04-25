@@ -6914,21 +6914,73 @@ async function syncStudyLogDayTotalMinutes(
   dateKey: string
 ): Promise<void> {
   const sessionsSnap = await db.collection(`centers/${centerId}/studyLogs/${studentId}/days/${dateKey}/sessions`).get();
-  const totalMinutes = sessionsSnap.docs.reduce((sum, docSnap) => {
+  const sessionTotalMinutes = sessionsSnap.docs.reduce((sum, docSnap) => {
     const raw = Number((docSnap.data() as Record<string, unknown>)?.durationMinutes ?? 0);
     return sum + (Number.isFinite(raw) ? Math.max(0, Math.round(raw)) : 0);
   }, 0);
+  const firstSessionStartAt = sessionsSnap.docs
+    .map((docSnap) => toTimestampOrNow((docSnap.data() as Record<string, unknown>)?.startTime))
+    .filter((value): value is admin.firestore.Timestamp => Boolean(value))
+    .sort((left, right) => left.toMillis() - right.toMillis())[0] ?? null;
+  const lastSessionEndAt = sessionsSnap.docs
+    .map((docSnap) => toTimestampOrNow((docSnap.data() as Record<string, unknown>)?.endTime))
+    .filter((value): value is admin.firestore.Timestamp => Boolean(value))
+    .sort((left, right) => right.toMillis() - left.toMillis())[0] ?? null;
+  const dayRef = db.doc(`centers/${centerId}/studyLogs/${studentId}/days/${dateKey}`);
+  const statRef = db.doc(`centers/${centerId}/dailyStudentStats/${dateKey}/students/${studentId}`);
 
-  await db.doc(`centers/${centerId}/studyLogs/${studentId}/days/${dateKey}`).set(
-    {
-      studentId,
-      centerId,
-      dateKey,
-      totalMinutes,
-      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-    },
-    { merge: true }
-  );
+  await db.runTransaction(async (transaction) => {
+    const [daySnap, statSnap] = await Promise.all([
+      transaction.get(dayRef),
+      transaction.get(statRef),
+    ]);
+    const dayData = (daySnap.data() || {}) as Record<string, unknown>;
+    const statData = (statSnap.data() || {}) as Record<string, unknown>;
+    const dayManualAdjustment = Math.round(parseFiniteNumber(dayData.manualAdjustmentMinutes) ?? 0);
+    const statManualAdjustment = Math.round(parseFiniteNumber(statData.manualAdjustmentMinutes) ?? 0);
+    const existingDayDisplayMinutes =
+      Math.max(0, Math.round(parseFiniteNumber(dayData.totalMinutes) ?? 0)) +
+      dayManualAdjustment;
+    const existingStatDisplayMinutes =
+      Math.max(0, Math.round(parseFiniteNumber(statData.totalStudyMinutes) ?? 0)) +
+      statManualAdjustment;
+    const hasManualAdjustment = dayManualAdjustment !== 0 || statManualAdjustment !== 0;
+    const existingDisplayMinutes = hasManualAdjustment
+      ? Math.max(0, existingDayDisplayMinutes, existingStatDisplayMinutes)
+      : Math.max(0, existingDayDisplayMinutes);
+    const displayTotalMinutes = hasManualAdjustment
+      ? existingDisplayMinutes
+      : Math.max(sessionTotalMinutes, existingDisplayMinutes);
+    const manualAdjustmentMinutes = displayTotalMinutes - sessionTotalMinutes;
+
+    transaction.set(
+      dayRef,
+      {
+        studentId,
+        centerId,
+        dateKey,
+        totalMinutes: sessionTotalMinutes,
+        manualAdjustmentMinutes,
+        ...(firstSessionStartAt ? { firstSessionStartAt } : {}),
+        ...(lastSessionEndAt ? { lastSessionEndAt } : {}),
+        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      },
+      { merge: true }
+    );
+
+    transaction.set(
+      statRef,
+      {
+        studentId,
+        centerId,
+        dateKey,
+        totalStudyMinutes: sessionTotalMinutes,
+        manualAdjustmentMinutes,
+        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      },
+      { merge: true }
+    );
+  });
 }
 
 /**
@@ -7033,6 +7085,8 @@ export const onSessionCreated = functions
         clamped: normalizedDuration,
       });
     }
+
+    await syncStudyLogDayTotalMinutes(db, centerId, studentId, dateKey);
 
     return null;
   });

@@ -40,6 +40,7 @@ import { useRouter } from 'next/navigation';
 import { format } from 'date-fns';
 import { sendKakaoNotification } from '@/lib/kakao-service';
 import { syncAutoAttendanceRecord } from '@/lib/attendance-auto';
+import { appendAttendanceEventToBatch, mergeAttendanceDailyStatToBatch } from '@/lib/attendance-events';
 import { resolveSeatIdentity } from '@/lib/seat-layout';
 
 export default function KioskPage() {
@@ -151,7 +152,9 @@ export default function KioskPage() {
     try {
       const batch = writeBatch(firestore);
       const seatRef = doc(firestore, 'centers', centerId, 'attendanceCurrent', seat.id);
-      const todayKey = format(new Date(), 'yyyy-MM-dd');
+      const nowDate = new Date();
+      const nowMs = nowDate.getTime();
+      const todayKey = format(nowDate, 'yyyy-MM-dd');
       let stopSessionId: string | null = null;
       const isReturningFromAway = nextStatus === 'studying' && (prevStatus === 'away' || prevStatus === 'break');
 
@@ -159,7 +162,7 @@ export default function KioskPage() {
       // away/break 상태에서 퇴실해도 lastCheckInAt 기준으로 시간을 기록한다 (T-2 버그 수정)
       if (nextStatus === 'absent' && (prevStatus === 'studying' || prevStatus === 'away' || prevStatus === 'break') && seat.lastCheckInAt) {
         const startTime = seat.lastCheckInAt.toMillis();
-        const durationMinutes = Math.max(1, Math.floor((Date.now() - startTime) / 60000));
+        const durationMinutes = Math.max(1, Math.floor((nowMs - startTime) / 60000));
 
         if (durationMinutes > 0) {
           const logRef = doc(firestore, 'centers', centerId, 'studyLogs', student.id, 'days', todayKey);
@@ -171,11 +174,20 @@ export default function KioskPage() {
             updatedAt: serverTimestamp()
           }, { merge: true });
 
+          const statRef = doc(firestore, 'centers', centerId, 'dailyStudentStats', todayKey, 'students', student.id);
+          batch.set(statRef, {
+            studentId: student.id,
+            centerId,
+            dateKey: todayKey,
+            totalStudyMinutes: increment(durationMinutes),
+            updatedAt: serverTimestamp(),
+          }, { merge: true });
+
           stopSessionId = `session_${seat.lastCheckInAt.toMillis()}`;
           const sessionRef = doc(firestore, 'centers', centerId, 'studyLogs', student.id, 'days', todayKey, 'sessions', stopSessionId);
           batch.set(sessionRef, {
             startTime: seat.lastCheckInAt,
-            endTime: serverTimestamp(),
+            endTime: Timestamp.fromMillis(nowMs),
             durationMinutes,
             sessionId: stopSessionId,
             createdAt: serverTimestamp()
@@ -187,6 +199,71 @@ export default function KioskPage() {
             updatedAt: serverTimestamp()
           }, { merge: true });
         }
+      }
+
+      if (prevStatus === 'absent' && nextStatus === 'studying') {
+        appendAttendanceEventToBatch(batch, firestore, centerId, {
+          studentId: student.id,
+          dateKey: todayKey,
+          eventType: 'check_in',
+          occurredAt: nowDate,
+          source: 'kiosk',
+          seatId: seat.id,
+          statusBefore: prevStatus,
+          statusAfter: nextStatus,
+        });
+        mergeAttendanceDailyStatToBatch(batch, firestore, centerId, student.id, todayKey, {
+          attendanceStatus: nextStatus,
+          checkInAt: nowDate,
+          source: 'kiosk',
+        });
+      } else if ((prevStatus === 'away' || prevStatus === 'break') && nextStatus === 'studying') {
+        appendAttendanceEventToBatch(batch, firestore, centerId, {
+          studentId: student.id,
+          dateKey: todayKey,
+          eventType: 'away_end',
+          occurredAt: nowDate,
+          source: 'kiosk',
+          seatId: seat.id,
+          statusBefore: prevStatus,
+          statusAfter: nextStatus,
+        });
+        mergeAttendanceDailyStatToBatch(batch, firestore, centerId, student.id, todayKey, {
+          attendanceStatus: nextStatus,
+          source: 'kiosk',
+        });
+      } else if ((nextStatus === 'away' || nextStatus === 'break') && prevStatus === 'studying') {
+        appendAttendanceEventToBatch(batch, firestore, centerId, {
+          studentId: student.id,
+          dateKey: todayKey,
+          eventType: 'away_start',
+          occurredAt: nowDate,
+          source: 'kiosk',
+          seatId: seat.id,
+          statusBefore: prevStatus,
+          statusAfter: nextStatus,
+        });
+        mergeAttendanceDailyStatToBatch(batch, firestore, centerId, student.id, todayKey, {
+          attendanceStatus: nextStatus,
+          source: 'kiosk',
+        });
+      } else if (nextStatus === 'absent' && prevStatus !== 'absent') {
+        appendAttendanceEventToBatch(batch, firestore, centerId, {
+          studentId: student.id,
+          dateKey: todayKey,
+          eventType: 'check_out',
+          occurredAt: nowDate,
+          source: 'kiosk',
+          seatId: seat.id,
+          statusBefore: prevStatus,
+          statusAfter: nextStatus,
+        });
+        mergeAttendanceDailyStatToBatch(batch, firestore, centerId, student.id, todayKey, {
+          attendanceStatus: nextStatus,
+          checkOutAt: nowDate,
+          hasCheckOutRecord: true,
+          source: 'kiosk',
+        });
       }
 
       const updateData: any = {
@@ -208,14 +285,14 @@ export default function KioskPage() {
 
       const autoCheckInAt =
         nextStatus === 'studying'
-          ? (isReturningFromAway && seat.lastCheckInAt ? seat.lastCheckInAt.toDate() : new Date())
+          ? (isReturningFromAway && seat.lastCheckInAt ? seat.lastCheckInAt.toDate() : nowDate)
           : (seat.lastCheckInAt ? seat.lastCheckInAt.toDate() : null);
       void syncAutoAttendanceRecord({
         firestore,
         centerId,
         studentId: student.id,
         studentName: student.name,
-        targetDate: new Date(),
+        targetDate: nowDate,
         checkInAt: autoCheckInAt,
       }).catch((syncError: any) => {
         console.warn('[kiosk] auto attendance sync skipped', syncError?.message || syncError);
