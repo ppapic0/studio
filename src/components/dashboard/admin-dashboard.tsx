@@ -389,6 +389,13 @@ const formatDateTimeLocalInput = (value: Date) => {
   return `${year}-${month}-${day}T${hours}:${minutes}`;
 };
 
+const formatChartMinutesAxisTick = (value: number) => {
+  const safeMinutes = Math.max(0, Math.round(Number(value || 0)));
+  if (safeMinutes < 60) return `${safeMinutes}m`;
+  const hours = safeMinutes / 60;
+  return `${Number.isInteger(hours) ? hours : hours.toFixed(1)}h`;
+};
+
 const roundUpToNextTenMinutes = (value: Date) => {
   const rounded = new Date(value);
   rounded.setSeconds(0, 0);
@@ -5767,11 +5774,11 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
                     <div className="flex h-[160px] items-center justify-center text-xs font-bold text-[#5c6e97]">데이터를 수집 중입니다.</div>
                   ) : (
                     <ResponsiveContainer width="100%" height={160}>
-                      <ComposedChart data={weeklyGrowthData} margin={{ top: 8, right: 36, left: -8, bottom: 0 }}>
+                      <ComposedChart data={weeklyGrowthData} margin={{ top: 8, right: 44, left: 8, bottom: 0 }}>
                         <CartesianGrid strokeDasharray="3 3" stroke="#E4ECFA" vertical={false} />
                         <XAxis dataKey="label" tick={{ fontSize: 9, fontWeight: 700, fill: '#5c6e97' }} tickLine={false} axisLine={false} />
-                        <YAxis yAxisId="min" tick={{ fontSize: 9, fontWeight: 700, fill: '#5c6e97' }} tickLine={false} axisLine={false} width={32} tickFormatter={(v) => `${Math.round(v / 60)}h`} />
-                        <YAxis yAxisId="pct" orientation="right" tick={{ fontSize: 9, fontWeight: 700, fill: '#5c6e97' }} tickLine={false} axisLine={false} width={30} tickFormatter={(v) => `${v}%`} />
+                        <YAxis yAxisId="min" tick={{ fontSize: 9, fontWeight: 700, fill: '#5c6e97' }} tickLine={false} axisLine={false} width={46} tickFormatter={(v) => formatChartMinutesAxisTick(Number(v))} />
+                        <YAxis yAxisId="pct" orientation="right" tick={{ fontSize: 9, fontWeight: 700, fill: '#5c6e97' }} tickLine={false} axisLine={false} width={40} tickFormatter={(v) => `${Math.round(Number(v || 0))}%`} />
                         <Tooltip
                           formatter={(v: number, name: string) => name === 'totalMinutes' ? [`${Math.floor(v / 60)}h ${v % 60}m`, '주간 학습'] : [`${v >= 0 ? '+' : ''}${v}%`, '성장률']}
                           contentStyle={{ borderRadius: '14px', border: '1px solid #DCE7FF', boxShadow: '0 14px 30px rgba(20,41,95,0.12)', fontSize: '11px', fontWeight: 700, color: '#14295F' }}
@@ -5827,11 +5834,11 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
                     <div className="flex h-[140px] items-center justify-center text-xs font-bold text-[#5c6e97]">데이터를 수집 중입니다.</div>
                   ) : (
                     <ResponsiveContainer width="100%" height={140}>
-                      <ComposedChart data={dailyGrowthWindowData} margin={{ top: 8, right: 36, left: -8, bottom: 0 }}>
+                      <ComposedChart data={dailyGrowthWindowData} margin={{ top: 8, right: 44, left: 8, bottom: 0 }}>
                         <CartesianGrid strokeDasharray="3 3" stroke="#E4ECFA" vertical={false} />
                         <XAxis dataKey="label" tick={{ fontSize: 10, fontWeight: 800, fill: '#5c6e97' }} tickLine={false} axisLine={false} />
-                        <YAxis yAxisId="min" tick={{ fontSize: 9, fontWeight: 700, fill: '#5c6e97' }} tickLine={false} axisLine={false} width={32} tickFormatter={(v) => `${Math.round(v / 60)}h`} />
-                        <YAxis yAxisId="pct" orientation="right" tick={{ fontSize: 9, fontWeight: 700, fill: '#5c6e97' }} tickLine={false} axisLine={false} width={30} tickFormatter={(v) => `${v}%`} />
+                        <YAxis yAxisId="min" tick={{ fontSize: 9, fontWeight: 700, fill: '#5c6e97' }} tickLine={false} axisLine={false} width={46} tickFormatter={(v) => formatChartMinutesAxisTick(Number(v))} />
+                        <YAxis yAxisId="pct" orientation="right" tick={{ fontSize: 9, fontWeight: 700, fill: '#5c6e97' }} tickLine={false} axisLine={false} width={40} tickFormatter={(v) => `${Math.round(Number(v || 0))}%`} />
                         <Tooltip
                           formatter={(v: number, name: string) => name === 'avgMinutes' ? [`${Math.floor(v / 60)}h ${v % 60}m`, '일 평균'] : [`${v >= 0 ? '+' : ''}${v}%`, '전월 대비']}
                           contentStyle={{ borderRadius: '14px', border: '1px solid #DCE7FF', boxShadow: '0 14px 30px rgba(20,41,95,0.12)', fontSize: '11px', fontWeight: 700, color: '#14295F' }}
@@ -5863,10 +5870,10 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
                     <div className="flex h-[130px] items-center justify-center text-xs font-bold text-[#5c6e97]">리듬 점수 데이터를 수집 중입니다.</div>
                   ) : (
                     <ResponsiveContainer width="100%" height={130}>
-                      <LineChart data={rhythmScoreTrendData} margin={{ top: 6, right: 8, left: -8, bottom: 0 }}>
+                      <LineChart data={rhythmScoreTrendData} margin={{ top: 6, right: 12, left: 8, bottom: 0 }}>
                         <CartesianGrid strokeDasharray="3 3" stroke="#E4ECFA" vertical={false} />
                         <XAxis dataKey="date" tick={{ fontSize: 9, fontWeight: 700, fill: '#5c6e97' }} tickLine={false} axisLine={false} />
-                        <YAxis domain={[0, 100]} tick={{ fontSize: 9, fontWeight: 700, fill: '#5c6e97' }} tickLine={false} axisLine={false} width={28} />
+                        <YAxis domain={[0, 100]} tick={{ fontSize: 9, fontWeight: 700, fill: '#5c6e97' }} tickLine={false} axisLine={false} width={40} />
                         <Tooltip
                           formatter={(v: number) => [`${Math.round(v)}점`, '리듬 점수']}
                           contentStyle={{ borderRadius: '14px', border: '1px solid #DCE7FF', boxShadow: '0 14px 30px rgba(20,41,95,0.12)', fontSize: '11px', fontWeight: 700, color: '#14295F' }}
@@ -5888,10 +5895,10 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
                     <div className="flex h-[130px] items-center justify-center text-xs font-bold text-[#5c6e97]">데이터를 수집 중입니다.</div>
                   ) : (
                     <ResponsiveContainer width="100%" height={130}>
-                      <ComposedChart data={rhythmData} margin={{ top: 6, right: 8, left: -8, bottom: 0 }}>
+                      <ComposedChart data={rhythmData} margin={{ top: 6, right: 12, left: 8, bottom: 0 }}>
                         <CartesianGrid strokeDasharray="3 3" stroke="#E4ECFA" vertical={false} />
                         <XAxis dataKey="label" tick={{ fontSize: 11, fontWeight: 800, fill: '#5c6e97' }} tickLine={false} axisLine={false} />
-                        <YAxis domain={[0, 24]} tick={{ fontSize: 9, fontWeight: 700, fill: '#5c6e97' }} tickLine={false} axisLine={false} width={32} tickFormatter={(v) => `${v}h`} />
+                        <YAxis domain={[0, 24]} tick={{ fontSize: 9, fontWeight: 700, fill: '#5c6e97' }} tickLine={false} axisLine={false} width={44} tickFormatter={(v) => `${Math.round(Number(v || 0))}h`} />
                         <Tooltip
                           formatter={(v: number, name: string) => [`${Math.floor(v)}:${Math.round((v % 1) * 60).toString().padStart(2, '0')}`, name === 'startHour' ? '시작시간' : '종료시간']}
                           contentStyle={{ borderRadius: '14px', border: '1px solid #DCE7FF', boxShadow: '0 14px 30px rgba(20,41,95,0.12)', fontSize: '11px', fontWeight: 700, color: '#14295F' }}
@@ -5922,10 +5929,10 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
                     </div>
                   ) : (
                     <ResponsiveContainer width="100%" height={130}>
-                      <ComposedChart data={awayTimeData} margin={{ top: 6, right: 8, left: -8, bottom: 0 }}>
+                      <ComposedChart data={awayTimeData} margin={{ top: 6, right: 12, left: 8, bottom: 0 }}>
                         <CartesianGrid strokeDasharray="3 3" stroke="#E4ECFA" vertical={false} />
                         <XAxis dataKey="date" tick={{ fontSize: 9, fontWeight: 700, fill: '#5c6e97' }} tickLine={false} axisLine={false} />
-                        <YAxis tick={{ fontSize: 9, fontWeight: 700, fill: '#5c6e97' }} tickLine={false} axisLine={false} width={28} tickFormatter={(v) => `${v}m`} />
+                        <YAxis tick={{ fontSize: 9, fontWeight: 700, fill: '#5c6e97' }} tickLine={false} axisLine={false} width={42} tickFormatter={(v) => `${Math.max(0, Math.round(Number(v || 0)))}m`} />
                         <Tooltip
                           formatter={(v: number) => [`${v}분`, '외출시간']}
                           contentStyle={{ borderRadius: '14px', border: '1px solid #DCE7FF', boxShadow: '0 14px 30px rgba(20,41,95,0.12)', fontSize: '11px', fontWeight: 700, color: '#14295F' }}

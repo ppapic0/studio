@@ -2848,15 +2848,15 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
   const hasStartEndTimeData = startEndTimeTrendData.some((item) => item.startHour !== null || item.endHour !== null);
   const hasAwayTimeData = awayTimeTrendData.some((item) => item.awayMinutes > 0);
   const parentAnalyticsTickFontSize = isAppMode ? 9 : 10;
-  const parentAnalyticsGrowthMargin = isAppMode ? { top: 8, right: 16, left: 10, bottom: 0 } : { top: 8, right: 6, left: -12, bottom: 0 };
-  const parentAnalyticsRhythmMargin = isAppMode ? { top: 8, right: 12, left: 10, bottom: 0 } : { top: 8, right: 8, left: -6, bottom: 0 };
-  const parentAnalyticsStartEndMargin = isAppMode ? { top: 8, right: 12, left: 12, bottom: 0 } : { top: 8, right: 8, left: -10, bottom: 0 };
-  const parentAnalyticsAwayMargin = isAppMode ? { top: 8, right: 12, left: 12, bottom: 0 } : { top: 8, right: 8, left: -10, bottom: 0 };
-  const parentAnalyticsGrowthLeftAxisWidth = isAppMode ? 44 : 34;
-  const parentAnalyticsGrowthRightAxisWidth = isAppMode ? 40 : 32;
-  const parentAnalyticsRhythmAxisWidth = isAppMode ? 38 : 28;
-  const parentAnalyticsStartEndAxisWidth = isAppMode ? 54 : 40;
-  const parentAnalyticsAwayAxisWidth = isAppMode ? 40 : 30;
+  const parentAnalyticsGrowthMargin = isAppMode ? { top: 8, right: 24, left: 16, bottom: 0 } : { top: 8, right: 14, left: 4, bottom: 0 };
+  const parentAnalyticsRhythmMargin = isAppMode ? { top: 8, right: 18, left: 16, bottom: 0 } : { top: 8, right: 14, left: 4, bottom: 0 };
+  const parentAnalyticsStartEndMargin = isAppMode ? { top: 8, right: 18, left: 16, bottom: 0 } : { top: 8, right: 14, left: 4, bottom: 0 };
+  const parentAnalyticsAwayMargin = isAppMode ? { top: 8, right: 18, left: 16, bottom: 0 } : { top: 8, right: 14, left: 4, bottom: 0 };
+  const parentAnalyticsGrowthLeftAxisWidth = isAppMode ? 54 : 46;
+  const parentAnalyticsGrowthRightAxisWidth = isAppMode ? 56 : 48;
+  const parentAnalyticsRhythmAxisWidth = isAppMode ? 46 : 42;
+  const parentAnalyticsStartEndAxisWidth = isAppMode ? 60 : 56;
+  const parentAnalyticsAwayAxisWidth = isAppMode ? 50 : 46;
 
   const weeklyGrowthInsight = useMemo(() => buildWeeklyStudyInsight(weeklyGrowthData), [weeklyGrowthData]);
   const rhythmInsight = useMemo(() => buildRhythmInsight(rhythmScoreOnlyTrend), [rhythmScoreOnlyTrend]);
@@ -4358,7 +4358,7 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
                           <ComposedChart data={awayTimeTrendData} margin={parentAnalyticsAwayMargin}>
                             <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#fde5eb" />
                             <XAxis dataKey="date" tickLine={false} axisLine={false} fontSize={parentAnalyticsTickFontSize} />
-                            <YAxis tickLine={false} axisLine={false} width={parentAnalyticsAwayAxisWidth} tickFormatter={(value) => `${value}m`} />
+                            <YAxis tickLine={false} axisLine={false} width={parentAnalyticsAwayAxisWidth} tickFormatter={(value) => `${Math.max(0, Math.round(Number(value || 0)))}m`} />
                             <Tooltip
                               contentStyle={{ borderRadius: '1rem', border: '1px solid #ffe0e7', boxShadow: '0 18px 36px rgba(225,29,72,0.10)' }}
                               formatter={(value: number) => [`${Math.round(Number(value || 0))}분`, '이탈시간']}

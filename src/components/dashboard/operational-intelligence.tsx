@@ -617,10 +617,10 @@ export function OperationalIntelligence() {
 
             <div className="h-[180px] w-full">
               <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={opsMetrics.consultationByWeekday} margin={{ top: 8, right: 8, left: -8, bottom: 0 }}>
+                <BarChart data={opsMetrics.consultationByWeekday} margin={{ top: 8, right: 12, left: 8, bottom: 0 }}>
                   <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#eff6ff" />
                   <XAxis dataKey="weekday" axisLine={false} tickLine={false} fontSize={11} />
-                  <YAxis allowDecimals={false} axisLine={false} tickLine={false} fontSize={11} width={28} />
+                  <YAxis allowDecimals={false} axisLine={false} tickLine={false} fontSize={11} width={40} />
                   <Tooltip formatter={(value: number) => [`${value}건`, '상담']} />
                   <Bar dataKey="count" fill="#3b82f6" radius={[8, 8, 0, 0]} barSize={22} />
                 </BarChart>
@@ -629,7 +629,7 @@ export function OperationalIntelligence() {
 
             <div className="h-[180px] w-full">
               <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={opsMetrics.consultationByHour} margin={{ top: 8, right: 8, left: -8, bottom: 0 }}>
+                <BarChart data={opsMetrics.consultationByHour} margin={{ top: 8, right: 12, left: 8, bottom: 0 }}>
                   <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#eff6ff" />
                   <XAxis
                     dataKey="label"
@@ -638,7 +638,7 @@ export function OperationalIntelligence() {
                     fontSize={10}
                     interval={2}
                   />
-                  <YAxis allowDecimals={false} axisLine={false} tickLine={false} fontSize={11} width={28} />
+                  <YAxis allowDecimals={false} axisLine={false} tickLine={false} fontSize={11} width={40} />
                   <Tooltip formatter={(value: number) => [`${value}건`, '상담']} />
                   <Bar dataKey="count" fill="#60a5fa" radius={[6, 6, 0, 0]} barSize={8} />
                 </BarChart>
@@ -672,10 +672,10 @@ export function OperationalIntelligence() {
 
             <div className="h-[180px] w-full">
               <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={opsMetrics.leadByWeekday} margin={{ top: 8, right: 8, left: -8, bottom: 0 }}>
+                <BarChart data={opsMetrics.leadByWeekday} margin={{ top: 8, right: 12, left: 8, bottom: 0 }}>
                   <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#fff7ed" />
                   <XAxis dataKey="weekday" axisLine={false} tickLine={false} fontSize={11} />
-                  <YAxis allowDecimals={false} axisLine={false} tickLine={false} fontSize={11} width={28} />
+                  <YAxis allowDecimals={false} axisLine={false} tickLine={false} fontSize={11} width={40} />
                   <Tooltip formatter={(value: number) => [`${value}건`, '리드 등록']} />
                   <Bar dataKey="count" fill="#f97316" radius={[8, 8, 0, 0]} barSize={22} />
                 </BarChart>
@@ -684,10 +684,10 @@ export function OperationalIntelligence() {
 
             <div className="h-[180px] w-full">
               <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={opsMetrics.leadByHour} margin={{ top: 8, right: 8, left: -8, bottom: 0 }}>
+                <BarChart data={opsMetrics.leadByHour} margin={{ top: 8, right: 12, left: 8, bottom: 0 }}>
                   <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#fff7ed" />
                   <XAxis dataKey="label" axisLine={false} tickLine={false} fontSize={10} interval={2} />
-                  <YAxis allowDecimals={false} axisLine={false} tickLine={false} fontSize={11} width={28} />
+                  <YAxis allowDecimals={false} axisLine={false} tickLine={false} fontSize={11} width={40} />
                   <Tooltip formatter={(value: number) => [`${value}건`, '리드 등록']} />
                   <Bar dataKey="count" fill="#fb923c" radius={[6, 6, 0, 0]} barSize={8} />
                 </BarChart>

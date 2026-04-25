@@ -151,7 +151,10 @@ function normalizeRhythmMinutes(series: Array<{ studyMinutes: number; hasActualS
 
 function hourTickFormatter(value: number): string {
   if (!Number.isFinite(value)) return '0h';
-  return `${Math.max(0, Math.round(value))}h`;
+  const safeMinutes = Math.max(0, Math.round(value * 60));
+  if (safeMinutes < 60) return `${safeMinutes}m`;
+  const hours = safeMinutes / 60;
+  return `${Number.isInteger(hours) ? hours : hours.toFixed(1)}h`;
 }
 
 function hourToClockLabel(value: number): string {
@@ -2172,20 +2175,20 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
   const analysisChartTickColor = '#14295F';
   const analysisChartTickSoftColor = '#14295F';
   const analysisChartAxisLine = { stroke: '#14295F', strokeOpacity: 0.24, strokeWidth: 1 };
-  const analysisDualAxisMargin = { top: 10, right: 22, left: 12, bottom: 0 };
-  const analysisSingleAxisMargin = { top: 10, right: 16, left: 12, bottom: 0 };
-  const analysisMinutesAxisWidth = 48;
-  const analysisGrowthAxisWidth = 58;
-  const analysisScoreAxisWidth = 44;
-  const analysisClockAxisWidth = 56;
-  const analysisAwayAxisWidth = 46;
-  const mobileAnalysisDualAxisMargin = { top: 8, right: 16, left: 10, bottom: 0 };
-  const mobileAnalysisSingleAxisMargin = { top: 8, right: 12, left: 10, bottom: 0 };
-  const mobileAnalysisMinutesAxisWidth = 46;
-  const mobileAnalysisGrowthAxisWidth = 48;
-  const mobileAnalysisScoreAxisWidth = 42;
-  const mobileAnalysisClockAxisWidth = 54;
-  const mobileAnalysisAwayAxisWidth = 42;
+  const analysisDualAxisMargin = { top: 10, right: 30, left: 18, bottom: 0 };
+  const analysisSingleAxisMargin = { top: 10, right: 22, left: 18, bottom: 0 };
+  const analysisMinutesAxisWidth = 58;
+  const analysisGrowthAxisWidth = 64;
+  const analysisScoreAxisWidth = 50;
+  const analysisClockAxisWidth = 62;
+  const analysisAwayAxisWidth = 54;
+  const mobileAnalysisDualAxisMargin = { top: 8, right: 22, left: 16, bottom: 0 };
+  const mobileAnalysisSingleAxisMargin = { top: 8, right: 18, left: 16, bottom: 0 };
+  const mobileAnalysisMinutesAxisWidth = 54;
+  const mobileAnalysisGrowthAxisWidth = 56;
+  const mobileAnalysisScoreAxisWidth = 48;
+  const mobileAnalysisClockAxisWidth = 60;
+  const mobileAnalysisAwayAxisWidth = 50;
   const analysisChartGridColor = isAnalysisPresentation ? 'rgba(244, 248, 255, 0.34)' : '#f2f2f2';
   const analysisStudyTrendStrokeColor = isAnalysisPresentation ? '#f4f8ff' : 'hsl(var(--primary))';
   const analysisChipPrimaryTextClass = isAnalysisPresentation ? 'text-[#f4f8ff]' : 'text-[#14295F]';
@@ -3444,7 +3447,7 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
                       </defs>
                       <CartesianGrid strokeDasharray="4 4" vertical={false} stroke="#e7eefb" />
                       <XAxis dataKey="dateLabel" tick={{ fontSize: 10, fontWeight: 800, fill: analysisChartTickColor }} tickLine={false} axisLine={analysisChartAxisLine} tickMargin={8} interval={1} />
-                      <YAxis tick={{ fontSize: 10, fontWeight: 800, fill: analysisChartTickColor }} tickLine={false} tickMargin={8} axisLine={analysisChartAxisLine} width={analysisAwayAxisWidth} tickFormatter={(value) => `${value}m`} />
+                      <YAxis tick={{ fontSize: 10, fontWeight: 800, fill: analysisChartTickColor }} tickLine={false} tickMargin={8} axisLine={analysisChartAxisLine} width={analysisAwayAxisWidth} tickFormatter={(value) => `${Math.max(0, Math.round(Number(value || 0)))}m`} />
                       <Tooltip
                         content={(
                           <AnalysisTrendTooltip
@@ -3795,7 +3798,7 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
                           </defs>
                           <CartesianGrid strokeDasharray="4 4" vertical={false} stroke="#e7eefb" />
                       <XAxis dataKey="dateLabel" tick={{ fontSize: 10, fontWeight: 800, fill: analysisChartTickColor }} tickLine={false} axisLine={analysisChartAxisLine} tickMargin={8} interval={1} />
-                      <YAxis tick={{ fontSize: 10, fontWeight: 800, fill: analysisChartTickColor }} tickLine={false} tickMargin={6} axisLine={analysisChartAxisLine} width={mobileAnalysisAwayAxisWidth} tickFormatter={(value) => `${value}m`} />
+                      <YAxis tick={{ fontSize: 10, fontWeight: 800, fill: analysisChartTickColor }} tickLine={false} tickMargin={6} axisLine={analysisChartAxisLine} width={mobileAnalysisAwayAxisWidth} tickFormatter={(value) => `${Math.max(0, Math.round(Number(value || 0)))}m`} />
                           <Tooltip
                             content={(
                               <AnalysisTrendTooltip
@@ -4425,7 +4428,7 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
                   isMobile ? "h-[260px]" : "h-[280px]"
                 )}>
                   <ResponsiveContainer width="100%" height="100%">
-                    <AreaChart data={displaySeries} margin={{ top: 12, right: 8, left: -12, bottom: 0 }}>
+                    <AreaChart data={displaySeries} margin={{ top: 12, right: 12, left: 8, bottom: 0 }}>
                       <defs>
                         <linearGradient id="studyMinutesDialogGradient" x1="0" y1="0" x2="0" y2="1">
                           <stop offset="5%" stopColor="#2554d4" stopOpacity={0.32} />
@@ -4434,7 +4437,7 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
                       </defs>
                       <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#dbe7ff" />
                       <XAxis dataKey="dateLabel" tick={{ fontSize: 11, fontWeight: 800, fill: '#14295F' }} tickLine={false} axisLine={analysisChartAxisLine} />
-                      <YAxis tick={{ fontSize: 11, fontWeight: 800, fill: '#14295F' }} tickLine={false} axisLine={analysisChartAxisLine} width={38} />
+                      <YAxis tick={{ fontSize: 11, fontWeight: 800, fill: '#14295F' }} tickLine={false} axisLine={analysisChartAxisLine} width={46} />
                       <Tooltip content={<CustomTooltip unit="분" presentationMode={false} />} />
                       <Area type="monotone" dataKey="studyMinutes" stroke="#2554d4" strokeWidth={3} fill="url(#studyMinutesDialogGradient)" />
                     </AreaChart>
@@ -4524,10 +4527,10 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
                 {hasCompletionTrendData ? (
                   <div className="h-[240px] w-full rounded-[1.2rem] border border-[#dbe7ff] bg-[#f8fbff] p-3">
                     <ResponsiveContainer width="100%" height="100%">
-                      <ComposedChart data={displaySeries} margin={{ top: 12, right: 0, left: -16, bottom: 0 }}>
+                      <ComposedChart data={displaySeries} margin={{ top: 12, right: 12, left: 8, bottom: 0 }}>
                         <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#dbe7ff" />
                         <XAxis dataKey="dateLabel" tick={{ fontSize: 11, fontWeight: 800, fill: analysisChartTickColor }} tickLine={false} axisLine={analysisChartAxisLine} />
-                        <YAxis tick={{ fontSize: 11, fontWeight: 800, fill: analysisChartTickColor }} tickLine={false} axisLine={analysisChartAxisLine} width={36} domain={[0, 100]} />
+                        <YAxis tick={{ fontSize: 11, fontWeight: 800, fill: analysisChartTickColor }} tickLine={false} axisLine={analysisChartAxisLine} width={44} domain={[0, 100]} />
                         <Tooltip
                           content={(
                             <AnalysisTrendTooltip
@@ -4647,7 +4650,7 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
                 </div>
                 <div className="h-[240px] w-full rounded-[1.2rem] border border-[#dbe7ff] bg-[#f8fbff] p-3">
                   <ResponsiveContainer width="100%" height="100%">
-                    <AreaChart data={displaySeries} margin={{ top: 12, right: 8, left: -12, bottom: 0 }}>
+                    <AreaChart data={displaySeries} margin={{ top: 12, right: 12, left: 8, bottom: 0 }}>
                       <defs>
                         <linearGradient id="rhythmStudyMinutesGradient" x1="0" y1="0" x2="0" y2="1">
                           <stop offset="5%" stopColor="#10b981" stopOpacity={0.35} />
@@ -4656,7 +4659,7 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
                       </defs>
                       <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#dbe7ff" />
                       <XAxis dataKey="dateLabel" tick={{ fontSize: 11, fontWeight: 800, fill: analysisChartTickColor }} tickLine={false} axisLine={analysisChartAxisLine} />
-                      <YAxis tick={{ fontSize: 11, fontWeight: 800, fill: analysisChartTickColor }} tickLine={false} axisLine={analysisChartAxisLine} width={36} />
+                      <YAxis tick={{ fontSize: 11, fontWeight: 800, fill: analysisChartTickColor }} tickLine={false} axisLine={analysisChartAxisLine} width={46} />
                       <Tooltip content={<CustomTooltip unit="분" presentationMode={presentationMode} />} />
                       <Area type="monotone" dataKey="studyMinutes" stroke="#10b981" strokeWidth={3} fill="url(#rhythmStudyMinutesGradient)" />
                     </AreaChart>

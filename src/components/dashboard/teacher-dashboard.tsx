@@ -4628,7 +4628,7 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
               </div>
               <div className="h-[210px] w-full rounded-[1.55rem] border border-[#DCE7FF] bg-[linear-gradient(180deg,#FFFFFF_0%,#F6FAFF_100%)] px-1 pb-2 pt-4">
                 <ResponsiveContainer width="100%" height="100%">
-                  <AreaChart data={centerTrendData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                  <AreaChart data={centerTrendData} margin={{ top: 10, right: 12, left: 8, bottom: 0 }}>
                     <defs>
                       <linearGradient id="teacherHomeTrend" x1="0" x2="0" y2="1">
                         <stop offset="5%" stopColor="#6EE7B7" stopOpacity={0.32} />
@@ -4637,7 +4637,7 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
                     </defs>
                     <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="rgba(20,41,95,0.08)" />
                     <XAxis dataKey="name" fontSize={9} fontWeight="bold" axisLine={false} tickLine={false} tick={{ fill: '#6E7EA3' }} />
-                    <YAxis fontSize={9} fontWeight="900" axisLine={false} tickLine={false} tick={{ fill: '#6E7EA3' }} />
+                    <YAxis width={42} fontSize={9} fontWeight="900" axisLine={false} tickLine={false} tick={{ fill: '#6E7EA3' }} />
                     <Tooltip
                       content={({ active, payload, label }) => {
                         if (active && payload && payload.length) {

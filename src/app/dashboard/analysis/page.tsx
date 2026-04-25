@@ -868,7 +868,7 @@ export default function AnalysisTrackPage() {
                     <div className="space-y-4">
                       <div className="analysis-growth-canvas rounded-[1.45rem] p-4">
                         <ResponsiveContainer width="100%" height={isMobile ? 180 : 260}>
-                          <ComposedChart data={chartData} margin={{ top: 12, right: 14, left: isMobile ? 18 : 12, bottom: 4 }}>
+                          <ComposedChart data={chartData} margin={{ top: 12, right: 18, left: isMobile ? 22 : 18, bottom: 4 }}>
                             <defs>
                               <linearGradient id="analysis-focus-gradient" x1="0" y1="0" x2="0" y2="1">
                                 <stop offset="0%" stopColor="#2E6BFF" />
@@ -878,11 +878,11 @@ export default function AnalysisTrackPage() {
                             <CartesianGrid strokeDasharray="4 4" vertical={false} stroke="var(--chart-grid)" />
                             <XAxis dataKey="label" tick={{ fontSize: 10, fontWeight: 800, fill: 'var(--chart-axis)' }} tickLine={false} axisLine={false} />
                             <YAxis
-                              width={isMobile ? 46 : 40}
+                              width={isMobile ? 54 : 52}
                               tick={{ fontSize: 10, fontWeight: 800, fill: 'var(--chart-axis)' }}
                               tickLine={{ stroke: 'var(--chart-grid)' }}
                               axisLine={{ stroke: 'var(--chart-grid)' }}
-                              tickFormatter={(value) => `${Math.round(Number(value) / 60)}h`}
+                              tickFormatter={(value) => minutesToCompactLabel(Number(value))}
                               tickMargin={8}
                             />
                             <Tooltip content={<AnalysisTooltip />} cursor={{ fill: 'rgba(90,136,255,0.12)' }} />
