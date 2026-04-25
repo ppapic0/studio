@@ -73,7 +73,6 @@ import { cn } from '@/lib/utils';
 import Link from 'next/link';
 import { isAdminRole, isTeacherOrAdminRole } from '@/lib/dashboard-access';
 import { getSafeErrorMessage } from '@/lib/exposed-error';
-import { WebsiteConsultOperations } from '@/components/dashboard/website-consult-operations';
 
 type ParentCommunicationRecord = {
   id: string;
@@ -1904,7 +1903,6 @@ export function AppointmentsPageContent({
 
         <TabsContent value="reservations" className="animate-in fade-in slide-in-from-bottom-2 duration-500 w-full">
           <div className="space-y-5">
-            {isAdmin && <WebsiteConsultOperations />}
             <Card variant={isStudentTrackTheme ? 'secondary' : 'default'} className={studentSectionCardClass}>
             <CardHeader className={studentSectionHeaderClass}>
               <div className={cn('flex gap-4', isMobile ? 'flex-col' : 'items-start justify-between')}>
