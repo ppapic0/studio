@@ -703,7 +703,7 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
 
         const missingRecentKeys = recentKeys.filter((dateKey) => {
           const stat = next[dateKey];
-          return !stat || stat.startHour === undefined || stat.endHour === undefined || stat.awayMinutes === undefined;
+          return !stat || stat.totalStudyMinutes <= 0 || stat.startHour === undefined || stat.endHour === undefined || stat.awayMinutes === undefined;
         });
 
         if (missingRecentKeys.length === 0) return;
@@ -719,16 +719,25 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
                 .map((s) => ({
                   startTime: s.startTime?.toDate?.() as Date | undefined,
                   endTime: s.endTime?.toDate?.() as Date | undefined,
+                  durationMinutes: Number(s.durationMinutes || 0),
                 }))
-                .filter((s): s is { startTime: Date; endTime: Date | undefined } => !!s.startTime);
+                .filter((s): s is { startTime: Date; endTime: Date | undefined; durationMinutes: number } => !!s.startTime);
 
-              if (!sessions.length) return { dateKey, startHour: undefined, endHour: undefined, awayMinutes: undefined };
+              if (!sessions.length) return { dateKey, startHour: undefined, endHour: undefined, awayMinutes: undefined, totalStudyMinutes: undefined };
 
               const first = sessions[0].startTime;
               const last = sessions[sessions.length - 1];
               const startH = first.getHours() + first.getMinutes() / 60;
               const endDate = last.endTime || last.startTime;
               const endH = endDate.getHours() + endDate.getMinutes() / 60;
+              const totalStudyMinutes = sessions.reduce((sum, session) => {
+                if (Number.isFinite(session.durationMinutes) && session.durationMinutes > 0) {
+                  return sum + Math.max(0, Math.round(session.durationMinutes));
+                }
+                if (!session.endTime) return sum;
+                const diffMs = session.endTime.getTime() - session.startTime.getTime();
+                return sum + (diffMs > 0 ? Math.max(1, Math.ceil(diffMs / 60000)) : 0);
+              }, 0);
 
               let awayMin = 0;
               for (let i = 1; i < sessions.length; i++) {
@@ -744,9 +753,10 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
                 startHour: Number(startH.toFixed(2)),
                 endHour: Number(endH.toFixed(2)),
                 awayMinutes: awayMin,
+                totalStudyMinutes,
               };
             } catch {
-              return { dateKey, startHour: undefined, endHour: undefined, awayMinutes: undefined };
+              return { dateKey, startHour: undefined, endHour: undefined, awayMinutes: undefined, totalStudyMinutes: undefined };
             }
           })
         );
@@ -755,10 +765,13 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
 
         setDailyStatsMap((prev) => {
           const merged = { ...prev };
-          sessionResults.forEach(({ dateKey, startHour, endHour, awayMinutes }) => {
+          sessionResults.forEach(({ dateKey, startHour, endHour, awayMinutes, totalStudyMinutes }) => {
             const existing = merged[dateKey] || { totalStudyMinutes: 0 };
             merged[dateKey] = {
               ...existing,
+              totalStudyMinutes: existing.totalStudyMinutes > 0
+                ? existing.totalStudyMinutes
+                : Math.max(0, Math.round(Number(totalStudyMinutes || 0))),
               startHour: existing.startHour ?? startHour,
               endHour: existing.endHour ?? endHour,
               awayMinutes: existing.awayMinutes ?? awayMinutes,

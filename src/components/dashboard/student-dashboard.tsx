@@ -1514,6 +1514,32 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
   }, [activeStudyDayKey, firestore, activeMembership?.id, studentUid]);
   const { data: todayStudyLog } = useDoc<StudyLogDay>(studyLogRef, { enabled: isActive });
 
+  const activeStudyDaySessionsQuery = useMemoFirebase(() => {
+    if (!firestore || !activeMembership || !studentUid || !activeStudyDayKey) return null;
+    return collection(firestore, 'centers', activeMembership.id, 'studyLogs', studentUid, 'days', activeStudyDayKey, 'sessions');
+  }, [activeStudyDayKey, firestore, activeMembership?.id, studentUid]);
+  const { data: activeStudyDaySessions } = useCollection<StudySession>(activeStudyDaySessionsQuery, { enabled: isActive });
+
+  const activeStudyDaySessionMinutes = useMemo(() => {
+    return (activeStudyDaySessions || []).reduce((sum, session) => {
+      const directMinutes = Number(session.durationMinutes || 0);
+      if (Number.isFinite(directMinutes) && directMinutes > 0) {
+        return sum + Math.max(0, Math.round(directMinutes));
+      }
+      const startAt = session.startTime?.toDate?.();
+      const endAt = session.endTime?.toDate?.();
+      if (!startAt || !endAt) return sum;
+      const diffMs = endAt.getTime() - startAt.getTime();
+      return sum + (diffMs > 0 ? Math.max(1, Math.ceil(diffMs / 60000)) : 0);
+    }, 0);
+  }, [activeStudyDaySessions]);
+
+  const recordedTodayStudyMinutes = Math.max(
+    0,
+    Math.round(Number(todayStudyLog?.totalMinutes || 0)),
+    activeStudyDaySessionMinutes
+  );
+
   const recentLogsQuery = useMemoFirebase(() => {
     if (!firestore || !activeMembership || !studentUid) return null;
     return query(
@@ -1548,8 +1574,11 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
     (recentLogs || []).forEach((log) => {
       map.set(log.dateKey, Math.max(0, Math.round(log.totalMinutes || 0)));
     });
+    if (activeStudyDayKey) {
+      map.set(activeStudyDayKey, Math.max(map.get(activeStudyDayKey) || 0, recordedTodayStudyMinutes));
+    }
     return map;
-  }, [recentLogs]);
+  }, [activeStudyDayKey, recentLogs, recordedTodayStudyMinutes]);
 
   // 3. 나의 신청 내역 조회
   const myRequestsQuery = useMemoFirebase(() => {
@@ -2506,7 +2535,7 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
     }
   };
   if (!isActive) return null;
-  const totalMinutesCount = (todayStudyLog?.totalMinutes || 0) + Math.ceil(liveStudyDaySeconds / 60);
+  const totalMinutesCount = recordedTodayStudyMinutes + Math.ceil(liveStudyDaySeconds / 60);
   const hDisplay = Math.floor(totalMinutesCount / 60);
   const mDisplay = totalMinutesCount % 60;
   const isJacob = user?.email === 'jacob444@naver.com';
@@ -2555,8 +2584,8 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
       const ownEntry = validDailyRankEntries.find((entry) => entry.studentId === studentUid);
       return Number(ownEntry?.value || 0);
     }
-    return Number(todayStudyLog?.totalMinutes || 0);
-  }, [dailyStudyRank, studentUid, todayStudyLog?.totalMinutes, validDailyRankEntries]);
+    return recordedTodayStudyMinutes;
+  }, [dailyStudyRank, recordedTodayStudyMinutes, studentUid, validDailyRankEntries]);
 
   const weeklyStudyRank = useMemo(() => {
     if (!studentUid || validWeeklyRankEntries.length === 0) return 0;
@@ -2846,7 +2875,7 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
     () => ((progress?.dailyPointStatus?.[previousStudyDayKey] || {}) as Record<string, any>),
     [previousStudyDayKey, progress?.dailyPointStatus]
   );
-  const liveTodaySeconds = Math.max(0, Number(todayStudyLog?.totalMinutes || 0) * 60 + liveStudyDaySeconds);
+  const liveTodaySeconds = Math.max(0, recordedTodayStudyMinutes * 60 + liveStudyDaySeconds);
   const liveTodayMinutes = Math.floor(liveTodaySeconds / 60);
   const persistedClaimedBoxes = useMemo(() => getClaimedStudyBoxes(todayPointStatus), [todayPointStatus]);
   const persistedRewardEntries = useMemo(

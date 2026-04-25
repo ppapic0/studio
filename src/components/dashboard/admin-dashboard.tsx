@@ -1735,7 +1735,8 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
       const studentProgress = progressList.find(p => p.id === member.id);
       const seat = attendanceList.find(a => a.studentId === member.id);
       const liveSession = getLiveRoundedMinutes(seat);
-      let cumulative = (studentStat?.totalStudyMinutes || 0) + liveSession;
+      const signalMinutes = Math.max(0, Math.round(Number(attendanceSeatSignalsByStudentId.get(member.id)?.todayStudyMinutes || 0)));
+      let cumulative = Math.max((studentStat?.totalStudyMinutes || 0) + liveSession, signalMinutes);
 
       totalTodayMins += cumulative;
 
@@ -1868,10 +1869,12 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
       const studentProgress = progressList.find((p) => p.id === member.id);
       const seat = attendanceList.find((a) => a.studentId === member.id);
       const liveSession = getLiveRoundedMinutes(seat);
-      const todayMinutes = Math.max(0, Math.round((studentStat?.totalStudyMinutes || 0) + liveSession));
+      const signalMinutes = Math.max(0, Math.round(Number(attendanceSeatSignalsByStudentId.get(member.id)?.todayStudyMinutes || 0)));
+      const todayMinutes = Math.max(0, Math.round((studentStat?.totalStudyMinutes || 0) + liveSession), signalMinutes);
       const weeklyMinutes = Math.max(
         0,
-        Math.round((weeklyStudyMinutesByStudent[member.id] || 0) + liveSession)
+        Math.round((weeklyStudyMinutesByStudent[member.id] || 0) + liveSession),
+        todayMinutes
       );
       const score = calculateStudentFocusScore(studentStat, studentProgress);
       return {
@@ -1926,7 +1929,7 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
       focusTop10,
       focusBottom10,
     };
-  }, [activeMembers, attendanceList, todayStats, yesterdayStats, dailyReports, progressList, parentActivityEvents, normalizedParentCommunications, consultingLeads, websiteConsultRequests, targetMemberIds, filteredStudentMembers, now, isMounted, weeklyStudyMinutesByStudent, liveTickMs]);
+  }, [activeMembers, attendanceList, todayStats, yesterdayStats, dailyReports, progressList, parentActivityEvents, normalizedParentCommunications, consultingLeads, websiteConsultRequests, targetMemberIds, filteredStudentMembers, now, isMounted, weeklyStudyMinutesByStudent, liveTickMs, attendanceSeatSignalsByStudentId]);
 
   const counselingTrackOverview = useMemo(
     () =>
@@ -1953,6 +1956,10 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
         const studentProfile = studentsById.get(selectedFocusStudentId);
         const focusStat = (todayStats || []).find((row) => row.studentId === selectedFocusStudentId) || null;
         const focusProgress = (progressList || []).find((row) => row.id === selectedFocusStudentId) || null;
+        const seat = (attendanceList || []).find((row) => row.studentId === selectedFocusStudentId);
+        const liveSession = getLiveRoundedMinutes(seat);
+        const signalMinutes = Math.max(0, Math.round(Number(attendanceSeatSignalsByStudentId.get(selectedFocusStudentId)?.todayStudyMinutes || 0)));
+        const todayMinutes = Math.max(0, Math.round((focusStat?.totalStudyMinutes || 0) + liveSession), signalMinutes);
         if (!member && !studentProfile && !focusStat) return null;
         return {
           studentId: selectedFocusStudentId,
@@ -1960,13 +1967,13 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
           className: member?.className || studentProfile?.className || '-',
           score: calculateStudentFocusScore(focusStat, focusProgress),
           completion: Math.round(focusStat?.todayPlanCompletionRate || 0),
-          studyMinutes: Math.max(0, Math.round(weeklyStudyMinutesByStudent[selectedFocusStudentId] || focusStat?.totalStudyMinutes || 0)),
-          todayMinutes: Math.max(0, Math.round(focusStat?.totalStudyMinutes || 0)),
+          studyMinutes: Math.max(0, Math.round((weeklyStudyMinutesByStudent[selectedFocusStudentId] || 0) + liveSession), todayMinutes),
+          todayMinutes,
         };
       })()
       || null
     );
-  }, [metrics, selectedFocusStudentId, studentMembersById, studentsById, todayStats, progressList, weeklyStudyMinutesByStudent]);
+  }, [metrics, selectedFocusStudentId, studentMembersById, studentsById, todayStats, progressList, weeklyStudyMinutesByStudent, attendanceList, attendanceSeatSignalsByStudentId]);
 
   const selectedFocusStat = useMemo(
     () => (selectedFocusStudentId ? (todayStats || []).find((row) => row.studentId === selectedFocusStudentId) || null : null),

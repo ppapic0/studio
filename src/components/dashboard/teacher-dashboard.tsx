@@ -1097,6 +1097,7 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
     
     const studentStat = todayStats?.find(s => s.studentId === studentId);
     const cumulativeMinutes = studentStat?.totalStudyMinutes || 0;
+    const signalMinutes = Math.max(0, Math.round(Number(attendanceSeatSignalsByStudentId.get(studentId)?.todayStudyMinutes || 0)));
     
     let sessionSeconds = 0;
     if (status === 'studying' && lastCheckInAt) {
@@ -1105,7 +1106,7 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
     }
 
     const sessionMinutes = Math.ceil(sessionSeconds / 60);
-    const totalMinutes = cumulativeMinutes + Math.max(0, sessionMinutes);
+    const totalMinutes = Math.max(cumulativeMinutes + Math.max(0, sessionMinutes), signalMinutes);
 
     const formatSession = (secs: number) => {
       const m = Math.floor(secs / 60);
@@ -3033,7 +3034,7 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
 
         if (sessionSeconds > 0) {
           const logRef = doc(firestore, 'centers', centerId, 'studyLogs', studentId, 'days', sessionDateKey);
-          batch.set(logRef, { studentId, centerId, dateKey: sessionDateKey, updatedAt: serverTimestamp() }, { merge: true });
+          batch.set(logRef, { studentId, centerId, dateKey: sessionDateKey, totalMinutes: increment(sessionMinutes), updatedAt: serverTimestamp() }, { merge: true });
 
           const sessionRef = doc(collection(firestore, 'centers', centerId, 'studyLogs', studentId, 'days', sessionDateKey, 'sessions'));
           batch.set(sessionRef, { startTime: selectedSeat.lastCheckInAt, endTime: Timestamp.fromMillis(nowTs), durationMinutes: sessionMinutes, createdAt: serverTimestamp() });

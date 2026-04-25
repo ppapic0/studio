@@ -167,6 +167,7 @@ export default function KioskPage() {
             studentId: student.id,
             centerId: centerId,
             dateKey: todayKey,
+            totalMinutes: increment(durationMinutes),
             updatedAt: serverTimestamp()
           }, { merge: true });
 

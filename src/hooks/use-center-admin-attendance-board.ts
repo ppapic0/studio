@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { format } from 'date-fns';
-import { collection, collectionGroup, getDocs, limit, query, where } from 'firebase/firestore';
+import { collection, collectionGroup, doc, getDoc, getDocs, limit, query, where } from 'firebase/firestore';
 
 import { useCollection, useFirestore } from '@/firebase';
 import { useMemoFirebase } from '@/hooks/use-memo-firebase';
@@ -86,6 +86,21 @@ function getScheduleTemplateTimestampMs(template: StudentScheduleTemplate) {
   if (raw instanceof Date) return raw.getTime();
   if (typeof (raw as any).toDate === 'function') return (raw as any).toDate().getTime();
   return 0;
+}
+
+function getStudySessionDurationMinutes(data: Record<string, unknown>) {
+  const directMinutes = Number(data.durationMinutes ?? 0);
+  if (Number.isFinite(directMinutes) && directMinutes > 0) {
+    return Math.max(0, Math.round(directMinutes));
+  }
+
+  const startAt = toDateSafe(data.startTime);
+  const endAt = toDateSafe(data.endTime);
+  if (!startAt || !endAt) return 0;
+
+  const diffMs = endAt.getTime() - startAt.getTime();
+  if (!Number.isFinite(diffMs) || diffMs <= 0) return 0;
+  return Math.max(1, Math.ceil(diffMs / 60000));
 }
 
 const EMPTY_SCHEDULE_MOVEMENT_INFO: ScheduleMovementInfo = {
@@ -264,6 +279,10 @@ export function useCenterAdminAttendanceBoard({
     () => new Set(activeMembers.map((member) => member.id)),
     [activeMembers]
   );
+  const activeMemberIds = useMemo(
+    () => activeMembers.map((member) => member.id).filter(Boolean),
+    [activeMembers]
+  );
 
   const resolvedAttendanceList = useMemo<ResolvedAttendanceSeat[]>(
     () =>
@@ -304,6 +323,21 @@ export function useCenterAdminAttendanceBoard({
   const [historyLoading, setHistoryLoading] = useState(false);
   const [routineInfoByStudentId, setRoutineInfoByStudentId] = useState<Record<string, AttendanceRoutineInfoWithMovement>>({});
   const [routineLoading, setRoutineLoading] = useState(false);
+  const [todayStudyLogMinutesByStudentId, setTodayStudyLogMinutesByStudentId] = useState<Record<string, number>>({});
+  const [todayStudyLogLoading, setTodayStudyLogLoading] = useState(false);
+
+  const attendanceStudyStateSignature = useMemo(
+    () =>
+      resolvedAttendanceList
+        .filter((seat) => seat.studentId && targetMemberIds.has(seat.studentId))
+        .map((seat) => {
+          const updatedAtMs = toDateSafe(seat.updatedAt)?.getTime() || 0;
+          return `${seat.studentId}:${seat.status}:${updatedAtMs}`;
+        })
+        .sort()
+        .join('|'),
+    [resolvedAttendanceList, targetMemberIds]
+  );
 
   useEffect(() => {
     if (!firestore || !centerId || !isActive) {
@@ -433,6 +467,59 @@ export function useCenterAdminAttendanceBoard({
     };
   }, [activeMembers, centerId, firestore, isActive, refreshKey, todayKey, todaySchedules, weekday, weekKey]);
 
+  useEffect(() => {
+    if (!firestore || !centerId || !isActive || !todayKey || activeMemberIds.length === 0) {
+      setTodayStudyLogMinutesByStudentId({});
+      setTodayStudyLogLoading(false);
+      return;
+    }
+
+    let cancelled = false;
+    const loadTodayStudyLogMinutes = async () => {
+      setTodayStudyLogLoading(true);
+      try {
+        const entries = await Promise.all(
+          activeMemberIds.map(async (studentId) => {
+            try {
+              const dayRef = doc(firestore, 'centers', centerId, 'studyLogs', studentId, 'days', todayKey);
+              const daySnap = await getDoc(dayRef);
+              const dayData = daySnap.exists() ? (daySnap.data() as Record<string, unknown>) : null;
+              const dayTotal = Math.max(0, Math.round(Number(dayData?.totalMinutes ?? dayData?.totalStudyMinutes ?? 0)));
+
+              if (dayTotal > 0) {
+                return [studentId, dayTotal] as const;
+              }
+
+              const sessionsSnap = await getDocs(collection(firestore, 'centers', centerId, 'studyLogs', studentId, 'days', todayKey, 'sessions'));
+              const sessionTotal = sessionsSnap.docs.reduce((sum, sessionDoc) => {
+                return sum + getStudySessionDurationMinutes(sessionDoc.data() as Record<string, unknown>);
+              }, 0);
+
+              return [studentId, Math.max(0, Math.round(sessionTotal))] as const;
+            } catch (error) {
+              logHandledClientIssue('[center-admin-attendance-board] today study log load failed', error);
+              return [studentId, 0] as const;
+            }
+          })
+        );
+
+        if (!cancelled) {
+          setTodayStudyLogMinutesByStudentId(Object.fromEntries(entries.filter(([, minutes]) => minutes > 0)));
+        }
+      } catch (error) {
+        logHandledClientIssue('[center-admin-attendance-board] today study log batch load failed', error);
+        if (!cancelled) setTodayStudyLogMinutesByStudentId({});
+      } finally {
+        if (!cancelled) setTodayStudyLogLoading(false);
+      }
+    };
+
+    void loadTodayStudyLogMinutes();
+    return () => {
+      cancelled = true;
+    };
+  }, [activeMemberIds, attendanceStudyStateSignature, centerId, firestore, isActive, todayKey]);
+
   const studentById = useMemo(() => new Map((students || []).map((student) => [student.id, student])), [students]);
   const memberById = useMemo(() => new Map((studentMembers || []).map((member) => [member.id, member])), [studentMembers]);
   const todayRecordByStudentId = useMemo(
@@ -495,7 +582,9 @@ export function useCenterAdminAttendanceBoard({
           seat.status === 'studying' && lastCheckInAt
             ? Math.max(0, Math.ceil((nowMs - lastCheckInAt.getTime()) / 60000))
             : 0;
-        const recordedStudyMinutes = Math.max(0, Math.round(Number(todayStat?.totalStudyMinutes || 0)));
+        const storedStudyMinutes = Math.max(0, Math.round(Number(todayStat?.totalStudyMinutes || 0)));
+        const fallbackStudyLogMinutes = Math.max(0, Math.round(Number(todayStudyLogMinutesByStudentId[studentId] || 0)));
+        const recordedStudyMinutes = Math.max(storedStudyMinutes, fallbackStudyLogMinutes);
         const totalStudyMinutes = recordedStudyMinutes + liveSessionMinutes;
         const currentAwayMinutes =
           (seat.status === 'away' || seat.status === 'break') && lastCheckInAt
@@ -526,7 +615,7 @@ export function useCenterAdminAttendanceBoard({
           hasStudyLog: recordedStudyMinutes > 0,
           nowMs,
           isRoutineLoading: routineLoading,
-          isStudyLogLoading: false,
+          isStudyLogLoading: todayStudyLogLoading,
         });
 
         const hasAttendanceEvidence =
@@ -630,6 +719,8 @@ export function useCenterAdminAttendanceBoard({
     todayKey,
     todayRecordByStudentId,
     todayScheduleByStudentId,
+    todayStudyLogLoading,
+    todayStudyLogMinutesByStudentId,
     todayStatsByStudentId,
   ]);
 
@@ -658,6 +749,7 @@ export function useCenterAdminAttendanceBoard({
       todaySchedulesLoading ||
       historyLoading ||
       routineLoading ||
+      todayStudyLogLoading ||
       !students ||
       !studentMembers ||
       !attendanceList ||
