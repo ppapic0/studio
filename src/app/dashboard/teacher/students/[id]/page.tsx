@@ -4213,9 +4213,9 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
       </Dialog>
 
       <Dialog open={isStudyTrendModalOpen} onOpenChange={setIsStudyTrendModalOpen}>
-        <DialogContent className="rounded-[2.25rem] border-none shadow-2xl p-0 overflow-hidden sm:max-w-2xl">
+        <DialogContent className="flex max-h-[calc(100dvh-1rem)] w-[calc(100vw-1rem)] flex-col overflow-hidden rounded-[2.25rem] border-none p-0 shadow-2xl sm:max-w-2xl">
           <div className={cn(
-            "px-6 py-5",
+            "shrink-0 px-6 py-5",
             isAnalysisPresentation
               ? "bg-[linear-gradient(135deg,#FFF8EE_0%,#FFE5C4_100%)] text-[#17326B]"
               : "bg-[linear-gradient(135deg,#14295F_0%,#173D8B_58%,#2554D4_100%)] text-white"
@@ -4241,7 +4241,10 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
             </DialogHeader>
           </div>
 
-          <div className="space-y-4 bg-white px-6 py-5">
+          <div className={cn(
+            "min-h-0 flex-1 touch-pan-y space-y-4 overflow-y-auto overscroll-contain bg-white px-6 py-5 [-webkit-overflow-scrolling:touch]",
+            isMobile && "px-4 py-4 pb-[calc(1rem+env(safe-area-inset-bottom))]"
+          )}>
             <div className={cn("mb-1 flex gap-1 rounded-xl p-1 w-fit", isAnalysisPresentation ? "bg-[#17326B]/8" : "border border-[#dbe7ff] bg-[#f8fbff]")}>
               {(['today', 'weekly', 'monthly'] as ChartRangeKey[]).map((key) => (
                 <Button
@@ -4281,7 +4284,10 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
                   </div>
                 </div>
 
-                <div className="relative h-[280px] w-full rounded-[1.2rem] border border-[#dbe7ff] bg-[linear-gradient(180deg,#fbfdff_0%,#f5f8ff_100%)] px-2 py-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.7)]">
+                <div className={cn(
+                  "relative w-full touch-pan-y rounded-[1.2rem] border border-[#dbe7ff] bg-[linear-gradient(180deg,#fbfdff_0%,#f5f8ff_100%)] px-2 py-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.7)]",
+                  isMobile ? "h-[260px]" : "h-[280px]"
+                )}>
                   <ResponsiveContainer width="100%" height="100%">
                     <AreaChart data={displaySeries} margin={{ top: 12, right: 8, left: -12, bottom: 0 }}>
                       <defs>
