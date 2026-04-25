@@ -153,6 +153,7 @@ export default function KioskPage() {
       const seatRef = doc(firestore, 'centers', centerId, 'attendanceCurrent', seat.id);
       const todayKey = format(new Date(), 'yyyy-MM-dd');
       let stopSessionId: string | null = null;
+      const isReturningFromAway = nextStatus === 'studying' && (prevStatus === 'away' || prevStatus === 'break');
 
       // 퇴실(absent) 처리 시 공부 시간 저장 로직
       // away/break 상태에서 퇴실해도 lastCheckInAt 기준으로 시간을 기록한다 (T-2 버그 수정)
@@ -197,7 +198,7 @@ export default function KioskPage() {
         updatedAt: serverTimestamp()
       };
 
-      if (nextStatus === 'studying') {
+      if (nextStatus === 'studying' && (!isReturningFromAway || !seat.lastCheckInAt)) {
         updateData.lastCheckInAt = serverTimestamp();
       }
 
@@ -206,7 +207,7 @@ export default function KioskPage() {
 
       const autoCheckInAt =
         nextStatus === 'studying'
-          ? new Date()
+          ? (isReturningFromAway && seat.lastCheckInAt ? seat.lastCheckInAt.toDate() : new Date())
           : (seat.lastCheckInAt ? seat.lastCheckInAt.toDate() : null);
       void syncAutoAttendanceRecord({
         firestore,
