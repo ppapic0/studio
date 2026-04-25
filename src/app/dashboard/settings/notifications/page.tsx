@@ -51,6 +51,7 @@ import {
 
 const SMS_BYTE_LIMIT = 90;
 const STUDENT_SMS_FALLBACK_UID = '__student__';
+const MANUAL_PARENT_SMS_UID = '__manual_parent__';
 
 type ParentSmsEventType =
   | 'study_start'
@@ -167,6 +168,7 @@ type SmsRecipientPreferenceDoc = {
   parentName?: string;
   phoneNumber?: string;
   enabled?: boolean;
+  isManualRecipient?: boolean;
   eventToggles?: Partial<Record<ParentSmsEventType, boolean>>;
   updatedAt?: { toDate?: () => Date };
 };
@@ -181,6 +183,7 @@ type RecipientPreferenceRow = {
   enabled: boolean;
   eventToggles: Record<ParentSmsEventType, boolean>;
   isFallbackRecipient?: boolean;
+  isManualRecipient?: boolean;
   isPhoneMissing?: boolean;
 };
 
@@ -810,6 +813,22 @@ export default function NotificationSettingsPage() {
           return rows;
         }, []);
         const parentRowsWithPhone = parentRows.filter((row) => !row.isPhoneMissing);
+        const manualParentPref = preferencesByKey.get(buildSmsRecipientPreferenceId(student.id, MANUAL_PARENT_SMS_UID));
+        const manualParentPhoneNumber = resolveFirstValidPhoneNumber(manualParentPref?.phoneNumber);
+        const manualParentRow: RecipientPreferenceRow | null = manualParentPhoneNumber
+          ? {
+              studentId: student.id,
+              studentName,
+              className,
+              parentUid: MANUAL_PARENT_SMS_UID,
+              parentName: manualParentPref?.parentName || '보호자',
+              phoneNumber: manualParentPhoneNumber,
+              enabled: manualParentPref?.enabled !== false,
+              eventToggles: mergeEventToggles(manualParentPref?.eventToggles),
+              isManualRecipient: true,
+              isPhoneMissing: false,
+            }
+          : null;
         const fallbackPref = preferencesByKey.get(buildSmsRecipientPreferenceId(student.id, STUDENT_SMS_FALLBACK_UID));
         const studentMember = membersById.get(student.id);
         const fallbackPhoneNumber = resolveFirstValidPhoneNumber(
@@ -829,7 +848,8 @@ export default function NotificationSettingsPage() {
           isFallbackRecipient: true,
           isPhoneMissing: !fallbackPhoneNumber,
         };
-        const effectiveRows: RecipientPreferenceRow[] = parentRowsWithPhone.length > 0 ? parentRowsWithPhone : [fallbackRow];
+        const parentRowsForSms = manualParentRow ? [...parentRowsWithPhone, manualParentRow] : parentRowsWithPhone;
+        const effectiveRows: RecipientPreferenceRow[] = parentRowsForSms.length > 0 ? parentRowsForSms : [fallbackRow];
         return {
           studentId: student.id,
           studentName,
@@ -1050,6 +1070,10 @@ export default function NotificationSettingsPage() {
     () => todayBoardRows.find((row) => row.studentId === selectedBoardStudentId) || null,
     [selectedBoardStudentId, todayBoardRows]
   );
+  const selectedManualParentRow = useMemo(
+    () => selectedBoardStudent?.recipients.find((row) => row.isManualRecipient) || null,
+    [selectedBoardStudent]
+  );
 
   useEffect(() => {
     if (!selectedBoardStudent) return;
@@ -1061,6 +1085,11 @@ export default function NotificationSettingsPage() {
           next[key] = row.phoneNumber || '';
         }
       });
+      const manualParentRow = selectedBoardStudent.recipients.find((row) => row.isManualRecipient);
+      const manualParentKey = `${selectedBoardStudent.studentId}:${MANUAL_PARENT_SMS_UID}`;
+      if (!(manualParentKey in next)) {
+        next[manualParentKey] = manualParentRow?.phoneNumber || '';
+      }
       return next;
     });
   }, [selectedBoardStudent]);
@@ -1298,6 +1327,37 @@ export default function NotificationSettingsPage() {
       return;
     }
     await handleUpdateRecipientPreference(row, row.enabled, row.eventToggles, nextPhone);
+  };
+
+  const handleSaveManualParentPhone = async (student: StudentSmsBoardRow) => {
+    const actionKey = `${student.studentId}:${MANUAL_PARENT_SMS_UID}`;
+    const nextPhone = normalizePhoneNumber(recipientPhoneDrafts[actionKey] || '');
+    if (!nextPhone) {
+      toast({
+        variant: 'destructive',
+        title: '보호자 번호 확인',
+        description: '보호자 휴대폰 번호를 01012345678 형식으로 입력해 주세요.',
+      });
+      return;
+    }
+
+    const existingManualRow = student.recipients.find((row) => row.isManualRecipient);
+    await handleUpdateRecipientPreference(
+      existingManualRow || {
+        studentId: student.studentId,
+        studentName: student.studentName,
+        className: student.className,
+        parentUid: MANUAL_PARENT_SMS_UID,
+        parentName: '보호자',
+        phoneNumber: nextPhone,
+        enabled: true,
+        eventToggles: getDefaultEventToggles(),
+        isManualRecipient: true,
+      },
+      existingManualRow?.enabled ?? true,
+      existingManualRow?.eventToggles ?? getDefaultEventToggles(),
+      nextPhone
+    );
   };
 
   const handleResendStudentEvent = async (studentId: string, eventType: TodayBoardEventType) => {
@@ -1699,6 +1759,7 @@ export default function NotificationSettingsPage() {
                             <div>
                               <div className="flex flex-wrap items-center gap-2">
                                 <p className="text-sm font-black text-slate-900">{row.parentName}</p>
+                                {row.isManualRecipient ? <Badge className="border-none bg-orange-100 text-orange-700 font-black">보호자 직접 추가</Badge> : null}
                                 {row.isFallbackRecipient ? <Badge className="border-none bg-blue-100 text-blue-700 font-black">학생 fallback</Badge> : null}
                                 {row.isPhoneMissing ? <Badge className="border-none bg-slate-200 text-slate-700 font-black">번호 미등록</Badge> : null}
                               </div>
@@ -1754,6 +1815,41 @@ export default function NotificationSettingsPage() {
                         </div>
                       );
                     })}
+                    <div className="rounded-2xl border border-orange-200 bg-orange-50/70 p-4">
+                      <div className="flex flex-wrap items-start justify-between gap-3">
+                        <div>
+                          <p className="text-sm font-black text-slate-900">보호자 번호 추가</p>
+                          <p className="mt-1 text-xs font-bold text-slate-500">
+                            학부모 계정 연결 전에도 이 번호를 보호자 문자 수신 대상으로 사용합니다.
+                          </p>
+                        </div>
+                        {selectedManualParentRow?.phoneNumber ? (
+                          <Badge className="border-none bg-white text-orange-700 font-black">
+                            {maskPhone(selectedManualParentRow.phoneNumber)}
+                          </Badge>
+                        ) : null}
+                      </div>
+                      <div className="mt-3 flex flex-col gap-2 sm:flex-row">
+                        <Input
+                          value={recipientPhoneDrafts[`${selectedBoardStudent.studentId}:${MANUAL_PARENT_SMS_UID}`] ?? selectedManualParentRow?.phoneNumber ?? ''}
+                          onChange={(e) => setRecipientPhoneDrafts((prev) => ({ ...prev, [`${selectedBoardStudent.studentId}:${MANUAL_PARENT_SMS_UID}`]: e.target.value.replace(/\D/g, '').slice(0, 11) }))}
+                          inputMode="tel"
+                          maxLength={11}
+                          placeholder="보호자 번호 입력"
+                          className="h-10 rounded-xl border-2 border-orange-200 bg-white text-sm font-bold"
+                        />
+                        <Button
+                          type="button"
+                          variant="outline"
+                          className="h-10 rounded-xl border-orange-200 bg-white px-4 text-xs font-black text-orange-700 hover:bg-orange-100"
+                          disabled={preferenceActionKey === `${selectedBoardStudent.studentId}:${MANUAL_PARENT_SMS_UID}`}
+                          onClick={() => void handleSaveManualParentPhone(selectedBoardStudent)}
+                        >
+                          {preferenceActionKey === `${selectedBoardStudent.studentId}:${MANUAL_PARENT_SMS_UID}` ? <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" /> : null}
+                          {selectedManualParentRow?.phoneNumber ? '보호자 번호 저장' : '보호자 번호 추가'}
+                        </Button>
+                      </div>
+                    </div>
                   </div>
                 </section>
 

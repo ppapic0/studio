@@ -17,6 +17,7 @@ if (admin.apps.length === 0) {
 
 const region = "asia-northeast3";
 const geminiApiKey = defineSecret("GEMINI_API_KEY");
+const MANUAL_PARENT_SMS_UID = "__manual_parent__";
 const allowedRoles = ["student", "teacher", "parent", "centerAdmin"] as const;
 const adminRoles = new Set(["centerAdmin", "owner", "admin", "centerManager"]);
 type AllowedRole = (typeof allowedRoles)[number];
@@ -95,6 +96,7 @@ type SmsRecipientPreferenceDoc = {
   parentName?: string | null;
   phoneNumber?: string;
   enabled?: boolean;
+  isManualRecipient?: boolean;
   eventToggles?: Partial<Record<ParentSmsEventType, boolean>>;
   updatedAt?: admin.firestore.Timestamp;
   updatedBy?: string;
@@ -2309,23 +2311,40 @@ async function collectParentRecipients(
   const parentUids = Array.isArray(parentUidsRaw)
     ? parentUidsRaw.filter((uid): uid is string => typeof uid === "string" && uid.trim().length > 0)
     : [];
-  if (parentUids.length === 0) return [];
 
   const recipients: SmsRecipient[] = [];
   const usedPhones = new Set<string>();
 
+  const manualParentPrefSnap = await db
+    .doc(`centers/${centerId}/smsRecipientPreferences/${buildSmsRecipientPreferenceId(studentId, MANUAL_PARENT_SMS_UID)}`)
+    .get();
+  if (manualParentPrefSnap.exists) {
+    const manualPref = manualParentPrefSnap.data() as SmsRecipientPreferenceDoc;
+    const phoneNumber = normalizePhoneNumber(manualPref.phoneNumber);
+    if (phoneNumber) {
+      recipients.push({
+        parentUid: MANUAL_PARENT_SMS_UID,
+        parentName: asTrimmedString(manualPref.parentName, "보호자"),
+        phoneNumber,
+      });
+      usedPhones.add(phoneNumber);
+    }
+  }
+
   for (const parentUid of parentUids) {
-    const [userSnap, memberSnap] = await Promise.all([
+    const [userSnap, memberSnap, prefSnap] = await Promise.all([
       db.doc(`users/${parentUid}`).get(),
       db.doc(`centers/${centerId}/members/${parentUid}`).get(),
+      db.doc(`centers/${centerId}/smsRecipientPreferences/${buildSmsRecipientPreferenceId(studentId, parentUid)}`).get(),
     ]);
 
     const userData = userSnap.exists ? userSnap.data() : null;
     const memberData = memberSnap.exists ? memberSnap.data() : null;
+    const prefData = prefSnap.exists ? (prefSnap.data() as SmsRecipientPreferenceDoc) : null;
     if (shouldExcludeFromSmsQueries(userData, parentUid) || shouldExcludeFromSmsQueries(memberData, parentUid)) {
       continue;
     }
-    const phoneNumber = normalizePhoneNumber(userData?.phoneNumber || memberData?.phoneNumber);
+    const phoneNumber = normalizePhoneNumber(userData?.phoneNumber || memberData?.phoneNumber || prefData?.phoneNumber);
     if (!phoneNumber || usedPhones.has(phoneNumber)) continue;
 
     recipients.push({
@@ -6186,6 +6205,32 @@ export const updateSmsRecipientPreference = functions.region(region).https.onCal
     throw new functions.https.HttpsError("not-found", "학생 정보를 찾을 수 없습니다.");
   }
 
+  const studentName = asTrimmedString(studentSnap.data()?.name, "학생");
+  const phoneNumberOverride = normalizePhoneNumber(data?.phoneNumberOverride || "");
+  const enabled = data?.enabled !== false;
+  const eventToggles = normalizeSmsEventToggles(data?.eventToggles);
+
+  if (parentUid === MANUAL_PARENT_SMS_UID) {
+    if (!phoneNumberOverride) {
+      throw new functions.https.HttpsError("invalid-argument", "보호자 휴대폰 번호가 필요합니다.");
+    }
+
+    await db.doc(`centers/${centerId}/smsRecipientPreferences/${buildSmsRecipientPreferenceId(studentId, parentUid)}`).set({
+      studentId,
+      studentName,
+      parentUid,
+      parentName: "보호자",
+      phoneNumber: phoneNumberOverride,
+      enabled,
+      eventToggles,
+      isManualRecipient: true,
+      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      updatedBy: context.auth.uid,
+    }, { merge: true });
+
+    return { ok: true };
+  }
+
   const parentUids = normalizeStringArray(studentSnap.data()?.parentUids);
   if (!parentUids.includes(parentUid)) {
     throw new functions.https.HttpsError("failed-precondition", "해당 학생에 연결된 학부모가 아닙니다.");
@@ -6196,11 +6241,8 @@ export const updateSmsRecipientPreference = functions.region(region).https.onCal
     db.doc(`centers/${centerId}/members/${parentUid}`).get(),
   ]);
 
-  const studentName = asTrimmedString(studentSnap.data()?.name, "학생");
   const parentName = asTrimmedString(memberSnap.data()?.displayName || userSnap.data()?.displayName || "학부모");
-  const phoneNumber = normalizePhoneNumber(userSnap.data()?.phoneNumber || memberSnap.data()?.phoneNumber);
-  const enabled = data?.enabled !== false;
-  const eventToggles = normalizeSmsEventToggles(data?.eventToggles);
+  const phoneNumber = normalizePhoneNumber(userSnap.data()?.phoneNumber || memberSnap.data()?.phoneNumber || phoneNumberOverride);
 
   await db.doc(`centers/${centerId}/smsRecipientPreferences/${buildSmsRecipientPreferenceId(studentId, parentUid)}`).set({
     studentId,
