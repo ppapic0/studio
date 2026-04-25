@@ -709,23 +709,23 @@ function ParentHomeSimpleActionCard({
     >
       <div className="pointer-events-none absolute inset-x-0 top-0 h-1.5 bg-[linear-gradient(90deg,#ffd18d_0%,#FF7A16_55%,#d45c09_100%)]" />
       <div className="pointer-events-none absolute -right-8 top-0 h-24 w-24 rounded-full bg-[#ffb56a]/18 blur-3xl transition-transform duration-500 group-hover:scale-110" />
-      <div className="relative z-10 flex h-full min-h-[8.5rem] flex-col gap-4">
-        <div className="flex items-start justify-between gap-3">
-          <div className="flex min-w-0 items-start gap-3">
+      <div className="relative z-10 flex h-full min-h-[9rem] flex-col gap-3.5">
+        <div className="flex flex-wrap items-start justify-between gap-2.5">
+          <div className="flex min-w-0 flex-1 items-start gap-3">
             <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[1rem] border border-[#ffd5aa] bg-[#fff4e8] text-[#FF7A16] shadow-[inset_0_1px_0_rgba(255,255,255,0.92),0_12px_22px_-18px_rgba(255,122,22,0.26)]">
               {icon}
             </div>
             <div className="min-w-0">
-              <p className="text-[10px] font-black uppercase tracking-[0.14em] text-[#c56a14]">{eyebrow}</p>
-              <h3 className="mt-1 break-keep text-[1rem] font-black leading-[1.25] tracking-tight text-[#14295F]">{title}</h3>
+              <p className="break-words text-[10px] font-black uppercase tracking-[0.12em] text-[#c56a14] [overflow-wrap:anywhere]">{eyebrow}</p>
+              <h3 className="mt-1 break-keep text-[0.95rem] font-black leading-[1.35] tracking-tight text-[#14295F]">{title}</h3>
             </div>
           </div>
-          {badge ? <div className="shrink-0">{badge}</div> : null}
+          {badge ? <div className="max-w-full shrink-0">{badge}</div> : null}
         </div>
-        <p className="break-keep text-[12.5px] font-bold leading-[1.65] text-[#6b5847]">{description}</p>
-        <div className="mt-auto flex items-center justify-between border-t border-[#ffe1c4] pt-3">
-          <span className="text-[10px] font-black uppercase tracking-[0.16em] text-[#c56a14]">팝업으로 확인</span>
-          <span className="inline-flex items-center gap-1 text-[11px] font-black text-[#FF7A16]">
+        <p className="break-keep text-[12px] font-bold leading-[1.7] text-[#6b5847]">{description}</p>
+        <div className="mt-auto flex flex-wrap items-center justify-between gap-2 border-t border-[#ffe1c4] pt-3">
+          <span className="text-[10px] font-black uppercase tracking-[0.12em] text-[#c56a14]">팝업으로 확인</span>
+          <span className="inline-flex shrink-0 items-center gap-1 text-[11px] font-black text-[#FF7A16]">
             {actionLabel}
             <ChevronRight className="h-3.5 w-3.5 transition-transform duration-300 group-hover:translate-x-0.5" />
           </span>
@@ -3800,7 +3800,12 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
             </ParentHomeMetricCardShell>
           </div>
 
-          <div className={cn('grid gap-3', isCompactAppMode ? 'grid-cols-1' : 'lg:grid-cols-3')}>
+          <div
+            className="grid gap-3"
+            style={{
+              gridTemplateColumns: isCompactAppMode ? 'minmax(0, 1fr)' : 'repeat(auto-fit, minmax(min(100%, 18rem), 1fr))',
+            }}
+          >
             <ParentHomeSimpleActionCard
               icon={<Sparkles className="h-4 w-4" />}
               eyebrow="우리 아이 리포트"
