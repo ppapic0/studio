@@ -557,8 +557,8 @@ function StudentSupportManualBody({ isMobileView }: { isMobileView: boolean }) {
 
       <ManualPenaltySection
         isMobileView={isMobileView}
-        intro="기본 벌점 기준이에요. 반복, 은폐, 반항, 타인 피해가 겹치면 같은 항목도 더 강하게 반영될 수 있어요."
-        note="심각한 경우에는 누적 점수와 무관하게 즉시 귀가 조치, 보호자 통보, 퇴원 검토가 진행될 수 있어요."
+        intro="기본 벌점 기준이에요. 실내화 미착용, 자습실 내 음식물 섭취, 젤리·사탕·껌 같은 작은 간식도 예외 없이 반영될 수 있어요."
+        note="반복, 은폐, 반항, 타인 피해, 방화벽 우회, 자습실 음식물 섭취처럼 명확한 위반은 누적 점수와 무관하게 즉시 귀가 조치, 보호자 통보, 퇴원 검토가 진행될 수 있어요."
       />
 
       <ManualTipsSection tips={STUDENT_MANUAL_PRO_TIPS} />

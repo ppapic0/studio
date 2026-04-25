@@ -5180,7 +5180,7 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
                 })}
               </div>
               <p className="mt-3 text-xs font-bold leading-5 text-slate-600">
-                반복 위반, 방화벽 우회, 시설 훼손, 타인 피해처럼 심각한 사안은 누적 점수와 무관하게 즉시 귀가 또는 퇴원 검토가 가능합니다.
+                반복 위반, 방화벽 우회, 자습실 음식물 섭취, 실내화 미착용 반복, 시설 훼손, 타인 피해는 누적 점수와 무관하게 즉시 귀가 또는 퇴원 검토가 가능합니다.
               </p>
             </div>
 

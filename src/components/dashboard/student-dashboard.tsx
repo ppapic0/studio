@@ -4082,7 +4082,7 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
                     <div className="rounded-[1.35rem] border border-[#E8EEF8] bg-[#F7F9FD] px-4 py-3 text-[12px] font-semibold leading-5 text-[#5A6F95]">
                       벌점은 학생을 혼내기 위한 게 아니라, 센터 루틴을 분명하게 지키기 위한 운영 기록이에요.
                       <span className="mt-1 block text-[#17326B]">
-                        도착 즉시 휴대폰 반납, 태블릿 학습용 사용, 방화벽 우회 금지, 잡담·소음 최소화만 지켜도 대부분의 벌점을 피할 수 있어요.
+                        휴대폰 반납, 태블릿 학습용 사용, 방화벽 우회 금지, 실내화 착용, 자습실 음식물 금지만 지켜도 대부분의 벌점을 피할 수 있어요.
                       </span>
                     </div>
                   </div>
