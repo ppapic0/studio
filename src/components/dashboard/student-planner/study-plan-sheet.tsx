@@ -106,6 +106,9 @@ function buildStudyTaskMeta(
     const unitLabel = resolveAmountUnitLabel(task);
     const targetAmount = Math.max(0, task.targetAmount || 0);
     const actualAmount = Math.max(0, task.actualAmount || 0);
+    if (targetAmount <= 0) {
+      return '자율 계획';
+    }
     const progressRate = targetAmount > 0 ? Math.round((actualAmount / targetAmount) * 100) : 0;
     return `목표 ${targetAmount}${unitLabel} · 실제 ${actualAmount}${unitLabel} · ${progressRate}%`;
   }
@@ -206,7 +209,7 @@ export function StudyPlanSheet({
           {!isPast ? (
             <StudyComposerCard
               title="새 계획 작성"
-              description="과목 분류, 실시할 내용, 분량을 순서대로 적으면 바로 추가할 수 있어요."
+              description="과목 분류와 오늘 할 내용을 자유롭게 적으면 바로 추가할 수 있어요."
               subjectOptions={subjectOptions}
               subjectValue={subjectValue}
               onSubjectChange={onSubjectChange}
@@ -266,7 +269,7 @@ export function StudyPlanSheet({
                   <div className="rounded-[1.2rem] border border-dashed border-white/12 bg-white/[0.04] px-4 py-5 text-center">
                     <p className="text-sm font-black text-white">아직 등록된 학습 계획이 없어요</p>
                     <p className="mt-2 text-[11px] font-semibold leading-5 text-[var(--text-on-dark-soft)]">
-                      위 입력 카드에서 끝낼 분량 하나만 적어도 바로 시작할 수 있어요.
+                      위 입력 카드에서 오늘 할 내용 하나만 적어도 바로 시작할 수 있어요.
                     </p>
                   </div>
                 ) : (
@@ -274,6 +277,7 @@ export function StudyPlanSheet({
                     {studyTasks.map((task) => {
                       const subject = subjectOptions.find((item) => item.id === (task.subject || 'etc'));
                       const isVolumeTask = resolveStudyPlanMode(task) === 'volume';
+                      const targetAmount = Math.max(0, task.targetAmount || 0);
                       const unitLabel = resolveAmountUnitLabel(task);
 
                       return (
@@ -290,9 +294,9 @@ export function StudyPlanSheet({
                           badgeLabel={task.subject === 'etc' ? task.subjectLabel?.trim() || subject?.label || '직접 입력' : subject?.label || '직접 입력'}
                           metaLabel={buildStudyTaskMeta(task)}
                           volumeMeta={
-                            isVolumeTask
+                            isVolumeTask && targetAmount > 0
                               ? {
-                                  targetAmount: Math.max(0, task.targetAmount || 0),
+                                  targetAmount,
                                   actualAmount: Math.max(0, task.actualAmount || 0),
                                   unitLabel,
                                   onCommitActual: (value) => onCommitActual(task, value),

@@ -47,7 +47,6 @@ import { RepeatCopySheet } from './repeat-copy-sheet';
 import { ScheduleItemCard } from './schedule-item-card';
 import { StudyPlanSheet } from './study-plan-sheet';
 import {
-  STUDY_AMOUNT_UNIT_OPTIONS,
   type AttendanceAwaySlot,
   STUDY_PLAN_MODE_OPTIONS,
   type StudyPlanMode,
@@ -115,6 +114,9 @@ function buildStudyTaskMeta(task: any) {
     const unitLabel = resolveAmountUnitLabel(task);
     const targetAmount = Math.max(0, task.targetAmount || 0);
     const actualAmount = Math.max(0, task.actualAmount || 0);
+    if (targetAmount <= 0) {
+      return '자율 계획';
+    }
     const progressRate = targetAmount > 0 ? Math.round((actualAmount / targetAmount) * 100) : 0;
     return `목표 ${targetAmount}${unitLabel} · 실제 ${actualAmount}${unitLabel} · ${progressRate}%`;
   }
@@ -628,10 +630,13 @@ export function PlannerMainView({ model }: PlannerMainViewProps) {
         taskBlueprint.endTime = resolvedWindowPreview.endTime;
       }
     } else {
-      taskBlueprint.targetAmount = Number(newStudyTargetAmount) || 0;
-      taskBlueprint.amountUnit = newStudyAmountUnit;
-      if (newStudyAmountUnit === '직접입력') {
-        taskBlueprint.amountUnitLabel = newStudyCustomAmountUnit.trim() || '단위';
+      const targetAmount = Math.max(0, Number(newStudyTargetAmount) || 0);
+      if (targetAmount > 0) {
+        taskBlueprint.targetAmount = targetAmount;
+        taskBlueprint.amountUnit = newStudyAmountUnit;
+        if (newStudyAmountUnit === '직접입력') {
+          taskBlueprint.amountUnitLabel = newStudyCustomAmountUnit.trim() || '단위';
+        }
       }
       if (enableVolumeStudyMinutes && resolvedTargetMinutes > 0 && resolvedWindowPreview) {
         taskBlueprint.targetMinutes = resolvedTargetMinutes;
@@ -1028,7 +1033,7 @@ export function PlannerMainView({ model }: PlannerMainViewProps) {
                               </div>
                             ) : null}
 
-                            {isStudyTask && isVolumeTask ? (
+                            {isStudyTask && isVolumeTask && Math.max(0, task.targetAmount || 0) > 0 ? (
                               <div className="flex flex-wrap gap-2">
                                 {[10, 20, 30, 50].map((value) => (
                                   <button

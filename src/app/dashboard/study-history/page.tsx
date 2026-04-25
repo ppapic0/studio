@@ -195,6 +195,9 @@ function buildStudyTaskMeta(task: Pick<StudyPlanItem, 'studyPlanMode' | 'targetM
     const unitLabel = resolveAmountUnitLabel(task);
     const targetAmount = Math.max(0, task.targetAmount || 0);
     const actualAmount = Math.max(0, task.actualAmount || 0);
+    if (targetAmount <= 0) {
+      return completionMeta ? `자율 계획 · ${completionMeta}` : '자율 계획';
+    }
     const baseMeta = `목표 ${targetAmount}${unitLabel} · 실제 ${actualAmount}${unitLabel}`;
     return completionMeta ? `${baseMeta} · ${completionMeta}` : baseMeta;
   }
@@ -839,11 +842,14 @@ export default function StudyHistoryPage() {
         if (newStudyMode === 'time') {
           data.targetMinutes = Number(newStudyMinutes) || 0;
         } else {
-          data.targetAmount = Number(newStudyTargetAmount) || 0;
-          data.actualAmount = 0;
-          data.amountUnit = newStudyAmountUnit;
-          if (newStudyAmountUnit === '직접입력') {
-            data.amountUnitLabel = newStudyCustomAmountUnit.trim() || '단위';
+          const targetAmount = Math.max(0, Number(newStudyTargetAmount) || 0);
+          if (targetAmount > 0) {
+            data.targetAmount = targetAmount;
+            data.actualAmount = 0;
+            data.amountUnit = newStudyAmountUnit;
+            if (newStudyAmountUnit === '직접입력') {
+              data.amountUnitLabel = newStudyCustomAmountUnit.trim() || '단위';
+            }
           }
           if (enableVolumeStudyMinutes && Number(newStudyMinutes) > 0) {
             data.targetMinutes = Number(newStudyMinutes) || 0;
@@ -1748,7 +1754,7 @@ export default function StudyHistoryPage() {
                         {!isActuallyPast && !isParent ? (
                           <StudyComposerCard
                             title="빠른 학습 추가"
-                            description="시간을 못 정해도 괜찮아요. 분량형이나 시간형 중 편한 방식으로 바로 적어보세요."
+                            description="시간을 못 정해도 괜찮아요. 오늘 할 내용을 자유롭게 적어보세요."
                             subjectOptions={SUBJECTS}
                             subjectValue={newStudySubject}
                             onSubjectChange={setNewStudySubject}
@@ -1782,6 +1788,7 @@ export default function StudyHistoryPage() {
                             {studyTasks.map((task) => {
                               const subject = SUBJECTS.find((item) => item.id === (task.subject || 'etc'));
                               const isVolumeTask = resolveStudyPlanMode(task) === 'volume';
+                              const targetAmount = Math.max(0, task.targetAmount || 0);
                               const unitLabel = resolveAmountUnitLabel(task);
                               return (
                                 <PlanItemCard
@@ -1794,10 +1801,10 @@ export default function StudyHistoryPage() {
                                   disabled={isActuallyPast || isParent}
                                   isMobile={isMobile}
                                   tone="emerald"
-                                  badgeLabel={`${subject?.label || '기타'} · ${isVolumeTask ? '분량형' : '시간형'}`}
+                                  badgeLabel={`${subject?.label || '기타'} · ${isVolumeTask ? (targetAmount > 0 ? '분량형' : '자율 계획') : '시간형'}`}
                                   metaLabel={buildStudyTaskMeta(task)}
-                                  volumeMeta={isVolumeTask ? {
-                                    targetAmount: Math.max(0, task.targetAmount || 0),
+                                  volumeMeta={isVolumeTask && targetAmount > 0 ? {
+                                    targetAmount,
                                     actualAmount: Math.max(0, task.actualAmount || 0),
                                     unitLabel,
                                     onCommitActual: (value) => handleCommitStudyActualAmount(task as WithId<StudyPlanItem>, value),

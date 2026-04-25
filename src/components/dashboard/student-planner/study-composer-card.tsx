@@ -6,19 +6,11 @@ import { History, Loader2, Target } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
 import { cn } from '@/lib/utils';
 
 import {
   type RecentStudyOption,
   type StudyAmountUnit,
-  STUDY_AMOUNT_UNIT_OPTIONS,
   type StudyPlanMode,
   STUDY_PLAN_MODE_OPTIONS,
 } from './planner-constants';
@@ -82,12 +74,6 @@ export function StudyComposerCard({
   onTaskChange,
   studyModeValue,
   onStudyModeChange,
-  amountValue,
-  onAmountChange,
-  amountUnitValue,
-  onAmountUnitChange,
-  customAmountUnitValue,
-  onCustomAmountUnitChange,
   enableVolumeMinutes,
   onEnableVolumeMinutesChange,
   onSubmit,
@@ -130,10 +116,7 @@ export function StudyComposerCard({
   const canSubmit =
     !disabled &&
     !isSubmitting &&
-    taskValue.trim().length > 0 &&
-    (!isVolumeMode ||
-      (amountValue.trim().length > 0 &&
-        (amountUnitValue !== '직접입력' || customAmountUnitValue.trim().length > 0)));
+    taskValue.trim().length > 0;
 
   return (
     <Card
@@ -188,7 +171,7 @@ export function StudyComposerCard({
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div className="min-w-0">
               <p className="break-keep text-sm font-black leading-6">
-                과목을 고르고 끝낼 양만 적으면 바로 오늘 계획에 추가돼요.
+                과목을 고르고 오늘 할 내용을 자유롭게 적으면 바로 계획에 추가돼요.
               </p>
             </div>
             <div className="rounded-full border border-[#D7E1F2] bg-white px-3 py-1 text-[11px] font-black text-[#14295F]">
@@ -200,8 +183,7 @@ export function StudyComposerCard({
             <p className="text-[11px] font-black text-[#355185]">입력 순서</p>
             <div className="mt-2 space-y-1.5 text-[11px] font-semibold leading-5 text-[#5C73A0]">
               <p><span className="font-black text-[#14295F]">과목 분류</span> : 국어, 수학, 영어처럼 큰 과목 이름</p>
-              <p><span className="font-black text-[#14295F]">실시할 내용</span> : 오늘 실제로 할 강의, 단원, 문제 유형</p>
-              <p><span className="font-black text-[#14295F]">분량</span> : 몇 강, 몇 단원, 몇 문제인지 숫자로 입력</p>
+              <p><span className="font-black text-[#14295F]">실시할 내용</span> : 오늘 할 교재, 강의, 단원, 문제 범위를 자유롭게 적기</p>
             </div>
           </div>
 
@@ -247,52 +229,11 @@ export function StudyComposerCard({
                 <Input
                   value={taskValue}
                   onChange={(event) => onTaskChange(event.target.value)}
-                  placeholder="예: 트랙 국어"
+                  placeholder="예: 국어 문학 1강 듣고 기출 10문제 풀기"
                   disabled={disabled || isSubmitting}
                   className="h-12 rounded-[1rem] border-[#D7E1F2] bg-white text-sm font-black text-[#14295F] shadow-none placeholder:text-[#7E93BB]"
                 />
               </div>
-
-              <div className="mt-3 space-y-1.5">
-                <p className="text-[11px] font-black text-[#5C73A0]">분량</p>
-                <div className={cn('grid gap-2', isMobile ? 'grid-cols-[minmax(0,1fr)_7.4rem]' : 'grid-cols-[minmax(0,1fr)_8rem]')}>
-                  <Input
-                    type="number"
-                    min={1}
-                    value={amountValue}
-                    onChange={(event) => onAmountChange(event.target.value)}
-                    disabled={disabled || isSubmitting}
-                    placeholder="예: 3"
-                    className="h-11 rounded-[1rem] border-[#D7E1F2] bg-white text-center text-sm font-black text-[#14295F] shadow-none placeholder:text-[#7E93BB]"
-                  />
-                  <Select
-                    value={amountUnitValue}
-                    onValueChange={(value) => onAmountUnitChange(value as StudyAmountUnit)}
-                    disabled={disabled || isSubmitting}
-                  >
-                    <SelectTrigger className="h-11 rounded-[1rem] border-[#D7E1F2] bg-white text-sm font-black text-[#14295F] shadow-none">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent className="rounded-2xl border-[#D7E1F2]">
-                      {STUDY_AMOUNT_UNIT_OPTIONS.map((unit) => (
-                        <SelectItem key={unit.value} value={unit.value}>
-                          {unit.label}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-
-              {amountUnitValue === '직접입력' ? (
-                <Input
-                  value={customAmountUnitValue}
-                  onChange={(event) => onCustomAmountUnitChange(event.target.value)}
-                  disabled={disabled || isSubmitting}
-                  placeholder="예: 강, 단원, 문제, 지문"
-                  className="mt-3 h-11 rounded-[1rem] border-[#D7E1F2] bg-white text-sm font-black text-[#14295F] shadow-none placeholder:text-[#7E93BB]"
-                />
-              ) : null}
 
               <div className="mt-3">
                 <button
@@ -349,7 +290,7 @@ export function StudyComposerCard({
                 <Input
                   value={taskValue}
                   onChange={(event) => onTaskChange(event.target.value)}
-                  placeholder="예: 트랙 국어"
+                  placeholder="예: 국어 문학 1강 듣고 기출 10문제 풀기"
                   disabled={disabled || isSubmitting}
                   className="h-12 rounded-[1rem] border-[#D7E1F2] bg-white text-sm font-black text-[#14295F] shadow-none placeholder:text-[#7E93BB]"
                 />

@@ -64,10 +64,12 @@ export function PlannerChecklistItem({
     setDraftEndTime(task.endTime || '');
   }, [task.startTime, task.endTime]);
 
-  const safeProgress = isVolumeTask && (task.targetAmount || 0) > 0
-    ? Math.min(100, Math.round(((task.actualAmount || 0) / Math.max(1, task.targetAmount || 1)) * 100))
+  const targetAmount = Math.max(0, task.targetAmount || 0);
+  const hasStructuredVolume = isVolumeTask && targetAmount > 0;
+  const safeProgress = hasStructuredVolume
+    ? Math.min(100, Math.round(((task.actualAmount || 0) / Math.max(1, targetAmount)) * 100))
     : 0;
-  const displayedProgress = isVolumeTask ? safeProgress : Math.max(0, Math.min(100, progressPercent));
+  const displayedProgress = hasStructuredVolume ? safeProgress : Math.max(0, Math.min(100, progressPercent));
   const containerClass =
     statusTone === 'completed'
       ? 'border-[#2FAA7D]/30 bg-[linear-gradient(180deg,rgba(25,74,82,0.92)_0%,rgba(18,57,63,0.88)_100%)]'
@@ -99,7 +101,7 @@ export function PlannerChecklistItem({
         className={cn('flex items-start gap-3 px-4 py-4 outline-none', isMobile ? 'min-h-[5.2rem]' : 'min-h-[5.6rem]')}
       >
         <div className="pt-1">
-          {isVolumeTask ? (
+          {hasStructuredVolume ? (
             <div className={cn(
               'flex h-7 min-w-[2.85rem] items-center justify-center rounded-full px-2.5 text-[10px] font-black',
               task.done ? 'bg-emerald-500 text-white' : 'bg-[#EFF5FF] text-[#173A82]'
@@ -208,11 +210,11 @@ export function PlannerChecklistItem({
 
       {expanded ? (
         <div className="space-y-3 border-t border-white/12 px-4 py-4">
-          {isVolumeTask ? (
+          {hasStructuredVolume ? (
             <div className="space-y-3">
               <div className="flex flex-wrap items-center gap-2 text-[11px] font-black text-[var(--text-on-dark-soft)]">
                 <span className="rounded-full bg-white/[0.1] px-2.5 py-1">
-                  목표 {Math.max(0, task.targetAmount || 0)}{task.amountUnit === '직접입력' ? task.amountUnitLabel || '단위' : task.amountUnit || '문제'}
+                  목표 {targetAmount}{task.amountUnit === '직접입력' ? task.amountUnitLabel || '단위' : task.amountUnit || '문제'}
                 </span>
                 <span className={cn(
                   'rounded-full px-2.5 py-1',
@@ -224,7 +226,7 @@ export function PlannerChecklistItem({
               {!disabled ? (
                 <div className="flex flex-wrap items-center gap-2">
                   <Button type="button" variant="dark" onClick={() => onCommitActual(0)} className="h-8 rounded-full text-[10px] font-black">0</Button>
-                  <Button type="button" variant="dark" onClick={() => onCommitActual(Math.max(1, Math.round((task.targetAmount || 0) / 2)))} className="h-8 rounded-full text-[10px] font-black">절반</Button>
+                  <Button type="button" variant="dark" onClick={() => onCommitActual(Math.max(1, Math.round(targetAmount / 2)))} className="h-8 rounded-full text-[10px] font-black">절반</Button>
                   <Button
                     type="button"
                     variant="ghost"
@@ -238,7 +240,7 @@ export function PlannerChecklistItem({
                   >
                     <X className="h-4 w-4" />
                   </Button>
-                  <Button type="button" variant="dark" onClick={() => onCommitActual(Math.max(0, task.targetAmount || 0))} className="h-8 rounded-full text-[10px] font-black">완료</Button>
+                  <Button type="button" variant="dark" onClick={() => onCommitActual(targetAmount)} className="h-8 rounded-full text-[10px] font-black">완료</Button>
                   <div className="flex items-center gap-2 rounded-full bg-white/[0.1] px-2 py-1.5">
                     <Input
                       type="number"

@@ -375,6 +375,9 @@ function buildStudyTaskMeta(task: Pick<StudyPlanItem, 'studyPlanMode' | 'targetM
     const unitLabel = resolveAmountUnitLabel(task);
     const targetAmount = Math.max(0, task.targetAmount || 0);
     const actualAmount = Math.max(0, task.actualAmount || 0);
+    if (targetAmount <= 0) {
+      return completionMeta ? `자율 계획 · ${completionMeta}` : '자율 계획';
+    }
     const baseMeta = `목표 ${targetAmount}${unitLabel} · 실제 ${actualAmount}${unitLabel}`;
     return completionMeta ? `${baseMeta} · ${completionMeta}` : baseMeta;
   }
@@ -905,6 +908,7 @@ export default function StudyPlanPage() {
       const subjectValue = task.subject || 'etc';
       const resolvedSubjectLabel = resolveSubjectLabel(subjectValue, task.subjectLabel);
       const studyModeValue = resolveStudyPlanMode(task);
+      const targetAmount = Math.max(0, task.targetAmount || 0);
       const amountUnitValue = (task.amountUnit || '문제') as StudyAmountUnit;
       const customAmountUnitValue = task.amountUnit === '직접입력' ? task.amountUnitLabel?.trim() || '' : '';
       const updatedAtMs = getPlanTimestampMs(task);
@@ -916,7 +920,7 @@ export default function StudyPlanPage() {
           subjectValue === 'etc' ? resolvedSubjectLabel : '',
           studyModeValue,
           studyModeValue === 'volume'
-            ? `${Math.max(0, task.targetAmount || 0)}:${resolveAmountUnitLabel(task)}`
+            ? `${targetAmount}:${resolveAmountUnitLabel(task)}`
             : `${Math.max(0, task.targetMinutes || 0)}`,
           normalizeStudyTitle(task.title),
         ].join('::'),
@@ -927,9 +931,9 @@ export default function StudyPlanPage() {
         subjectValue,
         subjectLabel: resolvedSubjectLabel,
         studyModeValue,
-        studyModeLabel: studyModeValue === 'volume' ? '분량형' : '시간형',
+        studyModeLabel: studyModeValue === 'volume' ? (targetAmount > 0 ? '분량형' : '자율 계획') : '시간형',
         minuteValue: String(task.targetMinutes || ''),
-        amountValue: String(task.targetAmount || ''),
+        amountValue: String(targetAmount || ''),
         amountUnitValue,
         customAmountUnitValue,
         enableVolumeMinutes: studyModeValue === 'volume' && Number(task.targetMinutes || 0) > 0,
@@ -1527,10 +1531,10 @@ export default function StudyPlanPage() {
   const studyGoalSummaryLabel = useMemo(() => {
     const timeTaskCount = studyTasks.length - volumeStudyTasks.length;
     if (volumeStudyTasks.length > 0 && studyTimeSummary.total > 0) {
-      return `분량형 ${volumeStudyTasks.length}개 · 총 계획 ${formatMinutesSummary(studyTimeSummary.total)}`;
+      return `자율 계획 ${volumeStudyTasks.length}개 · 총 계획 ${formatMinutesSummary(studyTimeSummary.total)}`;
     }
     if (volumeStudyTasks.length > 0) {
-      return `분량형 목표 ${volumeStudyTasks.length}개`;
+      return `자율 계획 ${volumeStudyTasks.length}개`;
     }
     return timeTaskCount > 0 ? `총 계획 ${formatMinutesSummary(studyTimeSummary.total)}` : '오늘 계획을 아직 정하지 않았어요';
   }, [studyTasks.length, volumeStudyTasks.length, studyTimeSummary.total]);
@@ -1801,10 +1805,10 @@ export default function StudyPlanPage() {
     setNewStudyCustomSubject(item.subjectValue === 'etc' ? normalizeCustomSubjectLabel(item.subjectLabel) : DEFAULT_CUSTOM_SUBJECT_LABEL);
     setNewStudyMode(item.studyModeValue);
     setNewStudyMinutes(item.minuteValue || '60');
-    setNewStudyTargetAmount(item.amountValue);
-    setNewStudyAmountUnit(item.amountUnitValue);
-    setNewStudyCustomAmountUnit(item.customAmountUnitValue);
-    setEnableVolumeStudyMinutes(item.enableVolumeMinutes);
+    setNewStudyTargetAmount('');
+    setNewStudyAmountUnit('문제');
+    setNewStudyCustomAmountUnit('');
+    setEnableVolumeStudyMinutes(false);
     setNewStudyTask(item.title);
     setActiveRecentStudyKey(item.key);
     setIsRecentStudySheetOpen(false);
@@ -2482,11 +2486,14 @@ export default function StudyPlanPage() {
             data.endTime = nextWindow.endTime;
           }
         } else {
-          data.targetAmount = Number(studyAmount) || 0;
-          data.actualAmount = 0;
-          data.amountUnit = studyAmountUnit;
-          if (studyAmountUnit === '직접입력') {
-            data.amountUnitLabel = customUnitLabel || '단위';
+          const targetAmount = Math.max(0, Number(studyAmount) || 0);
+          if (targetAmount > 0) {
+            data.targetAmount = targetAmount;
+            data.actualAmount = 0;
+            data.amountUnit = studyAmountUnit;
+            if (studyAmountUnit === '직접입력') {
+              data.amountUnitLabel = customUnitLabel || '단위';
+            }
           }
           if (shouldKeepMinutes && Number(studyMinutes) > 0) {
             data.targetMinutes = Number(studyMinutes) || 0;
@@ -3881,6 +3888,7 @@ export default function StudyPlanPage() {
                     const isStudyTask = task.category === 'study' || !task.category;
                     const subjectLabel = isStudyTask ? resolveSubjectLabel(task.subject, task.subjectLabel) : '기타 일정';
                     const isVolumeTask = resolveStudyPlanMode(task) === 'volume';
+                    const targetAmount = Math.max(0, task.targetAmount || 0);
                     const metaLabel = buildChecklistMeta(task);
                     return (
                       <div
@@ -3899,7 +3907,7 @@ export default function StudyPlanPage() {
                             </Badge>
                             {isStudyTask && isVolumeTask ? (
                               <span className="student-aggro-kicker text-[10px] font-black uppercase tracking-[0.16em] text-white/55">
-                                분량형
+                                {targetAmount > 0 ? '분량형' : '자율 계획'}
                               </span>
                             ) : null}
                           </div>
