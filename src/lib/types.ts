@@ -968,6 +968,7 @@ export interface StudyLogDay {
   centerId: string;
   dateKey: string;
   totalMinutes: number;
+  manualAdjustmentMinutes?: number;
   awayMinutes?: number;
   firstSessionStartAt?: Timestamp | null;
   lastSessionEndAt?: Timestamp | null;
@@ -1199,6 +1200,7 @@ export interface DailyStudentStat {
     dateKey: string;
     todayPlanCompletionRate: number;
     totalStudyMinutes: number;
+    manualAdjustmentMinutes?: number;
     studyTimeGrowthRate: number;
     createdAt: Timestamp;
 }

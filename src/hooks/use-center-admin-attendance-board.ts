@@ -484,7 +484,12 @@ export function useCenterAdminAttendanceBoard({
               const dayRef = doc(firestore, 'centers', centerId, 'studyLogs', studentId, 'days', todayKey);
               const daySnap = await getDoc(dayRef);
               const dayData = daySnap.exists() ? (daySnap.data() as Record<string, unknown>) : null;
-              const dayTotal = Math.max(0, Math.round(Number(dayData?.totalMinutes ?? dayData?.totalStudyMinutes ?? 0)));
+              const dayBaseMinutes = Number(dayData?.totalMinutes ?? dayData?.totalStudyMinutes ?? 0);
+              const dayAdjustmentMinutes = Number(dayData?.manualAdjustmentMinutes ?? 0);
+              const dayTotal = Math.round(
+                (Number.isFinite(dayBaseMinutes) ? dayBaseMinutes : 0) +
+                (Number.isFinite(dayAdjustmentMinutes) ? dayAdjustmentMinutes : 0)
+              );
 
               if (dayTotal > 0) {
                 return [studentId, dayTotal] as const;
@@ -495,7 +500,7 @@ export function useCenterAdminAttendanceBoard({
                 return sum + getStudySessionDurationMinutes(sessionDoc.data() as Record<string, unknown>);
               }, 0);
 
-              return [studentId, Math.max(0, Math.round(sessionTotal))] as const;
+              return [studentId, Math.round(sessionTotal + (Number.isFinite(dayAdjustmentMinutes) ? dayAdjustmentMinutes : 0))] as const;
             } catch (error) {
               logHandledClientIssue('[center-admin-attendance-board] today study log load failed', error);
               return [studentId, 0] as const;
@@ -504,7 +509,7 @@ export function useCenterAdminAttendanceBoard({
         );
 
         if (!cancelled) {
-          setTodayStudyLogMinutesByStudentId(Object.fromEntries(entries.filter(([, minutes]) => minutes > 0)));
+          setTodayStudyLogMinutesByStudentId(Object.fromEntries(entries));
         }
       } catch (error) {
         logHandledClientIssue('[center-admin-attendance-board] today study log batch load failed', error);
@@ -582,10 +587,15 @@ export function useCenterAdminAttendanceBoard({
           seat.status === 'studying' && lastCheckInAt
             ? Math.max(0, Math.ceil((nowMs - lastCheckInAt.getTime()) / 60000))
             : 0;
-        const storedStudyMinutes = Math.max(0, Math.round(Number(todayStat?.totalStudyMinutes || 0)));
-        const fallbackStudyLogMinutes = Math.max(0, Math.round(Number(todayStudyLogMinutesByStudentId[studentId] || 0)));
+        const storedBaseMinutes = Number(todayStat?.totalStudyMinutes || 0);
+        const storedAdjustmentMinutes = Number(todayStat?.manualAdjustmentMinutes || 0);
+        const storedStudyMinutes = Math.round(
+          (Number.isFinite(storedBaseMinutes) ? storedBaseMinutes : 0) +
+          (Number.isFinite(storedAdjustmentMinutes) ? storedAdjustmentMinutes : 0)
+        );
+        const fallbackStudyLogMinutes = Math.round(Number(todayStudyLogMinutesByStudentId[studentId] || 0));
         const recordedStudyMinutes = Math.max(storedStudyMinutes, fallbackStudyLogMinutes);
-        const totalStudyMinutes = recordedStudyMinutes + liveSessionMinutes;
+        const totalStudyMinutes = Math.max(0, recordedStudyMinutes + liveSessionMinutes);
         const currentAwayMinutes =
           (seat.status === 'away' || seat.status === 'break') && lastCheckInAt
             ? Math.max(0, Math.floor((nowMs - lastCheckInAt.getTime()) / 60000))
@@ -608,11 +618,11 @@ export function useCenterAdminAttendanceBoard({
           liveCheckedAt: lastCheckInAt,
           accessCheckedAt: lastCheckInAt,
           studyCheckedAt:
-            recordedStudyMinutes > 0
+            totalStudyMinutes > 0
               ? toDateSafe(todayRecord?.checkInAt) || lastCheckInAt || toDateSafe(todayRecord?.updatedAt)
               : null,
-          studyMinutes: recordedStudyMinutes,
-          hasStudyLog: recordedStudyMinutes > 0,
+          studyMinutes: Math.max(0, recordedStudyMinutes),
+          hasStudyLog: totalStudyMinutes > 0,
           nowMs,
           isRoutineLoading: routineLoading,
           isStudyLogLoading: todayStudyLogLoading,

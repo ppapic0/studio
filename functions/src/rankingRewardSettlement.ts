@@ -547,7 +547,9 @@ function getStudyLogDayDateKey(
 }
 
 function getStudyLogDayTotalMinutes(data: Record<string, unknown>) {
-  const value = Number(data.totalMinutes ?? data.totalStudyMinutes ?? 0);
+  const baseValue = Number(data.totalMinutes ?? data.totalStudyMinutes ?? 0);
+  const adjustment = Number(data.manualAdjustmentMinutes ?? 0);
+  const value = (Number.isFinite(baseValue) ? baseValue : 0) + (Number.isFinite(adjustment) ? adjustment : 0);
   return Number.isFinite(value) ? Math.max(0, Math.round(value)) : 0;
 }
 
@@ -883,7 +885,9 @@ async function buildWeeklyAwardEntries(
     snapshot.forEach((docSnap) => {
       const data = docSnap.data() as Record<string, unknown>;
       const studentId = typeof data.studentId === "string" ? data.studentId : docSnap.id;
-      const value = Math.max(0, Number(data.totalStudyMinutes ?? 0));
+      const baseValue = Number(data.totalStudyMinutes ?? 0);
+      const adjustment = Number(data.manualAdjustmentMinutes ?? 0);
+      const value = Math.max(0, (Number.isFinite(baseValue) ? baseValue : 0) + (Number.isFinite(adjustment) ? adjustment : 0));
       if (!studentId || isSyntheticStudentId(studentId) || !context.shouldInclude(studentId) || value <= 0) return;
       totals.set(studentId, (totals.get(studentId) || 0) + value);
     });

@@ -1534,11 +1534,17 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
     }, 0);
   }, [activeStudyDaySessions]);
 
-  const recordedTodayStudyMinutes = Math.max(
-    0,
-    Math.round(Number(todayStudyLog?.totalMinutes || 0)),
-    activeStudyDaySessionMinutes
-  );
+  const activeStudyDayBaseMinutes = useMemo(() => {
+    const storedMinutes = Number(todayStudyLog?.totalMinutes || 0);
+    const adjustmentMinutes = Number(todayStudyLog?.manualAdjustmentMinutes || 0);
+    const baseMinutes = Math.max(
+      Number.isFinite(storedMinutes) ? storedMinutes : 0,
+      activeStudyDaySessionMinutes
+    );
+    return Math.round(baseMinutes + (Number.isFinite(adjustmentMinutes) ? adjustmentMinutes : 0));
+  }, [activeStudyDaySessionMinutes, todayStudyLog?.manualAdjustmentMinutes, todayStudyLog?.totalMinutes]);
+
+  const recordedTodayStudyMinutes = Math.max(0, activeStudyDayBaseMinutes);
 
   const recentLogsQuery = useMemoFirebase(() => {
     if (!firestore || !activeMembership || !studentUid) return null;
@@ -2535,7 +2541,7 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
     }
   };
   if (!isActive) return null;
-  const totalMinutesCount = recordedTodayStudyMinutes + Math.ceil(liveStudyDaySeconds / 60);
+  const totalMinutesCount = Math.max(0, activeStudyDayBaseMinutes + Math.ceil(liveStudyDaySeconds / 60));
   const hDisplay = Math.floor(totalMinutesCount / 60);
   const mDisplay = totalMinutesCount % 60;
   const isJacob = user?.email === 'jacob444@naver.com';
@@ -2875,7 +2881,7 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
     () => ((progress?.dailyPointStatus?.[previousStudyDayKey] || {}) as Record<string, any>),
     [previousStudyDayKey, progress?.dailyPointStatus]
   );
-  const liveTodaySeconds = Math.max(0, recordedTodayStudyMinutes * 60 + liveStudyDaySeconds);
+  const liveTodaySeconds = Math.max(0, activeStudyDayBaseMinutes * 60 + liveStudyDaySeconds);
   const liveTodayMinutes = Math.floor(liveTodaySeconds / 60);
   const persistedClaimedBoxes = useMemo(() => getClaimedStudyBoxes(todayPointStatus), [todayPointStatus]);
   const persistedRewardEntries = useMemo(

@@ -46,6 +46,7 @@ const RANGE_MAP = { today: 7, weekly: 14, monthly: 28 } as const;
 type ChartRangeKey = keyof typeof RANGE_MAP;
 type DailyStatSnapshot = {
   totalStudyMinutes: number;
+  manualAdjustmentMinutes?: number;
   todayPlanCompletionRate?: number;
   studyTimeGrowthRate?: number;
   startHour?: number;
@@ -81,6 +82,27 @@ function minutesToLabel(minutes: number): string {
   if (h === 0) return `${m}분`;
   if (m === 0) return `${h}시간`;
   return `${h}시간 ${m}분`;
+}
+
+function signedMinutesToLabel(minutes: number): string {
+  const rounded = Math.round(minutes);
+  if (rounded === 0) return '0분';
+  return `${rounded > 0 ? '+' : '-'}${minutesToLabel(Math.abs(rounded))}`;
+}
+
+function toFiniteRoundedMinutes(value: unknown) {
+  const numeric = Number(value ?? 0);
+  return Number.isFinite(numeric) ? Math.round(numeric) : 0;
+}
+
+function getStudyLogBaseMinutes(log?: StudyLogDay | null) {
+  if (!log) return 0;
+  return toFiniteRoundedMinutes(log.totalMinutes) + toFiniteRoundedMinutes(log.manualAdjustmentMinutes);
+}
+
+function getDailyStatBaseMinutes(stat?: DailyStatSnapshot | null) {
+  if (!stat) return 0;
+  return toFiniteRoundedMinutes(stat.totalStudyMinutes) + toFiniteRoundedMinutes(stat.manualAdjustmentMinutes);
 }
 
 function calculateRhythmScore(minutes: number[]): number {
@@ -689,6 +711,7 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
           const awayMinutesRaw = data.awayMinutes ?? data.breakMinutes;
           next[keys[index]] = {
             totalStudyMinutes: Number(data.totalStudyMinutes || 0),
+            manualAdjustmentMinutes: typeof data.manualAdjustmentMinutes === 'number' ? data.manualAdjustmentMinutes : undefined,
             todayPlanCompletionRate: typeof data.todayPlanCompletionRate === 'number' ? data.todayPlanCompletionRate : undefined,
             studyTimeGrowthRate: typeof data.studyTimeGrowthRate === 'number' ? data.studyTimeGrowthRate : undefined,
             startHour: typeof startHourRaw === 'number' ? startHourRaw : undefined,
@@ -969,8 +992,8 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
       const log = studyLogMap[dateKey];
       const plan = planByDate[dateKey];
       const hasActualStudyLog = Boolean(log);
-      const loggedMinutes = Number(log?.totalMinutes || 0);
-      const fallbackMinutes = Number(stat?.totalStudyMinutes || 0);
+      const loggedMinutes = getStudyLogBaseMinutes(log);
+      const fallbackMinutes = getDailyStatBaseMinutes(stat);
       const inProgressMinutes = dateKey === todayKey ? activeSessionMinutes : 0;
       const baseMinutes = hasActualStudyLog ? loggedMinutes : fallbackMinutes;
       const studyMinutes = Math.max(0, baseMinutes + inProgressMinutes);
@@ -1108,10 +1131,11 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
     return Array.from({ length: 42 }, (_, idx) => {
       const day = subDays(today, 41 - idx);
       const dateKey = format(day, 'yyyy-MM-dd');
-      const logMinutes = Number(studyLogMap[dateKey]?.totalMinutes || 0);
-      const statMinutes = Number(dailyStatsMap[dateKey]?.totalStudyMinutes || 0);
+      const log = studyLogMap[dateKey];
+      const logMinutes = getStudyLogBaseMinutes(log);
+      const statMinutes = getDailyStatBaseMinutes(dailyStatsMap[dateKey]);
       const inProgressMinutes = dateKey === todayKey ? activeSessionMinutes : 0;
-      const minutes = Math.max(0, Math.round((logMinutes > 0 ? logMinutes : statMinutes) + inProgressMinutes));
+      const minutes = Math.max(0, Math.round((log ? logMinutes : statMinutes) + inProgressMinutes));
       return {
         dateKey,
         dateLabel: format(day, 'M/d', { locale: ko }),
@@ -1279,16 +1303,31 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
   }, [planItems, todayKey]);
 
   const recentStudySessions = useMemo(() => {
-    return fullSeries
-      .slice(-7)
-      .map((item) => ({
-        dateKey: item.dateKey,
-        dateLabel: format(new Date(`${item.dateKey}T00:00:00`), 'M월 d일 (EEE)', { locale: ko }),
-        minutes: Math.max(0, Math.round(item.studyMinutes)),
-        hasActualStudyLog: item.hasActualStudyLog,
-      }))
+    const todayDate = new Date(`${todayKey}T00:00:00`);
+    return Array.from({ length: 7 }, (_, idx) => {
+      const date = subDays(todayDate, 6 - idx);
+      const dateKey = format(date, 'yyyy-MM-dd');
+      const log = studyLogMap[dateKey];
+      const stat = dailyStatsMap[dateKey];
+      const hasActualStudyLog = Boolean(log);
+      const rawBaseMinutes = Math.max(0, toFiniteRoundedMinutes(log?.totalMinutes ?? stat?.totalStudyMinutes ?? 0));
+      const manualAdjustmentMinutes = toFiniteRoundedMinutes(log?.manualAdjustmentMinutes ?? stat?.manualAdjustmentMinutes ?? 0);
+      const liveMinutes = dateKey === todayKey && attendanceCurrent?.status === 'studying' ? activeSessionMinutes : 0;
+      const displayMinutes = Math.max(0, rawBaseMinutes + manualAdjustmentMinutes + liveMinutes);
+
+      return {
+        dateKey,
+        dateLabel: format(date, 'M월 d일 (EEE)', { locale: ko }),
+        minutes: Math.max(0, Math.round(displayMinutes)),
+        rawBaseMinutes,
+        manualAdjustmentMinutes,
+        activeSessionMinutes: liveMinutes,
+        isActiveToday: liveMinutes > 0,
+        hasActualStudyLog,
+      };
+    })
       .reverse();
-  }, [fullSeries]);
+  }, [activeSessionMinutes, attendanceCurrent?.status, dailyStatsMap, studyLogMap, todayKey]);
 
   const hasSessionAdjustmentChanges = useMemo(() => {
     return recentStudySessions.some((session) => {
@@ -1802,7 +1841,7 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
         },
         { merge: true }
       );
-      batch.set(sRef, { totalStudyMinutes: normalizedTodayMinutes, updatedAt: serverTimestamp() }, { merge: true });
+      batch.set(sRef, { totalStudyMinutes: normalizedTodayMinutes, manualAdjustmentMinutes: 0, updatedAt: serverTimestamp() }, { merge: true });
       batch.set(
         dailyLogRef,
         {
@@ -1810,6 +1849,7 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
           studentId,
           dateKey: todayKey,
           totalMinutes: normalizedTodayMinutes,
+          manualAdjustmentMinutes: 0,
           correctedAt: serverTimestamp(),
           correctedByUserId: currentUser?.uid || '',
           updatedAt: serverTimestamp(),
@@ -1854,9 +1894,21 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
         if (typeof nextValue !== 'number' || Number.isNaN(nextValue)) return null;
         const normalizedNext = Math.max(0, Math.round(nextValue));
         if (normalizedNext === session.minutes) return null;
-        return { dateKey: session.dateKey, minutes: normalizedNext };
+        return {
+          dateKey: session.dateKey,
+          minutes: normalizedNext,
+          rawBaseMinutes: session.rawBaseMinutes,
+          activeSessionMinutes: session.activeSessionMinutes,
+          isActiveToday: session.isActiveToday,
+        };
       })
-      .filter((item): item is { dateKey: string; minutes: number } => Boolean(item));
+      .filter((item): item is {
+        dateKey: string;
+        minutes: number;
+        rawBaseMinutes: number;
+        activeSessionMinutes: number;
+        isActiveToday: boolean;
+      } => Boolean(item));
 
     if (changedSessions.length === 0) {
       toast({ title: '변경된 세션이 없습니다.' });
@@ -1867,9 +1919,14 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
     try {
       const batch = writeBatch(firestore);
 
-      changedSessions.forEach(({ dateKey, minutes }) => {
+      changedSessions.forEach(({ dateKey, minutes, rawBaseMinutes, activeSessionMinutes, isActiveToday }) => {
         const dailyLogRef = doc(firestore, 'centers', centerId, 'studyLogs', studentId, 'days', dateKey);
         const dailyStatRef = doc(firestore, 'centers', centerId, 'dailyStudentStats', dateKey, 'students', studentId);
+        const shouldStoreAsAdjustment = isActiveToday && activeSessionMinutes > 0;
+        const storedBaseMinutes = shouldStoreAsAdjustment ? rawBaseMinutes : minutes;
+        const manualAdjustmentMinutes = shouldStoreAsAdjustment
+          ? minutes - activeSessionMinutes - rawBaseMinutes
+          : 0;
 
         batch.set(
           dailyLogRef,
@@ -1877,7 +1934,8 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
             centerId,
             studentId,
             dateKey,
-            totalMinutes: minutes,
+            totalMinutes: storedBaseMinutes,
+            manualAdjustmentMinutes,
             correctedAt: serverTimestamp(),
             correctedByUserId: currentUser?.uid || '',
             updatedAt: serverTimestamp(),
@@ -1888,7 +1946,8 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
         batch.set(
           dailyStatRef,
           {
-            totalStudyMinutes: minutes,
+            totalStudyMinutes: storedBaseMinutes,
+            manualAdjustmentMinutes,
             updatedAt: serverTimestamp(),
           },
           { merge: true }
@@ -1899,10 +1958,14 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
 
       setDailyStatsMap((prev) => {
         const next = { ...prev };
-        changedSessions.forEach(({ dateKey, minutes }) => {
+        changedSessions.forEach(({ dateKey, minutes, rawBaseMinutes, activeSessionMinutes, isActiveToday }) => {
+          const shouldStoreAsAdjustment = isActiveToday && activeSessionMinutes > 0;
           next[dateKey] = {
             ...(next[dateKey] || { totalStudyMinutes: 0 }),
-            totalStudyMinutes: minutes,
+            totalStudyMinutes: shouldStoreAsAdjustment ? rawBaseMinutes : minutes,
+            manualAdjustmentMinutes: shouldStoreAsAdjustment
+              ? minutes - activeSessionMinutes - rawBaseMinutes
+              : 0,
           };
         });
         return next;
@@ -4180,8 +4243,18 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
             ) : (
               <div className="space-y-2 max-h-[360px] overflow-y-auto pr-1">
                 {recentStudySessions.map((session) => {
-                  const adjustedMinutes = sessionAdjustments[session.dateKey] ?? session.minutes;
-                  const isChanged = Math.max(0, Math.round(adjustedMinutes)) !== session.minutes;
+                  const adjustedMinutes = Math.max(0, Math.round(sessionAdjustments[session.dateKey] ?? session.minutes));
+                  const nextAdjustmentMinutes = session.isActiveToday
+                    ? adjustedMinutes - session.activeSessionMinutes - session.rawBaseMinutes
+                    : 0;
+                  const isChanged = adjustedMinutes !== session.minutes;
+                  const setAdjustedMinutes = (nextValue: number) => {
+                    setSessionAdjustments((prev) => ({
+                      ...prev,
+                      [session.dateKey]: Math.max(0, Math.round(nextValue)),
+                    }));
+                  };
+
                   return (
                     <div key={session.dateKey} className="rounded-[1.35rem] border border-[#dbe7ff] bg-[#f8fbff] px-3 py-3">
                       <div className="flex items-center justify-between gap-3">
@@ -4190,24 +4263,49 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
                           <p className="text-[11px] font-bold text-[#5c6e97]">
                             {session.hasActualStudyLog ? '실제 학습 로그 반영' : '통계 데이터 기반'}
                           </p>
+                          {session.isActiveToday ? (
+                            <p className="mt-1 text-[11px] font-black text-[#2554d4]">
+                              진행 중 {minutesToLabel(session.activeSessionMinutes)} 포함 · 저장 보정 {signedMinutesToLabel(nextAdjustmentMinutes)}
+                            </p>
+                          ) : null}
                         </div>
                         {canEditGrowthData ? (
-                          <div className="flex items-center gap-2">
-                            <Input
-                              type="number"
-                              min={0}
-                              step={5}
-                              value={adjustedMinutes}
-                              onChange={(event) => {
-                                const parsed = Number.parseInt(event.target.value, 10);
-                                setSessionAdjustments((prev) => ({
-                                  ...prev,
-                                  [session.dateKey]: Number.isFinite(parsed) ? Math.max(0, parsed) : 0,
-                                }));
-                              }}
-                              className="h-9 w-24 rounded-lg border-2 border-[#dbe7ff] text-right font-black text-[#14295F]"
-                            />
-                            <span className="text-xs font-black text-[#5c6e97]">분</span>
+                          <div className="flex shrink-0 flex-col items-end gap-2">
+                            <div className="flex items-center gap-1.5">
+                              <Button
+                                type="button"
+                                variant="outline"
+                                className="h-8 w-9 rounded-lg border-[#dbe7ff] px-0 text-xs font-black text-[#14295F]"
+                                onClick={() => setAdjustedMinutes(adjustedMinutes - 5)}
+                              >
+                                -5
+                              </Button>
+                              <Input
+                                type="number"
+                                min={0}
+                                step={5}
+                                value={adjustedMinutes}
+                                onChange={(event) => {
+                                  const parsed = Number.parseInt(event.target.value, 10);
+                                  setAdjustedMinutes(Number.isFinite(parsed) ? parsed : 0);
+                                }}
+                                className="h-9 w-24 rounded-lg border-2 border-[#dbe7ff] text-right font-black text-[#14295F]"
+                              />
+                              <Button
+                                type="button"
+                                variant="outline"
+                                className="h-8 w-9 rounded-lg border-[#dbe7ff] px-0 text-xs font-black text-[#14295F]"
+                                onClick={() => setAdjustedMinutes(adjustedMinutes + 5)}
+                              >
+                                +5
+                              </Button>
+                              <span className="text-xs font-black text-[#5c6e97]">분</span>
+                            </div>
+                            {session.isActiveToday ? (
+                              <span className="text-[10px] font-bold text-[#5c6e97]">
+                                현재 표시 총합을 기준으로 ± 보정
+                              </span>
+                            ) : null}
                           </div>
                         ) : (
                           <Badge className="border-none bg-[#eaf1ff] text-[#2554d4] font-black">
