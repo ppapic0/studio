@@ -769,13 +769,13 @@ function ParentAnalyticsCard({
       <div className={cn('pointer-events-none absolute inset-x-0 top-0 h-1.5 bg-gradient-to-r', toneStyle.ribbon)} />
       <div className={cn('pointer-events-none absolute -right-8 top-0 h-24 w-24 rounded-full blur-3xl', toneStyle.glow)} />
       <div className="relative z-10">
-        <div className={cn('flex gap-3', compact ? 'flex-col' : 'items-start justify-between')}>
-          <div className="flex min-w-0 items-start gap-3">
+        <div className={cn('flex flex-wrap gap-3', compact ? 'flex-col' : 'items-start justify-between')}>
+          <div className="flex min-w-0 flex-1 items-start gap-3">
             <div className={cn('flex h-10 w-10 shrink-0 items-center justify-center rounded-[1.1rem] border shadow-[inset_0_1px_0_rgba(255,255,255,0.96),0_16px_26px_-22px_rgba(255,122,22,0.16)]', toneStyle.iconWrap, toneStyle.icon)}>
               {icon}
             </div>
             <div className="min-w-0">
-              <p className={cn('text-[10px] font-black uppercase tracking-[0.14em]', toneStyle.eyebrow)}>
+              <p className={cn('break-words text-[10px] font-black uppercase tracking-[0.1em] [overflow-wrap:anywhere]', toneStyle.eyebrow)}>
                 {compact ? '학부모 분석' : 'Parent Analytics'}
               </p>
               <h3 className="mt-1 break-keep text-[1.02rem] font-black leading-[1.25] tracking-tight text-[#14295F]">{title}</h3>
@@ -1212,19 +1212,19 @@ function RhythmTimeChartDialog({
   return (
     <Dialog>
       <DialogTrigger asChild>
-        <Card className="group relative overflow-hidden rounded-[1.9rem] border border-[#dce6f8] bg-[linear-gradient(180deg,#ffffff_0%,#f8fbff_46%,#eef4ff_100%)] p-5 shadow-[0_24px_48px_-34px_rgba(20,41,95,0.24)] transition-[transform,box-shadow] duration-200 cursor-pointer active:scale-[0.99] md:hover:-translate-y-0.5 md:hover:shadow-[0_28px_60px_-34px_rgba(20,41,95,0.28)] sm:p-6">
+        <Card className="group relative min-w-0 cursor-pointer overflow-hidden rounded-[1.9rem] border border-[#dce6f8] bg-[linear-gradient(180deg,#ffffff_0%,#f8fbff_46%,#eef4ff_100%)] p-5 shadow-[0_24px_48px_-34px_rgba(20,41,95,0.24)] transition-[transform,box-shadow] duration-200 active:scale-[0.99] md:hover:-translate-y-0.5 md:hover:shadow-[0_28px_60px_-34px_rgba(20,41,95,0.28)] sm:p-6">
           <div className="pointer-events-none absolute -right-10 top-0 h-28 w-28 rounded-full bg-[#ffd3a8]/35 blur-3xl" />
           <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(180deg,rgba(255,255,255,0.55)_0%,rgba(255,255,255,0)_42%)]" />
           <div className="relative z-10">
-            <div className="flex items-start justify-between gap-3">
-              <div className="flex min-w-0 items-start gap-3">
+            <div className="flex flex-wrap items-start justify-between gap-2.5">
+              <div className="flex min-w-0 flex-1 items-start gap-3">
                 <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-[1.15rem] border border-[#e4edff] bg-white/90 shadow-[inset_0_1px_0_rgba(255,255,255,0.92),0_12px_24px_-20px_rgba(20,41,95,0.18)]">
                   <TrendingUp className="h-4.5 w-4.5 text-[#FF7A16]" />
                 </div>
                 <div className="min-w-0">
-                  <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#6d7fa5]">Rhythm Insight</p>
-                  <CardTitle className="mt-1 text-[1.02rem] font-black tracking-tight text-[#14295F]">학습 리듬 시간</CardTitle>
-                  <p className="mt-1 text-[12px] font-bold leading-[1.55] text-slate-500">
+                  <p className="break-keep text-[10px] font-black tracking-[0.08em] text-[#6d7fa5]">리듬 인사이트</p>
+                  <CardTitle className="mt-1 break-keep text-[1rem] font-black leading-[1.3] tracking-tight text-[#14295F]">학습 리듬 시간</CardTitle>
+                  <p className="mt-1 break-keep text-[12px] font-bold leading-[1.6] text-slate-500">
                     시작 흐름과 리듬 점수를 리포트처럼 정리해 빠르게 읽을 수 있어요.
                   </p>
                 </div>
@@ -1385,19 +1385,19 @@ function SubjectStudyChartDialog({
   return (
     <Dialog>
       <DialogTrigger asChild>
-        <Card className="group relative overflow-hidden rounded-[1.9rem] border border-[#dbe7fb] bg-[linear-gradient(180deg,#ffffff_0%,#f9fbff_46%,#eef4ff_100%)] p-5 shadow-[0_24px_48px_-34px_rgba(20,41,95,0.22)] transition-[transform,box-shadow] duration-200 cursor-pointer active:scale-[0.99] md:hover:-translate-y-0.5 md:hover:shadow-[0_28px_60px_-34px_rgba(20,41,95,0.28)] sm:p-6">
+        <Card className="group relative min-w-0 cursor-pointer overflow-hidden rounded-[1.9rem] border border-[#dbe7fb] bg-[linear-gradient(180deg,#ffffff_0%,#f9fbff_46%,#eef4ff_100%)] p-5 shadow-[0_24px_48px_-34px_rgba(20,41,95,0.22)] transition-[transform,box-shadow] duration-200 active:scale-[0.99] md:hover:-translate-y-0.5 md:hover:shadow-[0_28px_60px_-34px_rgba(20,41,95,0.28)] sm:p-6">
           <div className="pointer-events-none absolute -right-10 top-0 h-28 w-28 rounded-full bg-[#bad3ff]/30 blur-3xl" />
           <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(180deg,rgba(255,255,255,0.55)_0%,rgba(255,255,255,0)_42%)]" />
           <div className="relative z-10">
-            <div className="flex items-start justify-between gap-3">
-              <div className="flex min-w-0 items-start gap-3">
+            <div className="flex flex-wrap items-start justify-between gap-2.5">
+              <div className="flex min-w-0 flex-1 items-start gap-3">
                 <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-[1.15rem] border border-[#dfe9ff] bg-white/92 shadow-[inset_0_1px_0_rgba(255,255,255,0.92),0_12px_24px_-20px_rgba(20,41,95,0.18)]">
                   <BarChart3 className="h-4.5 w-4.5 text-[#14295F]" />
                 </div>
                 <div className="min-w-0">
-                  <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#6d7fa5]">Subject Insight</p>
-                  <CardTitle className="mt-1 text-[1.02rem] font-black tracking-tight text-[#14295F]">과목별 학습시간</CardTitle>
-                  <p className="mt-1 text-[12px] font-bold leading-[1.55] text-slate-500">
+                  <p className="break-keep text-[10px] font-black tracking-[0.08em] text-[#6d7fa5]">과목 인사이트</p>
+                  <CardTitle className="mt-1 break-keep text-[1rem] font-black leading-[1.3] tracking-tight text-[#14295F]">과목별 학습시간</CardTitle>
+                  <p className="mt-1 break-keep text-[12px] font-bold leading-[1.6] text-slate-500">
                     어떤 과목에 시간이 가장 많이 배분됐는지 핵심 KPI 중심으로 보여드립니다.
                   </p>
                 </div>
@@ -4225,43 +4225,10 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
             </TabsContent>
 
             <TabsContent value="data" className="parent-tab-panel mt-0 space-y-4 sm:space-y-5">
-              <Card
-                className={cn(
-                  'relative overflow-hidden rounded-[2.3rem] border border-[#d9eadf] bg-[linear-gradient(145deg,#fbfffc_0%,#ffffff_56%,#eef8f1_100%)] p-5 shadow-[0_30px_70px_-44px_rgba(20,41,95,0.14)] sm:p-6',
-                  showEntryMotion && 'parent-card-enter parent-entry-delay-2'
-                )}
+              <div
+                className="grid gap-3"
+                style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 19rem), 1fr))' }}
               >
-                <div className="soft-glow absolute -right-8 top-0 h-24 w-24 rounded-full bg-[#8bd3a3]/18 blur-3xl" />
-                <div className="soft-glow absolute left-0 top-1/2 h-20 w-20 -translate-y-1/2 rounded-full bg-[#c5ecd2]/22 blur-3xl" />
-                <div className="relative z-10 flex flex-col gap-5 md:flex-row md:items-end md:justify-between">
-                  <div className="min-w-0">
-                    <div className="inline-flex items-center gap-2 rounded-full border border-[#d5e8db] bg-white/96 px-3 py-1 text-[10px] font-black uppercase tracking-[0.18em] text-[#224f3c] shadow-[0_12px_24px_-22px_rgba(20,41,95,0.12)] backdrop-blur-sm">
-                      <FileText className="h-3.5 w-3.5 text-[#178244]" />
-                      학습 분석 리포트
-                    </div>
-                    <h3 className="mt-3 break-keep text-[1.32rem] font-black tracking-tight text-[#14295F] sm:text-[1.52rem]">
-                      {activeStudentLabel} 학생의 최근 학습 흐름을
-                      <br className="hidden sm:block" />
-                      차분하게 읽을 수 있게 정리했어요
-                    </h3>
-                    <p className="mt-2 max-w-2xl break-keep text-[12.5px] font-bold leading-[1.7] text-[#284768] sm:text-[13px]">
-                      최근 42일 학습시간과 최근 14일 리듬 데이터를 바탕으로, 학부모님이 핵심 변화만 빠르게 파악할 수 있게 구성했습니다.
-                    </p>
-                  </div>
-                  <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap sm:justify-end">
-                    <div className="rounded-[1.15rem] border border-[#d8eadf] bg-white/96 px-3 py-3 text-left shadow-[inset_0_1px_0_rgba(255,255,255,0.08)] backdrop-blur-sm">
-                      <p className="text-[9px] font-black uppercase tracking-[0.16em] text-[#577763]">학습시간 창</p>
-                      <p className="mt-1 text-[12px] font-black text-[#14295F]">최근 6주</p>
-                    </div>
-                    <div className="rounded-[1.15rem] border border-[#d8eadf] bg-white/96 px-3 py-3 text-left shadow-[inset_0_1px_0_rgba(255,255,255,0.08)] backdrop-blur-sm">
-                      <p className="text-[9px] font-black uppercase tracking-[0.16em] text-[#577763]">리듬 창</p>
-                      <p className="mt-1 text-[12px] font-black text-[#14295F]">최근 14일</p>
-                    </div>
-                  </div>
-                </div>
-              </Card>
-
-              <div className={cn('grid grid-cols-1 gap-3', !isCompactAppMode && 'md:grid-cols-2')}>
                 <ParentAnalyticsCard
                   tone="growth"
                   icon={<BarChart3 className="h-[18px] w-[18px]" />}
@@ -4511,19 +4478,22 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
                   </div>
                 </ParentMetricCardShell>
 
-                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                <RhythmTimeChartDialog
-                  trend={dailyRhythmTrend}
-                  hasTrend={hasRhythmTrend}
-                  yAxisDomain={rhythmYAxisDomain}
-                  rhythmScoreTrend={rhythmScoreTrend}
-                  rhythmScore={rhythmScore}
-                />
+                <div
+                  className="grid gap-3"
+                  style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 18rem), 1fr))' }}
+                >
+                  <RhythmTimeChartDialog
+                    trend={dailyRhythmTrend}
+                    hasTrend={hasRhythmTrend}
+                    yAxisDomain={rhythmYAxisDomain}
+                    rhythmScoreTrend={rhythmScoreTrend}
+                    rhythmScore={rhythmScore}
+                  />
 
-                <SubjectStudyChartDialog
-                  subjects={subjectsData}
-                  subjectTotalMinutes={subjectTotalMinutes}
-                />
+                  <SubjectStudyChartDialog
+                    subjects={subjectsData}
+                    subjectTotalMinutes={subjectTotalMinutes}
+                  />
                 </div>
 
               </section>
