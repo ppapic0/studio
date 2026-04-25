@@ -3920,8 +3920,8 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
               </Card>
             </button>
           </DialogTrigger>
-          <DialogContent className={cn("rounded-[3rem] p-0 overflow-hidden border border-slate-200 flex flex-col", isMobile ? "w-[min(94vw,28rem)] max-h-[88svh] rounded-[2rem]" : "max-w-2xl max-h-[90vh]")}>
-            <div className="bg-amber-500 p-8 text-white relative shrink-0">
+          <DialogContent className={cn("flex flex-col overflow-hidden rounded-[3rem] border border-slate-200 p-0", isMobile ? "w-[min(94vw,28rem)] max-h-[88svh] rounded-[2rem]" : "w-[calc(100vw-1rem)] max-w-2xl max-h-[90vh]")}>
+            <div className={cn("relative shrink-0 bg-amber-500 p-8 text-white", isMobile ? "p-6" : "p-6 sm:p-8")}>
           <BellRing className="pointer-events-none absolute top-0 right-0 p-8 h-24 w-24 opacity-20" />
               <DialogHeader>
                 <DialogTitle className="text-2xl font-black">신청서 작성</DialogTitle>
@@ -3929,22 +3929,22 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
               </DialogHeader>
             </div>
             <div className="flex-1 overflow-y-auto bg-[#fafafa] custom-scrollbar">
-              <div className={cn("p-8 space-y-8", isMobile ? "max-h-[calc(88svh-10.5rem)] p-4 space-y-5" : "")}>
-                <div className="grid gap-6 bg-white p-6 rounded-[2rem] border">
-                  <div className={cn("grid gap-4", isMobile ? "grid-cols-1" : "grid-cols-2")}>
-                    <div className="space-y-1.5">
+              <div className={cn("space-y-8 p-8", isMobile ? "max-h-[calc(88svh-10.5rem)] p-4 space-y-5" : "p-4 sm:p-8")}>
+                <div className="grid min-w-0 gap-6 overflow-hidden rounded-[2rem] border bg-white p-4 sm:p-6">
+                  <div className={cn("grid gap-4", isMobile ? "grid-cols-1" : "grid-cols-1 sm:grid-cols-2")}>
+                    <div className="min-w-0 space-y-1.5">
                       <Label className="text-[10px] font-black uppercase text-muted-foreground ml-1">신청 종류</Label>
                       <Select value={requestType} onValueChange={(v:any) => setRequestType(v)}>
-                        <SelectTrigger className="rounded-xl border-2 h-12 font-bold"><SelectValue /></SelectTrigger>
+                        <SelectTrigger className="h-12 min-w-0 rounded-xl border-2 text-base font-bold sm:text-sm"><SelectValue /></SelectTrigger>
                         <SelectContent className="rounded-xl">
                           <SelectItem value="late">지각</SelectItem>
                           <SelectItem value="absence">결석</SelectItem>
                         </SelectContent>
                       </Select>
                     </div>
-                    <div className="space-y-1.5">
+                    <div className="min-w-0 space-y-1.5">
                       <Label className="text-[10px] font-black uppercase text-muted-foreground ml-1">날짜</Label>
-                      <Input type="date" value={requestDate} onChange={e => setRequestDate(e.target.value)} className="rounded-xl border-2 h-12 font-bold" />
+                      <Input type="date" value={requestDate} onChange={e => setRequestDate(e.target.value)} className="h-12 min-w-0 rounded-xl border-2 text-base font-bold sm:text-sm" />
                     </div>
                   </div>
                   <div className="space-y-1.5">
@@ -3952,7 +3952,7 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
                       <Label className="text-[10px] font-black uppercase text-muted-foreground">사유 (최소 10자)</Label>
                       <span className={cn("text-[9px] font-bold", requestReason.length < 10 ? "text-rose-500" : "text-emerald-500")}>{requestReason.length}/10자</span>
                     </div>
-                    <Textarea placeholder="사유를 상세히 입력해 주세요." value={requestReason} onChange={e => setRequestReason(e.target.value)} className="rounded-2xl border-2 min-h-[100px] font-bold text-sm resize-none" />
+                    <Textarea placeholder="사유를 상세히 입력해 주세요." value={requestReason} onChange={e => setRequestReason(e.target.value)} className="min-h-[100px] min-w-0 resize-none rounded-2xl border-2 text-base font-bold sm:text-sm" />
                   </div>
                   {todayKey && requestDate === todayKey && (
                     <div className="p-4 rounded-xl bg-rose-50 border border-rose-100 flex items-start gap-3"><AlertCircle className="h-4 w-4 text-rose-600 shrink-0 mt-0.5" /><p className="text-[11px] font-bold text-rose-900">당일 신청은 벌점 부과 대상이며, 아플 경우에는 진료확인, 처방전, 학부모님 연락이 필요합니다.</p></div>

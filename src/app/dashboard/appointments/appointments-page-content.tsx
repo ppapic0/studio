@@ -1507,15 +1507,15 @@ export function AppointmentsPageContent({
                       <DialogDescription className="text-white/80 font-bold mt-1 text-left">상담 일시와 선생님을 선택해 주세요.</DialogDescription>
                     </DialogHeader>
                   </div>
-                  <div className={cn("space-y-6 bg-white overflow-y-auto custom-scrollbar", isMobile ? "max-h-[calc(86svh-9rem)] p-5" : "p-8 max-h-[60vh]")}>
-                    <div className={cn("grid gap-4", isMobile ? "grid-cols-1" : "grid-cols-2")}>
-                      <div className="space-y-2">
+                  <div className={cn("space-y-6 bg-white overflow-y-auto custom-scrollbar", isMobile ? "max-h-[calc(86svh-9rem)] p-5" : "p-5 max-h-[60vh] sm:p-8")}>
+                    <div className={cn("grid gap-4", isMobile ? "grid-cols-1" : "grid-cols-1 sm:grid-cols-2")}>
+                      <div className="min-w-0 space-y-2">
                         <label className="text-[10px] font-black uppercase text-muted-foreground ml-1">희망 날짜</label>
-                        <Input type="date" value={aptDate} onChange={(e) => setAptDate(e.target.value)} className="rounded-xl h-12 border-2" />
+                        <Input type="date" value={aptDate} onChange={(e) => setAptDate(e.target.value)} className="h-12 min-w-0 rounded-xl border-2 text-base sm:text-sm" />
                       </div>
-                      <div className="space-y-2">
+                      <div className="min-w-0 space-y-2">
                         <label className="text-[10px] font-black uppercase text-muted-foreground ml-1">희망 시간</label>
-                        <Input type="time" value={aptTime} onChange={(e) => setAptTime(e.target.value)} className="rounded-xl h-12 border-2" />
+                        <Input type="time" value={aptTime} onChange={(e) => setAptTime(e.target.value)} className="h-12 min-w-0 rounded-xl border-2 text-base sm:text-sm" />
                       </div>
                     </div>
 
@@ -1524,7 +1524,7 @@ export function AppointmentsPageContent({
                         <UserCheck className="h-3 w-3" /> 상담 희망 선생님
                       </label>
                       <Select value={selectedTeacherId} onValueChange={setSelectedTeacherId}>
-                        <SelectTrigger className="h-12 rounded-xl border-2 font-bold">
+                        <SelectTrigger className="h-12 min-w-0 rounded-xl border-2 text-base font-bold sm:text-sm">
                           <SelectValue placeholder="선생님을 선택하세요" />
                         </SelectTrigger>
                         <SelectContent className="rounded-xl border-none shadow-2xl">
@@ -1544,7 +1544,7 @@ export function AppointmentsPageContent({
                         placeholder="고민이나 질문하고 싶은 내용을 자유롭게 적어주세요." 
                         value={studentNote}
                         onChange={(e) => setStudentNote(e.target.value)}
-                        className="rounded-xl min-h-[100px] resize-none text-sm font-bold border-2"
+                        className="min-h-[100px] min-w-0 resize-none rounded-xl border-2 text-base font-bold sm:text-sm"
                       />
                     </div>
                   </div>
@@ -1793,15 +1793,15 @@ export function AppointmentsPageContent({
                     <DialogDescription className="text-white/80 font-bold mt-1 text-left">상담 일시와 선생님을 선택해 주세요.</DialogDescription>
                   </DialogHeader>
                 </div>
-                <div className={cn("space-y-6 bg-white overflow-y-auto custom-scrollbar", isMobile ? "max-h-[calc(86svh-9rem)] p-5" : "p-8 max-h-[60vh]")}>
-                  <div className={cn("grid gap-4", isMobile ? "grid-cols-1" : "grid-cols-2")}>
-                    <div className="space-y-2">
+                <div className={cn("space-y-6 bg-white overflow-y-auto custom-scrollbar", isMobile ? "max-h-[calc(86svh-9rem)] p-5" : "p-5 max-h-[60vh] sm:p-8")}>
+                  <div className={cn("grid gap-4", isMobile ? "grid-cols-1" : "grid-cols-1 sm:grid-cols-2")}>
+                    <div className="min-w-0 space-y-2">
                       <label className="text-[10px] font-black uppercase text-muted-foreground ml-1">희망 날짜</label>
-                      <Input type="date" value={aptDate} onChange={(e) => setAptDate(e.target.value)} className="rounded-xl h-12 border-2" />
+                      <Input type="date" value={aptDate} onChange={(e) => setAptDate(e.target.value)} className="h-12 min-w-0 rounded-xl border-2 text-base sm:text-sm" />
                     </div>
-                    <div className="space-y-2">
+                    <div className="min-w-0 space-y-2">
                       <label className="text-[10px] font-black uppercase text-muted-foreground ml-1">희망 시간</label>
-                      <Input type="time" value={aptTime} onChange={(e) => setAptTime(e.target.value)} className="rounded-xl h-12 border-2" />
+                      <Input type="time" value={aptTime} onChange={(e) => setAptTime(e.target.value)} className="h-12 min-w-0 rounded-xl border-2 text-base sm:text-sm" />
                     </div>
                   </div>
 
@@ -1810,7 +1810,7 @@ export function AppointmentsPageContent({
                       <UserCheck className="h-3 w-3" /> 상담 희망 선생님
                     </label>
                     <Select value={selectedTeacherId} onValueChange={setSelectedTeacherId}>
-                      <SelectTrigger className="h-12 rounded-xl border-2 font-bold">
+                      <SelectTrigger className="h-12 min-w-0 rounded-xl border-2 text-base font-bold sm:text-sm">
                         <SelectValue placeholder="선생님을 선택하세요" />
                       </SelectTrigger>
                       <SelectContent className="rounded-xl border-none shadow-2xl">
@@ -1830,7 +1830,7 @@ export function AppointmentsPageContent({
                       placeholder="고민이나 질문하고 싶은 내용을 자유롭게 적어주세요." 
                       value={studentNote}
                       onChange={(e) => setStudentNote(e.target.value)}
-                      className="rounded-xl min-h-[100px] resize-none text-sm font-bold border-2"
+                      className="min-h-[100px] min-w-0 resize-none rounded-xl border-2 text-base font-bold sm:text-sm"
                     />
                   </div>
                 </div>

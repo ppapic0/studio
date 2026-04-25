@@ -19,7 +19,7 @@ const SelectTrigger = React.forwardRef<
   <SelectPrimitive.Trigger
     ref={ref}
     className={cn(
-      "flex h-11 w-full items-center justify-between rounded-xl border border-[color:var(--border-subtle)] bg-[var(--surface-light-gradient)] px-3.5 py-2.5 text-[14px] font-medium text-[var(--text-primary)] shadow-[0_1px_0_0_rgba(255,255,255,0.95)_inset,0_1px_3px_rgba(20,41,95,0.04)] ring-offset-background transition-[border-color,box-shadow,background-color] duration-150 placeholder:text-[var(--text-muted)] focus:outline-none focus:border-[color:var(--border-strong)] focus:shadow-[0_1px_0_0_rgba(255,255,255,0.95)_inset,0_0_0_3px_rgba(255,138,31,0.12),0_1px_3px_rgba(20,41,95,0.05)] disabled:cursor-not-allowed disabled:opacity-50 [&>span]:line-clamp-1",
+      "flex h-11 w-full min-w-0 items-center justify-between rounded-xl border border-[color:var(--border-subtle)] bg-[var(--surface-light-gradient)] px-3.5 py-2.5 text-[14px] font-medium text-[var(--text-primary)] shadow-[0_1px_0_0_rgba(255,255,255,0.95)_inset,0_1px_3px_rgba(20,41,95,0.04)] ring-offset-background transition-[border-color,box-shadow,background-color] duration-150 placeholder:text-[var(--text-muted)] focus:outline-none focus:border-[color:var(--border-strong)] focus:shadow-[0_1px_0_0_rgba(255,255,255,0.95)_inset,0_0_0_3px_rgba(255,138,31,0.12),0_1px_3px_rgba(20,41,95,0.05)] disabled:cursor-not-allowed disabled:opacity-50 [&>span]:line-clamp-1",
       className
     )}
     {...props}
