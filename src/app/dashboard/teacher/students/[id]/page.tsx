@@ -549,11 +549,13 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
   const [editPenaltyPoints, setEditPenaltyPoints] = useState(0);
   const [editStats, setEditStats] = useState({ focus: 0, consistency: 0, achievement: 0, resilience: 0 });
   const [editTodayMinutes, setEditTodayMinutes] = useState(0);
+  const [hasEditedTodayMinutes, setHasEditedTodayMinutes] = useState(false);
   const [sessionAdjustments, setSessionAdjustments] = useState<Record<string, number>>({});
   const [isSessionSaving, setIsSessionSaving] = useState(false);
   const [dailyGrowthWindowIndex, setDailyGrowthWindowIndex] = useState(0);
   const [rankingSnapshot, setRankingSnapshot] = useState<StudentRankingSnapshot>(EMPTY_STUDENT_RANKING_SNAPSHOT);
   const [rankingLoading, setRankingLoading] = useState(false);
+  const [liveNowMs, setLiveNowMs] = useState(() => Date.now());
 
   const hasInitializedForm = useRef(false);
   const [editForm, setEditForm] = useState({
@@ -686,11 +688,6 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
       hasInitializedForm.current = true;
     }
   }, [student, currentStudentMember?.phoneNumber, currentStudentMemberStatus]);
-
-  useEffect(() => {
-    if (isEditStats) return;
-    setEditTodayMinutes(dailyStatsMap[todayKey]?.totalStudyMinutes || 0);
-  }, [dailyStatsMap, todayKey, isEditStats]);
 
   useEffect(() => {
     let cancelled = false;
@@ -934,13 +931,30 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
 
   const attendanceCurrent = attendanceCurrentRows?.[0];
 
+  const activeStudyStartedAtMs = useMemo(() => {
+    if (!attendanceCurrent || attendanceCurrent.status !== 'studying' || !attendanceCurrent.lastCheckInAt) return null;
+    const startedAtMs = attendanceCurrent.lastCheckInAt.toDate().getTime();
+    return Number.isFinite(startedAtMs) ? startedAtMs : null;
+  }, [attendanceCurrent]);
+
+  useEffect(() => {
+    if (!activeStudyStartedAtMs) {
+      setLiveNowMs(Date.now());
+      return;
+    }
+
+    const updateNow = () => setLiveNowMs(Date.now());
+    updateNow();
+    const timer = window.setInterval(updateNow, 1000);
+    return () => window.clearInterval(timer);
+  }, [activeStudyStartedAtMs]);
+
   const activeSessionMinutes = useMemo(() => {
-    if (!attendanceCurrent || attendanceCurrent.status !== 'studying' || !attendanceCurrent.lastCheckInAt) return 0;
-    const startAt = attendanceCurrent.lastCheckInAt.toDate().getTime();
-    const elapsedMs = Date.now() - startAt;
+    if (!activeStudyStartedAtMs) return 0;
+    const elapsedMs = liveNowMs - activeStudyStartedAtMs;
     if (!Number.isFinite(elapsedMs) || elapsedMs <= 0) return 0;
     return Math.ceil(elapsedMs / 60000);
-  }, [attendanceCurrent]);
+  }, [activeStudyStartedAtMs, liveNowMs]);
 
   const rhythmTrendMaps = useMemo(() => {
     const nextStart: Record<string, Date | null> = {};
@@ -1742,6 +1756,24 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
   ]);
 
   const todayStudyMinutes = focusKpi.todayMinutes;
+  const todayStoredStudySnapshot = useMemo(() => {
+    const log = studyLogMap[todayKey];
+    const stat = dailyStatsMap[todayKey];
+    return {
+      rawBaseMinutes: Math.max(0, toFiniteRoundedMinutes(log?.totalMinutes ?? stat?.totalStudyMinutes ?? 0)),
+      manualAdjustmentMinutes: toFiniteRoundedMinutes(log?.manualAdjustmentMinutes ?? stat?.manualAdjustmentMinutes ?? 0),
+    };
+  }, [dailyStatsMap, studyLogMap, todayKey]);
+
+  useEffect(() => {
+    if (isEditStats) setHasEditedTodayMinutes(false);
+  }, [isEditStats, studentId]);
+
+  useEffect(() => {
+    if (isEditStats && hasEditedTodayMinutes) return;
+    setEditTodayMinutes(todayStudyMinutes);
+  }, [hasEditedTodayMinutes, isEditStats, todayStudyMinutes]);
+
   const attendanceRate30d = useMemo(() => {
     const trackedDays = operationsTimeline.filter((item) => item.attendanceStatus !== 'requested');
     if (!trackedDays.length) return 0;
@@ -1818,6 +1850,13 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
       const normalizedLp = Math.max(0, Math.round(Number(editLp) || 0));
       const normalizedPenaltyPoints = Math.max(0, Math.round(Number(editPenaltyPoints) || 0));
       const normalizedTodayMinutes = Math.max(0, Math.round(Number(editTodayMinutes) || 0));
+      const shouldStoreTodayAsAdjustment = activeSessionMinutes > 0;
+      const storedTodayBaseMinutes = shouldStoreTodayAsAdjustment
+        ? todayStoredStudySnapshot.rawBaseMinutes
+        : normalizedTodayMinutes;
+      const todayManualAdjustmentMinutes = shouldStoreTodayAsAdjustment
+        ? normalizedTodayMinutes - activeSessionMinutes - todayStoredStudySnapshot.rawBaseMinutes
+        : 0;
       const normalizedStats = {
         focus: Math.max(0, Math.min(100, Number(editStats.focus) || 0)),
         consistency: Math.max(0, Math.min(100, Number(editStats.consistency) || 0)),
@@ -1844,15 +1883,15 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
         },
         { merge: true }
       );
-      batch.set(sRef, { totalStudyMinutes: normalizedTodayMinutes, manualAdjustmentMinutes: 0, updatedAt: serverTimestamp() }, { merge: true });
+      batch.set(sRef, { totalStudyMinutes: storedTodayBaseMinutes, manualAdjustmentMinutes: todayManualAdjustmentMinutes, updatedAt: serverTimestamp() }, { merge: true });
       batch.set(
         dailyLogRef,
         {
           centerId,
           studentId,
           dateKey: todayKey,
-          totalMinutes: normalizedTodayMinutes,
-          manualAdjustmentMinutes: 0,
+          totalMinutes: storedTodayBaseMinutes,
+          manualAdjustmentMinutes: todayManualAdjustmentMinutes,
           correctedAt: serverTimestamp(),
           correctedByUserId: currentUser?.uid || '',
           updatedAt: serverTimestamp(),
@@ -4799,7 +4838,20 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
             {isEditStats && canEditGrowthData && (
               <section className="space-y-4">
                 <h4 className="text-xs font-black uppercase text-blue-600 flex items-center gap-2"><Timer className="h-4 w-4" /> 오늘 공부시간 보정 (분)</h4>
-                <Input type="number" value={editTodayMinutes} onChange={(event) => setEditTodayMinutes(Number(event.target.value))} className="h-14 rounded-2xl border-blue-200 font-black text-2xl text-center text-blue-600" />
+                <Input
+                  type="number"
+                  value={editTodayMinutes}
+                  onChange={(event) => {
+                    setHasEditedTodayMinutes(true);
+                    setEditTodayMinutes(Number(event.target.value));
+                  }}
+                  className="h-14 rounded-2xl border-blue-200 font-black text-2xl text-center text-blue-600"
+                />
+                {activeSessionMinutes > 0 ? (
+                  <p className="text-center text-[11px] font-bold text-blue-600/80">
+                    진행 중 {minutesToLabel(activeSessionMinutes)} 포함 · 저장 보정 {signedMinutesToLabel(editTodayMinutes - activeSessionMinutes - todayStoredStudySnapshot.rawBaseMinutes)}
+                  </p>
+                ) : null}
               </section>
             )}
 
