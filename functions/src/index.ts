@@ -5545,11 +5545,6 @@ export const completeSignupWithInvite = functions.region(region).https.onCall(as
             `${linkedStudentData?.name || "학생"} 학부모`;
         }
 
-        t.set(linkedStudentRef, {
-          parentUids: admin.firestore.FieldValue.arrayUnion(uid),
-          updatedAt: ts,
-        }, { merge: true });
-
         const linkedStudentParentCode = normalizeParentLinkCodeValue(linkedStudentData?.parentLinkCode);
         if (linkedStudentParentCode === studentLinkCode) {
           await reserveParentLinkCodeLookupInTransaction({
@@ -5562,6 +5557,23 @@ export const completeSignupWithInvite = functions.region(region).https.onCall(as
             timestamp: ts,
           });
         }
+
+        t.set(linkedStudentRef, {
+          parentUids: admin.firestore.FieldValue.arrayUnion(uid),
+          updatedAt: ts,
+        }, { merge: true });
+      }
+
+      if (role === "student") {
+        await reserveParentLinkCodeLookupInTransaction({
+          db,
+          transaction: t,
+          code: parentLinkCode,
+          centerId,
+          studentId: uid,
+          studentName: resolvedDisplayName,
+          timestamp: ts,
+        });
       }
 
       const userDocData: any = {
@@ -5620,16 +5632,6 @@ export const completeSignupWithInvite = functions.region(region).https.onCall(as
       t.set(userCenterRef, userCenterData, { merge: true });
 
       if (role === "student") {
-        await reserveParentLinkCodeLookupInTransaction({
-          db,
-          transaction: t,
-          code: parentLinkCode,
-          centerId,
-          studentId: uid,
-          studentName: resolvedDisplayName,
-          timestamp: ts,
-        });
-
         t.set(db.doc(`centers/${centerId}/students/${uid}`), {
           id: uid,
           name: resolvedDisplayName,
