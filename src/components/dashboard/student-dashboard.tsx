@@ -3654,14 +3654,14 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
       </Dialog>
 
       <Dialog open={isExamDialogOpen} onOpenChange={setIsExamDialogOpen}>
-        <DialogContent className={cn("flex max-h-[85vh] w-[94vw] max-w-[94vw] flex-col overflow-hidden rounded-2xl border-slate-200 p-0", isMobile ? "" : "w-full max-w-lg")}>
-          <div className="bg-primary p-5 text-white">
+        <DialogContent className={cn("flex max-h-[92vh] max-h-[calc(100dvh-1.5rem)] w-[94vw] max-w-[94vw] flex-col overflow-hidden rounded-2xl border-slate-200 p-0 sm:max-h-[calc(100dvh-3rem)]", isMobile ? "" : "w-full max-w-lg")}>
+          <div className="shrink-0 bg-primary p-5 text-white">
             <DialogHeader>
               <DialogTitle className="text-xl font-black tracking-tight">시험 디데이 / 진로 목표</DialogTitle>
               <DialogDescription className="text-white/80">시험 일정과 희망 학교 또는 직업을 등록해두면 학생 홈 상단에서 바로 확인할 수 있어요.</DialogDescription>
             </DialogHeader>
           </div>
-          <div className={cn("space-y-3 overflow-y-auto bg-white", isMobile ? "p-4" : "p-5")}>
+          <div className={cn("min-h-0 flex-1 space-y-3 overflow-y-auto overscroll-contain bg-white [WebkitOverflowScrolling:touch]", isMobile ? "p-4" : "p-5")}>
             <div className="rounded-2xl border border-primary/10 bg-slate-50/70 p-4">
               <div className={cn("grid gap-3", isMobile ? "grid-cols-1" : "grid-cols-[132px_minmax(0,1fr)]")}>
                 <div className="space-y-1.5">
@@ -3753,7 +3753,7 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
               </div>
             ) : null}
           </div>
-          <DialogFooter className={cn("border-t bg-white", isMobile ? "p-4" : "p-5")}>
+          <DialogFooter className={cn("shrink-0 border-t bg-white", isMobile ? "p-4" : "p-5")}>
             <Button type="button" variant="ghost" className="h-10 rounded-xl font-bold" onClick={() => setIsExamDialogOpen(false)}>
               닫기
             </Button>
