@@ -1144,7 +1144,7 @@ function LiveTopThreeBoard({ entries }: { entries: BattleEntry[] }) {
               <div className="min-w-0">
                 <div className={cn('inline-flex items-center gap-2 rounded-full border px-3 py-1 text-[11px] font-black tracking-[0.18em]', toneClass.chip)}>
                   <span className="inline-flex h-2 w-2 rounded-full bg-current opacity-80" />
-                  {entry.rank}위 LIVE
+                  {entry.rank}위 누적
                 </div>
                 <div className="mt-3 truncate text-lg font-black tracking-[-0.03em] text-[#132A63]">
                   {maskLeaderboardStudentName(entry.displayNameSnapshot)}
@@ -1157,7 +1157,7 @@ function LiveTopThreeBoard({ entries }: { entries: BattleEntry[] }) {
             </div>
 
             <div className="mt-4 rounded-[18px] border border-[#E8D8C6] bg-[#FFF4E3] px-3 py-3">
-              <div className="text-[11px] font-black tracking-[0.18em] text-[#7A86A2]">현재 공부중</div>
+              <div className="text-[11px] font-black tracking-[0.18em] text-[#7A86A2]">오늘 누적</div>
               <AnimatePresence mode="wait" initial={false}>
                 <motion.div
                   key={`${entry.studentId}-${entry.value}`}

@@ -366,6 +366,8 @@ export async function GET(request: NextRequest) {
       roomSeatNo: number;
     }>();
 
+    const excludedStudentIds = new Set<string>();
+
     studentsSnap.forEach((docSnap) => {
       const studentId = docSnap.id;
       if (isSyntheticStudentId(studentId)) return;
@@ -407,7 +409,6 @@ export async function GET(request: NextRequest) {
     }>();
     const knownStudentMemberIds = new Set<string>();
     const activeStudentIds = new Set<string>();
-    const excludedStudentIds = new Set<string>();
 
     membersSnap.forEach((docSnap) => {
       const studentId = docSnap.id;
@@ -486,10 +487,8 @@ export async function GET(request: NextRequest) {
         const dateKey = typeof data.dateKey === 'string' && data.dateKey.trim()
           ? data.dateKey.trim()
           : docSnap.id;
-        const persistedMinutes = Math.max(0, Number(data.totalMinutes ?? data.totalStudyMinutes ?? 0));
 
         if (!studentId || !dateKey || isSyntheticStudentId(studentId) || !shouldInclude(studentId)) return [];
-        if (persistedMinutes <= 0 && !data.firstSessionStartAt && !data.lastSessionEndAt) return [];
 
         return [{
           studentId,

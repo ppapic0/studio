@@ -722,10 +722,8 @@ async function buildDailyAwardEntries(
     const studentId = typeof data.studentId === "string" && data.studentId.trim()
       ? data.studentId.trim()
       : docSnap.ref.parent.parent?.id ?? "";
-    const persistedMinutes = Math.max(0, Number(data.totalMinutes ?? data.totalStudyMinutes ?? 0));
 
     if (!studentId || isSyntheticStudentId(studentId) || !context.shouldInclude(studentId)) return [];
-    if (persistedMinutes <= 0 && !data.firstSessionStartAt && !data.lastSessionEndAt) return [];
 
     return [{
       studentId,
