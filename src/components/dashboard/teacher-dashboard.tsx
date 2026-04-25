@@ -459,6 +459,7 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
   const [isEditMode, setIsEditMode] = useState(false);
   const [isAssigning, setIsAssigning] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [quickSessionAdjustingStudentId, setQuickSessionAdjustingStudentId] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [manualSeatOccupantName, setManualSeatOccupantName] = useState('');
   const [seatLabelDraft, setSeatLabelDraft] = useState('');
@@ -514,6 +515,10 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
 
   const centerId = activeMembership?.id;
   const canAdjustPenalty =
+    activeMembership?.role === 'teacher' ||
+    activeMembership?.role === 'centerAdmin' ||
+    activeMembership?.role === 'owner';
+  const canAdjustStudySession =
     activeMembership?.role === 'teacher' ||
     activeMembership?.role === 'centerAdmin' ||
     activeMembership?.role === 'owner';
@@ -1387,6 +1392,66 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
     }
     scrollToSection(liveBoardSectionRef);
   };
+  const handleQuickStudySessionAdjustment = async (
+    signal: CenterAdminAttendanceSeatSignal,
+    requestedDeltaMinutes: number
+  ) => {
+    if (!firestore || !centerId || !signal.studentId || !canAdjustStudySession) return;
+
+    const currentDisplayMinutes = Math.max(0, Math.round(Number(signal.todayStudyMinutes || 0)));
+    const normalizedDelta =
+      requestedDeltaMinutes < 0
+        ? -Math.min(Math.abs(requestedDeltaMinutes), currentDisplayMinutes)
+        : Math.max(0, Math.round(requestedDeltaMinutes));
+
+    if (normalizedDelta === 0) {
+      toast({ title: '보정할 공부시간이 없습니다.' });
+      return;
+    }
+
+    setQuickSessionAdjustingStudentId(signal.studentId);
+    try {
+      const dailyLogRef = doc(firestore, 'centers', centerId, 'studyLogs', signal.studentId, 'days', todayKey);
+      const dailyStatRef = doc(firestore, 'centers', centerId, 'dailyStudentStats', todayKey, 'students', signal.studentId);
+      const batch = writeBatch(firestore);
+
+      batch.set(
+        dailyLogRef,
+        {
+          centerId,
+          studentId: signal.studentId,
+          dateKey: todayKey,
+          manualAdjustmentMinutes: increment(normalizedDelta),
+          correctedAt: serverTimestamp(),
+          correctedByUserId: user?.uid || '',
+          updatedAt: serverTimestamp(),
+        },
+        { merge: true }
+      );
+      batch.set(
+        dailyStatRef,
+        {
+          centerId,
+          studentId: signal.studentId,
+          dateKey: todayKey,
+          manualAdjustmentMinutes: increment(normalizedDelta),
+          updatedAt: serverTimestamp(),
+        },
+        { merge: true }
+      );
+
+      await batch.commit();
+      toast({
+        title: '몰입세션 보정 완료',
+        description: `${signal.studentName} 학생 오늘 공부시간 ${normalizedDelta > 0 ? '+' : ''}${normalizedDelta}분`,
+      });
+    } catch (error) {
+      console.error('[teacher-dashboard] quick study session adjustment failed', error);
+      toast({ variant: 'destructive', title: '세션 보정 실패', description: '잠시 후 다시 시도해 주세요.' });
+    } finally {
+      setQuickSessionAdjustingStudentId((current) => (current === signal.studentId ? null : current));
+    }
+  };
   const teacherCounselingTrackOverview = useMemo(
     () =>
       buildCounselingTrackOverview({
@@ -1708,6 +1773,7 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
         ) : (
           <div className="grid gap-2">
             {signals.map((signal) => {
+              const isSessionAdjusting = quickSessionAdjustingStudentId === signal.studentId;
               const seatLabel =
                 signal.roomId && signal.roomSeatNo
                   ? formatSeatLabel(
@@ -1759,18 +1825,47 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
                         ))}
                       </div>
                     </div>
-                    <Button
-                      type="button"
-                      size="sm"
-                      variant="outline"
-                      className="h-8 shrink-0 rounded-full border-[#DCE7FF] bg-white px-3 text-[10px] font-black text-[#14295F] hover:border-[#FF7A16]/24 hover:text-[#C95A08]"
-                      onClick={() => {
-                        setIsHeroPriorityDialogOpen(false);
-                        openTeacherAttendanceSignal(signal);
-                      }}
-                    >
-                      교실에서 보기
-                    </Button>
+                    <div className="flex shrink-0 flex-col items-start gap-2 sm:items-end">
+                      {canAdjustStudySession ? (
+                        <div className="flex flex-wrap items-center gap-1.5 rounded-full border border-[#DCE7FF] bg-[#F7FAFF] p-1">
+                          <span className="flex items-center gap-1 px-2 text-[10px] font-black text-[#14295F]">
+                            <Timer className="h-3.5 w-3.5 text-[#2554D7]" />
+                            몰입세션
+                          </span>
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="outline"
+                            className="h-7 rounded-full border-[#DCE7FF] bg-white px-2.5 text-[10px] font-black text-[#14295F] hover:border-[#FF7A16]/24 hover:text-[#C95A08]"
+                            disabled={isSessionAdjusting || signal.todayStudyMinutes <= 0}
+                            onClick={() => handleQuickStudySessionAdjustment(signal, -5)}
+                          >
+                            {isSessionAdjusting ? <Loader2 className="h-3 w-3 animate-spin" /> : '-5분'}
+                          </Button>
+                          <Button
+                            type="button"
+                            size="sm"
+                            className="h-7 rounded-full bg-[#14295F] px-2.5 text-[10px] font-black text-white hover:bg-[#10224C]"
+                            disabled={isSessionAdjusting}
+                            onClick={() => handleQuickStudySessionAdjustment(signal, 5)}
+                          >
+                            {isSessionAdjusting ? <Loader2 className="h-3 w-3 animate-spin" /> : '+5분'}
+                          </Button>
+                        </div>
+                      ) : null}
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        className="h-8 rounded-full border-[#DCE7FF] bg-white px-3 text-[10px] font-black text-[#14295F] hover:border-[#FF7A16]/24 hover:text-[#C95A08]"
+                        onClick={() => {
+                          setIsHeroPriorityDialogOpen(false);
+                          openTeacherAttendanceSignal(signal);
+                        }}
+                      >
+                        교실에서 보기
+                      </Button>
+                    </div>
                   </div>
                 </div>
               );
@@ -6006,7 +6101,32 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
                             <div className="space-y-4">
                               <div className="flex items-center justify-between px-1">
                                 <h4 className="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-primary/60"><History className="h-3 w-3" /> 오늘의 몰입 세션</h4>
-                                <span className="text-[9px] font-bold uppercase text-muted-foreground">{todayKey}</span>
+                                <div className="flex flex-wrap items-center justify-end gap-2">
+                                  {selectedAttendanceSignal && canAdjustStudySession ? (
+                                    <div className="flex items-center gap-1 rounded-full border border-[#DCE7FF] bg-white p-1">
+                                      <Button
+                                        type="button"
+                                        size="sm"
+                                        variant="outline"
+                                        className="h-7 rounded-full border-[#DCE7FF] px-2.5 text-[10px] font-black text-[#14295F]"
+                                        disabled={quickSessionAdjustingStudentId === selectedAttendanceSignal.studentId || selectedAttendanceSignal.todayStudyMinutes <= 0}
+                                        onClick={() => handleQuickStudySessionAdjustment(selectedAttendanceSignal, -5)}
+                                      >
+                                        {quickSessionAdjustingStudentId === selectedAttendanceSignal.studentId ? <Loader2 className="h-3 w-3 animate-spin" /> : '-5분'}
+                                      </Button>
+                                      <Button
+                                        type="button"
+                                        size="sm"
+                                        className="h-7 rounded-full bg-[#14295F] px-2.5 text-[10px] font-black text-white hover:bg-[#10224C]"
+                                        disabled={quickSessionAdjustingStudentId === selectedAttendanceSignal.studentId}
+                                        onClick={() => handleQuickStudySessionAdjustment(selectedAttendanceSignal, 5)}
+                                      >
+                                        {quickSessionAdjustingStudentId === selectedAttendanceSignal.studentId ? <Loader2 className="h-3 w-3 animate-spin" /> : '+5분'}
+                                      </Button>
+                                    </div>
+                                  ) : null}
+                                  <span className="text-[9px] font-bold uppercase text-muted-foreground">{todayKey}</span>
+                                </div>
                               </div>
                               <div className="grid gap-3">
                                 {sessionsLoading ? (
