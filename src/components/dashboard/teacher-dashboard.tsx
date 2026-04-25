@@ -5735,13 +5735,21 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
                                   {selectedAttendanceSignal?.isReturned
                                     ? '복귀'
                                     : selectedAttendanceSignal?.isCheckedOut
-                                      ? '퇴실'
+                                      ? selectedAttendanceSignal.lastCheckOutLabel
+                                        ? `퇴실 ${selectedAttendanceSignal.lastCheckOutLabel}`
+                                        : '퇴실'
                                       : selectedAttendanceSignal?.seatStatus === 'away' || selectedAttendanceSignal?.seatStatus === 'break'
                                         ? '외출 중'
                                         : '진행 중'}
                                 </p>
                                 <p className="mt-2 text-xs font-bold text-slate-500">
-                                  {isEditMode ? '바로 위 관리 액션에서 설정을 수정할 수 있습니다.' : '빠른 조치는 위 액션 카드에서 바로 처리합니다.'}
+                                  {selectedAttendanceSignal?.isCheckedOut
+                                    ? [
+                                        selectedAttendanceSignal.wasLateToday ? '오늘 지각O' : '오늘 지각X',
+                                        selectedAttendanceSignal.firstCheckInLabel ? `최초입실 ${selectedAttendanceSignal.firstCheckInLabel}` : null,
+                                        selectedAttendanceSignal.lastCheckOutLabel ? `마지막퇴실 ${selectedAttendanceSignal.lastCheckOutLabel}` : null,
+                                      ].filter(Boolean).join(' · ')
+                                    : isEditMode ? '바로 위 관리 액션에서 설정을 수정할 수 있습니다.' : '빠른 조치는 위 액션 카드에서 바로 처리합니다.'}
                                 </p>
                               </div>
                             </div>

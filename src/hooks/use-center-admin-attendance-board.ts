@@ -583,9 +583,18 @@ export function useCenterAdminAttendanceBoard({
         };
 
         const lastCheckInAt = toDateSafe(seat.lastCheckInAt);
+        const sameDayLiveCheckInAt =
+          lastCheckInAt && format(lastCheckInAt, 'yyyy-MM-dd') === todayKey
+            ? lastCheckInAt
+            : null;
+        const todayStatCheckInAt = toDateSafe(todayStat?.checkInAt);
+        const todayRecordCheckInAt = toDateSafe(todayRecord?.checkInAt);
+        const firstCheckInAt = todayStatCheckInAt || todayRecordCheckInAt || sameDayLiveCheckInAt;
+        const lastCheckOutAt = toDateSafe(todayStat?.checkOutAt);
+        const hasCheckOutRecord = Boolean(todayStat?.hasCheckOutRecord || lastCheckOutAt);
         const liveSessionMinutes =
-          seat.status === 'studying' && lastCheckInAt
-            ? Math.max(0, Math.ceil((nowMs - lastCheckInAt.getTime()) / 60000))
+          seat.status === 'studying' && sameDayLiveCheckInAt
+            ? Math.max(0, Math.ceil((nowMs - sameDayLiveCheckInAt.getTime()) / 60000))
             : 0;
         const storedBaseMinutes = Number(todayStat?.totalStudyMinutes || 0);
         const storedAdjustmentMinutes = Number(todayStat?.manualAdjustmentMinutes || 0);
@@ -597,14 +606,14 @@ export function useCenterAdminAttendanceBoard({
         const recordedStudyMinutes = Math.max(storedStudyMinutes, fallbackStudyLogMinutes);
         const totalStudyMinutes = Math.max(0, recordedStudyMinutes + liveSessionMinutes);
         const currentAwayMinutes =
-          (seat.status === 'away' || seat.status === 'break') && lastCheckInAt
-            ? Math.max(0, Math.floor((nowMs - lastCheckInAt.getTime()) / 60000))
+          (seat.status === 'away' || seat.status === 'break') && sameDayLiveCheckInAt
+            ? Math.max(0, Math.floor((nowMs - sameDayLiveCheckInAt.getTime()) / 60000))
             : 0;
         const isLongAway = currentAwayMinutes >= 20;
         const isReturned =
           seat.status === 'studying' &&
           recordedStudyMinutes >= 1 &&
-          Boolean(lastCheckInAt && format(lastCheckInAt, 'yyyy-MM-dd') === todayKey);
+          Boolean(sameDayLiveCheckInAt);
 
         const derived = deriveAttendanceDisplayState({
           selectedDate: today,
@@ -614,12 +623,12 @@ export function useCenterAdminAttendanceBoard({
           recordStatus: todayRecord?.status,
           recordStatusSource: todayRecord?.statusSource,
           recordRoutineMissingAtCheckIn: Boolean(todayRecord?.routineMissingAtCheckIn),
-          recordCheckedAt: toDateSafe(todayRecord?.checkInAt),
-          liveCheckedAt: lastCheckInAt,
-          accessCheckedAt: lastCheckInAt,
+          recordCheckedAt: firstCheckInAt,
+          liveCheckedAt: sameDayLiveCheckInAt,
+          accessCheckedAt: sameDayLiveCheckInAt,
           studyCheckedAt:
             totalStudyMinutes > 0
-              ? toDateSafe(todayRecord?.checkInAt) || lastCheckInAt || toDateSafe(todayRecord?.updatedAt)
+              ? firstCheckInAt || toDateSafe(todayRecord?.updatedAt)
               : null,
           studyMinutes: Math.max(0, recordedStudyMinutes),
           hasStudyLog: totalStudyMinutes > 0,
@@ -629,6 +638,7 @@ export function useCenterAdminAttendanceBoard({
         });
 
         const hasAttendanceEvidence =
+          hasCheckOutRecord ||
           seat.status !== 'absent' ||
           derived.status === 'confirmed_present' ||
           derived.status === 'confirmed_late' ||
@@ -693,6 +703,10 @@ export function useCenterAdminAttendanceBoard({
           scheduleMovementSummary: scheduleMovementInfo.scheduleMovementSummary,
           scheduleMovementCount: scheduleMovementInfo.scheduleMovementCount,
           checkedAtLabel: formatAttendanceBoardClockLabel(derived.checkedAt),
+          firstCheckInLabel: formatAttendanceBoardClockLabel(firstCheckInAt),
+          lastCheckOutLabel: formatAttendanceBoardClockLabel(lastCheckOutAt),
+          wasLateToday: derived.status === 'confirmed_late',
+          hasCheckOutRecord,
           attendanceRiskLevel,
           attendanceRiskLabel,
           recentLateCount: historySummary.lateCount,
@@ -713,6 +727,9 @@ export function useCenterAdminAttendanceBoard({
             expectedArrivalTime: routineInfo?.expectedArrivalTime,
             currentAwayMinutes,
             attendanceRiskLabel,
+            firstCheckInLabel: formatAttendanceBoardClockLabel(firstCheckInAt),
+            lastCheckOutLabel: formatAttendanceBoardClockLabel(lastCheckOutAt),
+            wasLateToday: derived.status === 'confirmed_late',
           }),
         };
       });

@@ -43,6 +43,10 @@ export interface CenterAdminAttendanceSeatSignal {
   scheduleMovementSummary: string | null;
   scheduleMovementCount: number;
   checkedAtLabel: string | null;
+  firstCheckInLabel: string | null;
+  lastCheckOutLabel: string | null;
+  wasLateToday: boolean;
+  hasCheckOutRecord: boolean;
   attendanceRiskLevel: CenterAdminAttendanceRiskLevel;
   attendanceRiskLabel: '정상' | '출석주의' | '출석위험';
   recentLateCount: number;
@@ -232,11 +236,11 @@ export function resolveAttendanceBoardStatus(params: {
   if (seatStatus === 'studying' && isReturned) return 'returned';
   if (seatStatus === 'studying') return 'present';
   if (displayStatus === 'excused_absent') return 'excused_absent';
+  if (seatStatus === 'absent' && hasAttendanceEvidence) return 'checked_out';
   if (displayStatus === 'confirmed_late') return 'late';
   if (displayStatus === 'confirmed_present_missing_routine') return 'present_missing_routine';
   if (displayStatus === 'missing_routine') return 'routine_missing';
   if (displayStatus === 'confirmed_present') return 'present';
-  if (seatStatus === 'absent' && hasAttendanceEvidence) return 'checked_out';
   if (displayStatus === 'confirmed_absent') return 'absent';
   return 'planned';
 }
@@ -253,7 +257,7 @@ export function buildAttendanceBoardFlags(params: {
   const { displayStatus, attendanceRiskLevel, isLongAway } = params;
   return [
     attendanceRiskLevel === 'risk' ? '출석위험' : attendanceRiskLevel === 'warning' ? '출석주의' : null,
-    displayStatus === 'confirmed_late' ? '지각' : null,
+    displayStatus === 'confirmed_late' ? '오늘 지각O' : null,
     displayStatus === 'missing_routine' || displayStatus === 'confirmed_present_missing_routine' ? '루틴누락' : null,
     isLongAway ? '장기외출' : null,
     displayStatus === 'excused_absent' ? '미등원' : null,
@@ -266,8 +270,20 @@ export function buildAttendanceBoardNote(params: {
   expectedArrivalTime?: string | null;
   currentAwayMinutes?: number;
   attendanceRiskLabel: '정상' | '출석주의' | '출석위험';
+  firstCheckInLabel?: string | null;
+  lastCheckOutLabel?: string | null;
+  wasLateToday?: boolean;
 }) {
-  const { boardStatus, displayStatus, expectedArrivalTime, currentAwayMinutes = 0, attendanceRiskLabel } = params;
+  const {
+    boardStatus,
+    displayStatus,
+    expectedArrivalTime,
+    currentAwayMinutes = 0,
+    attendanceRiskLabel,
+    firstCheckInLabel,
+    lastCheckOutLabel,
+    wasLateToday = false,
+  } = params;
 
   switch (boardStatus) {
     case 'present':
@@ -297,7 +313,12 @@ export function buildAttendanceBoardNote(params: {
     case 'returned':
       return '현재 공부에 복귀한 상태이며, 오늘 누적 공부 기록이 함께 확인됩니다.';
     case 'checked_out':
-      return '오늘 출석 증거는 있으나 현재는 퇴실 상태입니다.';
+      return [
+        '퇴실 완료 상태입니다.',
+        wasLateToday ? '오늘 지각O' : '오늘 지각X',
+        firstCheckInLabel ? `최초입실 ${firstCheckInLabel}` : null,
+        lastCheckOutLabel ? `마지막퇴실 ${lastCheckOutLabel}` : null,
+      ].filter(Boolean).join(' · ');
     case 'absent':
       return expectedArrivalTime
         ? `예정 등원 ${expectedArrivalTime} 이후에도 오늘 입실 증거가 없습니다.`

@@ -270,9 +270,21 @@ export function CenterAdminAttendanceBoard({
                   const displayName = signal?.studentName || student?.name || member?.displayName || '학생';
                   const scheduleMovementLabel = signal?.scheduleMovementSummary || null;
                   const isNoAttendanceDay = Boolean(signal?.isNoAttendanceDay || signal?.boardStatus === 'excused_absent');
+                  const checkoutMetaLabel =
+                    signal?.boardStatus === 'checked_out'
+                      ? [
+                          signal.wasLateToday ? '오늘 지각O' : '오늘 지각X',
+                          signal.firstCheckInLabel ? `최초 ${signal.firstCheckInLabel}` : null,
+                          signal.lastCheckOutLabel ? `마지막 ${signal.lastCheckOutLabel}` : null,
+                        ].filter(Boolean).join(' · ')
+                      : null;
                   const attendanceTimeLabel = signal
                     ? isNoAttendanceDay
                       ? '미등원'
+                      : signal.boardStatus === 'checked_out'
+                      ? signal.lastCheckOutLabel
+                        ? `퇴실 ${signal.lastCheckOutLabel}`
+                        : '퇴실'
                       : signal.attendanceDisplayStatus === 'confirmed_late' && signal.checkedAtLabel
                       ? `지각 ${signal.checkedAtLabel}`
                       : signal.checkedAtLabel
@@ -281,7 +293,7 @@ export function CenterAdminAttendanceBoard({
                           ? `예정 ${signal.routineExpectedArrivalTime}`
                           : signal.boardLabel
                     : '확인중';
-                  const shouldShowSeatMeta = !isNameOnly || isNoAttendanceDay || Boolean(scheduleMovementLabel);
+                  const shouldShowSeatMeta = !isNameOnly || isNoAttendanceDay || Boolean(scheduleMovementLabel) || Boolean(checkoutMetaLabel);
 
                   if (isAisle) {
                     return <div key={`${room.id}_${roomSeatNo}`} className="aspect-square rounded-[1.35rem] bg-transparent" />;
@@ -329,12 +341,23 @@ export function CenterAdminAttendanceBoard({
                             className={cn(
                               'inline-flex max-w-full items-center rounded-full border border-white/85 bg-white/88 px-2.5 py-1 font-black tracking-tight text-[#14295F] shadow-[0_10px_18px_-16px_rgba(20,41,95,0.35)]',
                               isNoAttendanceDay && 'bg-rose-50 text-rose-700',
+                              signal?.boardStatus === 'checked_out' && 'border-slate-600 bg-slate-800 text-white',
                               isMobile ? 'text-[9px]' : 'text-[10px]'
                             )}
                           >
                             <span className="truncate">{attendanceTimeLabel}</span>
                           </span>
                         )}
+                        {checkoutMetaLabel ? (
+                          <span
+                            className={cn(
+                              'inline-flex max-w-full items-center rounded-full border border-white/85 bg-white/90 px-2 py-0.5 font-black tracking-tight text-slate-700 shadow-[0_10px_18px_-16px_rgba(20,41,95,0.35)]',
+                              isMobile ? 'text-[7.5px]' : 'text-[8.5px]'
+                            )}
+                          >
+                            <span className="truncate">{checkoutMetaLabel}</span>
+                          </span>
+                        ) : null}
                         {scheduleMovementLabel && !isNoAttendanceDay ? (
                           <span
                             className={cn(

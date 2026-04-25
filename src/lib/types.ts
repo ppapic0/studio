@@ -1202,7 +1202,12 @@ export interface DailyStudentStat {
     totalStudyMinutes: number;
     manualAdjustmentMinutes?: number;
     studyTimeGrowthRate: number;
+    attendanceStatus?: AttendanceCurrent['status'] | string;
+    checkInAt?: Timestamp;
+    checkOutAt?: Timestamp;
+    hasCheckOutRecord?: boolean;
     createdAt: Timestamp;
+    updatedAt?: Timestamp;
 }
 
 export interface LeaderboardEntry {
