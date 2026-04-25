@@ -41,6 +41,7 @@ export async function seedInitialData(db: Firestore, uid: string, centerId: stri
     { id: '0404', role: 'student', class: '04반' },
     { id: 'TUTOR', role: 'student', class: '과외반' },
     { id: 'T0313', role: 'teacher', class: '' },
+    { id: 'P0313', role: 'parent', class: '' },
     { id: 'A0313', role: 'centerAdmin', class: '' }
   ];
 

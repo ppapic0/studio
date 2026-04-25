@@ -2094,7 +2094,14 @@ async function clearParentLinkRateLimit(db: admin.firestore.Firestore, uid: stri
 }
 
 function shouldCountParentLinkFailedAttempt(error: unknown): boolean {
-  return error instanceof functions.https.HttpsError && error.code === "failed-precondition";
+  if (!(error instanceof functions.https.HttpsError) || error.code !== "failed-precondition") return false;
+  const message = String(error.message || "").toLowerCase();
+  return (
+    message.includes("student") ||
+    message.includes("parent link") ||
+    message.includes("linked student") ||
+    message.includes("invite center does not match linked student center")
+  );
 }
 
 function calculateSmsBytes(message: string): number {
@@ -3733,19 +3740,29 @@ async function refreshClassroomSignalsForCenter(
 
 function assertInviteUsable(inv: InviteDoc, expectedRole?: AllowedRole) {
   if (!allowedRoles.includes(inv.intendedRole)) {
-    throw new functions.https.HttpsError("failed-precondition", "Invite has invalid role configuration.");
+    throw new functions.https.HttpsError("failed-precondition", "Invite has invalid role configuration.", {
+      userMessage: "초대 코드의 역할 설정이 올바르지 않습니다. 센터 관리자에게 문의해 주세요.",
+    });
   }
   if (expectedRole && inv.intendedRole !== expectedRole) {
-    throw new functions.https.HttpsError("failed-precondition", "Invite role does not match selected signup role.");
+    throw new functions.https.HttpsError("failed-precondition", "Invite role does not match selected signup role.", {
+      userMessage: "선택한 역할과 초대 코드 권한이 맞지 않습니다.",
+    });
   }
   if (inv.isActive === false) {
-    throw new functions.https.HttpsError("failed-precondition", "Invite code is inactive.");
+    throw new functions.https.HttpsError("failed-precondition", "Invite code is inactive.", {
+      userMessage: "비활성화된 초대 코드입니다.",
+    });
   }
   if (typeof inv.maxUses === "number" && typeof inv.usedCount === "number" && inv.usedCount >= inv.maxUses) {
-    throw new functions.https.HttpsError("failed-precondition", "Invite code usage limit exceeded.");
+    throw new functions.https.HttpsError("failed-precondition", "Invite code usage limit exceeded.", {
+      userMessage: "사용 가능 횟수가 모두 소진된 초대 코드입니다.",
+    });
   }
   if (inv.expiresAt && inv.expiresAt.toMillis && inv.expiresAt.toMillis() < Date.now()) {
-    throw new functions.https.HttpsError("failed-precondition", "Invite code has expired.");
+    throw new functions.https.HttpsError("failed-precondition", "Invite code has expired.", {
+      userMessage: "만료된 초대 코드입니다.",
+    });
   }
 }
 
@@ -5200,7 +5217,7 @@ export const completeSignupWithInvite = functions.region(region).https.onCall(as
       userMessage: "선택 동의 정보를 다시 확인해 주세요.",
     });
   }
-  if (role !== "parent" && !code) {
+  if (!code) {
     throw new functions.https.HttpsError("invalid-argument", "초대 코드가 누락되었습니다.", {
       userMessage: "초대 코드를 입력해주세요.",
     });
@@ -5231,6 +5248,25 @@ export const completeSignupWithInvite = functions.region(region).https.onCall(as
       let linkedStudentData: admin.firestore.DocumentData | null = null;
       let linkedStudentId = "";
 
+      inviteRef = db.doc(`inviteCodes/${code}`);
+      const inviteSnap = await t.get(inviteRef);
+      if (!inviteSnap.exists) {
+        throw new functions.https.HttpsError("failed-precondition", "Invalid invite code.", {
+          userMessage: "유효하지 않은 초대 코드입니다.",
+        });
+      }
+
+      const inviteData = inviteSnap.data() as InviteDoc;
+      assertInviteUsable(inviteData, role);
+
+      centerId = asTrimmedString(inviteData.centerId);
+      targetClassName = inviteData.targetClassName || null;
+      if (!centerId) {
+        throw new functions.https.HttpsError("failed-precondition", "Invite code has no center information.", {
+          userMessage: "초대 코드의 센터 정보가 올바르지 않습니다.",
+        });
+      }
+
       if (role === "parent") {
         if (!/^\d{6}$/.test(studentLinkCode)) {
           throw new functions.https.HttpsError("invalid-argument", "Student link code must be a 6-digit number.", {
@@ -5240,11 +5276,15 @@ export const completeSignupWithInvite = functions.region(region).https.onCall(as
 
         const lookupCandidate = await resolveParentLinkCandidateFromLookupInTransaction(db, t, studentLinkCode);
         if (lookupCandidate) {
-          centerId = lookupCandidate.centerId;
+          if (lookupCandidate.centerId !== centerId) {
+            throw new functions.https.HttpsError("failed-precondition", "Invite center does not match linked student center.", {
+              userMessage: "센터 초대 코드와 학생 코드의 센터가 일치하지 않습니다. 코드를 다시 확인해 주세요.",
+            });
+          }
           linkedStudentRef = lookupCandidate.studentRef;
           linkedStudentData = lookupCandidate.studentData;
           linkedStudentId = lookupCandidate.studentId;
-          targetClassName = lookupCandidate.className || (linkedStudentData?.className as string | null) || null;
+          targetClassName = lookupCandidate.className || (linkedStudentData?.className as string | null) || targetClassName;
         } else {
           const codeAsNumber = Number(studentLinkCode);
           const candidateQueries = [
@@ -5299,7 +5339,7 @@ export const completeSignupWithInvite = functions.region(region).https.onCall(as
 
           if (studentDocMap.size === 0) {
             throw new functions.https.HttpsError("failed-precondition", "No student found for this link code.", {
-              userMessage: "No student matched this code. Please check the 6-digit student code and try again.",
+              userMessage: "해당 학생 코드를 찾을 수 없습니다. 6자리 학생 코드를 다시 확인해 주세요.",
             });
           }
 
@@ -5320,14 +5360,23 @@ export const completeSignupWithInvite = functions.region(region).https.onCall(as
             const pathSegments = studentDoc.ref.path.split("/");
             return pathSegments.length === 4 && pathSegments[0] === "centers" && pathSegments[2] === "students";
           });
+          const centerScopedStudentDocs = candidateStudentDocs.filter((studentDoc) => {
+            const pathSegments = studentDoc.ref.path.split("/");
+            return pathSegments[1] === centerId;
+          });
+          if (candidateStudentDocs.length > 0 && centerScopedStudentDocs.length === 0) {
+            throw new functions.https.HttpsError("failed-precondition", "Invite center does not match linked student center.", {
+              userMessage: "센터 초대 코드와 학생 코드의 센터가 일치하지 않습니다. 코드를 다시 확인해 주세요.",
+            });
+          }
 
           console.info("[completeSignupWithInvite] parent code lookup", {
             studentLinkCode,
             rawMatchedDocCount: studentDocMap.size,
-            centerStudentDocCount: candidateStudentDocs.length,
+            centerStudentDocCount: centerScopedStudentDocs.length,
           });
 
-          for (const studentDoc of candidateStudentDocs) {
+          for (const studentDoc of centerScopedStudentDocs) {
             const pathSegments = studentDoc.ref.path.split("/");
             const resolvedCenterId = pathSegments[1];
             if (!resolvedCenterId) continue;
@@ -5380,7 +5429,7 @@ export const completeSignupWithInvite = functions.region(region).https.onCall(as
             });
             throw new functions.https.HttpsError("failed-precondition", "No student profile could be resolved for this link code.", {
               userMessage:
-                "A student was found for this code, but profile linkage failed. Please ask the center admin to verify student data.",
+                "학생 코드는 확인됐지만 프로필 연결에 실패했습니다. 센터 관리자에게 학생 등록 상태를 확인해 주세요.",
             });
           }
 
@@ -5428,30 +5477,10 @@ export const completeSignupWithInvite = functions.region(region).https.onCall(as
           }
 
           const selected = candidates[0];
-          centerId = selected.centerId;
           linkedStudentRef = selected.studentDoc.ref;
           linkedStudentData = selected.studentData;
           linkedStudentId = selected.studentDoc.id;
-          targetClassName = selected.className || (linkedStudentData?.className as string | null) || null;
-        }
-      } else {
-        inviteRef = db.doc(`inviteCodes/${code}`);
-        const inviteSnap = await t.get(inviteRef);
-        if (!inviteSnap.exists) {
-          throw new functions.https.HttpsError("failed-precondition", "Invalid invite code.", {
-            userMessage: "유효하지 않은 초대 코드입니다.",
-          });
-        }
-
-        const inviteData = inviteSnap.data() as InviteDoc;
-        assertInviteUsable(inviteData, role);
-
-        centerId = inviteData.centerId;
-        targetClassName = inviteData.targetClassName || null;
-        if (!centerId) {
-          throw new functions.https.HttpsError("failed-precondition", "Invite code has no center information.", {
-            userMessage: "초대 코드의 센터 정보가 올바르지 않습니다.",
-          });
+          targetClassName = selected.className || (linkedStudentData?.className as string | null) || targetClassName;
         }
       }
 

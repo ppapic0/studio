@@ -243,7 +243,7 @@ export function SignupForm() {
       return false;
     }
 
-    if (values.role !== 'parent' && !values.inviteCode?.trim()) {
+    if (!values.inviteCode?.trim()) {
       form.setError('inviteCode', { message: '초대 코드를 입력해 주세요.' });
       return false;
     }
@@ -398,14 +398,20 @@ export function SignupForm() {
       const signupErrorMessage = resolveSignupErrorMessage(error);
       const msgLower = signupErrorMessage.toLowerCase();
 
-      if (values.role === 'parent') {
-        form.setError('studentLinkCode', { message: signupErrorMessage });
-      } else if (/invite|초대|invite code/.test(msgLower)) {
+      if (/invite|초대|invite code/.test(msgLower)) {
         form.setError('inviteCode', { message: signupErrorMessage });
       }
 
+      if (values.role === 'parent' && !/invite|초대|invite code/.test(msgLower)) {
+        form.setError('studentLinkCode', { message: signupErrorMessage });
+      }
+
       if (/parent|학부모|연동/.test(msgLower)) {
-        form.setError('parentLinkCode', { message: signupErrorMessage });
+        if (values.role === 'parent') {
+          form.setError('studentLinkCode', { message: signupErrorMessage });
+        } else {
+          form.setError('parentLinkCode', { message: signupErrorMessage });
+        }
       }
       if (/phone|전화|휴대폰/.test(msgLower)) {
         form.setError('phoneNumber', { message: signupErrorMessage });
@@ -599,7 +605,7 @@ export function SignupForm() {
                   />
                 </FormControl>
                 <FormDescription className="text-[10px] font-bold">
-                  초대코드 없이 학생 코드로 가입됩니다.
+                  센터 초대 코드와 함께 확인해 학생 계정에 연결됩니다.
                 </FormDescription>
                 <FormMessage />
               </FormItem>
@@ -632,33 +638,27 @@ export function SignupForm() {
           />
         )}
 
-        {selectedRole !== 'parent' ? (
-          <FormField
-            control={form.control}
-            name="inviteCode"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel className="font-bold">센터 초대 코드</FormLabel>
-                <FormControl>
-                  <Input
-                    placeholder="센터에서 받은 초대 코드"
-                    {...field}
-                    disabled={isLoading}
-                    className="h-12 rounded-xl border-2"
-                  />
-                </FormControl>
-                <FormDescription className="rounded-lg bg-primary/5 p-2 text-[10px] font-black text-primary">
-                  학생, 선생님, 관리자 가입 시 초대 코드가 필요합니다.
-                </FormDescription>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-        ) : (
-          <div className="rounded-xl border border-[#ffd9b7] bg-[#fff7ef] px-3 py-2 text-[11px] font-bold text-[#8b3e00]">
-            학부모는 센터 초대코드 없이 학생 코드로 가입할 수 있습니다.
-          </div>
-        )}
+        <FormField
+          control={form.control}
+          name="inviteCode"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel className="font-bold">센터 초대 코드</FormLabel>
+              <FormControl>
+                <Input
+                  placeholder="센터에서 받은 초대 코드"
+                  {...field}
+                  disabled={isLoading}
+                  className="h-12 rounded-xl border-2"
+                />
+              </FormControl>
+              <FormDescription className="rounded-lg bg-primary/5 p-2 text-[10px] font-black text-primary">
+                학생, 학부모, 선생님, 관리자 가입 시 모두 센터 초대 코드가 필요합니다.
+              </FormDescription>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
 
         <Button type="submit" className="mt-2 h-14 w-full rounded-2xl text-lg font-black shadow-xl" disabled={isLoading}>
           {isLoading && <Loader2 className="mr-2 h-5 w-5 animate-spin" />}
