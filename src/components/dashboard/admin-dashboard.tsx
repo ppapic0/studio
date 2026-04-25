@@ -83,11 +83,12 @@ import { useAppContext } from '@/contexts/app-context';
 import { useMemoFirebase } from '@/hooks/use-memo-firebase';
 import { addDoc, collection, query, where, Timestamp, doc, limit, getDoc, getDocs, orderBy, serverTimestamp, documentId } from 'firebase/firestore';
 import { httpsCallable } from 'firebase/functions';
-import { AttendanceCurrent, CounselingReservation, DailyStudentStat, DailyReport, CenterMembership, InviteCode, GrowthProgress, ParentActivityEvent, CounselingLog, LayoutRoomConfig, StudentProfile, StudyLogDay, OpenClawIntegrationDoc, OpenClawSnapshotRecordCounts, PointBoostEvent } from '@/lib/types';
+import { AttendanceCurrent, AttendanceRequest, CounselingReservation, DailyStudentStat, DailyReport, CenterMembership, InviteCode, GrowthProgress, ParentActivityEvent, CounselingLog, LayoutRoomConfig, StudentProfile, StudyLogDay, OpenClawIntegrationDoc, OpenClawSnapshotRecordCounts, PointBoostEvent } from '@/lib/types';
 import { format, subDays } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { logHandledClientIssue } from '@/lib/handled-client-log';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { useToast } from '@/hooks/use-toast';
 import { AdminWorkbenchCommandBar } from '@/components/dashboard/admin-workbench-command-bar';
 import { CenterAdminAttendanceBoard } from '@/components/dashboard/center-admin-attendance-board';
@@ -103,6 +104,7 @@ import { motion, useReducedMotion } from 'framer-motion';
 import { buildNoShowFlag } from '@/features/schedules/lib/buildNoShowFlag';
 import { useCenterAdminAttendanceBoard } from '@/hooks/use-center-admin-attendance-board';
 import { useCenterAdminHeatmap } from '@/hooks/use-center-admin-heatmap';
+import { getAttendanceRequestTypeLabel, getScheduleChangeReasonLabel } from '@/lib/attendance-request';
 import {
   buildCounselingTrackOverview,
   type DashboardCounselTrackTab,
@@ -117,6 +119,7 @@ import {
   normalizeLayoutRooms,
   resolveSeatIdentity,
 } from '@/lib/seat-layout';
+import { toStudyRoomTrackScheduleName } from '@/lib/study-room-class-schedule';
 import { createPointBoostEventSecure, cancelPointBoostEventSecure } from '@/lib/point-boost-actions';
 import { getDailyPointBreakdown } from '@/lib/student-rewards';
 
@@ -405,9 +408,52 @@ const formatPointBoostWindowLabel = (event: PointBoostEvent) => {
   return `${format(startAt, 'M/d HH:mm')} - ${format(endAt, 'M/d HH:mm')}`;
 };
 
+const getAttendanceRequestCreatedLabel = (request: AttendanceRequest): string => {
+  const createdAt = toTimestampDateSafe(request.createdAt);
+  return createdAt ? format(createdAt, 'MM.dd HH:mm') : '접수 시간 미상';
+};
+
+const buildAttendanceRequestTimingSummary = (request: AttendanceRequest): string => {
+  const detailParts: string[] = [];
+
+  if (request.requestedArrivalTime || request.requestedDepartureTime) {
+    detailParts.push(`등하원 ${request.requestedArrivalTime || '?'}~${request.requestedDepartureTime || '?'}`);
+  }
+
+  if (request.requestedAcademyStartTime || request.requestedAcademyEndTime) {
+    const academyName = request.requestedAcademyName?.trim();
+    detailParts.push(
+      `학원/외출 ${request.requestedAcademyStartTime || '?'}~${request.requestedAcademyEndTime || '?'}${academyName ? ` · ${academyName}` : ''}`
+    );
+  }
+
+  if (request.classScheduleName?.trim()) {
+    detailParts.push(toStudyRoomTrackScheduleName(request.classScheduleName));
+  }
+
+  if (request.reasonCategory) {
+    detailParts.push(getScheduleChangeReasonLabel(request.reasonCategory));
+  }
+
+  const reason = request.reason?.trim();
+  if (reason) {
+    detailParts.push(reason);
+  }
+
+  return detailParts.join(' · ') || '신청 사유와 시간을 확인해 처리하세요.';
+};
+
+const getAttendanceRequestSortScore = (request: AttendanceRequest, todayKey: string): number => {
+  if (!request.date || !todayKey) return 4;
+  if (request.date === todayKey) return 0;
+  if (request.date < todayKey) return 1;
+  return 2;
+};
+
 export function AdminDashboard({ isActive }: { isActive: boolean }) {
   const firestore = useFirestore();
   const functions = useFunctions();
+  const router = useRouter();
   const { user } = useUser();
   const { activeMembership, viewMode } = useAppContext();
   const { toast } = useToast();
@@ -626,6 +672,16 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
   }, [firestore, centerId]);
   const { data: attendanceList, isLoading: attendanceLoading } = useCollection<AttendanceCurrent>(attendanceQuery, { enabled: isActive });
   const hasMetricsReady = Boolean(activeMembers && attendanceList && isMounted && progressList);
+
+  const attendanceRequestsQuery = useMemoFirebase(() => {
+    if (!firestore || !centerId) return null;
+    return query(
+      collection(firestore, 'centers', centerId, 'attendanceRequests'),
+      where('status', '==', 'requested'),
+      limit(80)
+    );
+  }, [firestore, centerId]);
+  const { data: attendanceRequests } = useCollection<AttendanceRequest>(attendanceRequestsQuery, { enabled: isActive });
 
   // 4. 실시간 학습 로그 집계
   const todayStatsQuery = useMemoFirebase(() => {
@@ -921,6 +977,25 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
   const targetMemberIds = useMemo(
     () => new Set(filteredStudentMembers.map((member) => member.id)),
     [filteredStudentMembers]
+  );
+
+  const pendingAttendanceRequests = useMemo(
+    () =>
+      (attendanceRequests || [])
+        .filter((request) => request.status === 'requested')
+        .filter((request) => selectedClass === 'all' || targetMemberIds.has(request.studentId))
+        .sort((left, right) => {
+          const dateRankDelta =
+            getAttendanceRequestSortScore(left, todayKey) - getAttendanceRequestSortScore(right, todayKey);
+          if (dateRankDelta !== 0) return dateRankDelta;
+
+          const leftCreatedAtMs = toTimestampDateSafe(left.createdAt)?.getTime() ?? 0;
+          const rightCreatedAtMs = toTimestampDateSafe(right.createdAt)?.getTime() ?? 0;
+          if (leftCreatedAtMs !== rightCreatedAtMs) return rightCreatedAtMs - leftCreatedAtMs;
+
+          return (left.studentName || '').localeCompare(right.studentName || '', 'ko');
+        }),
+    [attendanceRequests, selectedClass, targetMemberIds, todayKey]
   );
 
   const pointHistoryDateKeys = useMemo(
@@ -2423,6 +2498,17 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
     () =>
       [
         {
+          key: 'attendance-request',
+          title: `출결 요청 확인 ${pendingAttendanceRequests.length}건`,
+          detail: pendingAttendanceRequests[0]
+            ? `${pendingAttendanceRequests[0].studentName || '학생'} · ${getAttendanceRequestTypeLabel(pendingAttendanceRequests[0].type)} · ${buildAttendanceRequestTimingSummary(pendingAttendanceRequests[0])}`
+            : '학생이 올린 지각·결석·등하원 변경 요청을 바로 검토하세요.',
+          actionLabel: '요청 확인',
+          href: '/dashboard/attendance?tab=requests',
+          icon: ClipboardCheck,
+          toneClass: 'bg-amber-100 text-amber-700',
+        },
+        {
           key: 'intervention',
           title: `즉시 개입 학생 ${urgentInterventionStudents.length}명`,
           detail:
@@ -2480,6 +2566,7 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
           toneClass: 'bg-emerald-100 text-emerald-700',
         },
       ].filter((item) => {
+        if (item.key === 'attendance-request') return pendingAttendanceRequests.length > 0;
         if (item.key === 'intervention') return urgentInterventionStudents.length > 0;
         if (item.key === 'attendance') return attendanceBoardSummary.lateOrAbsentCount > 0;
         if (item.key === 'away') return attendanceBoardSummary.longAwayCount > 0;
@@ -2487,7 +2574,7 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
         if (item.key === 'lead') return (metrics?.leadPipelineCount30d ?? 0) > 0;
         return true;
       }),
-    [attendanceBoardSummary, metrics, parentContactRecommendations, urgentInterventionStudents]
+    [attendanceBoardSummary, metrics, parentContactRecommendations, pendingAttendanceRequests, urgentInterventionStudents]
   );
 
   const todayAttendanceContactTargets = useMemo(() => {
@@ -2741,7 +2828,10 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
   const primaryAttendanceContactTarget = todayAttendanceContactTargets[0] || null;
   const secondaryAttendanceContactTargets = todayAttendanceContactTargets.slice(1, 4);
   const totalControlAlerts =
-    attendanceBoardSummary.lateOrAbsentCount + attendanceBoardSummary.longAwayCount + urgentInterventionStudents.length;
+    attendanceBoardSummary.lateOrAbsentCount
+    + attendanceBoardSummary.longAwayCount
+    + urgentInterventionStudents.length
+    + pendingAttendanceRequests.length;
   const weakestAxis =
     centerHealthAxes.length > 0
       ? centerHealthAxes.reduce((lowest, axis) => (axis.summaryScore < lowest.summaryScore ? axis : lowest))
@@ -2896,6 +2986,11 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
   const handleHomePriorityAction = (item: (typeof todayActionQueue)[number] | null | undefined) => {
     if (!item) return;
 
+    if (item.key === 'attendance-request') {
+      router.push('/dashboard/attendance?tab=requests');
+      return;
+    }
+
     if (item.key === 'intervention') {
       setIsImmediateInterventionSheetOpen(true);
       return;
@@ -2927,6 +3022,9 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
   const openCounselTrackDialog = (tab: DashboardCounselTrackTab = 'reservations') => {
     setCounselTrackDialogTab(tab);
     setIsCounselTrackDialogOpen(true);
+  };
+  const openAttendanceRequestsPage = () => {
+    router.push('/dashboard/attendance?tab=requests');
   };
   const openPointHistoryDialog = (window: PointHistoryWindow = 'today') => {
     setSelectedPointHistoryWindow(window);
@@ -2982,6 +3080,7 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
   const adminOperationsInboxTotalOpenCount =
     adminNoShowSignals.length
     + adminLateSignals.length
+    + pendingAttendanceRequests.length
     + counselingTrackOverview.consultationCount
     + counselingTrackOverview.wifiCount
     + counselingTrackOverview.parentRequestCount;
@@ -3008,6 +3107,16 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
         caption: adminLateSignals.length > 0 ? '입실 시간 확인 필요' : '현재 대상 없음',
         tone: adminLateSignals.length > 0 ? 'orange' : 'blue',
         onClick: adminLateSignals.length > 0 ? () => openAdminAttendanceSignal(adminLateSignals[0]) : undefined,
+      },
+      {
+        key: 'attendance-request',
+        label: '출결 요청 확인',
+        value: `${pendingAttendanceRequests.length}건`,
+        caption: pendingAttendanceRequests.length > 0
+          ? `${pendingAttendanceRequests[0].studentName || '학생'} · ${getAttendanceRequestTypeLabel(pendingAttendanceRequests[0].type)}`
+          : '처리 대기 없음',
+        tone: pendingAttendanceRequests.length > 0 ? 'amber' : 'blue',
+        onClick: pendingAttendanceRequests.length > 0 ? openAttendanceRequestsPage : undefined,
       },
       {
         key: 'consultation',
@@ -3049,6 +3158,7 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
       counselingTrackOverview.consultationCount,
       counselingTrackOverview.parentRequestCount,
       counselingTrackOverview.wifiCount,
+      pendingAttendanceRequests,
     ]
   );
   const adminOperationsInboxQueueItems = useMemo<OperationsInboxQueueItem[]>(
@@ -3065,6 +3175,17 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
                 : '예정 시간 미등록',
               tone: 'rose' as const,
               onClick: () => openAdminAttendanceSignal(adminNoShowSignals[0]),
+            }
+          : null,
+        pendingAttendanceRequests.length > 0
+          ? {
+              key: 'queue-attendance-request',
+              label: '출결 요청 확인',
+              title: `출결 요청 ${pendingAttendanceRequests.length}건 확인 필요`,
+              detail: `${pendingAttendanceRequests[0].studentName || '학생'} 학생의 ${getAttendanceRequestTypeLabel(pendingAttendanceRequests[0].type)} 요청부터 승인/반려를 검토하세요.`,
+              meta: `${pendingAttendanceRequests[0].date || '일자 미입력'} · ${getAttendanceRequestCreatedLabel(pendingAttendanceRequests[0])}`,
+              tone: 'amber' as const,
+              onClick: openAttendanceRequestsPage,
             }
           : null,
         adminLateSignals.length > 0
@@ -3112,7 +3233,7 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
             }
           : null,
       ].filter((item): item is NonNullable<typeof item> => Boolean(item)),
-    [adminLateSignals, adminNoShowSignals, counselingTrackOverview]
+    [adminLateSignals, adminNoShowSignals, counselingTrackOverview, pendingAttendanceRequests]
   );
   const adminOperationsInboxPanels = useMemo<OperationsInboxPanel[]>(
     () => [
@@ -3159,6 +3280,24 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
           };
         }),
         onOpenAll: adminLateSignals.length > 0 ? () => setIsAttendancePriorityDialogOpen(true) : undefined,
+      },
+      {
+        key: 'panel-attendance-request',
+        label: '출결',
+        title: '출결 요청 확인',
+        count: pendingAttendanceRequests.length,
+        emptyLabel: '처리 대기 중인 출결 요청이 없습니다.',
+        tone: 'amber' as const,
+        rows: pendingAttendanceRequests.slice(0, 3).map((request) => ({
+          key: `attendance-request-${request.id}`,
+          title: `${request.studentName || '학생'} · ${getAttendanceRequestTypeLabel(request.type)}`,
+          detail: buildAttendanceRequestTimingSummary(request),
+          meta: request.date || '일자 미입력',
+          badge: getAttendanceRequestCreatedLabel(request),
+          tone: 'amber' as const,
+          onClick: openAttendanceRequestsPage,
+        })),
+        onOpenAll: pendingAttendanceRequests.length > 0 ? openAttendanceRequestsPage : undefined,
       },
       {
         key: 'panel-consultation',
@@ -3224,7 +3363,7 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
             : undefined,
       },
     ],
-    [adminLateSignals, adminNoShowSignals, counselingTrackOverview, roomNameById]
+    [adminLateSignals, adminNoShowSignals, counselingTrackOverview, pendingAttendanceRequests, roomNameById]
   );
 
   if (!isActive) return null;

@@ -174,6 +174,7 @@ export default function AttendancePage() {
   const { toast } = useToast();
   
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
+  const [activeTab, setActiveTab] = useState<'kpi' | 'requests'>('kpi');
   const [isProcessing, setIsProcessing] = useState(false);
   const [attendanceRoutineMap, setAttendanceRoutineMap] = useState<Record<string, TodayScheduleInfo>>({});
   const [routineLoading, setRoutineLoading] = useState(false);
@@ -195,6 +196,14 @@ export default function AttendancePage() {
 
   useEffect(() => {
     setSelectedDate(new Date());
+  }, []);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const tabParam = new URLSearchParams(window.location.search).get('tab');
+    if (tabParam === 'requests') {
+      setActiveTab('requests');
+    }
   }, []);
 
   const classroomMembership = resolveMembershipByRole(
@@ -1000,7 +1009,7 @@ export default function AttendancePage() {
         </div>
       </AdminWorkbenchCommandBar>
 
-      <Tabs defaultValue="kpi" className="w-full">
+      <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value === 'requests' ? 'requests' : 'kpi')} className="w-full">
         <TabsList className="grid grid-cols-2 bg-muted/30 p-1 rounded-2xl border h-14 mb-8 max-w-2xl">
           <TabsTrigger value="kpi" className="rounded-xl font-black gap-2"><BarChart3 className="h-4 w-4" /> 출결 KPI</TabsTrigger>
           <TabsTrigger value="requests" className="rounded-xl font-black gap-2"><ClipboardCheck className="h-4 w-4" /> 신청 내역 관리</TabsTrigger>

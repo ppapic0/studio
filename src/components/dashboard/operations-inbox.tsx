@@ -209,7 +209,12 @@ export function OperationsInbox({
             ) : null}
           </div>
 
-          <div className="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
+          <div
+            className={cn(
+              'mt-5 grid gap-3 sm:grid-cols-2',
+              summaryChips.length >= 6 ? 'xl:grid-cols-6' : 'xl:grid-cols-5'
+            )}
+          >
             {summaryChips.map((chip) => {
               const toneClasses = toneClassMap[chip.tone];
               return (
