@@ -476,6 +476,7 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
   const [isPenaltySaving, setIsPenaltySaving] = useState(false);
   const [isPenaltyGuideOpen, setIsPenaltyGuideOpen] = useState(false);
   const [isHeroPriorityDialogOpen, setIsHeroPriorityDialogOpen] = useState(false);
+  const [heroPriorityExpandedKey, setHeroPriorityExpandedKey] = useState<string | null>(null);
   const [isHeroRoomsDialogOpen, setIsHeroRoomsDialogOpen] = useState(false);
   const [isCounselTrackDialogOpen, setIsCounselTrackDialogOpen] = useState(false);
   const [counselTrackDialogTab, setCounselTrackDialogTab] = useState<DashboardCounselTrackTab>('reservations');
@@ -504,6 +505,12 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
     const timer = setInterval(() => setNow(Date.now()), 1000);
     return () => clearInterval(timer);
   }, []);
+
+  useEffect(() => {
+    if (!isHeroPriorityDialogOpen) {
+      setHeroPriorityExpandedKey(null);
+    }
+  }, [isHeroPriorityDialogOpen]);
 
   const centerId = activeMembership?.id;
   const canAdjustPenalty =
@@ -1551,6 +1558,14 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
       ].filter((item): item is NonNullable<typeof item> => Boolean(item)),
     [teacherCounselingTrackOverview, teacherLateSignals, teacherNoShowSignals]
   );
+  useEffect(() => {
+    if (
+      heroPriorityExpandedKey &&
+      !teacherOperationsInboxQueueItems.some((item) => item.key === heroPriorityExpandedKey)
+    ) {
+      setHeroPriorityExpandedKey(null);
+    }
+  }, [heroPriorityExpandedKey, teacherOperationsInboxQueueItems]);
   const teacherOperationsInboxPanels = useMemo<OperationsInboxPanel[]>(
     () => [
       {
@@ -1671,6 +1686,134 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
     ],
     [persistedSeatLabelsBySeatId, roomConfigs, teacherCounselingTrackOverview, teacherLateSignals, teacherNoShowSignals]
   );
+
+  const renderHeroPriorityAttendanceDetail = (
+    signals: CenterAdminAttendanceSeatSignal[],
+    emptyLabel: string,
+    tone: 'rose' | 'orange'
+  ) => {
+    const isRose = tone === 'rose';
+
+    return (
+      <div
+        className={cn(
+          'mt-4 rounded-[1.35rem] border p-3',
+          isRose ? 'border-rose-100 bg-rose-50/50' : 'border-[#FFD7BA] bg-[#FFF8F2]'
+        )}
+      >
+        {signals.length === 0 ? (
+          <div className="rounded-[1.1rem] border border-dashed border-[#DCE7FF] bg-white px-4 py-6 text-center text-xs font-bold text-[#5c6e97]">
+            {emptyLabel}
+          </div>
+        ) : (
+          <div className="grid gap-2">
+            {signals.map((signal) => {
+              const seatLabel =
+                signal.roomId && signal.roomSeatNo
+                  ? formatSeatLabel(
+                      { roomId: signal.roomId, roomSeatNo: signal.roomSeatNo, seatId: signal.seatId },
+                      roomConfigs,
+                      '좌석 미배정',
+                      persistedSeatLabelsBySeatId
+                    )
+                  : '좌석 미배정';
+              const timeChips = [
+                signal.boardLabel,
+                signal.wasLateToday ? '오늘 지각 O' : null,
+                signal.firstCheckInLabel ? `최초 입실 ${signal.firstCheckInLabel}` : null,
+                signal.lastCheckOutLabel ? `마지막 퇴실 ${signal.lastCheckOutLabel}` : null,
+                signal.todayStudyLabel ? `오늘 ${signal.todayStudyLabel}` : null,
+              ].filter((chip): chip is string => Boolean(chip));
+
+              return (
+                <div key={`${signal.studentId}-${signal.seatId}`} className="rounded-[1.1rem] border border-[#DCE7FF] bg-white px-3.5 py-3.5">
+                  <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                    <div className="min-w-0">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <Badge
+                          className={cn(
+                            'h-6 rounded-full border-none px-2.5 text-[10px] font-black',
+                            isRose ? 'bg-rose-100 text-rose-700' : 'bg-[#FFF1E6] text-[#C95A08]'
+                          )}
+                        >
+                          {seatLabel}
+                        </Badge>
+                        {signal.className ? (
+                          <Badge className="h-6 rounded-full border-none bg-[#F7FAFF] px-2.5 text-[10px] font-black text-[#14295F]">
+                            {signal.className}
+                          </Badge>
+                        ) : null}
+                      </div>
+                      <p className="mt-2 text-sm font-black text-[#14295F]">{signal.studentName}</p>
+                      <p className="mt-1 text-[11px] font-bold leading-5 text-[#5c6e97]">
+                        {signal.note || emptyLabel}
+                      </p>
+                      <div className="mt-2 flex flex-wrap gap-1.5">
+                        {timeChips.map((chip) => (
+                          <span
+                            key={chip}
+                            className="rounded-full border border-[#E4ECFF] bg-[#F7FAFF] px-2 py-1 text-[10px] font-black text-[#5c6e97]"
+                          >
+                            {chip}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      className="h-8 shrink-0 rounded-full border-[#DCE7FF] bg-white px-3 text-[10px] font-black text-[#14295F] hover:border-[#FF7A16]/24 hover:text-[#C95A08]"
+                      onClick={() => {
+                        setIsHeroPriorityDialogOpen(false);
+                        openTeacherAttendanceSignal(signal);
+                      }}
+                    >
+                      교실에서 보기
+                    </Button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+    );
+  };
+
+  const getHeroPriorityCounselTab = (key: string): DashboardCounselTrackTab | null => {
+    if (key === 'queue-consultation') return 'reservations';
+    if (key === 'queue-wifi') return 'inquiries';
+    if (key === 'queue-parent-request') return 'parent';
+    return null;
+  };
+
+  const renderHeroPriorityInlineDetail = (item: OperationsInboxQueueItem) => {
+    if (item.key === 'queue-no-show') {
+      return renderHeroPriorityAttendanceDetail(
+        teacherNoShowSignals,
+        '예정 등원시간을 넘긴 미입실 학생이 없습니다.',
+        'rose'
+      );
+    }
+
+    if (item.key === 'queue-late') {
+      return renderHeroPriorityAttendanceDetail(teacherLateSignals, '오늘 지각 학생이 없습니다.', 'orange');
+    }
+
+    const counselTab = getHeroPriorityCounselTab(item.key);
+    if (counselTab) {
+      return (
+        <div className="mt-4 overflow-hidden rounded-[1.35rem] border border-[#DCE7FF] bg-white shadow-[0_14px_28px_-28px_rgba(20,41,95,0.18)]">
+          <div className="max-h-[58vh] overflow-y-auto">
+            <AppointmentsPageContent forceTab={counselTab} />
+          </div>
+        </div>
+      );
+    }
+
+    return null;
+  };
 
   const teacherActionQueue = useMemo(() => {
     const pendingAppointments = appointments.filter((apt) => apt.status === 'requested');
@@ -5149,39 +5292,46 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
               </div>
             ) : (
               <div className="space-y-3">
-                {teacherOperationsInboxQueueItems.map((item, index) => (
-                  <div key={item.key} className="rounded-[1.7rem] border border-[#DCE7FF] bg-white p-4 shadow-[0_18px_34px_-30px_rgba(20,41,95,0.18)]">
-                    <div className="flex items-start justify-between gap-4">
-                      <div className="min-w-0 flex-1">
-                        <div className="flex flex-wrap items-center gap-2">
-                          <Badge className="h-6 rounded-full border-none bg-[#EEF4FF] px-2.5 text-[10px] font-black text-[#2554D7]">
-                            {index === 0 ? '최우선' : `${index + 1}순위`}
-                          </Badge>
-                          <Badge className="h-6 rounded-full border-none bg-[#F7FAFF] px-2.5 text-[10px] font-black text-[#14295F]">
-                            {item.label}
-                          </Badge>
+                {teacherOperationsInboxQueueItems.map((item, index) => {
+                  const isExpanded = heroPriorityExpandedKey === item.key;
+
+                  return (
+                    <div key={item.key} className="rounded-[1.7rem] border border-[#DCE7FF] bg-white p-4 shadow-[0_18px_34px_-30px_rgba(20,41,95,0.18)]">
+                      <div className="flex items-start justify-between gap-4">
+                        <div className="min-w-0 flex-1">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <Badge className="h-6 rounded-full border-none bg-[#EEF4FF] px-2.5 text-[10px] font-black text-[#2554D7]">
+                              {index === 0 ? '최우선' : `${index + 1}순위`}
+                            </Badge>
+                            <Badge className="h-6 rounded-full border-none bg-[#F7FAFF] px-2.5 text-[10px] font-black text-[#14295F]">
+                              {item.label}
+                            </Badge>
+                          </div>
+                          <p className="mt-3 text-base font-black text-[#14295F]">{item.title}</p>
+                          <p className="mt-2 text-[12px] font-bold leading-6 text-[#5c6e97]">{item.detail}</p>
+                          {item.meta ? (
+                            <p className="mt-2 text-[11px] font-black text-[#8A98B5]">{item.meta}</p>
+                          ) : null}
                         </div>
-                        <p className="mt-3 text-base font-black text-[#14295F]">{item.title}</p>
-                        <p className="mt-2 text-[12px] font-bold leading-6 text-[#5c6e97]">{item.detail}</p>
-                        {item.meta ? (
-                          <p className="mt-2 text-[11px] font-black text-[#8A98B5]">{item.meta}</p>
-                        ) : null}
                       </div>
+                      <div className="mt-4 flex justify-end">
+                        <Button
+                          type="button"
+                          className={cn(
+                            'h-10 rounded-xl px-4 text-sm font-black',
+                            isExpanded
+                              ? 'border border-[#DCE7FF] bg-white text-[#14295F] hover:bg-[#F1F6FF]'
+                              : 'bg-[#FF7A16] text-white hover:bg-[#E56D10]'
+                          )}
+                          onClick={() => setHeroPriorityExpandedKey((current) => (current === item.key ? null : item.key))}
+                        >
+                          {isExpanded ? '접기' : '바로 열기'}
+                        </Button>
+                      </div>
+                      {isExpanded ? renderHeroPriorityInlineDetail(item) : null}
                     </div>
-                    <div className="mt-4 flex justify-end">
-                      <Button
-                        type="button"
-                        className="h-10 rounded-xl bg-[#FF7A16] px-4 text-sm font-black text-white hover:bg-[#E56D10]"
-                        onClick={() => {
-                          setIsHeroPriorityDialogOpen(false);
-                          item.onClick?.();
-                        }}
-                      >
-                        바로 열기
-                      </Button>
-                    </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             )}
           </div>
