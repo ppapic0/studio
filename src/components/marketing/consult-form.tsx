@@ -112,7 +112,7 @@ function ReceiptCard({ receipt, onReset }: { receipt: ReceiptInfo; onReset: () =
 
       <p className="mt-4 rounded-lg bg-amber-50 px-3 py-2.5 text-xs font-bold leading-relaxed text-amber-700">
         {receipt.waitlistRegistered
-          ? "📞 신청 내역은 먼저 대기 인원에 반영되며, 담당 선생님이 확인 후 등록하신 연락처로 연락드릴 예정입니다."
+          ? "📞 입학 대기 신청이 접수되었습니다. 담당 선생님이 확인 후 등록하신 연락처로 연락드릴 예정입니다."
           : "📞 담당 선생님이 확인 후 등록하신 연락처로 연락드릴 예정입니다."}
         <br />
         접수 확인 번호로{" "}
@@ -133,11 +133,7 @@ function ReceiptCard({ receipt, onReset }: { receipt: ReceiptInfo; onReset: () =
   );
 }
 
-type ConsultFormProps = {
-  waitlistCount?: number;
-};
-
-export function ConsultForm({ waitlistCount = 0 }: ConsultFormProps) {
+export function ConsultForm() {
   const [form, setForm] = useState<FormState>(INITIAL_FORM);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -294,18 +290,6 @@ export function ConsultForm({ waitlistCount = 0 }: ConsultFormProps) {
             </label>
           ))}
         </div>
-          {waitlistCount > 0 ? (
-            <div className="mt-3 rounded-xl border border-[#FF7A16]/25 bg-[#FFF4EC] px-4 py-3">
-              <p className="text-[11px] font-black tracking-[0.16em] text-[#FF7A16]">WAITLIST STATUS</p>
-              <div className="mt-1 flex items-end gap-1.5 text-[#14295F]">
-                <span className="text-2xl font-black leading-none">{waitlistCount}</span>
-                <span className="text-sm font-black">명 대기 중</span>
-              </div>
-              <p className="mt-1 text-xs font-bold leading-relaxed text-[#14295F]/70">
-                관리형 스터디센터는 접수 순서대로 안내하고 있습니다.
-              </p>
-            </div>
-          ) : null}
         </>
       )}
 
