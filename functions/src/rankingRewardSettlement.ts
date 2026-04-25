@@ -49,7 +49,8 @@ type RankingNotificationTarget = {
   awardDateKey: string;
 };
 
-const DAILY_RANK_START_HOUR = 17;
+const WEEKDAY_DAILY_RANK_START_HOUR = 17;
+const WEEKEND_DAILY_RANK_START_HOUR = 8;
 const DAILY_RANK_END_HOUR = 1;
 const ACTIVE_LIVE_RANK_STATUSES = new Set(["studying", "away", "break"]);
 
@@ -349,14 +350,19 @@ function shouldExcludeFromCompetitionRecord(value: unknown, studentId?: unknown)
   return exclusions?.rankings === true || exclusions?.competition === true;
 }
 
-function getCompetitionStartHour() {
-  return DAILY_RANK_START_HOUR;
+function isWeekendCompetitionDate(date: Date) {
+  const day = date.getDay();
+  return day === 0 || day === 6;
+}
+
+function getCompetitionStartHour(targetDate: Date) {
+  return isWeekendCompetitionDate(targetDate) ? WEEKEND_DAILY_RANK_START_HOUR : WEEKDAY_DAILY_RANK_START_HOUR;
 }
 
 function buildCompetitionWindow(targetDate: Date) {
   const competitionDate = startOfKstDay(targetDate);
   const startsAt = cloneDate(competitionDate);
-  startsAt.setHours(getCompetitionStartHour(), 0, 0, 0);
+  startsAt.setHours(getCompetitionStartHour(competitionDate), 0, 0, 0);
 
   const endsAt = cloneDate(competitionDate);
   endsAt.setDate(endsAt.getDate() + 1);
