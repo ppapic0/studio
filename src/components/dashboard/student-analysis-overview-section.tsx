@@ -192,7 +192,7 @@ export default function StudentAnalysisOverviewSection(props: StudentAnalysisOve
     riskSignals,
   } = props;
 
-  const chartMargin = isMobile ? { top: 12, right: 12, left: 8, bottom: 0 } : { top: 10, right: 10, left: -14, bottom: 0 };
+  const chartMargin = isMobile ? { top: 12, right: 16, left: 10, bottom: 0 } : { top: 10, right: 18, left: 12, bottom: 0 };
   const tooltipStyle = {
     borderRadius: 18,
     border: '1px solid #dbe7ff',
@@ -325,8 +325,8 @@ export default function StudentAnalysisOverviewSection(props: StudentAnalysisOve
                             </defs>
                             <CartesianGrid strokeDasharray="4 4" vertical={false} stroke="#e7eefb" />
                             <XAxis dataKey="label" tick={{ fontSize: 10, fontWeight: 800, fill: '#6b7ea6' }} tickLine={false} axisLine={false} tickMargin={8} />
-                            <YAxis yAxisId="mins" tick={{ fontSize: 10, fontWeight: 800, fill: '#6b7ea6' }} tickLine={false} axisLine={false} width={isMobile ? 44 : 38} tickFormatter={(value) => hourTickFormatter(Number(value) / 60)} />
-                            <YAxis yAxisId="growth" orientation="right" tick={{ fontSize: 9, fontWeight: 800, fill: '#9aaac8' }} tickLine={false} axisLine={false} width={isMobile ? 40 : 34} domain={[-20, 20]} tickFormatter={(value) => `${value}%`} />
+                            <YAxis yAxisId="mins" tick={{ fontSize: 10, fontWeight: 800, fill: '#6b7ea6' }} tickLine={false} tickMargin={isMobile ? 6 : 8} axisLine={false} width={isMobile ? 46 : 48} tickFormatter={(value) => hourTickFormatter(Number(value) / 60)} />
+                            <YAxis yAxisId="growth" orientation="right" tick={{ fontSize: 9, fontWeight: 800, fill: '#9aaac8' }} tickLine={false} tickMargin={isMobile ? 6 : 8} axisLine={false} width={isMobile ? 48 : 58} domain={[-20, 20]} tickFormatter={(value) => `${value}%`} />
                             <Tooltip contentStyle={tooltipStyle} />
                             <Bar yAxisId="mins" dataKey="totalMinutes" radius={[10, 10, 4, 4]} maxBarSize={isMobile ? 20 : 32} fill="url(#studentAnalysisWeeklyBarGradient)" />
                             <Line yAxisId="growth" type="monotone" dataKey="growth" stroke="#15b87b" strokeWidth={2.6} dot={false} activeDot={{ r: 4.5, fill: '#15b87b', stroke: '#ffffff', strokeWidth: 2 }} />
@@ -385,8 +385,8 @@ export default function StudentAnalysisOverviewSection(props: StudentAnalysisOve
                             </defs>
                             <CartesianGrid strokeDasharray="4 4" vertical={false} stroke="#e7eefb" />
                             <XAxis dataKey="dateLabel" tick={{ fontSize: 10, fontWeight: 800, fill: '#6b7ea6' }} tickLine={false} axisLine={false} tickMargin={8} interval={isMobile ? 1 : 0} />
-                            <YAxis yAxisId="mins" tick={{ fontSize: 10, fontWeight: 800, fill: '#6b7ea6' }} tickLine={false} axisLine={false} width={isMobile ? 44 : 38} tickFormatter={(value) => hourTickFormatter(Number(value) / 60)} />
-                            <YAxis yAxisId="growth" orientation="right" tick={{ fontSize: 9, fontWeight: 800, fill: '#9aaac8' }} tickLine={false} axisLine={false} width={isMobile ? 42 : 36} domain={[-100, 100]} tickFormatter={(value) => `${value}%`} />
+                            <YAxis yAxisId="mins" tick={{ fontSize: 10, fontWeight: 800, fill: '#6b7ea6' }} tickLine={false} tickMargin={isMobile ? 6 : 8} axisLine={false} width={isMobile ? 46 : 48} tickFormatter={(value) => hourTickFormatter(Number(value) / 60)} />
+                            <YAxis yAxisId="growth" orientation="right" tick={{ fontSize: 9, fontWeight: 800, fill: '#9aaac8' }} tickLine={false} tickMargin={isMobile ? 6 : 8} axisLine={false} width={isMobile ? 48 : 58} domain={[-100, 100]} tickFormatter={(value) => `${value}%`} />
                             <Tooltip contentStyle={tooltipStyle} />
                             <Bar yAxisId="mins" dataKey="minutes" radius={[10, 10, 4, 4]} maxBarSize={isMobile ? 16 : 24} fill="url(#studentAnalysisDailyBarGradient)" />
                             <Line yAxisId="growth" type="monotone" dataKey="growth" stroke="#ff9b24" strokeWidth={2.6} dot={false} activeDot={{ r: 4.5, fill: '#ff9b24', stroke: '#ffffff', strokeWidth: 2 }} />
@@ -435,7 +435,7 @@ export default function StudentAnalysisOverviewSection(props: StudentAnalysisOve
                         <ComposedChart data={completionTrendData} margin={chartMargin}>
                           <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f2f2f2" />
                           <XAxis dataKey="dateLabel" tick={{ fontSize: 10, fontWeight: 800, fill: '#6b7ea6' }} tickLine={false} axisLine={false} />
-                          <YAxis tick={{ fontSize: 10, fontWeight: 800, fill: '#6b7ea6' }} tickLine={false} axisLine={false} width={isMobile ? 42 : 32} domain={[0, 100]} />
+                          <YAxis tick={{ fontSize: 10, fontWeight: 800, fill: '#6b7ea6' }} tickLine={false} tickMargin={isMobile ? 6 : 8} axisLine={false} width={isMobile ? 42 : 44} domain={[0, 100]} />
                           <Tooltip contentStyle={tooltipStyle} />
                           <Bar dataKey="completionRate" radius={[8, 8, 0, 0]} fill="#f59e0b" barSize={isMobile ? 12 : 14} />
                           <Line type="monotone" dataKey="completionRate" stroke="#b45309" strokeWidth={2.5} dot={{ r: 3, fill: '#fff7ed', stroke: '#b45309', strokeWidth: 2 }} activeDot={{ r: 5, fill: '#fff7ed', stroke: '#b45309', strokeWidth: 2 }} />
@@ -531,7 +531,7 @@ export default function StudentAnalysisOverviewSection(props: StudentAnalysisOve
                             </defs>
                             <CartesianGrid strokeDasharray="4 4" vertical={false} stroke="#e7eefb" />
                             <XAxis dataKey="dateLabel" tick={{ fontSize: 10, fontWeight: 800, fill: '#6b7ea6' }} axisLine={false} tickLine={false} tickMargin={8} interval={1} />
-                            <YAxis tick={{ fontSize: 10, fontWeight: 800, fill: '#6b7ea6' }} axisLine={false} tickLine={false} width={isMobile ? 42 : 30} domain={[0, 100]} />
+                            <YAxis tick={{ fontSize: 10, fontWeight: 800, fill: '#6b7ea6' }} axisLine={false} tickLine={false} tickMargin={isMobile ? 6 : 8} width={isMobile ? 42 : 44} domain={[0, 100]} />
                             <Tooltip contentStyle={tooltipStyle} />
                             <Area type="monotone" dataKey="score" stroke="#17b777" strokeWidth={2.6} fill="url(#studentAnalysisRhythmGradient)" dot={false} activeDot={{ r: 4.5, fill: '#17b777', stroke: '#ffffff', strokeWidth: 2 }} />
                           </AreaChart>
@@ -576,7 +576,7 @@ export default function StudentAnalysisOverviewSection(props: StudentAnalysisOve
                           <RechartsLineChart data={startEndTimeTrendData} margin={chartMargin}>
                             <CartesianGrid strokeDasharray="4 4" vertical={false} stroke="#e7eefb" />
                             <XAxis dataKey="dateLabel" tick={{ fontSize: 10, fontWeight: 800, fill: '#6b7ea6' }} tickLine={false} axisLine={false} tickMargin={8} interval={1} />
-                            <YAxis tick={{ fontSize: 10, fontWeight: 800, fill: '#6b7ea6' }} tickLine={false} axisLine={false} width={isMobile ? 54 : 40} domain={[0, 24]} tickFormatter={(value) => hourToClockLabel(Number(value))} />
+                            <YAxis tick={{ fontSize: 10, fontWeight: 800, fill: '#6b7ea6' }} tickLine={false} tickMargin={isMobile ? 6 : 8} axisLine={false} width={isMobile ? 54 : 56} domain={[0, 24]} tickFormatter={(value) => hourToClockLabel(Number(value))} />
                             <Tooltip contentStyle={tooltipStyle} />
                             <Line type="monotone" dataKey="startHour" stroke="#23a8ff" strokeWidth={2.6} dot={false} activeDot={{ r: 4.5, fill: '#23a8ff', stroke: '#ffffff', strokeWidth: 2 }} />
                             <Line type="monotone" dataKey="endHour" stroke="#8b5cf6" strokeWidth={2.6} dot={false} activeDot={{ r: 4.5, fill: '#8b5cf6', stroke: '#ffffff', strokeWidth: 2 }} />
@@ -632,7 +632,7 @@ export default function StudentAnalysisOverviewSection(props: StudentAnalysisOve
                             </defs>
                             <CartesianGrid strokeDasharray="4 4" vertical={false} stroke="#e7eefb" />
                             <XAxis dataKey="dateLabel" tick={{ fontSize: 10, fontWeight: 800, fill: '#6b7ea6' }} tickLine={false} axisLine={false} tickMargin={8} interval={1} />
-                            <YAxis tick={{ fontSize: 10, fontWeight: 800, fill: '#6b7ea6' }} tickLine={false} axisLine={false} width={isMobile ? 44 : 32} tickFormatter={(value) => `${value}m`} />
+                            <YAxis tick={{ fontSize: 10, fontWeight: 800, fill: '#6b7ea6' }} tickLine={false} tickMargin={isMobile ? 6 : 8} axisLine={false} width={isMobile ? 44 : 46} tickFormatter={(value) => `${value}m`} />
                             <Tooltip contentStyle={tooltipStyle} />
                             <Bar dataKey="awayMinutes" fill="url(#studentAnalysisAwayGradient)" radius={[10, 10, 4, 4]} maxBarSize={isMobile ? 14 : 18} />
                             <Line type="monotone" dataKey="awayMinutes" stroke="#ef476f" strokeWidth={2.6} dot={false} activeDot={{ r: 4.5, fill: '#ef476f', stroke: '#ffffff', strokeWidth: 2 }} />
