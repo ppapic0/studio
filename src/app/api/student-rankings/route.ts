@@ -137,6 +137,12 @@ function buildStudentDateRankKey(studentId: string, dateKey: string) {
   return `${studentId}\u001f${dateKey}`;
 }
 
+function addRankMinutesByDate(target: Map<string, number>, studentId: string, dateKey: string, minutes: number) {
+  if (!studentId || !dateKey || minutes <= 0) return;
+  const key = buildStudentDateRankKey(studentId, dateKey);
+  target.set(key, (target.get(key) || 0) + minutes);
+}
+
 function mergeRankMinutesByDate(target: Map<string, number>, studentId: string, dateKey: string, minutes: number) {
   if (!studentId || !dateKey || minutes <= 0) return;
   const key = buildStudentDateRankKey(studentId, dateKey);
@@ -229,6 +235,30 @@ function isSyntheticStudentId(studentId: unknown): boolean {
   );
 }
 
+function getStudyLogDayStudentId(
+  docSnap: FirebaseFirestore.DocumentSnapshot,
+  data: Record<string, unknown>
+) {
+  const directStudentId = typeof data.studentId === 'string' && data.studentId.trim()
+    ? data.studentId.trim()
+    : '';
+  return directStudentId || docSnap.ref.parent.parent?.id || '';
+}
+
+function getStudyLogDayDateKey(
+  docSnap: FirebaseFirestore.DocumentSnapshot,
+  data: Record<string, unknown>
+) {
+  return typeof data.dateKey === 'string' && data.dateKey.trim()
+    ? data.dateKey.trim()
+    : docSnap.id;
+}
+
+function getStudyLogDayTotalMinutes(data: Record<string, unknown>) {
+  const value = Number(data.totalMinutes ?? data.totalStudyMinutes ?? 0);
+  return Number.isFinite(value) ? Math.max(0, Math.round(value)) : 0;
+}
+
 function applyCompetitionRanks(entries: Omit<RankEntry, 'rank'>[]): RankEntry[] {
   const sorted = [...entries].sort((left, right) => right.value - left.value);
   let lastValue: number | null = null;
@@ -246,28 +276,48 @@ function applyCompetitionRanks(entries: Omit<RankEntry, 'rank'>[]): RankEntry[] 
   });
 }
 
-function collectDailyTotalsFromSessionSnapshots(
-  sessionSnapshots: Array<{ studentId: string; snapshot: FirebaseFirestore.QuerySnapshot }>,
+function collectDailyMinutesByDateFromSessionSnapshots(
+  sessionSnapshots: Array<{ studentId: string; dateKey: string; snapshot: FirebaseFirestore.QuerySnapshot }>,
   dailyRankWindow: Pick<DailyRankWindowState, 'startsAt' | 'endsAt'>,
   shouldInclude: (studentId: string) => boolean
 ) {
-  const totals = new Map<string, number>();
+  const totalsByStudentDate = new Map<string, number>();
 
-  sessionSnapshots.forEach(({ studentId: fallbackStudentId, snapshot }) => {
+  sessionSnapshots.forEach(({ studentId: fallbackStudentId, dateKey: fallbackDateKey, snapshot }) => {
     snapshot.forEach((docSnap) => {
       const data = docSnap.data() as Record<string, unknown>;
       const studentId = typeof data.studentId === 'string' && data.studentId.trim()
         ? data.studentId.trim()
         : fallbackStudentId;
+      const dateKey = typeof data.dateKey === 'string' && data.dateKey.trim()
+        ? data.dateKey.trim()
+        : fallbackDateKey;
       const { startedAtMs, referenceMs } = getSessionReferenceMillis(data);
       const value = getDailyRankWindowOverlapMinutes(startedAtMs, referenceMs, dailyRankWindow);
 
-      if (!studentId || isSyntheticStudentId(studentId) || !shouldInclude(studentId) || value <= 0) return;
-      addRankMinutes(totals, studentId, value);
+      if (!studentId || !dateKey || isSyntheticStudentId(studentId) || !shouldInclude(studentId) || value <= 0) return;
+      addRankMinutesByDate(totalsByStudentDate, studentId, dateKey, value);
     });
   });
 
-  return totals;
+  return totalsByStudentDate;
+}
+
+function mergeStudyLogDayTotalsByDate(
+  target: Map<string, number>,
+  dayDocs: FirebaseFirestore.DocumentSnapshot[],
+  shouldInclude: (studentId: string) => boolean
+) {
+  dayDocs.forEach((docSnap) => {
+    if (!docSnap.exists) return;
+    const data = docSnap.data() as Record<string, unknown>;
+    const studentId = getStudyLogDayStudentId(docSnap, data);
+    const dateKey = getStudyLogDayDateKey(docSnap, data);
+    const value = getStudyLogDayTotalMinutes(data);
+
+    if (!studentId || !dateKey || isSyntheticStudentId(studentId) || !shouldInclude(studentId) || value <= 0) return;
+    mergeRankMinutesByDate(target, studentId, dateKey, value);
+  });
 }
 
 async function hasCenterAccess(uid: string, centerId: string) {
@@ -481,28 +531,26 @@ export async function GET(request: NextRequest) {
         if (!docSnap.exists) return [];
 
         const data = docSnap.data() as Record<string, unknown>;
-        const studentId = typeof data.studentId === 'string' && data.studentId.trim()
-          ? data.studentId.trim()
-          : docSnap.ref.parent.parent?.id ?? '';
-        const dateKey = typeof data.dateKey === 'string' && data.dateKey.trim()
-          ? data.dateKey.trim()
-          : docSnap.id;
+        const studentId = getStudyLogDayStudentId(docSnap, data);
+        const dateKey = getStudyLogDayDateKey(docSnap, data);
 
         if (!studentId || !dateKey || isSyntheticStudentId(studentId) || !shouldInclude(studentId)) return [];
 
         return [{
           studentId,
+          dateKey,
           snapshotRef: docSnap.ref.collection('sessions'),
         }];
       });
 
-      const snapshots: Array<{ studentId: string; snapshot: FirebaseFirestore.QuerySnapshot }> = [];
+      const snapshots: Array<{ studentId: string; dateKey: string; snapshot: FirebaseFirestore.QuerySnapshot }> = [];
       for (const chunk of chunkItems(requests, 40)) {
         if (chunk.length === 0) continue;
         const chunkSnapshots = await Promise.all(chunk.map(({ snapshotRef }) => snapshotRef.get()));
         chunkSnapshots.forEach((snapshot, index) => {
           snapshots.push({
             studentId: chunk[index]?.studentId ?? '',
+            dateKey: chunk[index]?.dateKey ?? '',
             snapshot,
           });
         });
@@ -540,16 +588,22 @@ export async function GET(request: NextRequest) {
       }
     });
 
-    const dailyTotals = collectDailyTotalsFromSessionSnapshots(
+    const dailyMinutesByStudentDate = collectDailyMinutesByDateFromSessionSnapshots(
       dailyStudySessionSnaps,
       dailyRankWindow,
       shouldInclude
     );
-    const previousDailyTotals = collectDailyTotalsFromSessionSnapshots(
+    mergeStudyLogDayTotalsByDate(dailyMinutesByStudentDate, dailyStudyDayDocs, shouldInclude);
+    const dailyTotals = foldRankMinutesByDate(dailyMinutesByStudentDate);
+
+    const previousDailyMinutesByStudentDate = collectDailyMinutesByDateFromSessionSnapshots(
       previousDailyStudySessionSnaps,
       previousDailyRankWindow,
       shouldInclude
     );
+    mergeStudyLogDayTotalsByDate(previousDailyMinutesByStudentDate, previousDailyStudyDayDocs, shouldInclude);
+    const previousDailyTotals = foldRankMinutesByDate(previousDailyMinutesByStudentDate);
+
     const weeklyMinutesByStudentDate = new Map<string, number>();
     const monthlyMinutesByStudentDate = new Map<string, number>();
 
@@ -580,9 +634,9 @@ export async function GET(request: NextRequest) {
     weeklyStudyDayDocs.forEach((docSnap) => {
       if (!docSnap.exists) return;
       const data = docSnap.data() as Record<string, unknown>;
-      const studentId = typeof data.studentId === 'string' ? data.studentId : '';
-      const dateKey = typeof data.dateKey === 'string' ? data.dateKey.trim() : '';
-      const value = Math.max(0, Number(data.totalMinutes ?? data.totalStudyMinutes ?? 0));
+      const studentId = getStudyLogDayStudentId(docSnap, data);
+      const dateKey = getStudyLogDayDateKey(docSnap, data);
+      const value = getStudyLogDayTotalMinutes(data);
       if (!studentId || !dateKey || isSyntheticStudentId(studentId) || !shouldInclude(studentId) || value <= 0) return;
       mergeRankMinutesByDate(weeklyMinutesByStudentDate, studentId, dateKey, value);
     });
@@ -590,9 +644,9 @@ export async function GET(request: NextRequest) {
     monthlyStudyDayDocs.forEach((docSnap) => {
       if (!docSnap.exists) return;
       const data = docSnap.data() as Record<string, unknown>;
-      const studentId = typeof data.studentId === 'string' ? data.studentId : '';
-      const dateKey = typeof data.dateKey === 'string' ? data.dateKey.trim() : '';
-      const value = Math.max(0, Number(data.totalMinutes ?? data.totalStudyMinutes ?? 0));
+      const studentId = getStudyLogDayStudentId(docSnap, data);
+      const dateKey = getStudyLogDayDateKey(docSnap, data);
+      const value = getStudyLogDayTotalMinutes(data);
       if (!studentId || !dateKey || isSyntheticStudentId(studentId) || !shouldInclude(studentId) || value <= 0) return;
       mergeRankMinutesByDate(monthlyMinutesByStudentDate, studentId, dateKey, value);
     });

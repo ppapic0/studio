@@ -498,6 +498,59 @@ function getSessionReferenceMillis(session: Record<string, unknown>) {
   };
 }
 
+function buildStudentDateRankKey(studentId: string, dateKey: string) {
+  return `${studentId}\u001f${dateKey}`;
+}
+
+function addRankMinutesByDate(target: Map<string, number>, studentId: string, dateKey: string, minutes: number) {
+  if (!studentId || !dateKey || minutes <= 0) return;
+  const key = buildStudentDateRankKey(studentId, dateKey);
+  target.set(key, (target.get(key) || 0) + minutes);
+}
+
+function mergeRankMinutesByDate(target: Map<string, number>, studentId: string, dateKey: string, minutes: number) {
+  if (!studentId || !dateKey || minutes <= 0) return;
+  const key = buildStudentDateRankKey(studentId, dateKey);
+  target.set(key, Math.max(target.get(key) || 0, minutes));
+}
+
+function foldRankMinutesByDate(source: Map<string, number>) {
+  const totals = new Map<string, number>();
+
+  source.forEach((minutes, compositeKey) => {
+    const separatorIndex = compositeKey.indexOf("\u001f");
+    const studentId = separatorIndex >= 0 ? compositeKey.slice(0, separatorIndex) : compositeKey;
+    if (!studentId || minutes <= 0) return;
+    totals.set(studentId, (totals.get(studentId) || 0) + minutes);
+  });
+
+  return totals;
+}
+
+function getStudyLogDayStudentId(
+  docSnap: FirebaseFirestore.DocumentSnapshot,
+  data: Record<string, unknown>
+) {
+  const directStudentId = typeof data.studentId === "string" && data.studentId.trim()
+    ? data.studentId.trim()
+    : "";
+  return directStudentId || docSnap.ref.parent.parent?.id || "";
+}
+
+function getStudyLogDayDateKey(
+  docSnap: FirebaseFirestore.DocumentSnapshot,
+  data: Record<string, unknown>
+) {
+  return typeof data.dateKey === "string" && data.dateKey.trim()
+    ? data.dateKey.trim()
+    : docSnap.id;
+}
+
+function getStudyLogDayTotalMinutes(data: Record<string, unknown>) {
+  const value = Number(data.totalMinutes ?? data.totalStudyMinutes ?? 0);
+  return Number.isFinite(value) ? Math.max(0, Math.round(value)) : 0;
+}
+
 function applyCompetitionRanks<T extends { value: number }>(entries: T[]): Array<T & { rank: number }> {
   const sorted = [...entries].sort((left, right) => right.value - left.value);
   let lastValue: number | null = null;
@@ -719,37 +772,54 @@ async function buildDailyAwardEntries(
     if (!docSnap.exists) return [];
 
     const data = docSnap.data() as Record<string, unknown>;
-    const studentId = typeof data.studentId === "string" && data.studentId.trim()
-      ? data.studentId.trim()
-      : docSnap.ref.parent.parent?.id ?? "";
+    const studentId = getStudyLogDayStudentId(docSnap, data);
+    const dateKey = getStudyLogDayDateKey(docSnap, data);
 
-    if (!studentId || isSyntheticStudentId(studentId) || !context.shouldInclude(studentId)) return [];
+    if (!studentId || !dateKey || isSyntheticStudentId(studentId) || !context.shouldInclude(studentId)) return [];
 
     return [{
       studentId,
+      dateKey,
       snapshotRef: docSnap.ref.collection("sessions"),
     }];
   });
 
-  const totals = new Map<string, number>();
+  const minutesByStudentDate = new Map<string, number>();
   for (const chunk of chunkItems(sessionRequests, 40)) {
     if (chunk.length === 0) continue;
     const chunkSnapshots = await Promise.all(chunk.map(({ snapshotRef }) => snapshotRef.get()));
     chunkSnapshots.forEach((snapshot, index) => {
       const fallbackStudentId = chunk[index]?.studentId ?? "";
+      const fallbackDateKey = chunk[index]?.dateKey ?? "";
       snapshot.forEach((docSnap) => {
         const data = docSnap.data() as Record<string, unknown>;
         const studentId = typeof data.studentId === "string" && data.studentId.trim()
           ? data.studentId.trim()
           : fallbackStudentId;
+        const dateKey = typeof data.dateKey === "string" && data.dateKey.trim()
+          ? data.dateKey.trim()
+          : fallbackDateKey;
         const { startedAtMs, referenceMs } = getSessionReferenceMillis(data);
         const value = getDailyWindowOverlapMinutes(startedAtMs, referenceMs, dailyWindow);
 
-        if (!studentId || isSyntheticStudentId(studentId) || !context.shouldInclude(studentId) || value <= 0) return;
-        totals.set(studentId, (totals.get(studentId) || 0) + value);
+        if (!studentId || !dateKey || isSyntheticStudentId(studentId) || !context.shouldInclude(studentId) || value <= 0) return;
+        addRankMinutesByDate(minutesByStudentDate, studentId, dateKey, value);
       });
     });
   }
+
+  dailyDayDocs.forEach((docSnap) => {
+    if (!docSnap.exists) return;
+    const data = docSnap.data() as Record<string, unknown>;
+    const studentId = getStudyLogDayStudentId(docSnap, data);
+    const dateKey = getStudyLogDayDateKey(docSnap, data);
+    const value = getStudyLogDayTotalMinutes(data);
+
+    if (!studentId || !dateKey || isSyntheticStudentId(studentId) || !context.shouldInclude(studentId) || value <= 0) return;
+    mergeRankMinutesByDate(minutesByStudentDate, studentId, dateKey, value);
+  });
+
+  const totals = foldRankMinutesByDate(minutesByStudentDate);
 
   const attendanceBuckets = new Map<string, Record<string, unknown>[]>();
   const attendanceSnap = await db.collection(`centers/${centerId}/attendanceCurrent`).get();

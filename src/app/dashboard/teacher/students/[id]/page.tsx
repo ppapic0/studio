@@ -1777,6 +1777,7 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
       const pRef = doc(firestore, 'centers', centerId, 'growthProgress', studentId);
       const rRef = doc(firestore, 'centers', centerId, 'leaderboards', `${periodKey}_lp`, 'entries', studentId);
       const sRef = doc(firestore, 'centers', centerId, 'dailyStudentStats', todayKey, 'students', studentId);
+      const dailyLogRef = doc(firestore, 'centers', centerId, 'studyLogs', studentId, 'days', todayKey);
 
       batch.set(
         pRef,
@@ -1789,6 +1790,19 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
         { merge: true }
       );
       batch.set(sRef, { totalStudyMinutes: normalizedTodayMinutes, updatedAt: serverTimestamp() }, { merge: true });
+      batch.set(
+        dailyLogRef,
+        {
+          centerId,
+          studentId,
+          dateKey: todayKey,
+          totalMinutes: normalizedTodayMinutes,
+          correctedAt: serverTimestamp(),
+          correctedByUserId: currentUser?.uid || '',
+          updatedAt: serverTimestamp(),
+        },
+        { merge: true }
+      );
       batch.set(rRef, { studentId, displayNameSnapshot: student?.name || '학생', value: normalizedLp, updatedAt: serverTimestamp() }, { merge: true });
 
       if (penaltyDelta !== 0) {
@@ -1847,8 +1861,12 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
         batch.set(
           dailyLogRef,
           {
+            centerId,
+            studentId,
             dateKey,
             totalMinutes: minutes,
+            correctedAt: serverTimestamp(),
+            correctedByUserId: currentUser?.uid || '',
             updatedAt: serverTimestamp(),
           },
           { merge: true }
