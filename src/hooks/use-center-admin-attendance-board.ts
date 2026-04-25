@@ -33,6 +33,7 @@ import type {
   CenterMembership,
   DailyStudentStat,
   StudentScheduleDoc,
+  StudentScheduleOuting,
   StudentScheduleTemplate,
   StudentProfile,
 } from '@/lib/types';
@@ -50,6 +51,19 @@ type ResolvedAttendanceSeat = AttendanceCurrent & {
   roomId: string;
   roomSeatNo: number;
 };
+
+type ScheduleMovementInfo = {
+  scheduleMovementLabel: string | null;
+  scheduleMovementRange: string | null;
+  scheduleMovementSummary: string | null;
+  scheduleMovementCount: number;
+  hasScheduleMovement: boolean;
+  movementStartAt: string | null;
+  movementEndAt: string | null;
+  movementReason: string | null;
+};
+
+type AttendanceRoutineInfoWithMovement = AttendanceRoutineInfo & ScheduleMovementInfo;
 
 type UseCenterAdminAttendanceBoardOptions = {
   centerId?: string;
@@ -71,23 +85,123 @@ function getScheduleTemplateTimestampMs(template: StudentScheduleTemplate) {
   return 0;
 }
 
-function buildRoutineInfoFromSchedule(schedule: StudentScheduleDoc): AttendanceRoutineInfo {
+const EMPTY_SCHEDULE_MOVEMENT_INFO: ScheduleMovementInfo = {
+  scheduleMovementLabel: null,
+  scheduleMovementRange: null,
+  scheduleMovementSummary: null,
+  scheduleMovementCount: 0,
+  hasScheduleMovement: false,
+  movementStartAt: null,
+  movementEndAt: null,
+  movementReason: null,
+};
+
+function resolveMovementLabel(outing: Pick<StudentScheduleOuting, 'kind' | 'reason' | 'title'>) {
+  const text = `${outing.reason || ''} ${outing.title || ''}`.trim();
+  if (outing.kind === 'academy' || text.includes('학원')) return '학원';
+  return '외출';
+}
+
+function buildScheduleMovementInfo(outings: StudentScheduleOuting[] | undefined | null): ScheduleMovementInfo {
+  const validOutings = (outings || []).filter((outing) => outing.startTime && outing.endTime);
+  const firstOuting = validOutings[0];
+  if (!firstOuting) return EMPTY_SCHEDULE_MOVEMENT_INFO;
+
+  const label = resolveMovementLabel(firstOuting);
+  const range = `${firstOuting.startTime}~${firstOuting.endTime}`;
+  const extraCount = validOutings.length - 1;
+  return {
+    scheduleMovementLabel: label,
+    scheduleMovementRange: range,
+    scheduleMovementSummary: `${label} ${range}${extraCount > 0 ? ` +${extraCount}` : ''}`,
+    scheduleMovementCount: validOutings.length,
+    hasScheduleMovement: true,
+    movementStartAt: firstOuting.startTime,
+    movementEndAt: firstOuting.endTime,
+    movementReason: firstOuting.reason || firstOuting.title || label,
+  };
+}
+
+function buildScheduleMovementInfoFromTemplate(template: StudentScheduleTemplate): ScheduleMovementInfo {
+  const outings: StudentScheduleOuting[] = [];
+  if (template.academyStartAtDefault && template.academyEndAtDefault) {
+    outings.push({
+      id: 'academy-template',
+      kind: 'academy',
+      title: null,
+      startTime: template.academyStartAtDefault,
+      endTime: template.academyEndAtDefault,
+      reason: template.academyNameDefault || '학원',
+    });
+  }
+  if (template.hasExcursionDefault && template.defaultExcursionStartAt && template.defaultExcursionEndAt) {
+    outings.push({
+      id: 'outing-template',
+      kind: 'outing',
+      title: null,
+      startTime: template.defaultExcursionStartAt,
+      endTime: template.defaultExcursionEndAt,
+      reason: template.defaultExcursionReason || '외출',
+    });
+  }
+  return buildScheduleMovementInfo(outings);
+}
+
+function buildScheduleMovementInfoFromLegacyTitles(scheduleTitles: string[]): ScheduleMovementInfo {
+  const outingTitles = scheduleTitles.filter((title) => title.includes('학원/외출 예정'));
+  const outings = outingTitles
+    .map((title, index) => {
+      const match = title.match(/([01]\d|2[0-3]):[0-5]\d\s*~\s*([01]\d|2[0-3]):[0-5]\d/);
+      if (!match) return null;
+      const [startTime, endTime] = match[0].split('~').map((value) => value.trim());
+      return {
+        id: `legacy-outing-${index + 1}`,
+        kind: title.includes('학원') ? 'academy' as const : 'outing' as const,
+        title: null,
+        startTime,
+        endTime,
+        reason: title.includes('학원') ? '학원' : '외출',
+      };
+    })
+    .filter(Boolean) as StudentScheduleOuting[];
+
+  return buildScheduleMovementInfo(outings);
+}
+
+function buildRoutineInfoFromSchedule(schedule: StudentScheduleDoc): AttendanceRoutineInfoWithMovement {
   return {
     hasRoutine: true,
     isNoAttendanceDay: Boolean(schedule.isAbsent || schedule.status === 'absent'),
     expectedArrivalTime: schedule.arrivalPlannedAt || schedule.inTime || null,
     plannedDepartureTime: schedule.departurePlannedAt || schedule.outTime || null,
     classScheduleName: schedule.classScheduleName || null,
+    ...(schedule.isAbsent || schedule.status === 'absent'
+      ? EMPTY_SCHEDULE_MOVEMENT_INFO
+      : buildScheduleMovementInfo(
+          schedule.outings?.length
+            ? schedule.outings
+            : schedule.hasExcursion && schedule.excursionStartAt && schedule.excursionEndAt
+              ? [{
+                  id: 'legacy-excursion',
+                  kind: 'outing',
+                  title: null,
+                  startTime: schedule.excursionStartAt,
+                  endTime: schedule.excursionEndAt,
+                  reason: schedule.excursionReason || '외출',
+                }]
+              : []
+        )),
   };
 }
 
-function buildRoutineInfoFromTemplate(template: StudentScheduleTemplate): AttendanceRoutineInfo {
+function buildRoutineInfoFromTemplate(template: StudentScheduleTemplate): AttendanceRoutineInfoWithMovement {
   return {
     hasRoutine: true,
     isNoAttendanceDay: false,
     expectedArrivalTime: template.arrivalPlannedAt || null,
     plannedDepartureTime: template.departurePlannedAt || null,
     classScheduleName: template.classScheduleName || null,
+    ...buildScheduleMovementInfoFromTemplate(template),
   };
 }
 
@@ -171,7 +285,7 @@ export function useCenterAdminAttendanceBoard({
 
   const [historyRecordsByDate, setHistoryRecordsByDate] = useState<Record<string, AttendanceBoardRecord[]>>({});
   const [historyLoading, setHistoryLoading] = useState(false);
-  const [routineInfoByStudentId, setRoutineInfoByStudentId] = useState<Record<string, AttendanceRoutineInfo>>({});
+  const [routineInfoByStudentId, setRoutineInfoByStudentId] = useState<Record<string, AttendanceRoutineInfoWithMovement>>({});
   const [routineLoading, setRoutineLoading] = useState(false);
 
   useEffect(() => {
@@ -264,7 +378,13 @@ export function useCenterAdminAttendanceBoard({
             );
             const snap = await getDocs(routineQuery);
             const scheduleTitles = snap.docs.map((docSnap) => String(docSnap.data()?.title || ''));
-            return [member.id, buildAttendanceRoutineInfo(scheduleTitles)] as const;
+            return [
+              member.id,
+              {
+                ...buildAttendanceRoutineInfo(scheduleTitles),
+                ...buildScheduleMovementInfoFromLegacyTitles(scheduleTitles),
+              },
+            ] as const;
           })
         );
 
@@ -338,6 +458,7 @@ export function useCenterAdminAttendanceBoard({
         const rawRoutineInfo = routineInfoByStudentId[studentId];
         const todaySchedule = todayScheduleByStudentId.get(studentId);
         const routineInfo = rawRoutineInfo || (todaySchedule ? buildRoutineInfoFromSchedule(todaySchedule) : undefined);
+        const scheduleMovementInfo = routineInfo?.isNoAttendanceDay ? EMPTY_SCHEDULE_MOVEMENT_INFO : routineInfo || EMPTY_SCHEDULE_MOVEMENT_INFO;
         const todayRecord = todayRecordByStudentId.get(studentId);
         const historySummary = historySummaryByStudentId.get(studentId) || {
           lateCount: 0,
@@ -413,10 +534,10 @@ export function useCenterAdminAttendanceBoard({
         const operationalException = resolveAttendanceOperationalException({
           boardStatus,
           plannedDepartureTime: routineInfo?.plannedDepartureTime || todaySchedule?.departurePlannedAt || null,
-          hasExcursion: Boolean(todaySchedule?.hasExcursion),
-          excursionStartAt: todaySchedule?.excursionStartAt || null,
-          excursionEndAt: todaySchedule?.excursionEndAt || null,
-          excursionReason: todaySchedule?.excursionReason || null,
+          hasExcursion: Boolean(scheduleMovementInfo.hasScheduleMovement),
+          excursionStartAt: scheduleMovementInfo.movementStartAt,
+          excursionEndAt: scheduleMovementInfo.movementEndAt,
+          excursionReason: scheduleMovementInfo.movementReason,
           currentAwayMinutes,
           nowMs,
         });
@@ -435,13 +556,18 @@ export function useCenterAdminAttendanceBoard({
           todayStudyMinutes: totalStudyMinutes,
           todayStudyLabel: formatAttendanceBoardMinutes(totalStudyMinutes),
           liveSessionMinutes,
+          isNoAttendanceDay: Boolean(routineInfo?.isNoAttendanceDay),
           routineExpectedArrivalTime: routineInfo?.expectedArrivalTime || null,
           plannedDepartureTime: routineInfo?.plannedDepartureTime || todaySchedule?.departurePlannedAt || null,
           classScheduleName: todaySchedule?.classScheduleName || routineInfo?.classScheduleName || null,
-          hasExcursion: Boolean(todaySchedule?.hasExcursion),
-          excursionStartAt: todaySchedule?.excursionStartAt || null,
-          excursionEndAt: todaySchedule?.excursionEndAt || null,
-          excursionReason: todaySchedule?.excursionReason || null,
+          hasExcursion: Boolean(scheduleMovementInfo.hasScheduleMovement),
+          excursionStartAt: scheduleMovementInfo.movementStartAt,
+          excursionEndAt: scheduleMovementInfo.movementEndAt,
+          excursionReason: scheduleMovementInfo.movementReason,
+          scheduleMovementLabel: scheduleMovementInfo.scheduleMovementLabel,
+          scheduleMovementRange: scheduleMovementInfo.scheduleMovementRange,
+          scheduleMovementSummary: scheduleMovementInfo.scheduleMovementSummary,
+          scheduleMovementCount: scheduleMovementInfo.scheduleMovementCount,
           checkedAtLabel: formatAttendanceBoardClockLabel(derived.checkedAt),
           attendanceRiskLevel,
           attendanceRiskLabel,

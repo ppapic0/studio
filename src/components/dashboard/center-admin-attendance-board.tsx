@@ -268,8 +268,12 @@ export function CenterAdminAttendanceBoard({
                   const isAisle = seat.type === 'aisle';
                   const isFilteredOut = selectedClass !== 'all' && member?.className !== selectedClass;
                   const displayName = signal?.studentName || student?.name || member?.displayName || '학생';
+                  const scheduleMovementLabel = signal?.scheduleMovementSummary || null;
+                  const isNoAttendanceDay = Boolean(signal?.isNoAttendanceDay || signal?.boardStatus === 'excused_absent');
                   const attendanceTimeLabel = signal
-                    ? signal.attendanceDisplayStatus === 'confirmed_late' && signal.checkedAtLabel
+                    ? isNoAttendanceDay
+                      ? '미등원'
+                      : signal.attendanceDisplayStatus === 'confirmed_late' && signal.checkedAtLabel
                       ? `지각 ${signal.checkedAtLabel}`
                       : signal.checkedAtLabel
                         ? `입실 ${signal.checkedAtLabel}`
@@ -277,6 +281,7 @@ export function CenterAdminAttendanceBoard({
                           ? `예정 ${signal.routineExpectedArrivalTime}`
                           : signal.boardLabel
                     : '확인중';
+                  const shouldShowSeatMeta = !isNameOnly || isNoAttendanceDay || Boolean(scheduleMovementLabel);
 
                   if (isAisle) {
                     return <div key={`${room.id}_${roomSeatNo}`} className="aspect-square rounded-[1.35rem] bg-transparent" />;
@@ -310,7 +315,7 @@ export function CenterAdminAttendanceBoard({
                       <span className="absolute left-2.5 top-2 text-[9px] font-black tracking-tight text-[#14295F]/46">
                         {seatDisplayLabel}
                       </span>
-                      <div className="flex h-full flex-col justify-end gap-2 pt-5">
+                      <div className="flex h-full flex-col justify-end gap-1.5 pt-5">
                         <p
                           className={cn(
                             'line-clamp-2 break-keep font-black leading-[1.1] tracking-tight text-[#14295F]',
@@ -319,16 +324,27 @@ export function CenterAdminAttendanceBoard({
                         >
                           {displayName}
                         </p>
-                        {!isNameOnly && (
+                        {shouldShowSeatMeta && (
                           <span
                             className={cn(
-                              'inline-flex w-fit items-center rounded-full border border-white/85 bg-white/88 px-2.5 py-1 font-black tracking-tight text-[#14295F] shadow-[0_10px_18px_-16px_rgba(20,41,95,0.35)]',
+                              'inline-flex max-w-full items-center rounded-full border border-white/85 bg-white/88 px-2.5 py-1 font-black tracking-tight text-[#14295F] shadow-[0_10px_18px_-16px_rgba(20,41,95,0.35)]',
+                              isNoAttendanceDay && 'bg-rose-50 text-rose-700',
                               isMobile ? 'text-[9px]' : 'text-[10px]'
                             )}
                           >
-                            {attendanceTimeLabel}
+                            <span className="truncate">{attendanceTimeLabel}</span>
                           </span>
                         )}
+                        {scheduleMovementLabel && !isNoAttendanceDay ? (
+                          <span
+                            className={cn(
+                              'inline-flex max-w-full items-center rounded-full border border-[#FFD9B6] bg-[#FFF6EC] px-2.5 py-1 font-black tracking-tight text-[#C95A08] shadow-[0_10px_18px_-16px_rgba(255,122,22,0.28)]',
+                              isMobile ? 'text-[8.5px]' : 'text-[9.5px]'
+                            )}
+                          >
+                            <span className="truncate">{scheduleMovementLabel}</span>
+                          </span>
+                        ) : null}
                       </div>
                     </button>
                   );
@@ -570,10 +586,7 @@ export function CenterAdminAttendanceBoard({
                 signal.routineExpectedArrivalTime && signal.plannedDepartureTime
                   ? `${signal.routineExpectedArrivalTime} ~ ${signal.plannedDepartureTime}`
                   : null;
-              const excursionRange =
-                signal.excursionStartAt && signal.excursionEndAt
-                  ? `${signal.excursionStartAt} ~ ${signal.excursionEndAt}`
-                  : null;
+              const excursionRange = signal.scheduleMovementSummary || null;
 
               return (
                 <button
@@ -624,7 +637,7 @@ export function CenterAdminAttendanceBoard({
                         ) : null}
                         {excursionRange ? (
                           <Badge className="h-6 rounded-full border border-[#DCE7FF] bg-[#FFF8F2] px-2.5 text-[10px] font-black text-[#C95A08]">
-                            이동 {excursionRange}
+                            {excursionRange}
                           </Badge>
                         ) : null}
                         {signal.currentAwayMinutes > 0 && signal.operationalExceptionKind === 'midday_leave' ? (

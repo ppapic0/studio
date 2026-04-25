@@ -30,6 +30,7 @@ export interface CenterAdminAttendanceSeatSignal {
   todayStudyMinutes: number;
   todayStudyLabel: string;
   liveSessionMinutes: number;
+  isNoAttendanceDay: boolean;
   routineExpectedArrivalTime: string | null;
   plannedDepartureTime: string | null;
   classScheduleName: string | null;
@@ -37,6 +38,10 @@ export interface CenterAdminAttendanceSeatSignal {
   excursionStartAt: string | null;
   excursionEndAt: string | null;
   excursionReason: string | null;
+  scheduleMovementLabel: string | null;
+  scheduleMovementRange: string | null;
+  scheduleMovementSummary: string | null;
+  scheduleMovementCount: number;
   checkedAtLabel: string | null;
   attendanceRiskLevel: CenterAdminAttendanceRiskLevel;
   attendanceRiskLabel: '정상' | '출석주의' | '출석위험';
@@ -139,7 +144,7 @@ const PRESENTATION_BY_STATUS: Record<CenterAdminAttendanceBoardStatus, Attendanc
   excused_absent: {
     surfaceClass: 'border-[#B7C4D8] bg-[#EDF2F8] text-[#14295F]',
     chipClass: 'bg-slate-600 text-white',
-    chipLabel: '예정 결석',
+    chipLabel: '미등원',
     flagClass: 'bg-white/95 text-slate-700',
     isDark: false,
   },
@@ -161,7 +166,7 @@ const BOARD_STATUS_LABELS: Record<CenterAdminAttendanceBoardStatus, string> = {
   returned: '복귀 후 공부',
   checked_out: '퇴실',
   absent: '미입실',
-  excused_absent: '예정 결석',
+  excused_absent: '미등원',
   planned: '입실 예정',
 };
 
@@ -251,7 +256,7 @@ export function buildAttendanceBoardFlags(params: {
     displayStatus === 'confirmed_late' ? '지각' : null,
     displayStatus === 'missing_routine' || displayStatus === 'confirmed_present_missing_routine' ? '루틴누락' : null,
     isLongAway ? '장기외출' : null,
-    displayStatus === 'excused_absent' ? '예정결석' : null,
+    displayStatus === 'excused_absent' ? '미등원' : null,
   ].filter(Boolean) as string[];
 }
 
@@ -298,7 +303,7 @@ export function buildAttendanceBoardNote(params: {
         ? `예정 등원 ${expectedArrivalTime} 이후에도 오늘 입실 증거가 없습니다.`
         : '오늘 입실 증거가 없어 미입실로 보고 있습니다.';
     case 'excused_absent':
-      return '오늘은 루틴상 등원하지 않는 날로 기록되어 있습니다.';
+      return '오늘은 미등원으로 등록되어 있습니다.';
     case 'planned':
       return '아직 루틴 예정 시각 전이거나 입실 대기 상태입니다.';
     default:
