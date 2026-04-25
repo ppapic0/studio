@@ -137,10 +137,40 @@ function normalizeStudentMembershipStatus(value: unknown): StudentMembershipStat
 }
 
 function studentStatusLabel(status: StudentMembershipStatus): string {
-  if (status === 'onHold') return '휴원';
-  if (status === 'withdrawn') return '퇴원';
-  return '재원';
+  if (status === 'onHold') return '휴학생';
+  if (status === 'withdrawn') return '퇴원생';
+  return '재학생';
 }
+
+const STUDENT_STATUS_OPTIONS: Array<{
+  value: StudentMembershipStatus;
+  label: string;
+  description: string;
+  toneClassName: string;
+  activeClassName: string;
+}> = [
+  {
+    value: 'active',
+    label: '재학생',
+    description: '현재 운영/등원 대상',
+    toneClassName: 'border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100',
+    activeClassName: 'border-emerald-500 bg-emerald-600 text-white shadow-lg shadow-emerald-500/20 hover:bg-emerald-600',
+  },
+  {
+    value: 'onHold',
+    label: '휴학생',
+    description: '일시 중지/휴학 상태',
+    toneClassName: 'border-amber-200 bg-amber-50 text-amber-700 hover:bg-amber-100',
+    activeClassName: 'border-amber-500 bg-amber-500 text-white shadow-lg shadow-amber-500/20 hover:bg-amber-500',
+  },
+  {
+    value: 'withdrawn',
+    label: '퇴원생',
+    description: '퇴원 처리/운영 제외',
+    toneClassName: 'border-slate-200 bg-slate-50 text-slate-700 hover:bg-slate-100',
+    activeClassName: 'border-slate-700 bg-slate-800 text-white shadow-lg shadow-slate-500/20 hover:bg-slate-800',
+  },
+];
 
 export default function StudentAccountManagementPage() {
   const { activeMembership, viewMode } = useAppContext();
@@ -384,7 +414,7 @@ export default function StudentAccountManagementPage() {
           className={cn('rounded-xl font-black', statusFilter !== 'active' && 'text-emerald-700 bg-emerald-50')}
           onClick={() => setStatusFilter('active')}
         >
-          재원생 {statusCounts.active}
+          재학생 {statusCounts.active}
         </Button>
         <Button
           type="button"
@@ -393,7 +423,7 @@ export default function StudentAccountManagementPage() {
           className={cn('rounded-xl font-black', statusFilter !== 'onHold' && 'text-amber-700 bg-amber-50')}
           onClick={() => setStatusFilter('onHold')}
         >
-          휴원생 {statusCounts.onHold}
+          휴학생 {statusCounts.onHold}
         </Button>
         <Button
           type="button"
@@ -409,7 +439,7 @@ export default function StudentAccountManagementPage() {
       <Card className="rounded-[2.5rem] border-none shadow-2xl bg-white overflow-hidden ring-1 ring-black/[0.03]">
         <CardHeader className="bg-muted/5 border-b p-8">
           <CardTitle className="text-xl font-black flex items-center gap-2">
-            <Users className="h-5 w-5 opacity-40" /> 학생 관리 센터 (재원·휴원·퇴원)
+            <Users className="h-5 w-5 opacity-40" /> 학생 관리 센터 (재학생·휴학생·퇴원생)
           </CardTitle>
           <CardDescription className="font-bold text-sm">모든 학생의 계정 정보와 성장 지표를 정밀하게 조작하거나 영구히 삭제할 수 있습니다.</CardDescription>
         </CardHeader>
@@ -524,16 +554,35 @@ export default function StudentAccountManagementPage() {
                     </SelectContent>
                   </Select>
                 </div>
-                <div className="space-y-1.5">
-                  <Label className="text-[10px] font-black uppercase text-muted-foreground ml-1">상태</Label>
-                  <Select value={editForm.memberStatus} onValueChange={(v: StudentMembershipStatus) => setEditForm({...editForm, memberStatus: v})}>
-                    <SelectTrigger className="h-11 rounded-xl border-2 font-bold"><SelectValue /></SelectTrigger>
-                    <SelectContent className="rounded-xl">
-                      <SelectItem value="active" className="font-bold">재원생</SelectItem>
-                      <SelectItem value="onHold" className="font-bold">휴원생</SelectItem>
-                      <SelectItem value="withdrawn" className="font-bold">퇴원생</SelectItem>
-                    </SelectContent>
-                  </Select>
+                <div className="col-span-2 space-y-1.5 md:col-span-2">
+                  <Label className="text-[10px] font-black uppercase text-muted-foreground ml-1">계정 상태</Label>
+                  <div className="grid gap-2 sm:grid-cols-3">
+                    {STUDENT_STATUS_OPTIONS.map((option) => {
+                      const isSelected = editForm.memberStatus === option.value;
+                      return (
+                        <Button
+                          key={option.value}
+                          type="button"
+                          variant="outline"
+                          className={cn(
+                            'h-auto min-h-[4.25rem] justify-start rounded-2xl border-2 px-4 py-3 text-left font-black transition-all',
+                            isSelected ? option.activeClassName : option.toneClassName
+                          )}
+                          onClick={() => setEditForm({ ...editForm, memberStatus: option.value })}
+                        >
+                          <span className="grid gap-1">
+                            <span className="flex items-center gap-2 text-sm">
+                              {isSelected ? <CheckCircle2 className="h-4 w-4" /> : null}
+                              {option.label}
+                            </span>
+                            <span className={cn('text-[10px] font-bold leading-4', isSelected ? 'text-white/75' : 'opacity-70')}>
+                              {option.description}
+                            </span>
+                          </span>
+                        </Button>
+                      );
+                    })}
+                  </div>
                 </div>
               </div>
               <div className="grid grid-cols-2 gap-4">

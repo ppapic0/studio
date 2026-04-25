@@ -146,6 +146,46 @@ type CounselingDemoSeedResult = {
   };
 };
 
+type StudentAccountStatus = Extract<CenterMembership['status'], 'active' | 'onHold' | 'withdrawn'>;
+type StudentQuickAction = 'attendance' | 'counseling' | 'sms' | 'account';
+
+const STUDENT_ACCOUNT_STATUS_OPTIONS: Array<{
+  value: StudentAccountStatus;
+  label: string;
+  description: string;
+  toneClassName: string;
+  activeClassName: string;
+}> = [
+  {
+    value: 'active',
+    label: '재학생',
+    description: '현재 운영/등원 대상',
+    toneClassName: 'border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100',
+    activeClassName: 'border-emerald-500 bg-emerald-600 text-white shadow-lg shadow-emerald-500/20 hover:bg-emerald-600',
+  },
+  {
+    value: 'onHold',
+    label: '휴학생',
+    description: '일시 중지/휴학 상태',
+    toneClassName: 'border-amber-200 bg-amber-50 text-amber-700 hover:bg-amber-100',
+    activeClassName: 'border-amber-500 bg-amber-500 text-white shadow-lg shadow-amber-500/20 hover:bg-amber-500',
+  },
+  {
+    value: 'withdrawn',
+    label: '퇴원생',
+    description: '퇴원 처리/운영 제외',
+    toneClassName: 'border-slate-200 bg-slate-50 text-slate-700 hover:bg-slate-100',
+    activeClassName: 'border-slate-700 bg-slate-800 text-white shadow-lg shadow-slate-500/20 hover:bg-slate-800',
+  },
+];
+
+function getStudentAccountStatusLabel(status?: CenterMembership['status']) {
+  if (status === 'onHold') return '휴학생';
+  if (status === 'withdrawn') return '퇴원생';
+  if (status === 'pending') return '승인 대기';
+  return '재학생';
+}
+
 export default function StudentListPage() {
   const { activeMembership, membershipsLoading, viewMode } = useAppContext();
   const { user: currentUser } = useUser();
@@ -155,14 +195,15 @@ export default function StudentListPage() {
   const router = useRouter();
   const { toast } = useToast();
   const [searchTerm, setSearchTerm] = useState('');
-  const [statusTab, setStatusTab] = useState<string>('active');
+  const [statusTab, setStatusTab] = useState<StudentAccountStatus>('active');
   const [classFilter, setClassFilter] = useState<string>('all');
   const [liveStatusFilter, setLiveStatusFilter] = useState<string>('all');
   const [selectedStudentId, setSelectedStudentId] = useState<string | null>(null);
-  const [activeQuickAction, setActiveQuickAction] = useState<'attendance' | 'counseling' | 'sms'>('attendance');
+  const [activeQuickAction, setActiveQuickAction] = useState<StudentQuickAction>('attendance');
   const [attendanceActionSaving, setAttendanceActionSaving] = useState(false);
   const [counselingActionSaving, setCounselingActionSaving] = useState(false);
   const [manualSmsSending, setManualSmsSending] = useState(false);
+  const [accountStatusSaving, setAccountStatusSaving] = useState<StudentAccountStatus | null>(null);
   const [counselingType, setCounselingType] = useState<'academic' | 'life' | 'career'>('academic');
   const [counselingContent, setCounselingContent] = useState('');
   const [counselingImprovement, setCounselingImprovement] = useState('');
@@ -741,6 +782,54 @@ export default function StudentListPage() {
     }
   };
 
+  const handleInlineAccountStatusChange = async (nextStatus: StudentAccountStatus) => {
+    if (!canManageStudentAccounts) {
+      toast({
+        variant: 'destructive',
+        title: '권한이 없습니다.',
+        description: '학생 계정 상태 변경은 센터 관리자만 가능합니다.',
+      });
+      return;
+    }
+    if (!functions || !centerId || !selectedStudentPreview) return;
+
+    const currentStatus = selectedStudentPreview.member.status;
+    const studentName = selectedStudentPreview.member.displayName || '학생';
+    const nextStatusLabel = getStudentAccountStatusLabel(nextStatus);
+
+    if (currentStatus === nextStatus) {
+      toast({
+        title: '이미 반영된 상태입니다.',
+        description: `${studentName} 학생은 이미 ${nextStatusLabel} 상태입니다.`,
+      });
+      return;
+    }
+
+    setAccountStatusSaving(nextStatus);
+    try {
+      const updateFn = httpsCallable(functions, 'updateStudentAccount', { timeout: 600000 });
+      await updateFn({
+        studentId: selectedStudentPreview.member.id,
+        centerId,
+        memberStatus: nextStatus,
+      });
+      toast({
+        title: '계정 상태를 변경했습니다.',
+        description: `${studentName} 학생을 ${nextStatusLabel}으로 변경했습니다.`,
+      });
+      setStatusTab(nextStatus);
+    } catch (error: any) {
+      console.error('[student-index] inline account status update failed', error);
+      toast({
+        variant: 'destructive',
+        title: '계정 상태 변경 실패',
+        description: resolveCallableErrorMessage(error, '학생 계정 상태를 저장하지 못했습니다. 잠시 후 다시 시도해 주세요.'),
+      });
+    } finally {
+      setAccountStatusSaving(null);
+    }
+  };
+
   const getStatusBadge = (status?: string) => {
     switch (status) {
       case 'studying': return <Badge className="bg-emerald-500 font-black text-[9px] h-5">공부중</Badge>;
@@ -791,7 +880,7 @@ export default function StudentListPage() {
                   </div>
                   <div className="flex flex-wrap gap-2">
                     <Badge className="border border-white/14 bg-white/8 px-3 py-1 text-[10px] font-black text-white">
-                      재원생 {counts.active}명
+                      재학생 {counts.active}명
                     </Badge>
                     <Badge className="border border-white/14 bg-white/8 px-3 py-1 text-[10px] font-black text-white/80">
                       좌석 연동 {operationalSummary.assignedSeatCount}명
@@ -1104,9 +1193,9 @@ export default function StudentListPage() {
         </div>
       </AdminWorkbenchCommandBar>
 
-      <Tabs defaultValue="active" className="w-full" onValueChange={setStatusTab}>
+      <Tabs value={statusTab} className="w-full" onValueChange={(value) => setStatusTab(value as StudentAccountStatus)}>
         <TabsList className={cn("grid grid-cols-3 rounded-[1.7rem] border border-[#dbe7ff] bg-[#f8fbff] p-1.5 shadow-[inset_0_1px_0_rgba(255,255,255,0.96)]", isMobile ? "h-14 mb-4" : "h-16 mb-8 max-w-2xl")}>
-          <TabsTrigger value="active" className="rounded-[1.1rem] font-black text-[#5c6e97] data-[state=active]:bg-[#14295F] data-[state=active]:text-white data-[state=active]:shadow-[0_18px_40px_-30px_rgba(20,41,95,0.6)] gap-2 transition-all"><UserCheck className="h-4 w-4" /><span className="hidden sm:inline">재원생</span><Badge variant="secondary" className="ml-1 h-5 rounded-md bg-emerald-50 px-1.5 text-[10px] font-black text-emerald-600">{counts.active}</Badge></TabsTrigger>
+          <TabsTrigger value="active" className="rounded-[1.1rem] font-black text-[#5c6e97] data-[state=active]:bg-[#14295F] data-[state=active]:text-white data-[state=active]:shadow-[0_18px_40px_-30px_rgba(20,41,95,0.6)] gap-2 transition-all"><UserCheck className="h-4 w-4" /><span className="hidden sm:inline">재학생</span><Badge variant="secondary" className="ml-1 h-5 rounded-md bg-emerald-50 px-1.5 text-[10px] font-black text-emerald-600">{counts.active}</Badge></TabsTrigger>
           <TabsTrigger value="onHold" className="rounded-[1.1rem] font-black text-[#5c6e97] data-[state=active]:bg-[#14295F] data-[state=active]:text-white data-[state=active]:shadow-[0_18px_40px_-30px_rgba(20,41,95,0.6)] gap-2 transition-all"><PauseCircle className="h-4 w-4" /><span className="hidden sm:inline">휴학생</span><Badge variant="secondary" className="ml-1 h-5 rounded-md bg-amber-50 px-1.5 text-[10px] font-black text-amber-600">{counts.onHold}</Badge></TabsTrigger>
           <TabsTrigger value="withdrawn" className="rounded-[1.1rem] font-black text-[#5c6e97] data-[state=active]:bg-[#14295F] data-[state=active]:text-white data-[state=active]:shadow-[0_18px_40px_-30px_rgba(20,41,95,0.6)] gap-2 transition-all"><UserMinus className="h-4 w-4" /><span className="hidden sm:inline">퇴원생</span><Badge variant="secondary" className="ml-1 h-5 rounded-md bg-[#eef4ff] px-1.5 text-[10px] font-black text-[#14295F]">{counts.withdrawn}</Badge></TabsTrigger>
         </TabsList>
@@ -1171,7 +1260,7 @@ export default function StudentListPage() {
                               <div className="rounded-xl border border-[#dbe7ff] bg-[#f8fbff] px-3 py-2">
                                 <p className="text-[9px] font-black uppercase tracking-[0.18em] text-[#9aa9c7]">계정 상태</p>
                                 <p className="mt-1 text-sm font-black text-[#14295F]">
-                                  {member.status === 'active' ? '재원중' : member.status === 'onHold' ? '휴원' : '퇴원'}
+                                  {getStudentAccountStatusLabel(member.status)}
                                 </p>
                               </div>
                               <div className="rounded-xl border border-[#dbe7ff] bg-[#f8fbff] px-3 py-2">
@@ -1296,11 +1385,7 @@ export default function StudentListPage() {
                   <div className="rounded-[1.2rem] border border-white/14 bg-white/8 px-4 py-3">
                     <p className="text-[10px] font-black uppercase tracking-[0.18em] text-white/60">계정 상태</p>
                     <p className="mt-2 text-base font-black text-white">
-                      {selectedStudentPreview.member.status === 'active'
-                        ? '재원중'
-                        : selectedStudentPreview.member.status === 'onHold'
-                          ? '휴원'
-                          : '퇴원'}
+                      {getStudentAccountStatusLabel(selectedStudentPreview.member.status)}
                     </p>
                   </div>
                 </div>
@@ -1317,7 +1402,7 @@ export default function StudentListPage() {
                       <Link href={`/dashboard/teacher/students/${selectedStudentPreview.member.id}`}>학생 360 열기</Link>
                     </Button>
                   </div>
-                  <div className={cn('mt-4 grid gap-2', isMobile ? 'grid-cols-1' : 'grid-cols-3')}>
+                  <div className={cn('mt-4 grid gap-2', isMobile ? 'grid-cols-1' : canManageStudentAccounts ? 'grid-cols-4' : 'grid-cols-3')}>
                     <Button type="button" variant={activeQuickAction === 'attendance' ? 'default' : 'outline'} className={cn('h-11 rounded-xl font-black', activeQuickAction === 'attendance' ? 'bg-[#14295F] text-white hover:bg-[#173D8B]' : 'border-[#dbe7ff] bg-white text-[#14295F] hover:bg-[#f4f7ff]')} onClick={() => setActiveQuickAction('attendance')}>
                       출결 처리
                     </Button>
@@ -1327,6 +1412,11 @@ export default function StudentListPage() {
                     <Button type="button" variant={activeQuickAction === 'sms' ? 'default' : 'outline'} className={cn('h-11 rounded-xl font-black', activeQuickAction === 'sms' ? 'bg-[#14295F] text-white hover:bg-[#173D8B]' : 'border-[#dbe7ff] bg-white text-[#14295F] hover:bg-[#f4f7ff]')} onClick={() => setActiveQuickAction('sms')}>
                       문자 보내기
                     </Button>
+                    {canManageStudentAccounts ? (
+                      <Button type="button" variant={activeQuickAction === 'account' ? 'default' : 'outline'} className={cn('h-11 rounded-xl font-black', activeQuickAction === 'account' ? 'bg-[#14295F] text-white hover:bg-[#173D8B]' : 'border-[#dbe7ff] bg-white text-[#14295F] hover:bg-[#f4f7ff]')} onClick={() => setActiveQuickAction('account')}>
+                        계정 설정
+                      </Button>
+                    ) : null}
                   </div>
                 </div>
 
@@ -1462,6 +1552,54 @@ export default function StudentListPage() {
                           </Button>
                         </div>
                       ) : null}
+
+                      {activeQuickAction === 'account' ? (
+                        <div className="space-y-4">
+                          <div>
+                            <p className="text-[11px] font-black uppercase tracking-[0.2em] text-[#5c6e97]">계정 설정</p>
+                            <p className="mt-1 text-sm font-bold text-[#5c6e97]">
+                              학생 계정 상태를 재학생, 휴학생, 퇴원생 중 하나로 바로 변경합니다.
+                            </p>
+                          </div>
+                          <div className="grid gap-2">
+                            {STUDENT_ACCOUNT_STATUS_OPTIONS.map((option) => {
+                              const isCurrent = selectedStudentPreview.member.status === option.value;
+                              const isSavingThis = accountStatusSaving === option.value;
+                              const StatusIcon = option.value === 'active' ? UserCheck : option.value === 'onHold' ? PauseCircle : UserMinus;
+                              return (
+                                <Button
+                                  key={option.value}
+                                  type="button"
+                                  variant="outline"
+                                  disabled={!!accountStatusSaving || isCurrent}
+                                  className={cn(
+                                    'h-auto min-h-[4rem] justify-start rounded-2xl border-2 px-4 py-3 text-left font-black transition-all disabled:opacity-95',
+                                    isCurrent ? option.activeClassName : option.toneClassName
+                                  )}
+                                  onClick={() => handleInlineAccountStatusChange(option.value)}
+                                >
+                                  {isSavingThis ? <Loader2 className="mr-3 h-4 w-4 animate-spin" /> : <StatusIcon className="mr-3 h-4 w-4 shrink-0" />}
+                                  <span className="grid min-w-0 gap-1">
+                                    <span className="flex flex-wrap items-center gap-2 text-sm">
+                                      {option.label}
+                                      {isCurrent ? <Badge className="rounded-full bg-white/20 px-2 text-[9px] font-black text-current">현재</Badge> : null}
+                                    </span>
+                                    <span className={cn('text-[10px] font-bold leading-4', isCurrent ? 'text-white/75' : 'opacity-70')}>
+                                      {option.description}
+                                    </span>
+                                  </span>
+                                </Button>
+                              );
+                            })}
+                          </div>
+                          <div className="rounded-[1.1rem] border border-dashed border-[#d6e2ff] bg-[#f7fbff] px-4 py-3">
+                            <p className="text-xs font-black text-[#14295F]">현재 계정 상태</p>
+                            <p className="mt-1 text-sm font-bold text-[#5c6e97]">
+                              {getStudentAccountStatusLabel(selectedStudentPreview.member.status)}
+                            </p>
+                          </div>
+                        </div>
+                      ) : null}
                     </div>
 
                     <div className="rounded-[1.55rem] border border-[#dbe6ff] bg-[linear-gradient(180deg,rgba(255,255,255,0.98)_0%,rgba(246,249,255,0.98)_100%)] p-4 shadow-[0_22px_36px_-30px_rgba(20,41,95,0.32)]">
@@ -1502,6 +1640,12 @@ export default function StudentListPage() {
                               <>
                                 <li>직접 문자를 보내도 수신 우선순위는 보호자 → 학생 fallback으로 유지됩니다.</li>
                                 <li>실제 수신은 통신사와 단말 정책에 따라 다를 수 있습니다.</li>
+                              </>
+                            ) : null}
+                            {activeQuickAction === 'account' ? (
+                              <>
+                                <li>재학생, 휴학생, 퇴원생 버튼으로 목록 상태를 바로 정리합니다.</li>
+                                <li>저장 후 해당 상태 탭으로 이동해 변경 결과를 확인할 수 있습니다.</li>
                               </>
                             ) : null}
                           </ul>
