@@ -56,6 +56,7 @@ import {
   AlertTriangle, 
   Loader2, 
   Clock, 
+  CalendarClock,
   ArrowUpRight, 
   ArrowDownRight,
   Zap,
@@ -761,6 +762,7 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
   const {
     seatSignals: attendanceSeatSignals,
     seatSignalsBySeatId: attendanceSeatSignalsBySeatId,
+    seatSignalsByStudentId: attendanceSeatSignalsByStudentId,
     summary: attendanceBoardSummary,
     isLoading: attendanceBoardLoading,
   } = useCenterAdminAttendanceBoard({
@@ -1002,6 +1004,14 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
           return (left.studentName || '').localeCompare(right.studentName || '', 'ko');
         }),
     [attendanceRequests, selectedClass, targetMemberIds, todayKey]
+  );
+  const pendingScheduleChangeRequests = useMemo(
+    () => pendingAttendanceRequests.filter((request) => request.type === 'schedule_change'),
+    [pendingAttendanceRequests]
+  );
+  const pendingOtherAttendanceRequests = useMemo(
+    () => pendingAttendanceRequests.filter((request) => request.type !== 'schedule_change'),
+    [pendingAttendanceRequests]
   );
 
   const pointHistoryDateKeys = useMemo(
@@ -2505,14 +2515,25 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
       [
         {
           key: 'attendance-request',
-          title: `출결 요청 확인 ${pendingAttendanceRequests.length}건`,
-          detail: pendingAttendanceRequests[0]
-            ? `${pendingAttendanceRequests[0].studentName || '학생'} · ${getAttendanceRequestTypeLabel(pendingAttendanceRequests[0].type)} · ${buildAttendanceRequestTimingSummary(pendingAttendanceRequests[0])}`
-            : '학생이 올린 지각·결석·등하원 변경 요청을 바로 검토하세요.',
+          title: `출결 요청 확인 ${pendingOtherAttendanceRequests.length}건`,
+          detail: pendingOtherAttendanceRequests[0]
+            ? `${pendingOtherAttendanceRequests[0].studentName || '학생'} · ${getAttendanceRequestTypeLabel(pendingOtherAttendanceRequests[0].type)} · ${buildAttendanceRequestTimingSummary(pendingOtherAttendanceRequests[0])}`
+            : '학생이 올린 지각·결석 요청을 바로 검토하세요.',
           actionLabel: '요청 확인',
           href: '/dashboard/attendance?tab=requests',
           icon: ClipboardCheck,
           toneClass: 'bg-amber-100 text-amber-700',
+        },
+        {
+          key: 'schedule-change',
+          title: `학원 일정 확인 ${pendingScheduleChangeRequests.length}건`,
+          detail: pendingScheduleChangeRequests[0]
+            ? `${pendingScheduleChangeRequests[0].studentName || '학생'} · ${buildScheduleChangeOpsDetail(pendingScheduleChangeRequests[0])}`
+            : '학생이 바꾼 학원/외출 일정이 실제 일정과 맞는지 학부모님께 확인하세요.',
+          actionLabel: '일정 확인',
+          href: '/dashboard/attendance?tab=requests',
+          icon: CalendarClock,
+          toneClass: 'bg-sky-100 text-sky-700',
         },
         {
           key: 'intervention',
@@ -2572,7 +2593,8 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
           toneClass: 'bg-emerald-100 text-emerald-700',
         },
       ].filter((item) => {
-        if (item.key === 'attendance-request') return pendingAttendanceRequests.length > 0;
+        if (item.key === 'attendance-request') return pendingOtherAttendanceRequests.length > 0;
+        if (item.key === 'schedule-change') return pendingScheduleChangeRequests.length > 0;
         if (item.key === 'intervention') return urgentInterventionStudents.length > 0;
         if (item.key === 'attendance') return attendanceBoardSummary.lateOrAbsentCount > 0;
         if (item.key === 'away') return attendanceBoardSummary.longAwayCount > 0;
@@ -2580,7 +2602,7 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
         if (item.key === 'lead') return (metrics?.leadPipelineCount30d ?? 0) > 0;
         return true;
       }),
-    [attendanceBoardSummary, metrics, parentContactRecommendations, pendingAttendanceRequests, urgentInterventionStudents]
+    [attendanceBoardSummary, attendanceSeatSignalsByStudentId, metrics, parentContactRecommendations, pendingOtherAttendanceRequests, pendingScheduleChangeRequests, urgentInterventionStudents]
   );
 
   const todayAttendanceContactTargets = useMemo(() => {
@@ -3083,10 +3105,24 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
         }),
     [attendanceSeatSignals, roomOrderById]
   );
+  function buildScheduleChangeOpsDetail(request: AttendanceRequest) {
+    const signal = attendanceSeatSignalsByStudentId.get(request.studentId);
+    const detailParts = [
+      signal?.scheduleMovementSummary ? `저장 일정 ${signal.scheduleMovementSummary}` : null,
+      signal?.routineExpectedArrivalTime && signal?.plannedDepartureTime
+        ? `등하원 ${signal.routineExpectedArrivalTime}~${signal.plannedDepartureTime}`
+        : null,
+      signal?.classScheduleName?.trim() ? toStudyRoomTrackScheduleName(signal.classScheduleName) : null,
+      buildAttendanceRequestTimingSummary(request),
+    ].filter(Boolean) as string[];
+
+    return detailParts.join(' · ');
+  }
   const adminOperationsInboxTotalOpenCount =
     adminNoShowSignals.length
     + adminLateSignals.length
-    + pendingAttendanceRequests.length
+    + pendingScheduleChangeRequests.length
+    + pendingOtherAttendanceRequests.length
     + counselingTrackOverview.consultationCount
     + counselingTrackOverview.wifiCount
     + counselingTrackOverview.parentRequestCount;
@@ -3117,12 +3153,22 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
       {
         key: 'attendance-request',
         label: '출결 요청 확인',
-        value: `${pendingAttendanceRequests.length}건`,
-        caption: pendingAttendanceRequests.length > 0
-          ? `${pendingAttendanceRequests[0].studentName || '학생'} · ${getAttendanceRequestTypeLabel(pendingAttendanceRequests[0].type)}`
+        value: `${pendingOtherAttendanceRequests.length}건`,
+        caption: pendingOtherAttendanceRequests.length > 0
+          ? `${pendingOtherAttendanceRequests[0].studentName || '학생'} · ${getAttendanceRequestTypeLabel(pendingOtherAttendanceRequests[0].type)}`
           : '처리 대기 없음',
-        tone: pendingAttendanceRequests.length > 0 ? 'amber' : 'blue',
-        onClick: pendingAttendanceRequests.length > 0 ? openAttendanceRequestsPage : undefined,
+        tone: pendingOtherAttendanceRequests.length > 0 ? 'amber' : 'blue',
+        onClick: pendingOtherAttendanceRequests.length > 0 ? openAttendanceRequestsPage : undefined,
+      },
+      {
+        key: 'schedule-change',
+        label: '학원 일정 확인',
+        value: `${pendingScheduleChangeRequests.length}건`,
+        caption: pendingScheduleChangeRequests.length > 0
+          ? `${pendingScheduleChangeRequests[0].studentName || '학생'} · 학부모 확인 권장`
+          : '변경 접수 없음',
+        tone: pendingScheduleChangeRequests.length > 0 ? 'teal' : 'blue',
+        onClick: pendingScheduleChangeRequests.length > 0 ? openAttendanceRequestsPage : undefined,
       },
       {
         key: 'consultation',
@@ -3164,7 +3210,8 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
       counselingTrackOverview.consultationCount,
       counselingTrackOverview.parentRequestCount,
       counselingTrackOverview.wifiCount,
-      pendingAttendanceRequests,
+      pendingOtherAttendanceRequests,
+      pendingScheduleChangeRequests,
     ]
   );
   const adminOperationsInboxQueueItems = useMemo<OperationsInboxQueueItem[]>(
@@ -3183,13 +3230,24 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
               onClick: () => openAdminAttendanceSignal(adminNoShowSignals[0]),
             }
           : null,
-        pendingAttendanceRequests.length > 0
+        pendingScheduleChangeRequests.length > 0
+          ? {
+              key: 'queue-schedule-change',
+              label: '학원 일정 확인',
+              title: `학원/외출 일정 변경 ${pendingScheduleChangeRequests.length}건`,
+              detail: `${pendingScheduleChangeRequests[0].studentName || '학생'} 학생의 저장된 학원/외출 시간이 실제 일정과 맞는지 학부모 확인이 필요합니다.`,
+              meta: buildScheduleChangeOpsDetail(pendingScheduleChangeRequests[0]),
+              tone: 'teal' as const,
+              onClick: openAttendanceRequestsPage,
+            }
+          : null,
+        pendingOtherAttendanceRequests.length > 0
           ? {
               key: 'queue-attendance-request',
               label: '출결 요청 확인',
-              title: `출결 요청 ${pendingAttendanceRequests.length}건 확인 필요`,
-              detail: `${pendingAttendanceRequests[0].studentName || '학생'} 학생의 ${getAttendanceRequestTypeLabel(pendingAttendanceRequests[0].type)} 요청부터 승인/반려를 검토하세요.`,
-              meta: `${pendingAttendanceRequests[0].date || '일자 미입력'} · ${getAttendanceRequestCreatedLabel(pendingAttendanceRequests[0])}`,
+              title: `출결 요청 ${pendingOtherAttendanceRequests.length}건 확인 필요`,
+              detail: `${pendingOtherAttendanceRequests[0].studentName || '학생'} 학생의 ${getAttendanceRequestTypeLabel(pendingOtherAttendanceRequests[0].type)} 요청부터 승인/반려를 검토하세요.`,
+              meta: `${pendingOtherAttendanceRequests[0].date || '일자 미입력'} · ${getAttendanceRequestCreatedLabel(pendingOtherAttendanceRequests[0])}`,
               tone: 'amber' as const,
               onClick: openAttendanceRequestsPage,
             }
@@ -3239,7 +3297,7 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
             }
           : null,
       ].filter((item): item is NonNullable<typeof item> => Boolean(item)),
-    [adminLateSignals, adminNoShowSignals, counselingTrackOverview, pendingAttendanceRequests]
+    [adminLateSignals, adminNoShowSignals, attendanceSeatSignalsByStudentId, counselingTrackOverview, pendingOtherAttendanceRequests, pendingScheduleChangeRequests]
   );
   const adminOperationsInboxPanels = useMemo<OperationsInboxPanel[]>(
     () => [
@@ -3291,10 +3349,10 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
         key: 'panel-attendance-request',
         label: '출결',
         title: '출결 요청 확인',
-        count: pendingAttendanceRequests.length,
+        count: pendingOtherAttendanceRequests.length,
         emptyLabel: '처리 대기 중인 출결 요청이 없습니다.',
         tone: 'amber' as const,
-        rows: pendingAttendanceRequests.slice(0, 3).map((request) => ({
+        rows: pendingOtherAttendanceRequests.slice(0, 3).map((request) => ({
           key: `attendance-request-${request.id}`,
           title: `${request.studentName || '학생'} · ${getAttendanceRequestTypeLabel(request.type)}`,
           detail: buildAttendanceRequestTimingSummary(request),
@@ -3303,7 +3361,25 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
           tone: 'amber' as const,
           onClick: openAttendanceRequestsPage,
         })),
-        onOpenAll: pendingAttendanceRequests.length > 0 ? openAttendanceRequestsPage : undefined,
+        onOpenAll: pendingOtherAttendanceRequests.length > 0 ? openAttendanceRequestsPage : undefined,
+      },
+      {
+        key: 'panel-schedule-change',
+        label: '일정',
+        title: '학원 일정 변경 확인',
+        count: pendingScheduleChangeRequests.length,
+        emptyLabel: '학부모 확인이 필요한 학원/외출 변경 접수가 없습니다.',
+        tone: 'teal' as const,
+        rows: pendingScheduleChangeRequests.slice(0, 3).map((request) => ({
+          key: `schedule-change-${request.id}`,
+          title: `${request.studentName || '학생'} · 학원/외출 변경`,
+          detail: buildScheduleChangeOpsDetail(request),
+          meta: request.date || '일자 미입력',
+          badge: '학부모 확인',
+          tone: 'teal' as const,
+          onClick: openAttendanceRequestsPage,
+        })),
+        onOpenAll: pendingScheduleChangeRequests.length > 0 ? openAttendanceRequestsPage : undefined,
       },
       {
         key: 'panel-consultation',
@@ -3369,7 +3445,7 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
             : undefined,
       },
     ],
-    [adminLateSignals, adminNoShowSignals, counselingTrackOverview, pendingAttendanceRequests, roomNameById]
+    [adminLateSignals, adminNoShowSignals, attendanceSeatSignalsByStudentId, counselingTrackOverview, pendingOtherAttendanceRequests, pendingScheduleChangeRequests, roomNameById]
   );
 
   if (!isActive) return null;

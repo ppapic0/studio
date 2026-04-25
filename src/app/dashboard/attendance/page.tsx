@@ -37,6 +37,7 @@ import {
   AttendanceRequest,
   CenterMembership,
   StudentScheduleDoc,
+  StudentScheduleOuting,
   StudentScheduleTemplate,
   StudyRoomClassScheduleTemplate,
   StudyRoomPeriodBlock,
@@ -70,6 +71,7 @@ import {
 import {
   SHARED_STUDY_ROOM_MANDATORY_ARRIVAL_TIME,
   SHARED_STUDY_ROOM_MANDATORY_DEPARTURE_TIME,
+  buildStudyRoomClassSchedulesForClassName,
   buildSharedStudyRoomClassSchedules,
   getStudyRoomClassScheduleDisplayName,
   toStudyRoomTrackScheduleName,
@@ -114,6 +116,9 @@ type TodayScheduleInfo = {
   hasExcursion: boolean;
   excursionStartAt: string | null;
   excursionEndAt: string | null;
+  scheduleMovementSummary: string | null;
+  classScheduleName: string | null;
+  scheduleUpdatedAt: Date | null;
   scheduleStatus: StudentScheduleDoc['status'] | null;
   actualArrivalAt: Date | null;
 };
@@ -141,6 +146,46 @@ function buildTodayScheduleInfoFromTemplate(template: StudentScheduleTemplate): 
     hasExcursion,
     excursionStartAt: hasExcursion ? template.defaultExcursionStartAt : null,
     excursionEndAt: hasExcursion ? template.defaultExcursionEndAt : null,
+    scheduleMovementSummary: hasExcursion
+      ? `학원/외출 ${template.defaultExcursionStartAt} ~ ${template.defaultExcursionEndAt}`
+      : null,
+    classScheduleName: template.classScheduleName || null,
+    scheduleUpdatedAt: toDateSafe(template.updatedAt || template.createdAt),
+    scheduleStatus: 'scheduled',
+    actualArrivalAt: null,
+  };
+}
+
+function getOutingLabel(outing: Pick<StudentScheduleOuting, 'kind' | 'reason' | 'title'>) {
+  const text = `${outing.reason || ''} ${outing.title || ''}`.trim();
+  if (outing.kind === 'academy' || text.includes('학원')) return '학원';
+  return '학원/외출';
+}
+
+function formatScheduleMovementSummary(outings?: StudentScheduleOuting[] | null) {
+  const validOutings = [...(outings || [])]
+    .filter((outing) => outing.startTime && outing.endTime)
+    .sort((left, right) => left.startTime.localeCompare(right.startTime));
+  const firstOuting = validOutings[0];
+  if (!firstOuting) return null;
+
+  const suffix = validOutings.length > 1 ? ` 외 ${validOutings.length - 1}건` : '';
+  const reason = firstOuting.reason?.trim() || firstOuting.title?.trim();
+  return `${getOutingLabel(firstOuting)} ${firstOuting.startTime} ~ ${firstOuting.endTime}${reason ? ` · ${reason}` : ''}${suffix}`;
+}
+
+function buildTodayScheduleInfoFromClassSchedule(schedule: StudyRoomClassScheduleTemplate): TodayScheduleInfo {
+  return {
+    hasRoutine: true,
+    isNoAttendanceDay: false,
+    expectedArrivalTime: schedule.arrivalTime || null,
+    plannedDepartureTime: schedule.departureTime || null,
+    hasExcursion: false,
+    excursionStartAt: null,
+    excursionEndAt: null,
+    scheduleMovementSummary: null,
+    classScheduleName: schedule.className || null,
+    scheduleUpdatedAt: toDateSafe(schedule.updatedAt || schedule.createdAt),
     scheduleStatus: 'scheduled',
     actualArrivalAt: null,
   };
@@ -303,6 +348,13 @@ export default function AttendancePage() {
                 logHandledClientIssue('[attendance] schedule template fallback failed', templateError);
               }
 
+              const defaultTrackSchedule = buildStudyRoomClassSchedulesForClassName(centerId, student.className)
+                .filter((schedule) => schedule.active !== false)
+                .find((schedule) => Array.isArray(schedule.weekdays) && schedule.weekdays.includes(weekday));
+              if (defaultTrackSchedule) {
+                return [student.id, buildTodayScheduleInfoFromClassSchedule(defaultTrackSchedule)] as const;
+              }
+
               const routineQuery = query(
                 collection(firestore, 'centers', centerId, 'plans', student.id, 'weeks', weekKey, 'items'),
                 where('dateKey', '==', dateKey),
@@ -323,6 +375,9 @@ export default function AttendancePage() {
                   hasExcursion: false,
                   excursionStartAt: null,
                   excursionEndAt: null,
+                  scheduleMovementSummary: null,
+                  classScheduleName: null,
+                  scheduleUpdatedAt: null,
                   scheduleStatus: null,
                   actualArrivalAt: null,
                 },
@@ -676,14 +731,24 @@ export default function AttendancePage() {
     const mapped = new Map<string, TodayScheduleInfo>();
     (todaySchedules || []).forEach((schedule) => {
       if (!schedule.uid) return;
+      const scheduleMovementSummary =
+        formatScheduleMovementSummary(schedule.outings)
+        || (
+          schedule.excursionStartAt && schedule.excursionEndAt
+            ? `학원/외출 ${schedule.excursionStartAt} ~ ${schedule.excursionEndAt}${schedule.excursionReason ? ` · ${schedule.excursionReason}` : ''}`
+            : null
+        );
       mapped.set(schedule.uid, {
         hasRoutine: true,
         isNoAttendanceDay: Boolean(schedule.isAbsent || schedule.status === 'absent'),
         expectedArrivalTime: schedule.arrivalPlannedAt || schedule.inTime || null,
         plannedDepartureTime: schedule.departurePlannedAt || schedule.outTime || null,
-        hasExcursion: Boolean(schedule.hasExcursion),
+        hasExcursion: Boolean(schedule.hasExcursion || scheduleMovementSummary),
         excursionStartAt: schedule.excursionStartAt || null,
         excursionEndAt: schedule.excursionEndAt || null,
+        scheduleMovementSummary,
+        classScheduleName: schedule.classScheduleName || null,
+        scheduleUpdatedAt: toDateSafe(schedule.updatedAt || schedule.createdAt),
         scheduleStatus: schedule.status || null,
         actualArrivalAt: toDateSafe(schedule.actualArrivalAt),
       });
@@ -844,6 +909,24 @@ export default function AttendancePage() {
     () => deriveRequestOperationsSummary(requests || [], new Date()),
     [requests]
   );
+  const pendingScheduleChangeRequestByStudentId = useMemo(() => {
+    const mapped = new Map<string, AttendanceRequest>();
+    (requests || [])
+      .filter((request) => request.status === 'requested')
+      .filter((request) => request.type === 'schedule_change')
+      .filter((request) => !dateKey || request.date === dateKey)
+      .sort((left, right) => {
+        const leftCreatedAtMs = toDateSafe(left.createdAt)?.getTime() ?? 0;
+        const rightCreatedAtMs = toDateSafe(right.createdAt)?.getTime() ?? 0;
+        return rightCreatedAtMs - leftCreatedAtMs;
+      })
+      .forEach((request) => {
+        if (!mapped.has(request.studentId)) {
+          mapped.set(request.studentId, request);
+        }
+      });
+    return mapped;
+  }, [dateKey, requests]);
   const classNameOptions = useMemo(
     () =>
       Array.from(
@@ -1088,6 +1171,7 @@ export default function AttendancePage() {
                     const record = attendanceMap.get(student.id);
                     const status = attendanceDisplayMap.get(student.id)?.status || 'requested';
                     const routine = mergedScheduleMap.get(student.id);
+                    const scheduleChangeRequest = pendingScheduleChangeRequestByStudentId.get(student.id);
                     const hasAttendanceRoutine = routine?.hasRoutine !== false;
                     const checkedAt = attendanceDisplayMap.get(student.id)?.checkedAt;
                     const manualStatus = record?.status && record.status !== 'requested' ? record.status : undefined;
@@ -1117,6 +1201,9 @@ export default function AttendancePage() {
                             {noShowFlag && (
                               <Badge className="font-black text-[10px] border-none bg-rose-100 text-rose-700">미등원</Badge>
                             )}
+                            {scheduleChangeRequest ? (
+                              <Badge className="font-black text-[10px] border-none bg-sky-100 text-sky-700">학원 일정 확인</Badge>
+                            ) : null}
                           </div>
                         </div>
                       </TableCell>
@@ -1147,7 +1234,9 @@ export default function AttendancePage() {
                           {routine?.hasExcursion ? (
                             <div className="flex items-center gap-1 text-[10px] font-bold text-slate-500">
                               <MapPinned className="h-3.5 w-3.5" />
-                              {isExcursionInProgress(routine) ? '외출 중' : `외출 ${routine.excursionStartAt} ~ ${routine.excursionEndAt}`}
+                              {isExcursionInProgress(routine)
+                                ? '학원/외출 중'
+                                : routine.scheduleMovementSummary || `학원/외출 ${routine.excursionStartAt} ~ ${routine.excursionEndAt}`}
                             </div>
                           ) : null}
                         </div>
@@ -1158,6 +1247,24 @@ export default function AttendancePage() {
                             <CalendarClock className="h-3.5 w-3.5 text-slate-400" />
                             {formatScheduleTimeRange(routine)}
                           </div>
+                          {routine?.classScheduleName?.trim() ? (
+                            <div className="flex items-center gap-1.5 text-[10px] font-bold text-[#5F739F]">
+                              <ClipboardCheck className="h-3.5 w-3.5" />
+                              {toStudyRoomTrackScheduleName(routine.classScheduleName)}
+                            </div>
+                          ) : null}
+                          {routine?.scheduleMovementSummary ? (
+                            <div className="flex items-center gap-1.5 text-[10px] font-bold text-[#C95A08]">
+                              <MapPinned className="h-3.5 w-3.5" />
+                              {routine.scheduleMovementSummary}
+                            </div>
+                          ) : null}
+                          {scheduleChangeRequest ? (
+                            <div className="flex items-center gap-1.5 text-[10px] font-black text-sky-700">
+                              <ShieldAlert className="h-3.5 w-3.5" />
+                              당일 변경 접수됨 · 학부모 확인 권장
+                            </div>
+                          ) : null}
                           {routine?.isNoAttendanceDay ? (
                             <div className="flex items-center gap-1.5 text-[10px] font-bold text-rose-500">
                               <CalendarX className="h-3.5 w-3.5" />
@@ -1301,7 +1408,13 @@ export default function AttendancePage() {
                 </div>
                 {requests?.length === 0 ? (
                   <div className="py-20 text-center opacity-20 italic font-black text-sm">접수된 신청 내역이 없습니다.</div>
-                ) : requests?.map((req) => (
+                ) : requests?.map((req) => {
+                  const relatedRoutine =
+                    req.type === 'schedule_change' && (!dateKey || req.date === dateKey)
+                      ? mergedScheduleMap.get(req.studentId)
+                      : null;
+
+                  return (
                   <div key={req.id} className="p-8 hover:bg-muted/5 transition-all group">
                     <div className="flex flex-col md:flex-row justify-between gap-6">
                       <div className="flex items-start gap-5">
@@ -1330,6 +1443,9 @@ export default function AttendancePage() {
                                 <Badge className="bg-amber-100 text-amber-700 border-none font-black text-[9px]">학부모 연락 필요</Badge>
                               )
                             ) : null}
+                            {req.type === 'schedule_change' && req.status === 'requested' ? (
+                              <Badge className="bg-sky-100 text-sky-700 border-none font-black text-[9px]">학원 일정 확인 필요</Badge>
+                            ) : null}
                           </div>
                           {req.type === 'schedule_change' ? (
                             <div className="flex flex-wrap gap-2 text-[11px] font-semibold text-[#5F739F]">
@@ -1340,6 +1456,19 @@ export default function AttendancePage() {
                                 <span>학원 {req.requestedAcademyStartTime} ~ {req.requestedAcademyEndTime}{req.requestedAcademyName ? ` · ${req.requestedAcademyName}` : ''}</span>
                               ) : null}
                               {req.classScheduleName?.trim() ? <span>{toStudyRoomTrackScheduleName(req.classScheduleName)}</span> : null}
+                              {relatedRoutine?.scheduleMovementSummary ? (
+                                <span>현재 저장 일정 · {relatedRoutine.scheduleMovementSummary}</span>
+                              ) : null}
+                              {relatedRoutine?.classScheduleName?.trim() ? (
+                                <span>적용 트랙 · {toStudyRoomTrackScheduleName(relatedRoutine.classScheduleName)}</span>
+                              ) : null}
+                            </div>
+                          ) : null}
+                          {req.type === 'schedule_change' && req.status === 'requested' ? (
+                            <div className="rounded-2xl border border-sky-100 bg-sky-50 px-4 py-3">
+                              <p className="text-[11px] font-black leading-5 text-sky-800">
+                                학생이 당일 학원/외출 또는 등하원 일정을 바꿨어요. 저장된 일정이 실제 학원 일정과 맞는지 학부모님께 확인하면 됩니다.
+                              </p>
                             </div>
                           ) : null}
                           <div className="p-4 rounded-2xl bg-[#fafafa] border shadow-inner">
@@ -1394,7 +1523,8 @@ export default function AttendancePage() {
                       </div>
                     </div>
                   </div>
-                ))}
+                  );
+                })}
               </div>
               }
             </CardContent>

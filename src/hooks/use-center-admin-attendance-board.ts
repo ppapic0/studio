@@ -28,6 +28,7 @@ import {
   type CenterAdminAttendanceSeatSignal,
 } from '@/lib/center-admin-attendance-board';
 import { resolveSeatIdentity } from '@/lib/seat-layout';
+import { buildStudyRoomClassSchedulesForClassName } from '@/lib/study-room-class-schedule';
 import type {
   AttendanceCurrent,
   CenterMembership,
@@ -36,6 +37,7 @@ import type {
   StudentScheduleOuting,
   StudentScheduleTemplate,
   StudentProfile,
+  StudyRoomClassScheduleTemplate,
 } from '@/lib/types';
 
 type AttendanceBoardRecord = {
@@ -104,7 +106,9 @@ function resolveMovementLabel(outing: Pick<StudentScheduleOuting, 'kind' | 'reas
 }
 
 function buildScheduleMovementInfo(outings: StudentScheduleOuting[] | undefined | null): ScheduleMovementInfo {
-  const validOutings = (outings || []).filter((outing) => outing.startTime && outing.endTime);
+  const validOutings = [...(outings || [])]
+    .filter((outing) => outing.startTime && outing.endTime)
+    .sort((left, right) => left.startTime.localeCompare(right.startTime));
   const firstOuting = validOutings[0];
   if (!firstOuting) return EMPTY_SCHEDULE_MOVEMENT_INFO;
 
@@ -203,6 +207,17 @@ function buildRoutineInfoFromTemplate(template: StudentScheduleTemplate): Attend
     plannedDepartureTime: template.departurePlannedAt || null,
     classScheduleName: template.classScheduleName || null,
     ...buildScheduleMovementInfoFromTemplate(template),
+  };
+}
+
+function buildRoutineInfoFromClassSchedule(schedule: StudyRoomClassScheduleTemplate): AttendanceRoutineInfoWithMovement {
+  return {
+    hasRoutine: true,
+    isNoAttendanceDay: false,
+    expectedArrivalTime: schedule.arrivalTime || null,
+    plannedDepartureTime: schedule.departureTime || null,
+    classScheduleName: schedule.className || null,
+    ...EMPTY_SCHEDULE_MOVEMENT_INFO,
   };
 }
 
@@ -372,6 +387,13 @@ export function useCenterAdminAttendanceBoard({
               logHandledClientIssue('[center-admin-attendance-board] schedule template fallback failed', templateError);
             }
 
+            const defaultTrackSchedule = buildStudyRoomClassSchedulesForClassName(centerId, member.className)
+              .filter((schedule) => schedule.active !== false)
+              .find((schedule) => Array.isArray(schedule.weekdays) && schedule.weekdays.includes(weekday));
+            if (defaultTrackSchedule) {
+              return [member.id, buildRoutineInfoFromClassSchedule(defaultTrackSchedule)] as const;
+            }
+
             const routineQuery = query(
               collection(firestore, 'centers', centerId, 'plans', member.id, 'weeks', weekKey, 'items'),
               where('dateKey', '==', todayKey),
@@ -535,6 +557,7 @@ export function useCenterAdminAttendanceBoard({
         });
         const operationalException = resolveAttendanceOperationalException({
           boardStatus,
+          expectedArrivalTime: routineInfo?.expectedArrivalTime || null,
           plannedDepartureTime: routineInfo?.plannedDepartureTime || todaySchedule?.departurePlannedAt || null,
           hasExcursion: Boolean(scheduleMovementInfo.hasScheduleMovement),
           excursionStartAt: scheduleMovementInfo.movementStartAt,

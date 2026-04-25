@@ -315,6 +315,7 @@ export function buildAttendanceBoardNote(params: {
 
 export function resolveAttendanceOperationalException(params: {
   boardStatus: CenterAdminAttendanceBoardStatus;
+  expectedArrivalTime?: string | null;
   plannedDepartureTime?: string | null;
   hasExcursion?: boolean;
   excursionStartAt?: string | null;
@@ -325,6 +326,7 @@ export function resolveAttendanceOperationalException(params: {
 }) {
   const {
     boardStatus,
+    expectedArrivalTime,
     plannedDepartureTime,
     hasExcursion = false,
     excursionStartAt,
@@ -368,10 +370,24 @@ export function resolveAttendanceOperationalException(params: {
   }
 
   if (boardStatus === 'checked_out') {
+    const arrivalMinutes = parseBoardTimeToMinutes(expectedArrivalTime);
     const departureMinutes = parseBoardTimeToMinutes(plannedDepartureTime);
     const now = new Date(nowMs);
-    const nowMinutes = now.getHours() * 60 + now.getMinutes();
-    if (departureMinutes !== null && nowMinutes + 15 < departureMinutes) {
+    let nowMinutes = now.getHours() * 60 + now.getMinutes();
+    let normalizedDepartureMinutes = departureMinutes;
+
+    if (
+      arrivalMinutes !== null &&
+      departureMinutes !== null &&
+      departureMinutes <= arrivalMinutes
+    ) {
+      normalizedDepartureMinutes = departureMinutes + 24 * 60;
+      if (nowMinutes < arrivalMinutes) {
+        nowMinutes += 24 * 60;
+      }
+    }
+
+    if (normalizedDepartureMinutes !== null && nowMinutes + 15 < normalizedDepartureMinutes) {
       return {
         kind: 'early_checkout' as const,
         label: '중간 하원',
