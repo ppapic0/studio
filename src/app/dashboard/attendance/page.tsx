@@ -189,7 +189,7 @@ export default function AttendancePage() {
     createPeriodBlock({ label: '1트랙', startTime: '18:10', endTime: '19:30' }),
     createPeriodBlock({ label: '2트랙', startTime: '19:40', endTime: '21:00' }),
     createPeriodBlock({ label: '3트랙', startTime: '21:20', endTime: '22:40' }),
-    createPeriodBlock({ label: '의무 트랙', startTime: '22:50', endTime: '23:30', description: '자습 / 오답정리 / 테스트 / 질의응답' }),
+    createPeriodBlock({ label: '의무 트랙', startTime: '22:50', endTime: '23:30', description: '자습 / 오답정리 / 테스트' }),
     createPeriodBlock({ label: '4트랙', startTime: '23:30', endTime: '00:50', description: '심화반 / 보강 / 선택자습' }),
   ]);
 
@@ -868,7 +868,7 @@ export default function AttendancePage() {
       createPeriodBlock({ label: '1트랙', startTime: '18:10', endTime: '19:30' }),
       createPeriodBlock({ label: '2트랙', startTime: '19:40', endTime: '21:00' }),
       createPeriodBlock({ label: '3트랙', startTime: '21:20', endTime: '22:40' }),
-      createPeriodBlock({ label: '의무 트랙', startTime: '22:50', endTime: '23:30', description: '자습 / 오답정리 / 테스트 / 질의응답' }),
+      createPeriodBlock({ label: '의무 트랙', startTime: '22:50', endTime: '23:30', description: '자습 / 오답정리 / 테스트' }),
       createPeriodBlock({ label: '4트랙', startTime: '23:30', endTime: '00:50', description: '심화반 / 보강 / 선택자습' }),
     ]);
   }, [classNameOptions]);

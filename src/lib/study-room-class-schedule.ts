@@ -87,7 +87,7 @@ export const SHARED_STUDY_ROOM_PERIOD_BLOCKS: StudyRoomPeriodBlock[] = [
     label: '의무 트랙',
     startTime: '22:50',
     endTime: '23:30',
-    description: '오답정리 / 테스트 / 질의응답',
+    description: '오답정리 / 테스트',
   },
   {
     id: 'shared-period-4',
