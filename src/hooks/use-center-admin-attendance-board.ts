@@ -75,6 +75,7 @@ type UseCenterAdminAttendanceBoardOptions = {
   attendanceList?: AttendanceCurrent[] | null;
   todayStats?: DailyStudentStat[] | null;
   nowMs?: number;
+  refreshKey?: number;
 };
 
 function getScheduleTemplateTimestampMs(template: StudentScheduleTemplate) {
@@ -215,6 +216,7 @@ export function useCenterAdminAttendanceBoard({
   attendanceList,
   todayStats,
   nowMs = Date.now(),
+  refreshKey = 0,
 }: UseCenterAdminAttendanceBoardOptions) {
   const firestore = useFirestore();
   const today = useMemo(() => (referenceDate ? new Date(referenceDate) : new Date()), [referenceDate]);
@@ -407,7 +409,7 @@ export function useCenterAdminAttendanceBoard({
     return () => {
       cancelled = true;
     };
-  }, [activeMembers, centerId, firestore, isActive, todayKey, todaySchedules, weekday, weekKey]);
+  }, [activeMembers, centerId, firestore, isActive, refreshKey, todayKey, todaySchedules, weekday, weekKey]);
 
   const studentById = useMemo(() => new Map((students || []).map((student) => [student.id, student])), [students]);
   const memberById = useMemo(() => new Map((studentMembers || []).map((member) => [member.id, member])), [studentMembers]);

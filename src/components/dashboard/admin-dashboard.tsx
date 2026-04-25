@@ -123,6 +123,8 @@ import { toStudyRoomTrackScheduleName } from '@/lib/study-room-class-schedule';
 import { createPointBoostEventSecure, cancelPointBoostEventSecure } from '@/lib/point-boost-actions';
 import { getDailyPointBreakdown } from '@/lib/student-rewards';
 
+const ADMIN_DASHBOARD_REFRESH_INTERVAL_MS = 60 * 1000;
+
 const isLikelyUid = (value: string): boolean => {
   const normalized = value.trim();
   if (!normalized) return false;
@@ -530,11 +532,14 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
   }, [now, today]);
 
   useEffect(() => {
+    if (!isActive) return;
+
     const syncLiveTick = () => setLiveTickMs(Date.now());
     syncLiveTick();
-    const tenMinuteTimer = setInterval(syncLiveTick, 10 * 60 * 1000);
-    return () => clearInterval(tenMinuteTimer);
-  }, []);
+    const refreshTimer = window.setInterval(syncLiveTick, ADMIN_DASHBOARD_REFRESH_INTERVAL_MS);
+
+    return () => window.clearInterval(refreshTimer);
+  }, [isActive]);
 
   const isMobile = viewMode === 'mobile';
   const centerId = activeMembership?.id;
@@ -768,6 +773,7 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
     attendanceList: resolvedAttendanceList,
     todayStats,
     nowMs: now,
+    refreshKey: liveTickMs,
   });
 
   const [focusStudyLogDaysRaw, setFocusStudyLogDaysRaw] = useState<StudyLogDay[]>([]);
