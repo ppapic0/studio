@@ -40,6 +40,7 @@ import type { AttendanceScheduleDraft, SavedAttendanceRoutine } from './planner-
 type WeekdayOption = {
   value: number;
   label: string;
+  isAutonomous?: boolean;
 };
 
 type CalendarDayOption = {
@@ -51,6 +52,7 @@ type CalendarDayOption = {
   date: Date;
   hasSchedule?: boolean;
   isAbsent?: boolean;
+  isAutonomousSunday?: boolean;
 };
 
 type AttendanceScheduleSheetProps = {
@@ -66,6 +68,7 @@ type AttendanceScheduleSheetProps = {
   calendarDays: CalendarDayOption[];
   onMoveWeek: (direction: -1 | 1) => void;
   onSelectDate: (date: Date) => void;
+  onAutonomousSundayClick?: () => void;
   todayDraft: AttendanceScheduleDraft;
   onTodayChange: (patch: Partial<AttendanceScheduleDraft>) => void;
   onSaveToday: () => void | Promise<boolean>;
@@ -374,6 +377,7 @@ export function AttendanceScheduleSheet({
   calendarDays,
   onMoveWeek,
   onSelectDate,
+  onAutonomousSundayClick,
   todayDraft,
   onTodayChange,
   onSaveToday,
@@ -441,11 +445,13 @@ export function AttendanceScheduleSheet({
   const formatWeekdaySummary = (weekdays?: number[]) => {
     if (!weekdays?.length) return '';
     return weekdayOptions
-      .filter((option) => weekdays.includes(option.value))
+      .filter((option) => weekdays.includes(option.value) && !option.isAutonomous)
       .map((option) => option.label)
       .join(', ');
   };
   const selectedWeekdaysLabel = formatWeekdaySummary(selectedWeekdays);
+  const selectedDayMeta = calendarDays.find((day) => day.isSelected);
+  const selectedDayIsAutonomousSunday = Boolean(selectedDayMeta?.isAutonomousSunday);
 
   const hasUnsavedChanges =
     open &&
@@ -477,6 +483,10 @@ export function AttendanceScheduleSheet({
   };
 
   const handleSaveTodayAction = async () => {
+    if (selectedDayIsAutonomousSunday) {
+      onAutonomousSundayClick?.();
+      return false;
+    }
     if (isSubmitting || activeDraftValidationMessage) return false;
     const saved = await onSaveToday();
     if (saved) {
@@ -486,6 +496,10 @@ export function AttendanceScheduleSheet({
   };
 
   const handleSaveWeekdayAction = async () => {
+    if (selectedWeekdays.length > 0 && selectedWeekdays.every((weekday) => weekday === 0)) {
+      onAutonomousSundayClick?.();
+      return false;
+    }
     if (isSubmitting || selectedWeekdays.length === 0 || activeDraftValidationMessage) return false;
     const saved = await onSaveWeekday();
     if (saved) {
@@ -514,18 +528,21 @@ export function AttendanceScheduleSheet({
 
   const weekdayQuickGroups = useMemo(() => {
     const workdays = weekdayOptions.filter((option) => ['월', '화', '수', '목', '금'].includes(option.label)).map((option) => option.value);
-    const weekends = weekdayOptions.filter((option) => ['토', '일'].includes(option.label)).map((option) => option.value);
+    const weekends = weekdayOptions.filter((option) => option.label === '토').map((option) => option.value);
     return {
       workdays,
       weekends,
-      all: weekdayOptions.map((option) => option.value),
+      all: weekdayOptions.filter((option) => !option.isAutonomous).map((option) => option.value),
     };
   }, [weekdayOptions]);
 
   const setSelectedWeekdaysTo = (targetValues: number[]) => {
     markAsLocallyEdited();
-    const nextValues = weekdayOptions.filter((option) => targetValues.includes(option.value)).map((option) => option.value);
+    const nextValues = weekdayOptions
+      .filter((option) => targetValues.includes(option.value) && !option.isAutonomous)
+      .map((option) => option.value);
     weekdayOptions.forEach((option) => {
+      if (option.isAutonomous) return;
       const shouldSelect = nextValues.includes(option.value);
       const isSelected = selectedWeekdays.includes(option.value);
       if (shouldSelect !== isSelected) {
@@ -534,9 +551,9 @@ export function AttendanceScheduleSheet({
     });
   };
 
-  const selectedDayMeta = calendarDays.find((day) => day.isSelected);
   const selectedDayUsesClassScheduleDefault = Boolean(
     !selectedDayMeta?.hasSchedule &&
+      !selectedDayIsAutonomousSunday &&
       !hasSelectedWeekdayTemplate &&
       matchedClassSchedule
   );
@@ -632,11 +649,19 @@ export function AttendanceScheduleSheet({
                       <button
                         key={day.key}
                         type="button"
-                        onClick={() => onSelectDate(day.date)}
+                        onClick={() => {
+                          if (day.isAutonomousSunday) {
+                            onAutonomousSundayClick?.();
+                            return;
+                          }
+                          onSelectDate(day.date);
+                        }}
                         className={cn(
                           'rounded-[1rem] border px-1 py-2 text-center transition-all',
                           day.isSelected
                             ? 'border-[#FFB168] bg-[linear-gradient(180deg,#FFF4E3_0%,#FFE7C6_100%)] text-[#17326B] shadow-[0_10px_24px_-18px_rgba(255,138,31,0.28)]'
+                            : day.isAutonomousSunday
+                              ? 'border-sky-100 bg-sky-50 text-sky-700 hover:border-sky-200 hover:bg-sky-100'
                             : 'border-[#DDE7FB] bg-white text-[#5F739F] hover:border-[#FFB168] hover:bg-[#FFF8EF]',
                           day.isToday && !day.isSelected && 'border-[#FFB168]'
                         )}
@@ -658,6 +683,10 @@ export function AttendanceScheduleSheet({
                           >
                             {day.isAbsent ? '미등원' : '등록'}
                           </span>
+                        ) : day.isAutonomousSunday ? (
+                          <span className="mt-1 inline-flex rounded-full bg-white px-1.5 py-0.5 text-[8px] font-black text-sky-700">
+                            자율
+                          </span>
                         ) : null}
                       </button>
                     ))}
@@ -667,7 +696,9 @@ export function AttendanceScheduleSheet({
                 <div
                   className={cn(
                     'mt-4 rounded-[1.15rem] border px-4 py-3',
-                    selectedDayMeta?.hasSchedule
+                    selectedDayIsAutonomousSunday
+                      ? 'border-sky-100 bg-sky-50 text-sky-700'
+                      : selectedDayMeta?.hasSchedule
                       ? 'border-[#FFD1A1] bg-[#FFF6E8] text-[#D86A11]'
                       : hasSelectedWeekdayTemplate
                         ? 'border-[#DCE6F7] bg-[#F8FBFF] text-[#17326B]'
@@ -676,7 +707,9 @@ export function AttendanceScheduleSheet({
                 >
                   <p className="text-[10px] font-black uppercase tracking-[0.18em]">현재 상태</p>
                   <p className="mt-2 text-sm font-black">
-                    {selectedDayMeta?.hasSchedule
+                    {selectedDayIsAutonomousSunday
+                      ? '일요일 자율등원'
+                      : selectedDayMeta?.hasSchedule
                       ? selectedDayMeta.isAbsent
                         ? '이 날짜 예외 설정됨 · 미등원'
                         : '이 날짜 예외 설정됨'
@@ -687,7 +720,9 @@ export function AttendanceScheduleSheet({
                           : '아직 일정 없음'}
                   </p>
                   <p className="mt-1 text-[11px] font-semibold leading-5 opacity-80">
-                    {selectedDayMeta?.hasSchedule
+                    {selectedDayIsAutonomousSunday
+                      ? '일요일은 자율등원이므로 트랙제 등원 일정을 작성하지 않아요.'
+                      : selectedDayMeta?.hasSchedule
                       ? '기본 일정 대신 이 날짜에만 별도 설정이 적용되고 있어요.'
                       : hasSelectedWeekdayTemplate
                         ? `${selectedDateWeekdayLabel} 기본값이 이 날짜에도 적용돼요.`
@@ -713,58 +748,69 @@ export function AttendanceScheduleSheet({
                 </div>
               ) : null}
 
-              {hasSelectedWeekdayTemplate ? (
-                <div className="rounded-[1.35rem] border border-emerald-200 bg-emerald-50 p-4">
-                  <div className="flex flex-wrap items-center justify-between gap-2">
-                    <div>
-                      <p className="text-[11px] font-black text-emerald-700">{selectedDateWeekdayLabel} 기본 일정이 있어요</p>
-                      <p className="mt-1 text-[11px] font-semibold leading-5 text-emerald-700/80">
-                        예외를 지우거나 다시 불러오면 기본 일정 상태로 되돌릴 수 있어요.
-                      </p>
-                    </div>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      onClick={() => {
-                        markAsLocallyEdited();
-                        onApplySelectedWeekdayTemplateToToday();
-                      }}
-                      className="h-9 rounded-full border-emerald-200 bg-white px-4 text-[11px] font-black text-emerald-700 hover:bg-emerald-50"
-                    >
-                      <Copy className="mr-1.5 h-3.5 w-3.5" />
-                      기본 일정 불러오기
-                    </Button>
-                  </div>
-                </div>
-              ) : null}
-
-              {matchedClassSchedule ? (
-                <ClassSchedulePreviewCard
-                  schedule={matchedClassSchedule}
-                  actionLabel="트랙제 다시 적용"
-                  onApply={() => {
-                    markAsLocallyEdited();
-                    onApplyMatchedClassScheduleToToday();
-                  }}
-                />
-              ) : (
-                <div className="rounded-[1.2rem] border border-dashed border-[#D8E4FB] bg-[#F8FBFF] px-4 py-4">
-                  <p className="text-[11px] font-black text-[#17326B]">센터 공통 트랙제를 아직 불러오지 못했어요</p>
-                  <p className="mt-1 text-[11px] font-semibold leading-5 text-[#5F739F]">
-                    공통 트랙제 정보가 준비되면 여기서 바로 불러와 등하원 기본값으로 적용돼요.
+              {selectedDayIsAutonomousSunday ? (
+                <div className="rounded-[1.35rem] border border-sky-100 bg-sky-50 p-4">
+                  <p className="text-[11px] font-black text-sky-700">일요일은 자율등원입니다</p>
+                  <p className="mt-2 break-keep text-[11px] font-semibold leading-5 text-sky-700/80">
+                    트랙제 등원 일정은 작성하지 않고, 필요한 학생은 자율로 등원하면 됩니다.
                   </p>
                 </div>
-              )}
+              ) : (
+                <>
+                  {hasSelectedWeekdayTemplate ? (
+                    <div className="rounded-[1.35rem] border border-emerald-200 bg-emerald-50 p-4">
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <div>
+                          <p className="text-[11px] font-black text-emerald-700">{selectedDateWeekdayLabel} 기본 일정이 있어요</p>
+                          <p className="mt-1 text-[11px] font-semibold leading-5 text-emerald-700/80">
+                            예외를 지우거나 다시 불러오면 기본 일정 상태로 되돌릴 수 있어요.
+                          </p>
+                        </div>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          onClick={() => {
+                            markAsLocallyEdited();
+                            onApplySelectedWeekdayTemplateToToday();
+                          }}
+                          className="h-9 rounded-full border-emerald-200 bg-white px-4 text-[11px] font-black text-emerald-700 hover:bg-emerald-50"
+                        >
+                          <Copy className="mr-1.5 h-3.5 w-3.5" />
+                          기본 일정 불러오기
+                        </Button>
+                      </div>
+                    </div>
+                  ) : null}
 
-              <AttendanceDraftFields
-                draft={todayDraft}
-                onChange={(patch) => {
-                  markAsLocallyEdited();
-                  onTodayChange(patch);
-                }}
-                isMobile={isMobile}
-                disabled={isSubmitting}
-              />
+                  {matchedClassSchedule ? (
+                    <ClassSchedulePreviewCard
+                      schedule={matchedClassSchedule}
+                      actionLabel="트랙제 다시 적용"
+                      onApply={() => {
+                        markAsLocallyEdited();
+                        onApplyMatchedClassScheduleToToday();
+                      }}
+                    />
+                  ) : (
+                    <div className="rounded-[1.2rem] border border-dashed border-[#D8E4FB] bg-[#F8FBFF] px-4 py-4">
+                      <p className="text-[11px] font-black text-[#17326B]">센터 공통 트랙제를 아직 불러오지 못했어요</p>
+                      <p className="mt-1 text-[11px] font-semibold leading-5 text-[#5F739F]">
+                        공통 트랙제 정보가 준비되면 여기서 바로 불러와 등하원 기본값으로 적용돼요.
+                      </p>
+                    </div>
+                  )}
+
+                  <AttendanceDraftFields
+                    draft={todayDraft}
+                    onChange={(patch) => {
+                      markAsLocallyEdited();
+                      onTodayChange(patch);
+                    }}
+                    isMobile={isMobile}
+                    disabled={isSubmitting}
+                  />
+                </>
+              )}
 
             </TabsContent>
 
@@ -772,9 +818,9 @@ export function AttendanceScheduleSheet({
               <div className="rounded-[1.45rem] border border-[#E0E8F6] bg-[linear-gradient(180deg,#FFFFFF_0%,#F8FBFF_100%)] p-4 shadow-[0_18px_40px_-34px_rgba(15,33,73,0.16)]">
                 <div className="mb-3">
                   <p className="text-[11px] font-black uppercase tracking-[0.18em] text-[#5F739F]">주간 등원 일정</p>
-                  <h3 className="mt-1 text-lg font-black tracking-tight text-[#17326B]">월~일 기본 일정을 간단히 정해두세요</h3>
+                  <h3 className="mt-1 text-lg font-black tracking-tight text-[#17326B]">월~토 기본 일정을 간단히 정해두세요</h3>
                   <p className="mt-1 break-keep text-[11px] font-semibold leading-5 text-[#5F739F]">
-                    센터 공통 트랙제를 기본으로 보고, 학원처럼 달라지는 학생만 추가로 조정해요.
+                    일요일은 자율등원이라 트랙제 등원 일정에 포함하지 않아요.
                   </p>
                 </div>
 
@@ -788,25 +834,36 @@ export function AttendanceScheduleSheet({
                 ) : null}
 
                 <div className="flex flex-wrap gap-2">
-                  {weekdayOptions.map((option) => (
-                    <Button
-                      key={option.value}
-                      type="button"
-                      variant="outline"
-                      onClick={() => {
-                        markAsLocallyEdited();
-                        onToggleWeekday(option.value);
-                      }}
-                      className={cn(
-                        'h-9 rounded-full px-4 text-[11px] font-black',
-                        selectedWeekdays.includes(option.value)
-                          ? 'border-[#FFB168] bg-[linear-gradient(180deg,#FFF4E3_0%,#FFE7C6_100%)] text-[#FF8A1F] shadow-[0_14px_26px_-20px_rgba(255,150,38,0.35)]'
-                          : 'border-[#DCE6F7] bg-white text-[#5F739F] hover:border-[#FFB168] hover:bg-[#FFF8EF]'
-                      )}
-                    >
-                      {option.label}
-                    </Button>
-                  ))}
+                  {weekdayOptions.map((option) => {
+                    const isAutonomous = Boolean(option.isAutonomous);
+                    const isSelected = selectedWeekdays.includes(option.value) && !isAutonomous;
+                    return (
+                      <Button
+                        key={option.value}
+                        type="button"
+                        variant="outline"
+                        onClick={() => {
+                          if (isAutonomous) {
+                            onAutonomousSundayClick?.();
+                            return;
+                          }
+                          markAsLocallyEdited();
+                          onToggleWeekday(option.value);
+                        }}
+                        className={cn(
+                          'h-9 rounded-full px-4 text-[11px] font-black',
+                          isSelected
+                            ? 'border-[#FFB168] bg-[linear-gradient(180deg,#FFF4E3_0%,#FFE7C6_100%)] text-[#FF8A1F] shadow-[0_14px_26px_-20px_rgba(255,150,38,0.35)]'
+                            : isAutonomous
+                              ? 'border-sky-100 bg-sky-50 text-sky-700 hover:border-sky-200 hover:bg-sky-100'
+                            : 'border-[#DCE6F7] bg-white text-[#5F739F] hover:border-[#FFB168] hover:bg-[#FFF8EF]'
+                        )}
+                      >
+                        {option.label}
+                        {isAutonomous ? <span className="ml-1 text-[9px]">자율</span> : null}
+                      </Button>
+                    );
+                  })}
                 </div>
                 <div className="mt-3 grid gap-2 md:grid-cols-2">
                   <Button
@@ -823,7 +880,7 @@ export function AttendanceScheduleSheet({
                     onClick={() => setSelectedWeekdaysTo(weekdayQuickGroups.weekends)}
                     className="h-10 rounded-xl border-[#DCE6F7] bg-white text-[11px] font-black text-[#17326B] hover:bg-[#FFF8EF]"
                   >
-                    주말만 적용
+                    토요일만 적용
                   </Button>
                   <Button
                     type="button"
@@ -843,7 +900,7 @@ export function AttendanceScheduleSheet({
                   </Button>
                 </div>
                 <div className="mt-3 rounded-[1rem] border border-[#E4ECF9] bg-[#F9FBFF] px-3 py-2 text-[11px] font-semibold text-[#5F739F]">
-                  저장 대상: <span className="font-black text-[#17326B]">{selectedWeekdays.length > 0 ? `매주 ${selectedWeekdaysLabel}` : '요일을 먼저 선택해 주세요'}</span>
+                  저장 대상: <span className="font-black text-[#17326B]">{selectedWeekdaysLabel ? `매주 ${selectedWeekdaysLabel}` : '월~토 중 요일을 먼저 선택해 주세요'}</span>
                 </div>
               </div>
 
@@ -1063,7 +1120,7 @@ export function AttendanceScheduleSheet({
               <Button
                 type="button"
                 onClick={() => void handleSaveTodayAction()}
-                disabled={isSubmitting || Boolean(validateScheduleDraft(todayDraft, todayDraft.awaySlots || []))}
+                disabled={isSubmitting || selectedDayIsAutonomousSunday || Boolean(validateScheduleDraft(todayDraft, todayDraft.awaySlots || []))}
                 className={cn(
                   'h-11 rounded-xl bg-[linear-gradient(135deg,#FF9A2B_0%,#FF7A16_100%)] font-black text-white shadow-[0_18px_30px_-20px_rgba(255,122,22,0.36)]',
                   isMobile ? 'w-full' : 'min-w-[11rem]'
@@ -1077,7 +1134,11 @@ export function AttendanceScheduleSheet({
             <Button
               type="button"
               onClick={() => void handleSaveWeekdayAction()}
-              disabled={isSubmitting || selectedWeekdays.length === 0 || Boolean(validateScheduleDraft(weekdayDraft, weekdayDraft.awaySlots || []))}
+              disabled={
+                isSubmitting ||
+                selectedWeekdays.filter((weekday) => weekday !== 0).length === 0 ||
+                Boolean(validateScheduleDraft(weekdayDraft, weekdayDraft.awaySlots || []))
+              }
               className={cn(
                 'h-11 rounded-xl bg-[linear-gradient(135deg,#FF9A2B_0%,#FF7A16_100%)] font-black text-white shadow-[0_18px_30px_-20px_rgba(255,122,22,0.36)]',
                 isMobile ? 'w-full' : 'min-w-[11rem]'

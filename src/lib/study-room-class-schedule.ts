@@ -6,13 +6,13 @@ import type {
 
 export const SHARED_STUDY_ROOM_CLASS_SCHEDULE_ID = 'shared-study-room-schedule';
 export const SHARED_STUDY_ROOM_CLASS_SCHEDULE_NAME = '센터 공통 트랙제';
-export const SHARED_STUDY_ROOM_CLASS_SCHEDULE_WEEKDAYS = [1, 2, 3, 4, 5, 0] as const;
+export const SHARED_STUDY_ROOM_CLASS_SCHEDULE_WEEKDAYS = [1, 2, 3, 4, 5] as const;
 export const SATURDAY_STUDY_ROOM_CLASS_SCHEDULE_ID = 'saturday-mandatory-track-schedule';
 export const SATURDAY_STUDY_ROOM_CLASS_SCHEDULE_NAME = '토요일 의무 트랙제';
 export const SATURDAY_STUDY_ROOM_CLASS_SCHEDULE_WEEKDAYS = [6] as const;
 export const NSU_STUDY_ROOM_CLASS_SCHEDULE_ID = 'nsu-study-room-schedule';
 export const NSU_STUDY_ROOM_CLASS_SCHEDULE_NAME = 'N수반 트랙제';
-export const NSU_STUDY_ROOM_CLASS_SCHEDULE_WEEKDAYS = [1, 2, 3, 4, 5, 6, 0] as const;
+export const NSU_STUDY_ROOM_CLASS_SCHEDULE_WEEKDAYS = [1, 2, 3, 4, 5, 6] as const;
 export const DEFAULT_STUDY_ROOM_SCHEDULE_TEMPLATE_ID = 'default-shared-study-room-schedule';
 export const SATURDAY_STUDY_ROOM_SCHEDULE_TEMPLATE_ID = 'default-saturday-mandatory-track-schedule';
 export const NSU_STUDY_ROOM_SCHEDULE_TEMPLATE_ID = 'default-nsu-study-room-schedule';

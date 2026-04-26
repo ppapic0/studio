@@ -177,9 +177,10 @@ const WEEKDAY_OPTIONS = [
   { value: 4, label: '목' },
   { value: 5, label: '금' },
   { value: 6, label: '토' },
-  { value: 0, label: '일' },
+  { value: 0, label: '일', isAutonomous: true },
 ];
 
+const AUTONOMOUS_SUNDAY_NOTICE = '일요일은 자율등원이므로 자율로 등원하세요 !';
 const PLAN_TRACK_ONBOARDING_VERSION = 1;
 const DAILY_STUDY_MINUTES_MAP: Record<string, number> = {
   '4h': 240,
@@ -197,6 +198,7 @@ const RECOMMENDATION_BADGE_TONE: Record<MainPlanRecommendation['badge'], string>
 };
 const SCHEDULE_STATUS_BADGE_TONE: Record<string, string> = {
   '등원 예정': 'border-[#FFE2C5] bg-[#FFF4E8] text-[#D86A11]',
+  '자율등원': 'border-sky-100 bg-sky-50 text-sky-700',
   휴식: 'border-[#DCE6F5] bg-[#EEF4FF] text-[#5A6F95]',
   미정: 'border-[#E5ECF7] bg-white text-[#5A6F95]',
 };
@@ -294,8 +296,23 @@ function buildAttendanceDraftFromTemplate(template: StudentScheduleTemplate): At
   });
 }
 
+function isAutonomousSundayDate(date?: Date | null) {
+  return Boolean(date && getDay(date) === 0);
+}
+
+function isAutonomousSundayDateKey(dateKey?: string | null) {
+  if (!dateKey) return false;
+  const [year, month, day] = dateKey.split('-').map(Number);
+  if (!year || !month || !day) return false;
+  return isAutonomousSundayDate(new Date(year, month - 1, day));
+}
+
+function isSchedulableAttendanceWeekday(value: number) {
+  return Number.isInteger(value) && value >= 0 && value <= 6 && value !== 0;
+}
+
 function normalizeWeekdayValues(values: number[] = []) {
-  return [...values].sort((left, right) => left - right);
+  return Array.from(new Set(values.filter(isSchedulableAttendanceWeekday))).sort((left, right) => left - right);
 }
 
 function areWeekdaySetsEqual(left: number[] = [], right: number[] = []) {
@@ -590,6 +607,12 @@ export default function StudyPlanPage() {
   const firestore = useFirestore();
   const { activeMembership, activeStudentId, viewMode } = useAppContext();
   const { toast } = useToast();
+  const showAutonomousSundayNotice = useCallback(() => {
+    toast({
+      title: AUTONOMOUS_SUNDAY_NOTICE,
+      description: '일요일은 트랙제 등원 계획을 만들지 않고 자율 등원으로 운영합니다.',
+    });
+  }, [toast]);
   const searchParams = useSearchParams();
   const authUid = user?.uid || null;
   const studentDocId = activeStudentId || authUid || null;
@@ -771,7 +794,8 @@ export default function StudyPlanPage() {
       const parsed = JSON.parse(raw) as typeof scheduleRecommendationPrefill;
       if (!parsed) return;
       setScheduleRecommendationPrefill(parsed);
-      setSelectedRecurringWeekdays(parsed.repeatWeekdays || [1, 2, 3, 4, 5]);
+      const prefillWeekdays = normalizeWeekdayValues(parsed.repeatWeekdays || [1, 2, 3, 4, 5]);
+      setSelectedRecurringWeekdays(prefillWeekdays.length > 0 ? prefillWeekdays : [1, 2, 3, 4, 5]);
       setWeekdayDraft((previous) => ({
         ...previous,
         inTime: parsed.recommendedArrivalTime || previous.inTime,
@@ -797,7 +821,7 @@ export default function StudyPlanPage() {
     if (!selectedDate) return;
     const day = getDay(selectedDate);
     setTaskCopyDays(prev => prev.length > 0 ? prev : [day]);
-    setRoutineCopyDays(prev => prev.length > 0 ? prev : [day]);
+    setRoutineCopyDays(prev => prev.length > 0 ? prev.filter(isSchedulableAttendanceWeekday) : normalizeWeekdayValues([day]));
   }, [selectedDate]);
 
   const isStudent = activeMembership?.role === 'student';
@@ -1039,8 +1063,9 @@ export default function StudyPlanPage() {
     [activeMembership?.id, scheduleTemplates]
   );
   const matchingWeekdayTemplate = useMemo(
-    () =>
-      activeScheduleTemplates.find((template) =>
+    () => {
+      if (selectedWeekdayValue === 0) return undefined;
+      return activeScheduleTemplates.find((template) =>
         Array.isArray(template.weekdays) &&
         template.weekdays.includes(selectedWeekdayValue) &&
         !(
@@ -1048,16 +1073,17 @@ export default function StudyPlanPage() {
           template.source === 'default-study-room-class-schedule' &&
           template.classScheduleId === SHARED_STUDY_ROOM_CLASS_SCHEDULE_ID
         )
-      ),
+      );
+    },
     [activeScheduleTemplates, selectedWeekdayValue]
   );
   const matchingRecurringTemplate = useMemo(() => {
-    const normalizedSelected = [...selectedRecurringWeekdays].sort((left, right) => left - right);
+    const normalizedSelected = normalizeWeekdayValues(selectedRecurringWeekdays);
     if (normalizedSelected.length === 0) return null;
 
     return (
       activeScheduleTemplates.find((template) => {
-        const weekdays = Array.isArray(template.weekdays) ? [...template.weekdays].sort((left, right) => left - right) : [];
+        const weekdays = normalizeWeekdayValues(Array.isArray(template.weekdays) ? template.weekdays : []);
         return weekdays.length === normalizedSelected.length && weekdays.every((value, index) => value === normalizedSelected[index]);
       }) || null
     );
@@ -1067,18 +1093,25 @@ export default function StudyPlanPage() {
     () =>
       [...classScheduleTemplates]
         .filter((schedule) => schedule.active !== false)
+        .map((schedule) => ({
+          ...schedule,
+          weekdays: normalizeWeekdayValues(schedule.weekdays || []),
+        }))
+        .filter((schedule) => schedule.weekdays.length > 0)
         .sort((left, right) => {
-          const leftWeekday = Math.min(...(left.weekdays || [0]));
-          const rightWeekday = Math.min(...(right.weekdays || [0]));
+          const leftWeekday = Math.min(...left.weekdays);
+          const rightWeekday = Math.min(...right.weekdays);
           return leftWeekday - rightWeekday;
         }),
     [classScheduleTemplates]
   );
   const matchedClassSchedule = useMemo(
-    () =>
-      availableClassSchedules.find((schedule) =>
+    () => {
+      if (selectedWeekdayValue === 0) return null;
+      return availableClassSchedules.find((schedule) =>
         Array.isArray(schedule.weekdays) && schedule.weekdays.includes(selectedWeekdayValue)
-      ) || null,
+      ) || null;
+    },
     [availableClassSchedules, selectedWeekdayValue]
   );
   const preferredClassScheduleForWeek = useMemo(() => {
@@ -1094,7 +1127,8 @@ export default function StudyPlanPage() {
     return availableClassSchedules[0] || null;
   }, [availableClassSchedules, matchedClassSchedule, selectedRecurringWeekdays]);
   const selectedRecurringWeekdayLabel = useMemo(() => {
-    const labels = WEEKDAY_OPTIONS.filter((option) => selectedRecurringWeekdays.includes(option.value)).map((option) => option.label);
+    const normalizedWeekdays = normalizeWeekdayValues(selectedRecurringWeekdays);
+    const labels = WEEKDAY_OPTIONS.filter((option) => normalizedWeekdays.includes(option.value)).map((option) => option.label);
     if (labels.length === 0) return '요일 미선택';
     return labels.join(', ');
   }, [selectedRecurringWeekdays]);
@@ -1125,7 +1159,7 @@ export default function StudyPlanPage() {
         id: template.id || `template-${template.name}`,
         name: template.name,
         active: template.active !== false,
-        weekdays: template.weekdays,
+        weekdays: normalizeWeekdayValues(template.weekdays || []),
       })),
     [activeScheduleTemplates]
   );
@@ -1138,16 +1172,21 @@ export default function StudyPlanPage() {
   );
   const attendanceCalendarDays = useMemo(
     () =>
-      weekDays.map((day) => ({
-        key: format(day, 'yyyy-MM-dd'),
-        weekdayLabel: format(day, 'EEE', { locale: ko }),
-        dateLabel: format(day, 'd'),
-        isToday: isSameDay(day, new Date()),
-        isSelected: selectedDate ? isSameDay(day, selectedDate) : false,
-        date: day,
-        hasSchedule: Boolean(weekScheduleMap[format(day, 'yyyy-MM-dd')]),
-        isAbsent: Boolean(weekScheduleMap[format(day, 'yyyy-MM-dd')]?.isAbsent),
-      })),
+      weekDays.map((day) => {
+        const dateKey = format(day, 'yyyy-MM-dd');
+        const isAutonomousSunday = isAutonomousSundayDate(day);
+        return {
+          key: dateKey,
+          weekdayLabel: format(day, 'EEE', { locale: ko }),
+          dateLabel: format(day, 'd'),
+          isToday: isSameDay(day, new Date()),
+          isSelected: selectedDate ? isSameDay(day, selectedDate) : false,
+          date: day,
+          hasSchedule: !isAutonomousSunday && Boolean(weekScheduleMap[dateKey]),
+          isAbsent: !isAutonomousSunday && Boolean(weekScheduleMap[dateKey]?.isAbsent),
+          isAutonomousSunday,
+        };
+      }),
     [selectedDate, weekDays, weekScheduleMap]
   );
 
@@ -1681,8 +1720,11 @@ export default function StudyPlanPage() {
   const weeklyScheduleOverview = useMemo(() => {
     return weekDays.map((day) => {
       const dateKey = format(day, 'yyyy-MM-dd');
-      const directSchedule = weekScheduleMap[dateKey];
-      const template = activeScheduleTemplates.find((item) => Array.isArray(item.weekdays) && item.weekdays.includes(getDay(day)));
+      const isAutonomousSunday = isAutonomousSundayDate(day);
+      const directSchedule = isAutonomousSunday ? null : weekScheduleMap[dateKey];
+      const template = isAutonomousSunday
+        ? null
+        : activeScheduleTemplates.find((item) => normalizeWeekdayValues(item.weekdays || []).includes(getDay(day)));
       const plannedArrival = directSchedule?.arrivalPlannedAt || template?.arrivalPlannedAt || null;
       const plannedDeparture = directSchedule?.departurePlannedAt || template?.departurePlannedAt || null;
       const hasArrivalPlan = Boolean(plannedArrival && plannedDeparture && !directSchedule?.isAbsent);
@@ -1693,16 +1735,20 @@ export default function StudyPlanPage() {
         template?.hasExcursionDefault
       );
       const isRestDay = Boolean(directSchedule?.isAbsent);
-      const status = isRestDay
-        ? '휴식'
-        : plannedArrival && plannedDeparture
-          ? '등원 예정'
-          : '미정';
-      const timeLabel = plannedArrival && plannedDeparture
-        ? `${plannedArrival} · ${plannedDeparture}`
+      const status = isAutonomousSunday
+        ? '자율등원'
         : isRestDay
-          ? '이날은 등원하지 않아요.'
-          : '';
+          ? '휴식'
+          : plannedArrival && plannedDeparture
+            ? '등원 예정'
+            : '미정';
+      const timeLabel = isAutonomousSunday
+        ? '자율로 등원하세요'
+        : plannedArrival && plannedDeparture
+          ? `${plannedArrival} · ${plannedDeparture}`
+          : isRestDay
+            ? '이날은 등원하지 않아요.'
+            : '';
 
       return {
         date: day,
@@ -1715,6 +1761,7 @@ export default function StudyPlanPage() {
         status,
         timeLabel,
         hasExcursion,
+        isAutonomousSunday,
       };
     });
   }, [activeScheduleTemplates, selectedDate, weekDays, weekScheduleMap]);
@@ -1754,11 +1801,23 @@ export default function StudyPlanPage() {
   }, []);
 
   const openAttendanceSheetForDate = useCallback((date: Date, tab: 'today' | 'weekday' | 'saved' = 'today') => {
+    if (isAutonomousSundayDate(date)) {
+      showAutonomousSundayNotice();
+      return;
+    }
     setSelectedDate(date);
     setAttendanceSheetInitialTab(tab);
     setAttendanceSaveError(null);
     setIsAttendanceScheduleSheetOpen(true);
-  }, []);
+  }, [showAutonomousSundayNotice]);
+
+  const handleSelectAttendanceSheetDate = useCallback((date: Date) => {
+    if (isAutonomousSundayDate(date)) {
+      showAutonomousSundayNotice();
+      return;
+    }
+    setSelectedDate(date);
+  }, [showAutonomousSundayNotice]);
 
   useEffect(() => {
     if (!activeRecentStudyKey) return;
@@ -2421,6 +2480,10 @@ export default function StudyPlanPage() {
     if (isPast || !firestore || !user || !activeMembership || !studentUid || !title.trim() || !isStudent || !weekKey || !selectedDateKey) {
       return false;
     }
+    if (category === 'schedule' && isAutonomousSundayDate(selectedDate)) {
+      showAutonomousSundayNotice();
+      return false;
+    }
 
     setIsSubmitting(true);
     const itemsCollectionRef = collection(
@@ -2676,6 +2739,10 @@ export default function StudyPlanPage() {
   }): Promise<PersistStudentScheduleResult> => {
     if (!firestore || !user) return { legacySyncWarning: false };
 
+    if (isAutonomousSundayDateKey(params.dateKey)) {
+      throw new Error(AUTONOMOUS_SUNDAY_NOTICE);
+    }
+
     const validationMessage = validateScheduleDraft(params.draft, params.awaySlots || []);
     if (validationMessage) {
       throw new Error(validationMessage);
@@ -2719,10 +2786,11 @@ export default function StudyPlanPage() {
     targetWeekdays: number[];    
     draft: AttendanceScheduleDraft;
   }): Promise<PersistStudentScheduleResult> => {
-    const targetWeekdaySet = new Set(params.targetWeekdays);
+    const targetWeekdaySet = new Set(normalizeWeekdayValues(params.targetWeekdays));
     const todayStart = startOfDay(new Date());
     const visibleTargetDays = weekDays.filter((day) => (
       targetWeekdaySet.has(getDay(day)) &&
+      !isAutonomousSundayDate(day) &&
       !isBefore(startOfDay(day), todayStart)
     ));
     let legacySyncWarning = false;
@@ -2757,6 +2825,10 @@ export default function StudyPlanPage() {
 
   const handleSetAttendance = async (type: 'attend' | 'absent') => {
     if (isPast || !firestore || !user || !activeMembership || !weekKey || !selectedDateKey) return;
+    if (isAutonomousSundayDate(selectedDate)) {
+      showAutonomousSundayNotice();
+      return;
+    }
     setIsSubmitting(true);
 
     try {
@@ -2853,6 +2925,14 @@ export default function StudyPlanPage() {
 
   const executeSaveTodaySchedule = useCallback(async (draft: AttendanceScheduleDraft) => {
     if (!selectedDateKey) return false;
+    if (isAutonomousSundayDateKey(selectedDateKey)) {
+      showAutonomousSundayNotice();
+      setAttendanceSaveError({
+        title: '일요일은 자율등원입니다',
+        description: AUTONOMOUS_SUNDAY_NOTICE,
+      });
+      return false;
+    }
     try {
       const persistResult = await persistStudentSchedule({
         dateKey: selectedDateKey,
@@ -2884,7 +2964,7 @@ export default function StudyPlanPage() {
       });
       return false;
     }
-  }, [clearSchedulePrefillCache, persistStudentSchedule, scheduleRecommendationPrefill, selectedDateKey]);
+  }, [clearSchedulePrefillCache, persistStudentSchedule, scheduleRecommendationPrefill, selectedDateKey, showAutonomousSundayNotice]);
 
   const executeResetTodaySchedule = useCallback(async () => {
     if (!firestore || !user || !selectedDateKey) return false;
@@ -3082,13 +3162,20 @@ export default function StudyPlanPage() {
   ]);
 
   const handleToggleRecurringWeekday = useCallback((weekday: number) => {
+    if (weekday === 0) {
+      showAutonomousSundayNotice();
+      setSelectedRecurringWeekdays((previous) => normalizeWeekdayValues(previous));
+      return;
+    }
     setAttendanceSaveError(null);
     setSelectedRecurringWeekdays((previous) =>
-      previous.includes(weekday)
-        ? previous.filter((value) => value !== weekday)
-        : [...previous, weekday].sort()
+      normalizeWeekdayValues(
+        previous.includes(weekday)
+          ? previous.filter((value) => value !== weekday)
+          : [...previous, weekday]
+      )
     );
-  }, []);
+  }, [showAutonomousSundayNotice]);
 
   const handleCopyTodayToWeekday = useCallback(() => {
     setAttendanceSaveError(null);
@@ -3097,10 +3184,16 @@ export default function StudyPlanPage() {
 
   const handleSaveWeekdayTemplate = useCallback(async () => {
     if (!firestore || !user) return false;
-    if (selectedRecurringWeekdays.length === 0) {
+    const targetWeekdays = normalizeWeekdayValues(selectedRecurringWeekdays);
+    if (targetWeekdays.length === 0) {
+      if (selectedRecurringWeekdays.includes(0)) {
+        showAutonomousSundayNotice();
+      }
       setAttendanceSaveError({
         title: '반복 요일을 선택해 주세요',
-        description: '최소 1개 이상의 요일을 선택해야 저장할 수 있어요.',
+        description: selectedRecurringWeekdays.includes(0)
+          ? '일요일은 자율등원이라 등원 일정으로 저장할 수 없어요. 월~토 중에서 선택해 주세요.'
+          : '최소 1개 이상의 요일을 선택해야 저장할 수 있어요.',
       });
       return false;
     }
@@ -3117,8 +3210,11 @@ export default function StudyPlanPage() {
     setIsSubmitting(true);
     setAttendanceSaveError(null);
     try {
-      const targetWeekdays = [...selectedRecurringWeekdays].sort((left, right) => left - right);
-      const templateId = matchingRecurringTemplate?.id || `template-${selectedRecurringWeekdays.join('-')}`;
+      setSelectedRecurringWeekdays(targetWeekdays);
+      const targetWeekdayLabel = WEEKDAY_OPTIONS.filter((option) => targetWeekdays.includes(option.value))
+        .map((option) => option.label)
+        .join(', ');
+      const templateId = matchingRecurringTemplate?.id || `template-${targetWeekdays.join('-')}`;
       const batch = writeBatch(firestore);
 
       activeScheduleTemplates.forEach((template) => {
@@ -3142,7 +3238,7 @@ export default function StudyPlanPage() {
         doc(firestore, 'users', user.uid, 'scheduleTemplates', templateId),
         {
           centerId: activeMembership?.id || null,
-          name: presetName.trim() || `${selectedRecurringWeekdayLabel} 기본 루틴`,
+          name: presetName.trim() || `${targetWeekdayLabel} 기본 루틴`,
           weekdays: targetWeekdays,
           arrivalPlannedAt: weekdayDraft.inTime,
           departurePlannedAt: weekdayDraft.outTime,
@@ -3183,10 +3279,10 @@ export default function StudyPlanPage() {
         variant: syncResult.legacySyncWarning || visibleSyncWarning ? 'warning' : 'success',
         title: '주간 기본 일정 저장 완료',
         description: visibleSyncWarning
-          ? `매주 ${selectedRecurringWeekdayLabel} 기본 일정을 저장했어요. 이번 주 일정 반영은 잠시 늦을 수 있어요.`
+          ? `매주 ${targetWeekdayLabel} 기본 일정을 저장했어요. 이번 주 일정 반영은 잠시 늦을 수 있어요.`
           : syncResult.legacySyncWarning
-          ? `매주 ${selectedRecurringWeekdayLabel} 기본 일정을 저장했어요. 일부 일정 카드는 잠시 늦게 갱신될 수 있어요.`
-          : `매주 ${selectedRecurringWeekdayLabel} 기본 일정을 저장하고 이번 주에도 바로 반영했어요.`,
+          ? `매주 ${targetWeekdayLabel} 기본 일정을 저장했어요. 일부 일정 카드는 잠시 늦게 갱신될 수 있어요.`
+          : `매주 ${targetWeekdayLabel} 기본 일정을 저장하고 이번 주에도 바로 반영했어요.`,
       });
       setAttendanceSheetInitialTab('weekday');
       setIsAttendanceScheduleSheetOpen(false);
@@ -3201,10 +3297,13 @@ export default function StudyPlanPage() {
     } finally {
       setIsSubmitting(false);
     }
-  }, [activeMembership?.id, activeScheduleTemplates, clearSchedulePrefillCache, firestore, matchingRecurringTemplate, presetName, selectedRecurringWeekdayLabel, selectedRecurringWeekdays, syncWeekdayTemplateToVisibleSchedules, user, weekdayDraft]);
+  }, [activeMembership?.id, activeScheduleTemplates, clearSchedulePrefillCache, firestore, matchingRecurringTemplate, presetName, selectedRecurringWeekdayLabel, selectedRecurringWeekdays, showAutonomousSundayNotice, syncWeekdayTemplateToVisibleSchedules, user, weekdayDraft]);
 
   const handleSaveSchedulePreset = useCallback(async () => {
     if (!firestore || !user) return;
+    const targetWeekdays = normalizeWeekdayValues(
+      selectedRecurringWeekdays.length > 0 ? selectedRecurringWeekdays : [selectedWeekdayValue]
+    );
     if (!presetName.trim()) {
       toast({
         variant: 'destructive',
@@ -3213,12 +3312,16 @@ export default function StudyPlanPage() {
       });
       return;
     }
+    if (targetWeekdays.length === 0) {
+      showAutonomousSundayNotice();
+      return;
+    }
     setIsSubmitting(true);
     try {
       await addDoc(collection(firestore, 'users', user.uid, 'scheduleTemplates'), {
         centerId: activeMembership?.id || null,
         name: presetName.trim(),
-        weekdays: selectedRecurringWeekdays.length > 0 ? selectedRecurringWeekdays : [selectedWeekdayValue],
+        weekdays: targetWeekdays,
         arrivalPlannedAt: inTime,
         departurePlannedAt: outTime,
         academyNameDefault: null,
@@ -3249,7 +3352,7 @@ export default function StudyPlanPage() {
     } finally {
       setIsSubmitting(false);
     }
-  }, [activeMembership?.id, appliedClassScheduleId, appliedClassScheduleName, awayEndTime, awayReason, awayStartTime, firestore, inTime, outTime, presetName, selectedRecurringWeekdays, selectedWeekdayValue, toast, user]);
+  }, [activeMembership?.id, appliedClassScheduleId, appliedClassScheduleName, awayEndTime, awayReason, awayStartTime, firestore, inTime, outTime, presetName, selectedRecurringWeekdays, selectedWeekdayValue, showAutonomousSundayNotice, toast, user]);
 
   const handleDeleteScheduleTemplate = useCallback(async (templateId: string) => {
     if (!firestore || !user) return;
@@ -3265,20 +3368,33 @@ export default function StudyPlanPage() {
   }, []);
 
   const handleApplyMatchedClassScheduleToToday = useCallback(() => {
+    if (isAutonomousSundayDate(selectedDate)) {
+      showAutonomousSundayNotice();
+      return;
+    }
     if (!matchedClassSchedule) return;
     applyAttendanceDraftToState(buildAttendanceDraftFromClassSchedule(matchedClassSchedule));
-  }, [applyAttendanceDraftToState, matchedClassSchedule]);
+  }, [applyAttendanceDraftToState, matchedClassSchedule, selectedDate, showAutonomousSundayNotice]);
 
   const handleApplyClassScheduleToWeekday = useCallback((schedule: StudyRoomClassScheduleTemplate) => {
-    setSelectedRecurringWeekdays(normalizeWeekdayValues(schedule.weekdays || []));
+    const weekdays = normalizeWeekdayValues(schedule.weekdays || []);
+    if (weekdays.length === 0) {
+      showAutonomousSundayNotice();
+      return;
+    }
+    setSelectedRecurringWeekdays(weekdays);
     setWeekdayDraft(buildAttendanceDraftFromClassSchedule(schedule));
     setPresetName(getStudyRoomClassScheduleDisplayName(schedule));
-  }, []);
+  }, [showAutonomousSundayNotice]);
 
   const handleApplySelectedWeekdayTemplateToToday = useCallback(() => {
+    if (isAutonomousSundayDate(selectedDate)) {
+      showAutonomousSundayNotice();
+      return;
+    }
     if (!matchingWeekdayTemplate) return;
     applyAttendanceDraftToState(buildAttendanceDraftFromTemplate(matchingWeekdayTemplate));
-  }, [applyAttendanceDraftToState, matchingWeekdayTemplate]);
+  }, [applyAttendanceDraftToState, matchingWeekdayTemplate, selectedDate, showAutonomousSundayNotice]);
 
   const handleToggleScheduleTemplateActive = useCallback(async (templateId: string, active: boolean) => {
     if (!firestore || !user) return;
@@ -3304,6 +3420,10 @@ export default function StudyPlanPage() {
 
   const handleUpdateScheduleRange = async (itemId: string, baseTitle: string, start: {h: string, m: string, p: '오전' | '오후'}, end: {h: string, m: string, p: '오전' | '오후'}) => {
     if (isPast || !firestore || !user || !activeMembership || !studentUid || !weekKey) return;
+    if (isAutonomousSundayDate(selectedDate)) {
+      showAutonomousSundayNotice();
+      return;
+    }
     const formattedStart = to24h(`${start.h}:${start.m}`, start.p);
     const formattedEnd = to24h(`${end.h}:${end.m}`, end.p);
     const rangeStr = `${formattedStart} ~ ${formattedEnd}`;
@@ -3603,6 +3723,11 @@ export default function StudyPlanPage() {
 
     setIsSubmitting(true);
     const weekday = getDay(selectedDate);
+    if (weekday === 0) {
+      showAutonomousSundayNotice();
+      setIsSubmitting(false);
+      return;
+    }
     const monthDates = eachDayOfInterval({ start: startOfMonth(selectedDate), end: endOfMonth(selectedDate) });
     const targetDates = monthDates.filter(d => getDay(d) === weekday && !isSameDay(d, selectedDate) && !isBefore(startOfDay(d), startOfDay(new Date())));
     
@@ -3638,7 +3763,12 @@ export default function StudyPlanPage() {
       setTaskCopyDays(prev => checked ? Array.from(new Set([...prev, day])) : prev.filter(d => d !== day));
       return;
     }
-    setRoutineCopyDays(prev => checked ? Array.from(new Set([...prev, day])) : prev.filter(d => d !== day));
+    if (day === 0) {
+      showAutonomousSundayNotice();
+      setRoutineCopyDays(prev => normalizeWeekdayValues(prev));
+      return;
+    }
+    setRoutineCopyDays(prev => normalizeWeekdayValues(checked ? [...prev, day] : prev.filter(d => d !== day)));
   };
 
   const toggleCopyItem = (target: 'task' | 'routine', id: string, checked: boolean) => {
@@ -3668,7 +3798,12 @@ export default function StudyPlanPage() {
       return false;
     }
 
-    if (options.weekdays.length === 0) {
+    const targetWeekdays = kind === 'routine' ? normalizeWeekdayValues(options.weekdays) : options.weekdays;
+
+    if (targetWeekdays.length === 0) {
+      if (kind === 'routine' && options.weekdays.includes(0)) {
+        showAutonomousSundayNotice();
+      }
       toast({ variant: 'destructive', title: '복사할 요일을 하나 이상 선택해 주세요.' });
       return false;
     }
@@ -3676,7 +3811,7 @@ export default function StudyPlanPage() {
     const normalizedWeeks = Number.isFinite(options.weeks) ? Math.max(1, Math.min(12, options.weeks)) : 1;
     const intervalStart = addDays(startOfDay(selectedDate), 1);
     const intervalEnd = addDays(startOfDay(selectedDate), normalizedWeeks * 7);
-    const weekdaySet = new Set(options.weekdays);
+    const weekdaySet = new Set(targetWeekdays);
     const todayStart = startOfDay(new Date());
     const targetDates = eachDayOfInterval({ start: intervalStart, end: intervalEnd }).filter(targetDate => {
       if (isBefore(startOfDay(targetDate), todayStart)) return false;
@@ -4109,7 +4244,9 @@ export default function StudyPlanPage() {
                   isMobile
                     ? cn(
                         "flex min-h-[6.8rem] flex-col items-center justify-center text-center",
-                        day.hasArrivalPlan
+                        day.isAutonomousSunday
+                          ? "border-sky-100 bg-[linear-gradient(180deg,#F8FCFF_0%,#EAF5FF_100%)]"
+                          : day.hasArrivalPlan
                           ? "border-[#BFE2C9] bg-[linear-gradient(180deg,#F8FFF9_0%,#E5F7EA_100%)]"
                           : "border-[#FFD5DB] bg-[linear-gradient(180deg,#FFF8F8_0%,#FFECEE_100%)]",
                         day.isSelected
@@ -4129,7 +4266,7 @@ export default function StudyPlanPage() {
                 {isMobile ? (
                   <p className={cn(
                     "font-aggro-display text-[1.45rem] font-black tracking-[-0.03em]",
-                    day.hasArrivalPlan ? "text-[#178244]" : "text-[#D94A61]"
+                    day.isAutonomousSunday ? "text-sky-700" : day.hasArrivalPlan ? "text-[#178244]" : "text-[#D94A61]"
                   )}>
                     {day.dateLabel}
                   </p>
@@ -4510,7 +4647,8 @@ export default function StudyPlanPage() {
         weekRangeLabel={weekRangeLabel}
         calendarDays={attendanceCalendarDays}
         onMoveWeek={moveWeek}
-        onSelectDate={setSelectedDate}
+        onSelectDate={handleSelectAttendanceSheetDate}
+        onAutonomousSundayClick={showAutonomousSundayNotice}
         todayDraft={buildCurrentAttendanceDraft()}
         onTodayChange={handleTodayScheduleChange}
         onSaveToday={handleSaveTodaySchedule}
