@@ -319,6 +319,19 @@ const formatPointsInPt = (value: number): string => `${value.toLocaleString()}pt
 
 type PointHistoryWindow = 'today' | '7d' | '30d';
 
+type PointHistoryGrantRow = {
+  key: string;
+  dateKey: string;
+  studentId: string;
+  studentName: string;
+  className: string;
+  totalPoints: number;
+  studyBoxPoints: number;
+  rankPoints: number;
+  otherPoints: number;
+  detail: string;
+};
+
 type PointHistoryRow = {
   studentId: string;
   studentName: string;
@@ -337,6 +350,11 @@ type PointHistorySummary = {
   earners: number;
 };
 
+type PointHistoryDailySummary = PointHistorySummary & {
+  dateKey: string;
+  grants: PointHistoryGrantRow[];
+};
+
 const POINT_HISTORY_WINDOW_ORDER: PointHistoryWindow[] = ['today', '7d', '30d'];
 
 const EMPTY_POINT_HISTORY_SUMMARY: PointHistorySummary = {
@@ -351,6 +369,33 @@ const buildRecentDateKeys = (referenceDate: Date | null, dayCount: number): stri
   if (!referenceDate || dayCount <= 0) return [];
   return Array.from({ length: dayCount }, (_, index) => format(subDays(referenceDate, index), 'yyyy-MM-dd'));
 };
+
+function formatPointBreakdownDetail(breakdown: ReturnType<typeof getDailyPointBreakdown>): string {
+  const eventLabels = Array.isArray(breakdown.pointItems)
+    ? breakdown.pointItems
+        .map((item: any) => {
+          const label = typeof item?.label === 'string' ? item.label.trim() : '';
+          const reason = typeof item?.reason === 'string' ? item.reason.trim() : '';
+          const type = typeof item?.type === 'string' ? item.type.trim() : '';
+          if (label) return label;
+          if (reason) return reason;
+          if (type === 'box') return '공부상자';
+          if (type === 'rank') return '랭킹 보상';
+          return '';
+        })
+        .filter(Boolean)
+    : [];
+
+  if (eventLabels.length > 0) {
+    return Array.from(new Set(eventLabels)).slice(0, 3).join(' · ');
+  }
+
+  return [
+    breakdown.studyBoxPoints > 0 ? `상자 ${formatPointsInPt(breakdown.studyBoxPoints)}` : '',
+    breakdown.rankPoints > 0 ? `랭킹 ${formatPointsInPt(breakdown.rankPoints)}` : '',
+    breakdown.otherPoints > 0 ? `기타 ${formatPointsInPt(breakdown.otherPoints)}` : '',
+  ].filter(Boolean).join(' · ') || '포인트 적립';
+}
 
 const summarizePointHistoryRows = (rows: PointHistoryRow[]): PointHistorySummary =>
   rows.reduce(
@@ -1031,16 +1076,20 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
   );
 
   const pointHistoryByWindow = useMemo(() => {
+    const getMemberDailyPointBreakdown = (memberId: string, dateKey: string) => {
+      const progress = progressById.get(memberId);
+      const dailyPointStatus = (progress?.dailyPointStatus || {}) as Record<string, any>;
+      return getDailyPointBreakdown((dailyPointStatus[dateKey] || {}) as Record<string, any>);
+    };
+
     const buildRows = (dateKeys: string[]): PointHistoryRow[] => {
       if (dateKeys.length === 0) return [];
 
       return filteredStudentMembers
         .map((member) => {
-          const progress = progressById.get(member.id);
-          const dailyPointStatus = (progress?.dailyPointStatus || {}) as Record<string, any>;
           const totals = dateKeys.reduce(
             (acc, dateKey) => {
-              const breakdown = getDailyPointBreakdown((dailyPointStatus[dateKey] || {}) as Record<string, any>);
+              const breakdown = getMemberDailyPointBreakdown(member.id, dateKey);
               return {
                 totalPoints: acc.totalPoints + breakdown.totalPoints,
                 studyBoxPoints: acc.studyBoxPoints + breakdown.studyBoxPoints,
@@ -1068,6 +1117,48 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
         });
     };
 
+    const buildDailyRows = (dateKeys: string[]): PointHistoryDailySummary[] =>
+      dateKeys
+        .map((dateKey) => {
+          const grants = filteredStudentMembers
+            .map((member): PointHistoryGrantRow | null => {
+              const breakdown = getMemberDailyPointBreakdown(member.id, dateKey);
+              if (breakdown.totalPoints <= 0) return null;
+
+              return {
+                key: `${dateKey}-${member.id}`,
+                dateKey,
+                studentId: member.id,
+                studentName: toSafeStudentName(member.displayName, member.id),
+                className: member.className || '-',
+                totalPoints: breakdown.totalPoints,
+                studyBoxPoints: breakdown.studyBoxPoints,
+                rankPoints: breakdown.rankPoints,
+                otherPoints: breakdown.otherPoints,
+                detail: formatPointBreakdownDetail(breakdown),
+              };
+            })
+            .filter((row): row is PointHistoryGrantRow => Boolean(row))
+            .sort((left, right) => {
+              if (right.totalPoints !== left.totalPoints) return right.totalPoints - left.totalPoints;
+              return left.studentName.localeCompare(right.studentName, 'ko');
+            });
+
+          const summary = grants.reduce(
+            (acc, row) => ({
+              totalPoints: acc.totalPoints + row.totalPoints,
+              studyBoxPoints: acc.studyBoxPoints + row.studyBoxPoints,
+              rankPoints: acc.rankPoints + row.rankPoints,
+              otherPoints: acc.otherPoints + row.otherPoints,
+              earners: acc.earners + 1,
+            }),
+            EMPTY_POINT_HISTORY_SUMMARY
+          );
+
+          return { dateKey, grants, ...summary };
+        })
+        .filter((row) => row.totalPoints > 0);
+
     const todayRows = buildRows(pointHistoryDateKeys.today);
     const sevenDayRows = buildRows(pointHistoryDateKeys['7d']);
     const thirtyDayRows = buildRows(pointHistoryDateKeys['30d']);
@@ -1080,6 +1171,7 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
         leaderboardLabel: '오늘',
         rows: todayRows,
         summary: summarizePointHistoryRows(todayRows),
+        dailyRows: buildDailyRows(pointHistoryDateKeys.today),
       },
       '7d': {
         key: '7d' as const,
@@ -1088,6 +1180,7 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
         leaderboardLabel: '7일',
         rows: sevenDayRows,
         summary: summarizePointHistoryRows(sevenDayRows),
+        dailyRows: buildDailyRows(pointHistoryDateKeys['7d']),
       },
       '30d': {
         key: '30d' as const,
@@ -1096,6 +1189,7 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
         leaderboardLabel: '30일',
         rows: thirtyDayRows,
         summary: summarizePointHistoryRows(thirtyDayRows),
+        dailyRows: buildDailyRows(pointHistoryDateKeys['30d']),
       },
     };
   }, [filteredStudentMembers, pointHistoryDateKeys, progressById]);
@@ -3217,6 +3311,14 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
             ? () => openCounselTrackDialog('parent')
             : undefined,
       },
+      {
+        key: 'today-points',
+        label: '오늘 포인트',
+        value: `${todayPointsSummary.totalPoints.toLocaleString()}P`,
+        caption: `지급 학생 ${todayPointsSummary.earners}명`,
+        tone: todayPointsSummary.totalPoints > 0 ? 'emerald' : 'blue',
+        onClick: () => openPointHistoryDialog('today'),
+      },
     ],
     [
       adminLateSignals,
@@ -3226,6 +3328,8 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
       counselingTrackOverview.wifiCount,
       pendingOtherAttendanceRequests,
       pendingScheduleChangeRequests,
+      todayPointsSummary.earners,
+      todayPointsSummary.totalPoints,
     ]
   );
   const adminOperationsInboxQueueItems = useMemo<OperationsInboxQueueItem[]>(
@@ -4485,6 +4589,62 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
                     );
                   })}
                 </div>
+
+                <div className="mb-4 rounded-[1.6rem] border border-[#DCE7FF] bg-white p-4 shadow-[0_18px_32px_-28px_rgba(20,41,95,0.16)]">
+                  <div className="flex flex-wrap items-start justify-between gap-3 border-b border-[#EEF4FF] pb-3">
+                    <div>
+                      <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#5c6e97]">일자별 배부 내역</p>
+                      <p className="mt-1 text-sm font-black text-[#14295F]">
+                        {selectedPointHistoryData.headlineLabel} 일자별 학생 포인트
+                      </p>
+                    </div>
+                    <Badge className="border-none bg-emerald-100 px-3 py-1 text-[11px] font-black text-emerald-700">
+                      {selectedPointHistoryData.dailyRows.length}일 기록
+                    </Badge>
+                  </div>
+
+                  {selectedPointHistoryData.dailyRows.length === 0 ? (
+                    <div className="mt-3 rounded-[1.25rem] border border-dashed border-[#DCE7FF] bg-[#F8FBFF] px-4 py-6 text-center text-xs font-bold text-[#6E7EA3]">
+                      선택한 기간에 학생별 포인트 배부 기록이 없습니다.
+                    </div>
+                  ) : (
+                    <div className="mt-3 space-y-3">
+                      {selectedPointHistoryData.dailyRows.map((day) => (
+                        <div key={day.dateKey} className="rounded-[1.3rem] border border-[#EEF4FF] bg-[#F8FBFF] p-3">
+                          <div className="flex flex-wrap items-center justify-between gap-2">
+                            <div>
+                              <p className="text-sm font-black text-[#14295F]">{day.dateKey}</p>
+                              <p className="mt-1 text-[11px] font-bold text-[#6E7EA3]">지급 학생 {day.earners}명</p>
+                            </div>
+                            <Badge className="border-none bg-[#14295F] px-3 py-1 text-[11px] font-black text-white">
+                              {formatPointsInPt(day.totalPoints)}
+                            </Badge>
+                          </div>
+                          <div className="mt-3 grid gap-2">
+                            {day.grants.map((grant) => (
+                              <div
+                                key={grant.key}
+                                className="flex items-start justify-between gap-3 rounded-[1rem] border border-[#E4ECFF] bg-white px-3 py-2.5"
+                              >
+                                <div className="min-w-0">
+                                  <div className="flex flex-wrap items-center gap-2">
+                                    <p className="truncate text-sm font-black text-[#14295F]">{grant.studentName}</p>
+                                    <Badge className="h-5 rounded-full border-none bg-[#EEF4FF] px-2 text-[10px] font-black text-[#2554D7]">
+                                      {grant.className}
+                                    </Badge>
+                                  </div>
+                                  <p className="mt-1 truncate text-[11px] font-bold text-[#6E7EA3]">{grant.detail}</p>
+                                </div>
+                                <p className="shrink-0 text-sm font-black text-emerald-700">{formatPointsInPt(grant.totalPoints)}</p>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
                 {selectedPointHistoryData.rows.length === 0 ? (
                   <div className="rounded-[1.6rem] border border-dashed border-[#DCE7FF] bg-white px-6 py-10 text-center text-sm font-bold text-[#5c6e97]">
                     {selectedPointHistoryData.headlineLabel} 포인트 집계 대상 학생이 없습니다.

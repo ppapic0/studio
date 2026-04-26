@@ -1754,16 +1754,8 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
             ? () => openCounselTrackDialog('parent')
             : undefined,
       },
-      {
-        key: 'center-points',
-        label: '오늘 포인트',
-        value: `${centerPointDistribution.todayTotal.toLocaleString()}P`,
-        caption: '센터 배부 합계',
-        tone: centerPointDistribution.todayTotal > 0 ? 'emerald' : 'blue',
-        onClick: () => setIsCenterPointDialogOpen(true),
-      },
     ],
-    [centerPointDistribution.todayTotal, teacherCounselingTrackOverview, teacherLateSignals, teacherNoShowSignals]
+    [teacherCounselingTrackOverview, teacherLateSignals, teacherNoShowSignals]
   );
   const teacherOperationsInboxQueueItems = useMemo<OperationsInboxQueueItem[]>(
     () =>
