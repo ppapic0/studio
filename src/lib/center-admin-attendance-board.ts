@@ -44,6 +44,8 @@ export interface CenterAdminAttendanceSeatSignal {
   scheduleMovementCount: number;
   checkedAtLabel: string | null;
   firstCheckInLabel: string | null;
+  latestAwayStartLabel: string | null;
+  latestAwayEndLabel: string | null;
   lastCheckOutLabel: string | null;
   wasLateToday: boolean;
   hasCheckOutRecord: boolean;

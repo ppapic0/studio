@@ -1119,6 +1119,9 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
         attendanceStatus: attendanceSignal.seatStatus,
         checkedAtLabel: attendanceSignal.checkedAtLabel,
         firstCheckInLabel: attendanceSignal.firstCheckInLabel,
+        latestAwayStartLabel: attendanceSignal.latestAwayStartLabel,
+        latestAwayEndLabel: attendanceSignal.latestAwayEndLabel,
+        lastCheckOutLabel: attendanceSignal.lastCheckOutLabel,
         routineExpectedArrivalTime: attendanceSignal.routineExpectedArrivalTime,
         plannedDepartureTime: attendanceSignal.plannedDepartureTime,
         compositeHealth,
@@ -4359,6 +4362,9 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
                       ? 'text-white drop-shadow-[0_1px_6px_rgba(15,23,42,0.28)]'
                       : 'text-slate-950';
                   const firstCheckInTimeLabel = seatSignal?.firstCheckInLabel || seatSignal?.checkedAtLabel || null;
+                  const latestAwayStartLabel = seatSignal?.latestAwayStartLabel || null;
+                  const latestAwayEndLabel = seatSignal?.latestAwayEndLabel || null;
+                  const actualCheckOutLabel = seatSignal?.lastCheckOutLabel || null;
                   const plannedDepartureTimeLabel = seatSignal?.plannedDepartureTime
                     ? seatSignal.routineExpectedArrivalTime
                       ? `${seatSignal.routineExpectedArrivalTime}~${seatSignal.plannedDepartureTime}`
@@ -4373,10 +4379,31 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
                               className: 'border-white/80 bg-white/92 text-[#14295F]',
                             }
                           : null,
+                        latestAwayStartLabel
+                          ? {
+                              key: 'latestAwayStart',
+                              label: `외출 ${latestAwayStartLabel}`,
+                              className: 'border-[#FFD0A6] bg-[#FFF8F2] text-[#C95A08]',
+                            }
+                          : null,
+                        latestAwayEndLabel
+                          ? {
+                              key: 'latestAwayEnd',
+                              label: `복귀 ${latestAwayEndLabel}`,
+                              className: 'border-emerald-200 bg-emerald-50 text-emerald-700',
+                            }
+                          : null,
+                        actualCheckOutLabel
+                          ? {
+                              key: 'actualCheckOut',
+                              label: `하원 ${actualCheckOutLabel}`,
+                              className: 'border-slate-200 bg-white/92 text-[#14295F]',
+                            }
+                          : null,
                         plannedDepartureTimeLabel
                           ? {
                               key: 'plannedDeparture',
-                              label: `하원 ${plannedDepartureTimeLabel}`,
+                              label: `예정 ${plannedDepartureTimeLabel}`,
                               className: 'border-[#FFD0A6] bg-[#FFF1E2] text-[#C95A08]',
                             }
                           : null,
@@ -4478,7 +4505,7 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
                                   className={cn(
                                     'inline-flex max-w-full items-center justify-center rounded-full border px-1.5 py-0.5 font-black leading-none shadow-[0_8px_14px_-12px_rgba(20,41,95,0.34)]',
                                     chip.className,
-                                    compact ? 'min-h-[12px] text-[5.5px]' : 'min-h-[15px] text-[7px]'
+                                    compact ? 'min-h-[11px] text-[5.2px]' : 'min-h-[14px] text-[6.4px]'
                                   )}
                                 >
                                   <span className="truncate">{chip.label}</span>

@@ -124,6 +124,23 @@ function pickAttendanceEventTime(
   );
 }
 
+function pickAttendanceEventTimeAfter(
+  events: AttendanceBoardEvent[],
+  eventType: string,
+  after: Date | null | undefined,
+  mode: 'earliest' | 'latest'
+) {
+  if (!after) return null;
+  const afterMs = after.getTime();
+  return pickDateByMode(
+    events
+      .filter((event) => event.eventType === eventType)
+      .map((event) => toDateSafe(event.occurredAt) || toDateSafe(event.createdAt))
+      .filter((date): date is Date => date instanceof Date && date.getTime() >= afterMs),
+    mode
+  );
+}
+
 function getAttendanceEventDate(event: AttendanceBoardEvent) {
   return toDateSafe(event.occurredAt) || toDateSafe(event.createdAt);
 }
@@ -664,12 +681,21 @@ export function useCenterAdminAttendanceBoard({
         const todayRecordCheckInAt = toDateSafe(todayRecord?.checkInAt);
         const firstCheckInEventAt = pickAttendanceEventTime(todayEventsForStudent, 'check_in', 'earliest');
         const latestAwayStartAt = pickAttendanceEventTime(todayEventsForStudent, 'away_start', 'latest');
-        const latestAwayEndAt = pickAttendanceEventTime(todayEventsForStudent, 'away_end', 'latest');
+        const latestAwayEndAt = pickAttendanceEventTimeAfter(
+          todayEventsForStudent,
+          'away_end',
+          latestAwayStartAt,
+          'latest'
+        );
+        const latestCheckOutEventAt = pickAttendanceEventTime(todayEventsForStudent, 'check_out', 'latest');
         const firstCheckInAt = pickDateByMode(
           [firstCheckInEventAt, todayStatCheckInAt, todayRecordCheckInAt, sameDayLiveCheckInAt],
           'earliest'
         );
-        const lastCheckOutAt = toDateSafe(todayStat?.checkOutAt);
+        const lastCheckOutAt = pickDateByMode(
+          [latestCheckOutEventAt, toDateSafe(todayStat?.checkOutAt)],
+          'latest'
+        );
         const hasCheckOutRecord = Boolean(todayStat?.hasCheckOutRecord || lastCheckOutAt);
         const liveSessionMinutes = getLiveStudySessionDurationMinutes({
           status: seat.status,
@@ -794,8 +820,10 @@ export function useCenterAdminAttendanceBoard({
           scheduleMovementSummary: scheduleMovementInfo.scheduleMovementSummary,
           scheduleMovementCount: scheduleMovementInfo.scheduleMovementCount,
           checkedAtLabel: formatAttendanceBoardClockLabel(derived.checkedAt),
-          firstCheckInLabel: formatAttendanceBoardClockLabel(firstCheckInAt),
-          lastCheckOutLabel: formatAttendanceBoardClockLabel(lastCheckOutAt),
+          firstCheckInLabel: formatAttendanceBoardClockLabel(firstCheckInEventAt || firstCheckInAt),
+          latestAwayStartLabel: formatAttendanceBoardClockLabel(latestAwayStartAt),
+          latestAwayEndLabel: formatAttendanceBoardClockLabel(latestAwayEndAt),
+          lastCheckOutLabel: formatAttendanceBoardClockLabel(latestCheckOutEventAt || lastCheckOutAt),
           wasLateToday: derived.status === 'confirmed_late',
           hasCheckOutRecord,
           attendanceRiskLevel,

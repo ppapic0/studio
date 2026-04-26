@@ -32,6 +32,9 @@ export interface CenterAdminStudentSeatSignal {
   attendanceStatus: AttendanceCurrent['status'];
   checkedAtLabel?: string | null;
   firstCheckInLabel?: string | null;
+  latestAwayStartLabel?: string | null;
+  latestAwayEndLabel?: string | null;
+  lastCheckOutLabel?: string | null;
   routineExpectedArrivalTime?: string | null;
   plannedDepartureTime?: string | null;
   compositeHealth: number;

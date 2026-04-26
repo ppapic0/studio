@@ -283,6 +283,9 @@ export function CenterAdminAttendanceBoard({
                   const isNoAttendanceDay = Boolean(signal?.isNoAttendanceDay || signal?.boardStatus === 'excused_absent');
                   const isCheckedOutLate = Boolean(signal?.boardStatus === 'checked_out' && signal.wasLateToday);
                   const firstCheckInTimeLabel = signal?.firstCheckInLabel || signal?.checkedAtLabel || null;
+                  const latestAwayStartLabel = signal?.latestAwayStartLabel || null;
+                  const latestAwayEndLabel = signal?.latestAwayEndLabel || null;
+                  const actualCheckOutLabel = signal?.lastCheckOutLabel || null;
                   const plannedDepartureTimeLabel = signal?.plannedDepartureTime && !isNoAttendanceDay
                     ? signal.routineExpectedArrivalTime
                       ? `${signal.routineExpectedArrivalTime}~${signal.plannedDepartureTime}`
@@ -296,10 +299,31 @@ export function CenterAdminAttendanceBoard({
                           className: 'border-white/85 bg-white/92 text-[#14295F]',
                         }
                       : null,
+                    latestAwayStartLabel
+                      ? {
+                          key: 'latestAwayStart',
+                          label: `외출 ${latestAwayStartLabel}`,
+                          className: 'border-[#FFD0A6] bg-[#FFF8F2] text-[#C95A08]',
+                        }
+                      : null,
+                    latestAwayEndLabel
+                      ? {
+                          key: 'latestAwayEnd',
+                          label: `복귀 ${latestAwayEndLabel}`,
+                          className: 'border-emerald-200 bg-emerald-50 text-emerald-700',
+                        }
+                      : null,
+                    actualCheckOutLabel
+                      ? {
+                          key: 'actualCheckOut',
+                          label: `하원 ${actualCheckOutLabel}`,
+                          className: 'border-slate-200 bg-white/92 text-[#14295F]',
+                        }
+                      : null,
                     plannedDepartureTimeLabel
                       ? {
                           key: 'plannedDeparture',
-                          label: `하원 ${plannedDepartureTimeLabel}`,
+                          label: `예정 ${plannedDepartureTimeLabel}`,
                           className: 'border-[#FFD0A6] bg-[#FFF1E2] text-[#C95A08]',
                         }
                       : null,
@@ -314,16 +338,6 @@ export function CenterAdminAttendanceBoard({
                             className: signal.wasLateToday
                               ? 'border-[#FFD0A6] bg-[#FFF1E2] text-[#C95A08]'
                               : 'border-white/85 bg-white/92 text-slate-700',
-                          },
-                          {
-                            key: 'firstCheckIn',
-                            label: `최초 등원 ${signal.firstCheckInLabel || '-'}`,
-                            className: 'border-white/85 bg-white/92 text-[#14295F]',
-                          },
-                          {
-                            key: 'lastCheckOut',
-                            label: `실제 하원 ${signal.lastCheckOutLabel || '-'}`,
-                            className: 'border-white/85 bg-white/92 text-[#14295F]',
                           },
                         ]
                       : [];
@@ -342,7 +356,11 @@ export function CenterAdminAttendanceBoard({
                           ? `예정 ${signal.routineExpectedArrivalTime}`
                           : signal.boardLabel
                     : '확인중';
-                  const shouldShowSeatMeta = !isNameOnly || isNoAttendanceDay || Boolean(scheduleMovementLabel) || checkoutMetaChips.length > 0;
+                  const shouldShowSeatMeta =
+                    (!isNameOnly && !hasSeatTimeChips) ||
+                    isNoAttendanceDay ||
+                    Boolean(scheduleMovementLabel) ||
+                    checkoutMetaChips.length > 0;
 
                   if (isAisle) {
                     if (isLayoutEditMode) {
@@ -446,7 +464,7 @@ export function CenterAdminAttendanceBoard({
                                 className={cn(
                                   'inline-flex max-w-full items-center rounded-full border px-2 py-0.5 font-black leading-none tracking-tight shadow-[0_10px_18px_-16px_rgba(20,41,95,0.35)]',
                                   chip.className,
-                                  isMobile ? 'min-h-[16px] text-[7.5px]' : 'min-h-[18px] text-[8.5px]'
+                                  isMobile ? 'min-h-[15px] text-[7px]' : 'min-h-[16px] text-[7.8px]'
                                 )}
                               >
                                 <span className="truncate">{chip.label}</span>
