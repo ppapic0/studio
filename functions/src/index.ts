@@ -2663,9 +2663,24 @@ async function queueParentSmsNotification(
     eventAt: smsEventAt,
   });
   const dedupeRef = db.doc(`centers/${centerId}/smsDedupes/${dedupeKey}`);
+  const ts = admin.firestore.Timestamp.now();
+  const dedupePayload = {
+    centerId,
+    studentId,
+    eventType,
+    dedupeKey,
+    createdAt: ts,
+    renderedMessage: message,
+    messageBytes,
+  };
   if (!params.force) {
-    const dedupeSnap = await dedupeRef.get();
-    if (dedupeSnap.exists) {
+    const shouldQueue = await db.runTransaction(async (tx) => {
+      const dedupeSnap = await tx.get(dedupeRef);
+      if (dedupeSnap.exists) return false;
+      tx.set(dedupeRef, dedupePayload, { merge: true });
+      return true;
+    });
+    if (!shouldQueue) {
       return { queuedCount: 0, recipientCount: recipients.length, message };
     }
   }
@@ -2680,18 +2695,11 @@ async function queueParentSmsNotification(
   );
 
   const provider = settings.smsProvider || "none";
-  const ts = admin.firestore.Timestamp.now();
   const batch = db.batch();
   const initialStatus = buildSmsQueueInitialStatus(settings);
-  batch.set(dedupeRef, {
-    centerId,
-    studentId,
-    eventType,
-    dedupeKey,
-    createdAt: ts,
-    renderedMessage: message,
-    messageBytes,
-  }, { merge: true });
+  if (params.force) {
+    batch.set(dedupeRef, { ...dedupePayload, forcedAt: ts }, { merge: true });
+  }
 
   allowedRecipients.forEach((recipient) => {
     const queueRef = db.collection(`centers/${centerId}/smsQueue`).doc();
@@ -2929,6 +2937,78 @@ async function queueCustomParentSmsNotification(
 
   return { queuedCount: allowedRecipients.length, recipientCount: recipients.length, message };
 }
+
+function normalizeAttendanceEventForParentSms(value: unknown): AttendanceSmsEventType | null {
+  const normalized = asTrimmedString(value);
+  if (normalized === "check_in") return "study_start";
+  if (normalized === "check_out") return "study_end";
+  if (normalized === "away_start" || normalized === "away_end") return normalized;
+  if (normalized === "study_start" || normalized === "study_end") return normalized;
+  return null;
+}
+
+export const onAttendanceEventCreated = functions
+  .region(region)
+  .firestore.document("centers/{centerId}/attendanceEvents/{eventId}")
+  .onCreate(async (snap, context) => {
+    const db = admin.firestore();
+    const centerId = asTrimmedString(context.params.centerId);
+    const eventId = asTrimmedString(context.params.eventId);
+    const data = (snap.data() || {}) as Record<string, unknown>;
+    const studentId = asTrimmedString(data.studentId);
+    const eventType = normalizeAttendanceEventForParentSms(data.eventType);
+
+    if (!centerId || !studentId || !eventType) {
+      return null;
+    }
+
+    try {
+      const eventAt =
+        toKstDateFromUnknownTimestamp(data.occurredAt)
+        || toKstDateFromUnknownTimestamp(data.createdAt)
+        || toKstDate();
+      const [settings, studentSnap] = await Promise.all([
+        loadNotificationSettings(db, centerId),
+        db.doc(`centers/${centerId}/students/${studentId}`).get(),
+      ]);
+      const studentData = studentSnap.exists ? studentSnap.data() || {} : {};
+      const studentName = asTrimmedString(
+        studentData.name || asRecord(data.meta)?.studentName || data.studentName,
+        "학생"
+      );
+      const queueResult = await queueParentSmsNotification(db, {
+        centerId,
+        studentId,
+        studentName,
+        eventType,
+        eventAt,
+        settings,
+      });
+
+      await snap.ref.set({
+        smsAutoQueuedAt: admin.firestore.FieldValue.serverTimestamp(),
+        smsAutoQueuedCount: queueResult.queuedCount,
+        smsAutoRecipientCount: queueResult.recipientCount,
+        smsAutoEventType: eventType,
+        smsAutoMessage: queueResult.message || null,
+      }, { merge: true });
+    } catch (error: any) {
+      console.error("[attendance-sms-auto] failed", {
+        centerId,
+        eventId,
+        studentId,
+        eventType,
+        message: error?.message || String(error),
+      });
+      await snap.ref.set({
+        smsAutoQueuedAt: admin.firestore.FieldValue.serverTimestamp(),
+        smsAutoError: error?.message || String(error),
+        smsAutoEventType: eventType,
+      }, { merge: true });
+    }
+
+    return null;
+  });
 
 async function runLateArrivalCheckForCenter(
   db: admin.firestore.Firestore,
