@@ -974,6 +974,14 @@ function toTimeLabel(date) {
     const mm = String(date.getMinutes()).padStart(2, "0");
     return `${hh}:${mm}`;
 }
+function hasActiveOrSentSmsQueueStatus(status) {
+    const normalized = asTrimmedString(status);
+    return normalized === "queued" || normalized === "processing" || normalized === "sent";
+}
+function hasRetryableSmsQueueStatus(status) {
+    const normalized = asTrimmedString(status);
+    return normalized === "failed" || normalized === "pending_provider";
+}
 function parseHourMinute(value) {
     if (typeof value !== "string")
         return null;
@@ -2369,7 +2377,7 @@ async function queueAttendanceTransitionSmsDirectly(db, params) {
     if (!params.centerId || !params.studentId || !smsEventType || !eventId || eventAtMillis <= 0) {
         return null;
     }
-    const eventAt = new Date(eventAtMillis);
+    const eventAt = toKstDate(new Date(eventAtMillis));
     const eventRef = db.doc(`centers/${params.centerId}/attendanceEvents/${eventId}`);
     try {
         const [settings, studentSnap] = await Promise.all([
@@ -2513,6 +2521,53 @@ exports.onAttendanceEventCreated = functions
     }
     return null;
 });
+async function loadExistingAttendanceSmsQueuesForDate(db, centerId, dateKey) {
+    const queueSnap = await db
+        .collection(`centers/${centerId}/smsQueue`)
+        .where("dateKey", "==", dateKey)
+        .limit(1500)
+        .get();
+    return queueSnap.docs.map((queueDoc) => {
+        const queueData = (queueDoc.data() || {});
+        const queueMetadata = asRecord(queueData.metadata);
+        return {
+            id: queueDoc.id,
+            studentId: asTrimmedString(queueData.studentId),
+            eventType: asTrimmedString(queueData.eventType),
+            status: asTrimmedString(queueData.status),
+            dedupeKey: asTrimmedString(queueData.dedupeKey),
+            eventAtMs: toMillisSafe(queueData.eventAt || (queueMetadata === null || queueMetadata === void 0 ? void 0 : queueMetadata.eventAt)),
+            createdAtMs: toMillisSafe(queueData.createdAt),
+            renderedMessage: asTrimmedString(queueData.renderedMessage || queueData.message),
+        };
+    });
+}
+function getExistingAttendanceSmsQueueState(existingQueues, params) {
+    const normalizedEventType = normalizeSmsEventType(params.eventType);
+    const eventAtMs = params.eventAt.getTime();
+    const eventTimeLabel = toTimeLabel(params.eventAt);
+    let hasRetryableQueue = false;
+    for (const queue of existingQueues) {
+        if (queue.studentId !== params.studentId)
+            continue;
+        if (normalizeAttendanceEventForParentSms(queue.eventType) !== normalizedEventType)
+            continue;
+        const matchesDedupe = params.dedupeKey && queue.dedupeKey === params.dedupeKey;
+        const matchesEventAt = queue.eventAtMs > 0 && Math.abs(queue.eventAtMs - eventAtMs) <= 2 * MINUTE_MS;
+        const matchesRenderedTime = Boolean(queue.renderedMessage) &&
+            queue.renderedMessage.includes(params.studentName) &&
+            queue.renderedMessage.includes(eventTimeLabel);
+        if (!matchesDedupe && !matchesEventAt && !matchesRenderedTime)
+            continue;
+        if (hasActiveOrSentSmsQueueStatus(queue.status)) {
+            return "active_or_sent";
+        }
+        if (hasRetryableSmsQueueStatus(queue.status)) {
+            hasRetryableQueue = true;
+        }
+    }
+    return hasRetryableQueue ? "retryable" : "none";
+}
 async function repairAttendanceSmsQueueForCenter(db, centerId, dateKey) {
     const eventsSnap = await db
         .collection(`centers/${centerId}/attendanceEvents`)
@@ -2549,12 +2604,31 @@ async function repairAttendanceSmsQueueForCenter(db, centerId, dateKey) {
         const studentData = studentSnap.exists ? studentSnap.data() || {} : {};
         studentNameById.set(studentSnap.id, asTrimmedString(studentData.name, "학생"));
     });
+    const existingQueues = await loadExistingAttendanceSmsQueuesForDate(db, centerId, dateKey);
     let queuedCount = 0;
     let suppressedCount = 0;
     let skippedCount = 0;
     let noRecipientCount = 0;
     for (const event of targetEvents) {
         const studentName = studentNameById.get(event.studentId) || asTrimmedString(event.data.studentName, "학생");
+        const dedupeKey = buildAttendanceEventSmsDedupeKey({
+            centerId,
+            studentId: event.studentId,
+            eventType: event.eventType,
+            eventAt: event.eventAt,
+            eventId: event.eventId,
+        });
+        const existingQueueState = getExistingAttendanceSmsQueueState(existingQueues, {
+            studentId: event.studentId,
+            studentName,
+            eventType: event.eventType,
+            eventAt: event.eventAt,
+            dedupeKey,
+        });
+        if (existingQueueState === "active_or_sent") {
+            skippedCount += 1;
+            continue;
+        }
         const queueResult = await queueParentSmsNotification(db, {
             centerId,
             studentId: event.studentId,
@@ -2562,14 +2636,9 @@ async function repairAttendanceSmsQueueForCenter(db, centerId, dateKey) {
             eventType: event.eventType,
             eventAt: event.eventAt,
             settings,
+            force: existingQueueState === "retryable",
             useExactEventAt: true,
-            dedupeKeyOverride: buildAttendanceEventSmsDedupeKey({
-                centerId,
-                studentId: event.studentId,
-                eventType: event.eventType,
-                eventAt: event.eventAt,
-                eventId: event.eventId,
-            }),
+            dedupeKeyOverride: dedupeKey,
             sourceEventId: event.eventId,
         });
         if (queueResult.deduped) {
@@ -2686,20 +2755,35 @@ async function repairRecentAttendanceSmsQueueForCenter(db, centerId, dateKey, wi
         const studentData = studentSnap.exists ? studentSnap.data() || {} : {};
         studentNameById.set(studentSnap.id, asTrimmedString(studentData.name, "학생"));
     });
+    const existingQueues = await loadExistingAttendanceSmsQueuesForDate(db, centerId, dateKey);
     for (const event of recentEvents) {
         const studentName = studentNameById.get(event.studentId) || asTrimmedString(event.data.studentName, "학생");
-        const queueResult = await queueParentSmsNotification(db, Object.assign({ centerId, studentId: event.studentId, studentName, eventType: event.eventType, eventAt: event.eventAt, settings, useExactEventAt: true }, (event.eventId
-            ? {
-                dedupeKeyOverride: buildAttendanceEventSmsDedupeKey({
-                    centerId,
-                    studentId: event.studentId,
-                    eventType: event.eventType,
-                    eventAt: event.eventAt,
-                    eventId: event.eventId,
-                }),
-                sourceEventId: event.eventId,
-            }
-            : {})));
+        const dedupeKey = event.eventId
+            ? buildAttendanceEventSmsDedupeKey({
+                centerId,
+                studentId: event.studentId,
+                eventType: event.eventType,
+                eventAt: event.eventAt,
+                eventId: event.eventId,
+            })
+            : buildSmsDedupeKey({
+                centerId,
+                studentId: event.studentId,
+                eventType: normalizeSmsEventType(event.eventType),
+                eventAt: event.eventAt,
+            });
+        const existingQueueState = getExistingAttendanceSmsQueueState(existingQueues, {
+            studentId: event.studentId,
+            studentName,
+            eventType: event.eventType,
+            eventAt: event.eventAt,
+            dedupeKey,
+        });
+        if (existingQueueState === "active_or_sent") {
+            baseResult.skippedCount += 1;
+            continue;
+        }
+        const queueResult = await queueParentSmsNotification(db, Object.assign({ centerId, studentId: event.studentId, studentName, eventType: event.eventType, eventAt: event.eventAt, settings, force: existingQueueState === "retryable", useExactEventAt: true, dedupeKeyOverride: dedupeKey }, (event.eventId ? { sourceEventId: event.eventId } : {})));
         if (queueResult.deduped) {
             baseResult.skippedCount += 1;
             continue;
