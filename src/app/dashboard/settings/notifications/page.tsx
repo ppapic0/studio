@@ -376,10 +376,11 @@ function formatDateLabel(value?: { toDate?: () => Date }) {
   return `${date.getMonth() + 1}.${String(date.getDate()).padStart(2, '0')} ${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`;
 }
 
-function maskPhone(value?: string) {
+function formatPhone(value?: string) {
   const digits = String(value || '').replace(/\D/g, '');
-  if (digits.length < 8) return value || '-';
-  return `${digits.slice(0, 3)}-${digits.slice(3, digits.length - 4).replace(/\d/g, '*')}-${digits.slice(-4)}`;
+  if (digits.length === 11) return `${digits.slice(0, 3)}-${digits.slice(3, 7)}-${digits.slice(7)}`;
+  if (digits.length === 10) return `${digits.slice(0, 3)}-${digits.slice(3, 6)}-${digits.slice(6)}`;
+  return value || '-';
 }
 
 function normalizePhoneNumber(value?: string) {
@@ -1740,7 +1741,7 @@ export default function NotificationSettingsPage() {
                                 {row.isManualRecipient ? <Badge className="border-none bg-orange-100 text-orange-700 font-black">보호자 직접 추가</Badge> : null}
                                 {row.isPhoneMissing ? <Badge className="border-none bg-slate-200 text-slate-700 font-black">번호 미등록</Badge> : null}
                               </div>
-                              <p className="mt-1 text-xs font-bold text-slate-500">{row.phoneNumber ? maskPhone(row.phoneNumber) : '번호 미등록'}</p>
+                              <p className="mt-1 text-xs font-bold text-slate-500">{row.phoneNumber ? formatPhone(row.phoneNumber) : '번호 미등록'}</p>
                               {row.isPhoneMissing ? (
                                 <div className="mt-3 flex flex-col gap-2 sm:flex-row">
                                   <Input
@@ -1802,7 +1803,7 @@ export default function NotificationSettingsPage() {
                         </div>
                         {selectedManualParentRow?.phoneNumber ? (
                           <Badge className="border-none bg-white text-orange-700 font-black">
-                            {maskPhone(selectedManualParentRow.phoneNumber)}
+                            {formatPhone(selectedManualParentRow.phoneNumber)}
                           </Badge>
                         ) : null}
                       </div>
@@ -1965,7 +1966,7 @@ export default function NotificationSettingsPage() {
                         <p className="text-sm font-black text-slate-900">{row.parentName}</p>
                                     <Badge className={cn('border-none font-black', row.statusTone)}>{row.statusLabel}</Badge>
                                   </div>
-                                  <p className="mt-1 text-[11px] font-bold text-slate-500">{row.phoneNumber ? maskPhone(row.phoneNumber) : '번호 미등록'}</p>
+                                  <p className="mt-1 text-[11px] font-bold text-slate-500">{row.phoneNumber ? formatPhone(row.phoneNumber) : '번호 미등록'}</p>
                                 </div>
                                 <p className="text-[11px] font-bold text-slate-500">{row.timeLabel}</p>
                               </div>
@@ -2038,7 +2039,7 @@ export default function NotificationSettingsPage() {
                               <p className="text-sm font-black text-slate-900">{row.parentName}</p>
                               {row.isPhoneMissing ? <Badge className="border-none bg-slate-200 text-slate-700 font-black">번호 미등록</Badge> : null}
                             </div>
-                            <p className="text-xs font-bold text-slate-500">{row.phoneNumber ? maskPhone(row.phoneNumber) : '번호 미등록'}</p>
+                            <p className="text-xs font-bold text-slate-500">{row.phoneNumber ? formatPhone(row.phoneNumber) : '번호 미등록'}</p>
                           </div>
                           <div className="flex items-center gap-3">
                             <span className="text-xs font-bold text-slate-500">전체 수신</span>
@@ -2200,7 +2201,7 @@ export default function NotificationSettingsPage() {
                       <Badge className="border-none bg-slate-100 text-slate-700 font-black">{getEventLabel(row.eventType)}</Badge>
                       <Badge className={cn('border-none font-black', row.status === 'sent' ? 'bg-emerald-100 text-emerald-700' : row.status === 'failed' ? 'bg-rose-100 text-rose-700' : 'bg-amber-100 text-amber-700')}>{getDeliveryStatusLabel(row.status)}</Badge>
                     </div>
-                    <p className="mt-1 text-[11px] font-bold text-slate-500">{row.parentName || '학부모'} {row.phoneNumber ? `· ${maskPhone(row.phoneNumber)}` : ''} · {row.provider || 'none'}</p>
+                    <p className="mt-1 text-[11px] font-bold text-slate-500">{row.parentName || '학부모'} {row.phoneNumber ? `· ${formatPhone(row.phoneNumber)}` : ''} · {row.provider || 'none'}</p>
                   </div>
                   <p className="text-[11px] font-bold text-slate-500">{formatDateLabel(row.createdAt)}</p>
                 </div>
