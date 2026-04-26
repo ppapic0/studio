@@ -621,6 +621,59 @@ async function finalizeStudySession(params) {
                 dailyPointStatusUpdates[entry.dateKey] = currentDayStatus;
             }
         });
+        const createdSessionEntries = sessionEntries.filter((entry, index) => {
+            const sessionSnap = sessionSnapshots[index];
+            return !sessionSnap.exists && entry.durationMinutes > 0;
+        });
+        uniqueSessionDayRefs.forEach(([dateKey, dayRef], dayIndex) => {
+            var _a, _b;
+            const existingSessionData = existingSessionSnaps[dayIndex].docs.map((docSnap) => {
+                return (docSnap.data() || {});
+            });
+            const createdSessionData = createdSessionEntries
+                .filter((entry) => entry.dateKey === dateKey)
+                .map((entry) => ({
+                startTime: admin.firestore.Timestamp.fromMillis(entry.startMs),
+                endTime: admin.firestore.Timestamp.fromMillis(entry.endMs),
+                durationMinutes: entry.durationMinutes,
+                durationSeconds: entry.durationSeconds,
+            }));
+            const allSessionData = [...existingSessionData, ...createdSessionData];
+            if (allSessionData.length === 0)
+                return;
+            const recomputedTotalMinutes = allSessionData.reduce((sum, sessionData) => {
+                return sum + getStudySessionDurationMinutesFromData(sessionData);
+            }, 0);
+            const firstSessionStartMs = (_a = allSessionData
+                .map((sessionData) => toMillisSafe(sessionData.startTime))
+                .filter((value) => value > 0)
+                .sort((left, right) => left - right)[0]) !== null && _a !== void 0 ? _a : 0;
+            const lastSessionEndMs = (_b = allSessionData
+                .map((sessionData) => toMillisSafe(sessionData.endTime))
+                .filter((value) => value > 0)
+                .sort((left, right) => right - left)[0]) !== null && _b !== void 0 ? _b : 0;
+            totalMinutesByDateKey[dateKey] = Math.max(0, Math.round(recomputedTotalMinutes));
+            transaction.set(dayRef, {
+                studentId,
+                centerId,
+                dateKey,
+                totalMinutes: totalMinutesByDateKey[dateKey],
+                firstSessionStartAt: firstSessionStartMs > 0
+                    ? admin.firestore.Timestamp.fromMillis(firstSessionStartMs)
+                    : admin.firestore.FieldValue.delete(),
+                lastSessionEndAt: lastSessionEndMs > 0
+                    ? admin.firestore.Timestamp.fromMillis(lastSessionEndMs)
+                    : admin.firestore.FieldValue.delete(),
+                updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+            }, { merge: true });
+            transaction.set(db.doc(`centers/${centerId}/dailyStudentStats/${dateKey}/students/${studentId}`), {
+                studentId,
+                centerId,
+                dateKey,
+                totalStudyMinutes: totalMinutesByDateKey[dateKey],
+                updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+            }, { merge: true });
+        });
         const createdSessionCount = sessionEntries.reduce((count, entry, index) => {
             const sessionSnap = sessionSnapshots[index];
             return count + (!sessionSnap.exists && entry.durationMinutes > 0 ? 1 : 0);

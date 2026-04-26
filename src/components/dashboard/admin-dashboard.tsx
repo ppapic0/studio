@@ -112,7 +112,7 @@ import { useCenterAdminAttendanceBoard } from '@/hooks/use-center-admin-attendan
 import { useCenterAdminHeatmap } from '@/hooks/use-center-admin-heatmap';
 import { getAttendanceRequestTypeLabel, getScheduleChangeReasonLabel } from '@/lib/attendance-request';
 import { syncAutoAttendanceRecord } from '@/lib/attendance-auto';
-import { setStudentAttendanceStatusSecure } from '@/lib/study-session-actions';
+import { repairRecentStudySessionTotals, setStudentAttendanceStatusSecure } from '@/lib/study-session-actions';
 import { getStudySessionDurationMinutes } from '@/lib/study-session-time';
 import {
   buildCounselingTrackOverview,
@@ -760,6 +760,7 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
   const [selectedRoomView, setSelectedRoomView] = useState<'all' | string>('all');
   const hasInitializedRoomViewRef = useRef(false);
   const hasHydratedRoomDraftsRef = useRef(false);
+  const autoRepairedStudyTotalKeysRef = useRef<Set<string>>(new Set());
   const liveClassroomSectionRef = useRef<HTMLDivElement | null>(null);
   const [isClassroomEditMode, setIsClassroomEditMode] = useState(false);
   const [isClassroomLayoutSaving, setIsClassroomLayoutSaving] = useState(false);
@@ -786,6 +787,7 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
   const [pointBoostMultiplierDraft, setPointBoostMultiplierDraft] = useState('2');
   const [pointBoostMessageDraft, setPointBoostMessageDraft] = useState('');
   const [focusAttendanceActionSaving, setFocusAttendanceActionSaving] = useState<AttendanceCurrent['status'] | null>(null);
+  const [focusStudyTotalsRepairing, setFocusStudyTotalsRepairing] = useState(false);
   const [isCreatingPointBoost, setIsCreatingPointBoost] = useState(false);
   const [cancellingPointBoostId, setCancellingPointBoostId] = useState<string | null>(null);
   const [isOpenClawExporting, setIsOpenClawExporting] = useState(false);
@@ -2751,6 +2753,14 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
     [selectedFocusTodaySessions]
   );
 
+  const selectedFocusClosedSessionTotalMinutes = useMemo(
+    () =>
+      selectedFocusTodaySessions
+        .filter((session) => !session.isLive)
+        .reduce((sum, session) => sum + Math.max(0, session.durationMinutes), 0),
+    [selectedFocusTodaySessions]
+  );
+
   const selectedFocusStudent = useMemo(() => {
     if (!selectedFocusStudentId || !metrics) return null;
     return (
@@ -2950,10 +2960,24 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
     [progressList, selectedFocusStudentId]
   );
 
+  const selectedFocusStoredTodayStudyMinutes = useMemo(
+    () => Math.max(0, Math.round(Number(selectedFocusStudent?.todayMinutes ?? selectedFocusStat?.totalStudyMinutes ?? 0))),
+    [selectedFocusStat?.totalStudyMinutes, selectedFocusStudent?.todayMinutes]
+  );
+
+  const selectedFocusEffectiveTodayStudyMinutes = useMemo(
+    () => Math.max(selectedFocusStoredTodayStudyMinutes, selectedFocusTodaySessionTotalMinutes),
+    [selectedFocusStoredTodayStudyMinutes, selectedFocusTodaySessionTotalMinutes]
+  );
+
+  const hasSelectedFocusStudyTotalMismatch =
+    selectedFocusTodaySessions.length > 0 &&
+    selectedFocusClosedSessionTotalMinutes > selectedFocusStoredTodayStudyMinutes + 1;
+
   const selectedFocusBreakdown = useMemo(() => {
     if (!selectedFocusStudent) return null;
     const completionRate = clampScore(selectedFocusStat?.todayPlanCompletionRate || 0);
-    const studyMinutes = Math.max(0, selectedFocusStudent.todayMinutes || selectedFocusStat?.totalStudyMinutes || 0);
+    const studyMinutes = selectedFocusEffectiveTodayStudyMinutes;
     const growthRate = Number(selectedFocusStat?.studyTimeGrowthRate || 0);
     const focusStat = clampScore(selectedFocusProgress?.stats?.focus || 0);
     const penaltyPoints = Math.max(0, selectedFocusProgress?.penaltyPoints || 0);
@@ -2978,7 +3002,7 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
       penaltyScore,
       weighted,
     };
-  }, [selectedFocusStudent, selectedFocusStat, selectedFocusProgress]);
+  }, [selectedFocusStudent, selectedFocusStat, selectedFocusProgress, selectedFocusEffectiveTodayStudyMinutes]);
 
   const focusStudentTrend = useMemo(() => {
     const progress = progressList?.find((p) => p.id === selectedFocusStudentId);
@@ -2999,7 +3023,7 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
       const stat = statByDateKey.get(dateKey);
       const rawMinutes = minutesByDateKey.get(dateKey) ?? Math.round(stat?.totalStudyMinutes || 0);
       const minutes = dateKey === todayKey && selectedFocusStudent?.todayMinutes != null
-        ? Math.max(0, Math.round(selectedFocusStudent.todayMinutes))
+        ? selectedFocusEffectiveTodayStudyMinutes
         : rawMinutes;
       const score = stat
         ? calculateStudentFocusScore(
@@ -3017,7 +3041,7 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
         minutes,
       };
     });
-  }, [focusStudentTrendRaw, focusStudyLogDaysRaw, progressList, selectedFocusStudentId, selectedFocusStudent?.todayMinutes, today, todayKey]);
+  }, [focusStudentTrendRaw, focusStudyLogDaysRaw, progressList, selectedFocusStudentId, selectedFocusStudent?.todayMinutes, selectedFocusEffectiveTodayStudyMinutes, today, todayKey]);
 
   // ── 선택 학생 세션 데이터 로드 (시작시간 분포·외출시간 산출용) ──
   useEffect(() => {
@@ -3217,7 +3241,7 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
     if (prev7Rows.length === 0) return 0;
     return Math.round(prev7Rows.reduce((sum, row) => sum + (row.totalStudyMinutes || 0), 0) / prev7Rows.length);
   }, [focusStudentTrendRaw, today]);
-  const todayStudyMinutes = Math.round(selectedFocusStudent?.todayMinutes ?? selectedFocusStat?.totalStudyMinutes ?? 0);
+  const todayStudyMinutes = selectedFocusEffectiveTodayStudyMinutes;
   const todayLearningGrowthPercent = previous7AvgStudyMinutes > 0
     ? Math.round(((todayStudyMinutes - previous7AvgStudyMinutes) / previous7AvgStudyMinutes) * 100)
     : 0;
@@ -4353,6 +4377,65 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
       setFocusAttendanceActionSaving(null);
     }
   };
+  const handleRepairFocusStudyTotals = async (options: { silent?: boolean } = {}) => {
+    if (!centerId || !selectedFocusStudentId) return;
+
+    setFocusStudyTotalsRepairing(true);
+    try {
+      const result = await repairRecentStudySessionTotals({
+        centerId,
+        studentId: selectedFocusStudentId,
+        days: 7,
+      });
+      setLiveTickMs(Date.now());
+      if (!options.silent) {
+        toast({
+          title: '세션 합계를 재계산했습니다.',
+          description: `${result.daysSynced || 0}일 동기화 · 복구 세션 ${result.sessionsCreated || 0}건`,
+        });
+      }
+    } catch (error) {
+      logHandledClientIssue('[admin-dashboard] focus study totals repair failed', error);
+      if (!options.silent) {
+        toast({
+          variant: 'destructive',
+          title: '세션 합계 재계산 실패',
+          description: '잠시 후 다시 시도해 주세요.',
+        });
+      }
+    } finally {
+      setFocusStudyTotalsRepairing(false);
+    }
+  };
+
+  useEffect(() => {
+    if (
+      !isActive ||
+      !centerId ||
+      !selectedFocusStudentId ||
+      !todayKey ||
+      selectedFocusTodaySessionsLoading ||
+      focusStudyTotalsRepairing ||
+      !hasSelectedFocusStudyTotalMismatch
+    ) {
+      return;
+    }
+
+    const repairKey = `${centerId}_${selectedFocusStudentId}_${todayKey}_${selectedFocusClosedSessionTotalMinutes}`;
+    if (autoRepairedStudyTotalKeysRef.current.has(repairKey)) return;
+    autoRepairedStudyTotalKeysRef.current.add(repairKey);
+    void handleRepairFocusStudyTotals({ silent: true });
+  }, [
+    centerId,
+    focusStudyTotalsRepairing,
+    hasSelectedFocusStudyTotalMismatch,
+    isActive,
+    selectedFocusClosedSessionTotalMinutes,
+    selectedFocusStudentId,
+    selectedFocusTodaySessionsLoading,
+    todayKey,
+  ]);
+
   const handleToggleClassroomEditMode = () => {
     if (!isClassroomEditMode && selectedRoomView === 'all' && roomConfigs[0]) {
       setSelectedRoomView(roomConfigs[0].id);
@@ -7964,12 +8047,32 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
                       </div>
                     </div>
                     <div className="flex flex-wrap items-center gap-2">
+                      {hasSelectedFocusStudyTotalMismatch ? (
+                        <Badge className="h-7 rounded-full border-none bg-rose-50 px-3 text-[10px] font-black text-rose-600">
+                          {focusStudyTotalsRepairing ? '합계 보정중' : '합계 불일치'}
+                        </Badge>
+                      ) : null}
                       <Badge className="h-7 rounded-full border-none bg-[#EEF4FF] px-3 text-[10px] font-black text-[#2554D7]">
                         {selectedFocusTodaySessions.length}개
                       </Badge>
                       <Badge className="h-7 rounded-full border-none bg-[#FFF8F2] px-3 text-[10px] font-black text-[#C95A08]">
                         합계 {formatFocusSessionDurationLabel(selectedFocusTodaySessionTotalMinutes)}
                       </Badge>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        className="h-7 rounded-full border-[#DCE7FF] px-3 text-[10px] font-black text-[#14295F]"
+                        disabled={!selectedFocusStudentId || focusStudyTotalsRepairing}
+                        onClick={() => void handleRepairFocusStudyTotals()}
+                      >
+                        {focusStudyTotalsRepairing ? (
+                          <Loader2 className="mr-1.5 h-3 w-3 animate-spin" />
+                        ) : (
+                          <History className="mr-1.5 h-3 w-3" />
+                        )}
+                        합계 재계산
+                      </Button>
                     </div>
                   </div>
 
