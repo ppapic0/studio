@@ -16,6 +16,17 @@ if (admin.apps.length === 0) {
 }
 
 const region = "asia-northeast3";
+const smsVpcConnector = (
+  process.env.SMS_VPC_CONNECTOR ||
+  process.env.FUNCTIONS_VPC_CONNECTOR ||
+  ""
+).trim();
+const smsDispatcherFunctions = smsVpcConnector
+  ? functions.region(region).runWith({
+      vpcConnector: smsVpcConnector,
+      vpcConnectorEgressSettings: "ALL_TRAFFIC",
+    })
+  : functions.region(region);
 const geminiApiKey = defineSecret("GEMINI_API_KEY");
 const MANUAL_PARENT_SMS_UID = "__manual_parent__";
 const STUDENT_SMS_FALLBACK_UID = "__student__";
@@ -6987,11 +6998,14 @@ export const sendManualStudentSms = functions.region(region).https.onCall(async 
   };
 });
 
-export const scheduledSmsQueueDispatcher = functions
-  .region(region)
+export const scheduledSmsQueueDispatcher = smsDispatcherFunctions
   .pubsub.schedule("every 1 minutes")
   .timeZone("Asia/Seoul")
   .onRun(async () => {
+    if (!smsVpcConnector) {
+      console.warn("[sms-dispatcher] SMS_VPC_CONNECTOR is not configured; outbound SMS traffic may not use the static egress IP.");
+    }
+
     const db = admin.firestore();
     const now = new Date();
     const todayKey = toDateKey(toKstDate(now));
