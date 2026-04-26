@@ -39,6 +39,8 @@ import {
   PencilLine,
   BrainCircuit,
   ArrowRight,
+  RotateCcw,
+  SlidersHorizontal,
 } from 'lucide-react';
 import { useCollection, useFirestore, useUser, useDoc, useStorage } from '@/firebase';
 import { useAppContext } from '@/contexts/app-context';
@@ -141,6 +143,7 @@ import {
   formatClockRange,
   formatDurationLabel,
   getNextAutoWindow,
+  type PlannerQuickTaskSuggestion,
   type PlannerTaskDraft,
   type PlannerTemplateRecord,
 } from '@/lib/plan-track';
@@ -332,6 +335,56 @@ const SUBJECTS = [
   { id: 'etc', label: '직접 입력', color: 'bg-slate-400', light: 'bg-slate-50', text: 'text-slate-500' },
 ];
 const DEFAULT_CUSTOM_SUBJECT_LABEL = '직접 입력';
+const QUICK_ADD_MAX_ITEMS = 6;
+const QUICK_ADD_TITLE_MAX_LENGTH = 16;
+const QUICK_ADD_TAG_MAX_LENGTH = 12;
+
+function createDefaultQuickAddSuggestions(): PlannerQuickTaskSuggestion[] {
+  return PLANNER_QUICK_TASK_SUGGESTIONS.slice(0, 4).map((suggestion) => ({ ...suggestion }));
+}
+
+function createQuickAddSuggestionDraft(): PlannerQuickTaskSuggestion {
+  return {
+    id: `quick-add-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+    title: '새 빠른 추가',
+    subject: 'math',
+    targetMinutes: 60,
+    tag: '빠른추가',
+    priority: 'medium',
+  };
+}
+
+function normalizeQuickAddSuggestions(raw: unknown): PlannerQuickTaskSuggestion[] {
+  if (!Array.isArray(raw)) return createDefaultQuickAddSuggestions();
+  const validSubjectIds = new Set(SUBJECTS.map((item) => item.id));
+  const normalized = raw.reduce<PlannerQuickTaskSuggestion[]>((rows, item, index) => {
+    if (!item || typeof item !== 'object') return rows;
+    const value = item as Partial<PlannerQuickTaskSuggestion>;
+    const title = String(value.title || '').trim().slice(0, QUICK_ADD_TITLE_MAX_LENGTH);
+    if (!title) return rows;
+    const subject = validSubjectIds.has(String(value.subject || ''))
+      ? String(value.subject)
+      : 'etc';
+    const subjectLabel = subject === 'etc'
+      ? normalizeCustomSubjectLabel(value.subjectLabel)
+      : undefined;
+    const targetMinutes = Math.max(5, Math.min(720, Math.round(Number(value.targetMinutes) || 60)));
+    const tag = String(value.tag || '').trim().slice(0, QUICK_ADD_TAG_MAX_LENGTH) || '빠른추가';
+    const priority = value.priority === 'high' || value.priority === 'low' ? value.priority : 'medium';
+    rows.push({
+      id: String(value.id || `quick-add-${index}`),
+      title,
+      subject,
+      subjectLabel,
+      targetMinutes,
+      tag,
+      priority,
+    });
+    return rows;
+  }, []);
+
+  return normalized.length > 0 ? normalized.slice(0, QUICK_ADD_MAX_ITEMS) : createDefaultQuickAddSuggestions();
+}
 
 function normalizeCustomSubjectLabel(label?: string | null) {
   const trimmed = label?.trim();
@@ -643,6 +696,8 @@ export default function StudyPlanPage() {
   const [isRecentStudySheetOpen, setIsRecentStudySheetOpen] = useState(false);
   const [isStudyPlanSheetOpen, setIsStudyPlanSheetOpen] = useState(false);
   const [isTemplateSheetOpen, setIsTemplateSheetOpen] = useState(false);
+  const [isQuickAddSettingsOpen, setIsQuickAddSettingsOpen] = useState(false);
+  const [isQuickAddSaving, setIsQuickAddSaving] = useState(false);
   const [isRoutineSectionOpen, setIsRoutineSectionOpen] = useState(false);
   const [isMemoSectionOpen, setIsMemoSectionOpen] = useState(false);
   const [showQuickAddCard, setShowQuickAddCard] = useState(false);
@@ -661,6 +716,8 @@ export default function StudyPlanPage() {
   const [recentStudyHistory, setRecentStudyHistory] = useState<StudyPlanItem[]>([]);
   const [isRecentStudyLoading, setIsRecentStudyLoading] = useState(false);
   const [activeRecentStudyKey, setActiveRecentStudyKey] = useState<string | null>(null);
+  const [quickAddSuggestions, setQuickAddSuggestions] = useState<PlannerQuickTaskSuggestion[]>(() => createDefaultQuickAddSuggestions());
+  const [quickAddDrafts, setQuickAddDrafts] = useState<PlannerQuickTaskSuggestion[]>(() => createDefaultQuickAddSuggestions());
 
   const planSubjectOptions = useMemo(
     () =>
@@ -742,6 +799,14 @@ export default function StudyPlanPage() {
   const { data: userProfile } = useDoc<UserType>(userProfileRef, {
     enabled: Boolean(userProfileRef),
   });
+
+  useEffect(() => {
+    const nextSuggestions = normalizeQuickAddSuggestions(userProfile?.plannerQuickAddSuggestions);
+    setQuickAddSuggestions(nextSuggestions);
+    if (!isQuickAddSettingsOpen) {
+      setQuickAddDrafts(nextSuggestions);
+    }
+  }, [isQuickAddSettingsOpen, userProfile?.plannerQuickAddSuggestions]);
 
   useEffect(() => {
     const requestedDate = searchParams.get('date');
@@ -2625,15 +2690,77 @@ export default function StudyPlanPage() {
     }
   };
 
-  const handleQuickAddSuggestion = async (suggestionId: string) => {
-    const suggestion = PLANNER_QUICK_TASK_SUGGESTIONS.find((item) => item.id === suggestionId);
-    if (!suggestion) return;
+  const handleOpenQuickAddSettings = () => {
+    setQuickAddDrafts(quickAddSuggestions);
+    setIsQuickAddSettingsOpen(true);
+  };
+
+  const handleUpdateQuickAddDraft = (itemId: string, patch: Partial<PlannerQuickTaskSuggestion>) => {
+    setQuickAddDrafts((previous) =>
+      previous.map((item) => (item.id === itemId ? { ...item, ...patch } : item))
+    );
+  };
+
+  const handleAddQuickAddDraft = () => {
+    setQuickAddDrafts((previous) => {
+      if (previous.length >= QUICK_ADD_MAX_ITEMS) return previous;
+      return [...previous, createQuickAddSuggestionDraft()];
+    });
+  };
+
+  const handleDeleteQuickAddDraft = (itemId: string) => {
+    setQuickAddDrafts((previous) => previous.filter((item) => item.id !== itemId));
+  };
+
+  const handleResetQuickAddDrafts = () => {
+    setQuickAddDrafts(createDefaultQuickAddSuggestions());
+  };
+
+  const handleSaveQuickAddSettings = async () => {
+    if (!userProfileRef) return;
+    const hasInvalidDraft = quickAddDrafts.some((item) => !item.title.trim() || Number(item.targetMinutes) <= 0);
+    if (quickAddDrafts.length === 0 || hasInvalidDraft) {
+      toast({
+        variant: 'destructive',
+        title: '빠른 추가 설정 확인',
+        description: '버튼 이름과 목표 시간을 입력해 주세요.',
+      });
+      return;
+    }
+
+    const nextSuggestions = normalizeQuickAddSuggestions(quickAddDrafts);
+    setIsQuickAddSaving(true);
+    try {
+      await setDoc(userProfileRef, {
+        plannerQuickAddSuggestions: nextSuggestions,
+        updatedAt: serverTimestamp(),
+      }, { merge: true });
+      setQuickAddSuggestions(nextSuggestions);
+      setQuickAddDrafts(nextSuggestions);
+      setIsQuickAddSettingsOpen(false);
+      toast({
+        title: '빠른 추가 설정을 저장했어요',
+        description: '오늘 계획에서 바로 새 버튼을 사용할 수 있습니다.',
+      });
+    } catch (error: any) {
+      toast({
+        variant: 'destructive',
+        title: '빠른 추가 저장 실패',
+        description: getSafeErrorMessage(error, '설정을 저장하지 못했습니다.'),
+      });
+    } finally {
+      setIsQuickAddSaving(false);
+    }
+  };
+
+  const handleQuickAddSuggestion = async (suggestion: PlannerQuickTaskSuggestion) => {
     const nextWindow = getNextAutoWindow(studyTasks, suggestion.targetMinutes, PLAN_DEFAULT_START_TIME);
     const added = await handleAddTask(suggestion.title, 'study', {
       taskBlueprint: {
         category: 'study',
         title: suggestion.title,
         subject: suggestion.subject,
+        subjectLabel: suggestion.subject === 'etc' ? normalizeCustomSubjectLabel(suggestion.subjectLabel) : undefined,
         studyPlanMode: 'time',
         targetMinutes: suggestion.targetMinutes,
         startTime: nextWindow.startTime,
@@ -4113,17 +4240,25 @@ export default function StudyPlanPage() {
           <div className="rounded-[1.2rem] border border-white/10 bg-[linear-gradient(180deg,rgba(8,20,49,0.18)_0%,rgba(255,255,255,0.06)_100%)] px-4 py-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.1)]">
             <div className="flex flex-wrap items-center gap-2">
               <p className="student-aggro-kicker text-[10px] font-black uppercase tracking-[0.18em] text-white/65">빠른 추가</p>
-              {PLANNER_QUICK_TASK_SUGGESTIONS.slice(0, 4).map((suggestion) => (
+              {quickAddSuggestions.slice(0, QUICK_ADD_MAX_ITEMS).map((suggestion) => (
                 <button
                   key={suggestion.id}
                   type="button"
-                  onClick={() => void handleQuickAddSuggestion(suggestion.id)}
+                  onClick={() => void handleQuickAddSuggestion(suggestion)}
                   className="student-aggro-body rounded-full border border-white/16 bg-white px-3 py-1.5 text-[10px] font-black text-[#17326B] transition hover:border-[#FFB665]/60 hover:bg-[#FFF4E8]"
                   disabled={isPast}
                 >
                   {suggestion.title}
                 </button>
               ))}
+              <button
+                type="button"
+                onClick={handleOpenQuickAddSettings}
+                className="student-aggro-body inline-flex items-center gap-1.5 rounded-full border border-white/16 bg-white/10 px-3 py-1.5 text-[10px] font-black text-white transition hover:border-[#FFB665]/60 hover:bg-white/16"
+              >
+                <SlidersHorizontal className="h-3 w-3" />
+                빠른 추가 설정하기
+              </button>
             </div>
           </div>
         </div>
@@ -4574,6 +4709,172 @@ export default function StudyPlanPage() {
               className="h-11 w-full rounded-[1rem] border-[#DCE6F5] bg-white font-black text-[#17326B]"
             >
               다시 보기
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={isQuickAddSettingsOpen}
+        onOpenChange={(open) => {
+          setIsQuickAddSettingsOpen(open);
+          if (open) {
+            setQuickAddDrafts(quickAddSuggestions);
+          }
+        }}
+      >
+        <DialogContent className="flex max-h-[88vh] flex-col overflow-hidden rounded-[1.6rem] border-none bg-white p-0 shadow-[0_30px_90px_-42px_rgba(20,41,95,0.45)] sm:max-w-[680px]">
+          <DialogHeader className="border-b border-[#EAF0FA] bg-[linear-gradient(135deg,#14295F_0%,#2855D9_78%,#FF8A2A_140%)] px-6 py-5 text-left text-white">
+            <DialogTitle className="font-aggro-display text-xl font-black tracking-[-0.03em] text-white">
+              빠른 추가 설정
+            </DialogTitle>
+            <DialogDescription className="student-aggro-body text-xs font-semibold text-white/78">
+              자주 하는 공부를 버튼으로 저장해두면 오늘 계획에 바로 추가할 수 있어요.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="min-h-0 flex-1 space-y-3 overflow-y-auto px-5 py-5">
+            {quickAddDrafts.map((draft, index) => {
+              const isCustomSubject = draft.subject === 'etc';
+              return (
+                <div key={draft.id} className="rounded-[1.25rem] border border-[#DCE6F5] bg-[#F8FBFF] p-4">
+                  <div className="flex items-center justify-between gap-3">
+                    <Badge className="border-none bg-white px-2.5 py-1 text-[10px] font-black text-[#17326B] shadow-none">
+                      빠른 추가 {index + 1}
+                    </Badge>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handleDeleteQuickAddDraft(draft.id)}
+                      disabled={quickAddDrafts.length <= 1 || isQuickAddSaving}
+                      className="h-8 rounded-full border-rose-100 bg-white px-3 text-[10px] font-black text-rose-600 hover:bg-rose-50"
+                    >
+                      <Trash2 className="mr-1 h-3.5 w-3.5" />
+                      삭제
+                    </Button>
+                  </div>
+
+                  <div className="mt-4 grid gap-3 sm:grid-cols-[minmax(0,1.2fr)_minmax(0,0.8fr)]">
+                    <div className="space-y-1.5">
+                      <Label htmlFor={`quick-add-title-${draft.id}`} className="text-[11px] font-black text-[#17326B]">
+                        버튼 이름
+                      </Label>
+                      <Input
+                        id={`quick-add-title-${draft.id}`}
+                        value={draft.title}
+                        maxLength={QUICK_ADD_TITLE_MAX_LENGTH}
+                        onChange={(event) => handleUpdateQuickAddDraft(draft.id, { title: event.target.value.slice(0, QUICK_ADD_TITLE_MAX_LENGTH) })}
+                        className="h-10 rounded-xl border-[#DCE6F5] bg-white text-sm font-black text-[#17326B]"
+                      />
+                    </div>
+
+                    <div className="space-y-1.5">
+                      <Label className="text-[11px] font-black text-[#17326B]">과목</Label>
+                      <Select
+                        value={draft.subject}
+                        onValueChange={(value) =>
+                          handleUpdateQuickAddDraft(draft.id, {
+                            subject: value,
+                            subjectLabel: value === 'etc' ? normalizeCustomSubjectLabel(draft.subjectLabel) : undefined,
+                          })
+                        }
+                      >
+                        <SelectTrigger className="h-10 rounded-xl border-[#DCE6F5] bg-white text-sm font-black text-[#17326B]">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent className="rounded-xl border-none shadow-2xl">
+                          {SUBJECTS.map((subject) => (
+                            <SelectItem key={subject.id} value={subject.id} className="font-bold">
+                              {subject.label}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    {isCustomSubject ? (
+                      <div className="space-y-1.5">
+                        <Label htmlFor={`quick-add-subject-${draft.id}`} className="text-[11px] font-black text-[#17326B]">
+                          과목명
+                        </Label>
+                        <Input
+                          id={`quick-add-subject-${draft.id}`}
+                          value={draft.subjectLabel || ''}
+                          maxLength={12}
+                          onChange={(event) => handleUpdateQuickAddDraft(draft.id, { subjectLabel: event.target.value.slice(0, 12) })}
+                          className="h-10 rounded-xl border-[#DCE6F5] bg-white text-sm font-black text-[#17326B]"
+                        />
+                      </div>
+                    ) : null}
+
+                    <div className="space-y-1.5">
+                      <Label htmlFor={`quick-add-minutes-${draft.id}`} className="text-[11px] font-black text-[#17326B]">
+                        목표 시간
+                      </Label>
+                      <div className="flex items-center gap-2">
+                        <Input
+                          id={`quick-add-minutes-${draft.id}`}
+                          type="number"
+                          min={5}
+                          max={720}
+                          step={5}
+                          inputMode="numeric"
+                          value={draft.targetMinutes || ''}
+                          onChange={(event) => handleUpdateQuickAddDraft(draft.id, { targetMinutes: Number(event.target.value) || 0 })}
+                          className="h-10 rounded-xl border-[#DCE6F5] bg-white text-sm font-black text-[#17326B]"
+                        />
+                        <span className="shrink-0 text-xs font-black text-[#5A6F95]">분</span>
+                      </div>
+                    </div>
+
+                    <div className="space-y-1.5">
+                      <Label htmlFor={`quick-add-tag-${draft.id}`} className="text-[11px] font-black text-[#17326B]">
+                        태그
+                      </Label>
+                      <Input
+                        id={`quick-add-tag-${draft.id}`}
+                        value={draft.tag}
+                        maxLength={QUICK_ADD_TAG_MAX_LENGTH}
+                        onChange={(event) => handleUpdateQuickAddDraft(draft.id, { tag: event.target.value.slice(0, QUICK_ADD_TAG_MAX_LENGTH) })}
+                        className="h-10 rounded-xl border-[#DCE6F5] bg-white text-sm font-black text-[#17326B]"
+                      />
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+
+          <DialogFooter className="grid gap-2 border-t border-[#EAF0FA] bg-[#FCFDFF] px-5 py-4 sm:grid-cols-[auto_auto_minmax(0,1fr)]">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={handleResetQuickAddDrafts}
+              disabled={isQuickAddSaving}
+              className="h-11 rounded-xl border-[#DCE6F5] bg-white font-black text-[#17326B]"
+            >
+              <RotateCcw className="mr-2 h-4 w-4" />
+              기본값
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={handleAddQuickAddDraft}
+              disabled={quickAddDrafts.length >= QUICK_ADD_MAX_ITEMS || isQuickAddSaving}
+              className="h-11 rounded-xl border-[#DCE6F5] bg-white font-black text-[#17326B]"
+            >
+              <Plus className="mr-2 h-4 w-4" />
+              항목 추가
+            </Button>
+            <Button
+              type="button"
+              onClick={() => void handleSaveQuickAddSettings()}
+              disabled={isQuickAddSaving}
+              className={cn('h-11 rounded-xl font-black text-white bg-gradient-to-r', rewardGradient)}
+            >
+              {isQuickAddSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <SlidersHorizontal className="mr-2 h-4 w-4" />}
+              저장
             </Button>
           </DialogFooter>
         </DialogContent>

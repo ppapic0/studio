@@ -65,6 +65,15 @@ export interface User {
   studyRoutineOnboarding?: RoutineOnboardingState;
   studyRoutineProfile?: UserStudyProfile;
   studyPlannerDiagnostic?: StudyPlannerDiagnosticRecord;
+  plannerQuickAddSuggestions?: Array<{
+    id: string;
+    title: string;
+    subject: string;
+    subjectLabel?: string;
+    targetMinutes: number;
+    tag: string;
+    priority?: 'low' | 'medium' | 'high';
+  }>;
   createdAt: Timestamp;
   updatedAt: Timestamp;
 }

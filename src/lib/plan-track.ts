@@ -33,6 +33,7 @@ export type PlannerQuickTaskSuggestion = {
   id: string;
   title: string;
   subject: string;
+  subjectLabel?: string;
   targetMinutes: number;
   tag: string;
   priority?: 'low' | 'medium' | 'high';
