@@ -55,7 +55,9 @@ type AttendanceBoardEvent = {
   studentId?: string;
   dateKey?: string;
   eventType?: string;
+  type?: string;
   occurredAt?: unknown;
+  eventAt?: unknown;
   createdAt?: unknown;
 };
 
@@ -118,8 +120,8 @@ function pickAttendanceEventTime(
 ) {
   return pickDateByMode(
     events
-      .filter((event) => event.eventType === eventType)
-      .map((event) => toDateSafe(event.occurredAt) || toDateSafe(event.createdAt)),
+      .filter((event) => getAttendanceBoardEventType(event) === eventType)
+      .map((event) => getAttendanceEventDate(event)),
     mode
   );
 }
@@ -134,15 +136,19 @@ function pickAttendanceEventTimeAfter(
   const afterMs = after.getTime();
   return pickDateByMode(
     events
-      .filter((event) => event.eventType === eventType)
-      .map((event) => toDateSafe(event.occurredAt) || toDateSafe(event.createdAt))
+      .filter((event) => getAttendanceBoardEventType(event) === eventType)
+      .map((event) => getAttendanceEventDate(event))
       .filter((date): date is Date => date instanceof Date && date.getTime() >= afterMs),
     mode
   );
 }
 
+function getAttendanceBoardEventType(event: AttendanceBoardEvent) {
+  return String(event.eventType || event.type || '').trim();
+}
+
 function getAttendanceEventDate(event: AttendanceBoardEvent) {
-  return toDateSafe(event.occurredAt) || toDateSafe(event.createdAt);
+  return toDateSafe(event.occurredAt) || toDateSafe(event.eventAt) || toDateSafe(event.createdAt);
 }
 
 function calculateClosedStudyMinutesFromAttendanceEvents(events: AttendanceBoardEvent[]) {
@@ -155,11 +161,12 @@ function calculateClosedStudyMinutesFromAttendanceEvents(events: AttendanceBoard
   let totalMinutes = 0;
 
   sortedEvents.forEach(({ event, occurredAt }) => {
-    if (event.eventType === 'check_in' || event.eventType === 'away_end') {
+    const eventType = getAttendanceBoardEventType(event);
+    if (eventType === 'check_in' || eventType === 'away_end') {
       activeStartAt = occurredAt;
       return;
     }
-    if ((event.eventType === 'away_start' || event.eventType === 'check_out') && activeStartAt) {
+    if ((eventType === 'away_start' || eventType === 'check_out') && activeStartAt) {
       const diffMinutes = Math.ceil((occurredAt.getTime() - activeStartAt.getTime()) / 60000);
       if (diffMinutes > 0) {
         totalMinutes += Math.min(360, diffMinutes);
@@ -378,8 +385,7 @@ export function useCenterAdminAttendanceBoard({
     if (!firestore || !centerId || !isActive) return null;
     return query(
       collection(firestore, 'centers', centerId, 'attendanceEvents'),
-      where('dateKey', '==', todayKey),
-      limit(1500)
+      where('dateKey', '==', todayKey)
     );
   }, [firestore, centerId, isActive, todayKey]);
   const { data: todayEvents, isLoading: todayEventsLoading } = useCollection<AttendanceBoardEvent>(

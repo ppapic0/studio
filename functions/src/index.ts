@@ -8571,6 +8571,22 @@ async function resolveAttendanceSeatDocForTransition(params: {
         return directSnap;
       }
     }
+
+    const seatSnap = await db
+      .collection(`centers/${centerId}/attendanceCurrent`)
+      .where("studentId", "==", studentId)
+      .limit(10)
+      .get();
+    const existingStudentSeatDoc = pickPreferredAttendanceSeatDoc(seatSnap.docs);
+    if (existingStudentSeatDoc) {
+      return existingStudentSeatDoc;
+    }
+
+    if (!directSnap.exists) {
+      return directSnap;
+    }
+
+    return null;
   }
 
   const seatSnap = await db
