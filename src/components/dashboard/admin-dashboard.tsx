@@ -84,6 +84,7 @@ import {
   ArrowRightLeft,
   Search,
   UserPlus,
+  PlusCircle,
 } from 'lucide-react';
 import { useFirestore, useCollection, useFunctions, useDoc, useUser } from '@/firebase';
 import { useAppContext } from '@/contexts/app-context';
@@ -114,7 +115,7 @@ import { useCenterAdminAttendanceBoard } from '@/hooks/use-center-admin-attendan
 import { useCenterAdminHeatmap } from '@/hooks/use-center-admin-heatmap';
 import { getAttendanceRequestTypeLabel, getScheduleChangeReasonLabel } from '@/lib/attendance-request';
 import { syncAutoAttendanceRecord } from '@/lib/attendance-auto';
-import { repairRecentStudySessionTotals, setStudentAttendanceStatusSecure } from '@/lib/study-session-actions';
+import { createManualStudySessionSecure, repairRecentStudySessionTotals, setStudentAttendanceStatusSecure } from '@/lib/study-session-actions';
 import { getStudySessionDurationMinutes } from '@/lib/study-session-time';
 import {
   buildCounselingTrackOverview,
@@ -662,6 +663,20 @@ const formatDateTimeLocalInput = (value: Date) => {
   return `${year}-${month}-${day}T${hours}:${minutes}`;
 };
 
+const buildDateFromTimeLabel = (baseDate: Date | null, label?: string | null): Date | null => {
+  if (!baseDate || !label) return null;
+  const match = label.match(/(\d{1,2}):(\d{2})/);
+  if (!match) return null;
+  const hours = Number(match[1]);
+  const minutes = Number(match[2]);
+  if (!Number.isFinite(hours) || !Number.isFinite(minutes) || hours < 0 || hours > 23 || minutes < 0 || minutes > 59) {
+    return null;
+  }
+  const date = new Date(baseDate);
+  date.setHours(hours, minutes, 0, 0);
+  return date;
+};
+
 const formatChartMinutesAxisTick = (value: number) => {
   const safeMinutes = Math.max(0, Math.round(Number(value || 0)));
   if (safeMinutes < 60) return `${safeMinutes}m`;
@@ -797,6 +812,11 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
   const [pointBoostMessageDraft, setPointBoostMessageDraft] = useState('');
   const [focusAttendanceActionSaving, setFocusAttendanceActionSaving] = useState<AttendanceCurrent['status'] | null>(null);
   const [focusStudyTotalsRepairing, setFocusStudyTotalsRepairing] = useState(false);
+  const [isManualStudySessionDialogOpen, setIsManualStudySessionDialogOpen] = useState(false);
+  const [manualStudySessionStartDraft, setManualStudySessionStartDraft] = useState('');
+  const [manualStudySessionEndDraft, setManualStudySessionEndDraft] = useState('');
+  const [manualStudySessionNoteDraft, setManualStudySessionNoteDraft] = useState('');
+  const [isManualStudySessionSaving, setIsManualStudySessionSaving] = useState(false);
   const [isCreatingPointBoost, setIsCreatingPointBoost] = useState(false);
   const [cancellingPointBoostId, setCancellingPointBoostId] = useState<string | null>(null);
   const [isOpenClawExporting, setIsOpenClawExporting] = useState(false);
@@ -909,6 +929,14 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
     useCollection<FocusStudySessionDoc>(selectedFocusTodaySessionsQuery, {
       enabled: isActive && Boolean(selectedFocusStudentId && todayKey),
     });
+
+  useEffect(() => {
+    setIsManualStudySessionDialogOpen(false);
+    setManualStudySessionStartDraft('');
+    setManualStudySessionEndDraft('');
+    setManualStudySessionNoteDraft('');
+    setIsManualStudySessionSaving(false);
+  }, [selectedFocusStudentId, todayKey]);
 
   useEffect(() => {
     hasHydratedRoomDraftsRef.current = false;
@@ -2844,6 +2872,13 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
     [selectedFocusTodaySessions]
   );
 
+  const manualStudySessionDraftMinutes = useMemo(() => {
+    const startMs = parseKstDateTimeInput(manualStudySessionStartDraft);
+    const endMs = parseKstDateTimeInput(manualStudySessionEndDraft);
+    if (!startMs || !endMs || endMs <= startMs) return 0;
+    return Math.max(0, Math.round((endMs - startMs) / 60000));
+  }, [manualStudySessionEndDraft, manualStudySessionStartDraft]);
+
   const selectedFocusStudent = useMemo(() => {
     if (!selectedFocusStudentId || !metrics) return null;
     return (
@@ -4071,6 +4106,103 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
     );
   }
 
+  function renderManualStudySessionDialog() {
+    const studentName = selectedFocusStudent?.name || selectedFocusOperationsSummary?.student?.name || '학생';
+
+    return (
+      <Dialog
+        open={isManualStudySessionDialogOpen}
+        onOpenChange={(open) => {
+          setIsManualStudySessionDialogOpen(open);
+          if (!open && !isManualStudySessionSaving) {
+            setManualStudySessionNoteDraft('');
+          }
+        }}
+      >
+        <DialogContent motionPreset="dashboard-premium" className={cn(studioDialogContentClassName, 'sm:max-w-2xl')}>
+          <div className={studioDialogHeaderClassName}>
+            <DialogHeader className="text-left">
+              <div className="flex flex-wrap items-center gap-2">
+                <Badge className="border-none bg-white/18 px-2.5 py-1 text-[10px] font-black text-white">오늘 세션</Badge>
+                <Badge className="border-none bg-white px-2.5 py-1 text-[10px] font-black text-[#14295F]">
+                  {studentName}
+                </Badge>
+              </div>
+              <DialogTitle className="text-2xl font-black tracking-tight">누락된 학습 세션 만들기</DialogTitle>
+              <DialogDescription className="text-sm font-medium text-white/76">
+                출결 오류로 세션이 빠졌을 때 실제 공부 시작·종료 시간을 입력해 오늘 합계에 반영합니다.
+              </DialogDescription>
+            </DialogHeader>
+          </div>
+
+          <div className="bg-[linear-gradient(180deg,#F7FAFF_0%,#EEF4FF_100%)] px-5 py-5">
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div className="flex flex-col gap-2">
+                <Label className="text-[11px] font-black uppercase tracking-[0.14em] text-[#5c6e97]">시작</Label>
+                <Input
+                  type="datetime-local"
+                  value={manualStudySessionStartDraft}
+                  onChange={(event) => setManualStudySessionStartDraft(event.target.value)}
+                  className="h-11 rounded-xl border-[#DCE7FF] font-bold text-[#14295F]"
+                />
+              </div>
+              <div className="flex flex-col gap-2">
+                <Label className="text-[11px] font-black uppercase tracking-[0.14em] text-[#5c6e97]">종료</Label>
+                <Input
+                  type="datetime-local"
+                  value={manualStudySessionEndDraft}
+                  onChange={(event) => setManualStudySessionEndDraft(event.target.value)}
+                  className="h-11 rounded-xl border-[#DCE7FF] font-bold text-[#14295F]"
+                />
+              </div>
+            </div>
+
+            <div className="mt-3 flex flex-col gap-2">
+              <Label className="text-[11px] font-black uppercase tracking-[0.14em] text-[#5c6e97]">메모</Label>
+              <Input
+                value={manualStudySessionNoteDraft}
+                onChange={(event) => setManualStudySessionNoteDraft(event.target.value)}
+                placeholder="예: 키오스크 외출 오류로 수동 생성"
+                className="h-11 rounded-xl border-[#DCE7FF] font-bold text-[#14295F] placeholder:text-[#7F91B3]"
+              />
+            </div>
+
+            <div className="mt-4 rounded-[1.25rem] border border-[#DCE7FF] bg-white px-4 py-3">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <p className="text-xs font-black text-[#14295F]">생성될 세션</p>
+                <Badge className="h-7 rounded-full border-none bg-[#FFF8F2] px-3 text-[10px] font-black text-[#C95A08]">
+                  {manualStudySessionDraftMinutes > 0
+                    ? formatFocusSessionDurationLabel(manualStudySessionDraftMinutes)
+                    : '시간 확인 필요'}
+                </Badge>
+              </div>
+              <p className="mt-2 text-[11px] font-bold leading-5 text-[#5c6e97]">
+                저장 시 기존 세션과 겹치는 시간은 서버에서 막고, 세션 문서와 오늘 학습시간 합계를 같이 보정합니다.
+              </p>
+            </div>
+          </div>
+
+          <DialogFooter className="border-t border-[#DCE7FF] bg-white px-5 py-4">
+            <DialogClose asChild>
+              <Button type="button" variant="outline" className="rounded-xl border-[#DCE7FF] font-black text-[#14295F]">
+                취소
+              </Button>
+            </DialogClose>
+            <Button
+              type="button"
+              onClick={() => void handleCreateManualStudySession()}
+              disabled={isManualStudySessionSaving || manualStudySessionDraftMinutes <= 0}
+              className="rounded-xl bg-[#14295F] font-black text-white hover:bg-[#10224C]"
+            >
+              {isManualStudySessionSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <PlusCircle className="mr-2 h-4 w-4" />}
+              세션 만들기
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    );
+  }
+
   function renderIntegratedClassroomSection() {
     const activeRoom = selectedRoomConfig || roomConfigs[0] || null;
     const activeRoomDraft = activeRoom ? roomDrafts[activeRoom.id] : null;
@@ -4659,6 +4791,98 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
       setFocusAttendanceActionSaving(null);
     }
   };
+  const handleOpenManualStudySessionDialog = () => {
+    if (!selectedFocusStudentId || !today) return;
+
+    const current = new Date(now || Date.now());
+    current.setSeconds(0, 0);
+
+    const latestClosedSession = [...selectedFocusTodaySessions].reverse().find((session) => session.endAt);
+    let defaultEnd = current;
+    let defaultStart: Date | null = null;
+
+    if (latestClosedSession?.endAt && latestClosedSession.endAt.getTime() < current.getTime()) {
+      defaultStart = new Date(latestClosedSession.endAt);
+      defaultEnd = new Date(Math.min(current.getTime(), defaultStart.getTime() + 60 * 60000));
+    } else {
+      defaultStart = buildDateFromTimeLabel(today, selectedFocusOperationsSummary?.firstCheckInLabel);
+    }
+
+    if (!defaultStart || defaultStart.getTime() >= defaultEnd.getTime()) {
+      defaultStart = new Date(defaultEnd.getTime() - 60 * 60000);
+    }
+    if (defaultStart.getTime() >= defaultEnd.getTime()) {
+      defaultStart = new Date(defaultEnd.getTime() - 10 * 60000);
+    }
+
+    setManualStudySessionStartDraft(formatDateTimeLocalInput(defaultStart));
+    setManualStudySessionEndDraft(formatDateTimeLocalInput(defaultEnd));
+    setManualStudySessionNoteDraft('');
+    setIsManualStudySessionDialogOpen(true);
+  };
+
+  const handleCreateManualStudySession = async () => {
+    if (!centerId || !selectedFocusStudentId || !todayKey) return;
+
+    const startAtMs = parseKstDateTimeInput(manualStudySessionStartDraft);
+    const endAtMs = parseKstDateTimeInput(manualStudySessionEndDraft);
+    if (!startAtMs || !endAtMs || endAtMs <= startAtMs) {
+      toast({
+        variant: 'destructive',
+        title: '세션 시간 확인 필요',
+        description: '시작 시간과 종료 시간을 다시 확인해 주세요.',
+      });
+      return;
+    }
+
+    const startDateKey = format(new Date(startAtMs), 'yyyy-MM-dd');
+    const endDateKey = format(new Date(endAtMs - 1), 'yyyy-MM-dd');
+    if (startDateKey !== todayKey || endDateKey !== todayKey) {
+      toast({
+        variant: 'destructive',
+        title: '오늘 세션만 만들 수 있습니다.',
+        description: '현재 화면에서는 오늘 날짜 안의 시작/종료 시간만 입력해 주세요.',
+      });
+      return;
+    }
+
+    if (endAtMs > Date.now() + 5 * 60000) {
+      toast({
+        variant: 'destructive',
+        title: '아직 지나지 않은 시간입니다.',
+        description: '종료 시간은 현재 시간보다 뒤일 수 없습니다.',
+      });
+      return;
+    }
+
+    setIsManualStudySessionSaving(true);
+    try {
+      const result = await createManualStudySessionSecure({
+        centerId,
+        studentId: selectedFocusStudentId,
+        startAtMs,
+        endAtMs,
+        source: 'admin_focus_board',
+        note: manualStudySessionNoteDraft.trim() || undefined,
+      });
+      setLiveTickMs(Date.now());
+      setIsManualStudySessionDialogOpen(false);
+      toast({
+        title: '세션을 만들었습니다.',
+        description: `${formatFocusSessionDurationLabel(result.sessionMinutes || manualStudySessionDraftMinutes)} 세션이 오늘 학습시간에 반영됩니다.`,
+      });
+    } catch (error: any) {
+      logHandledClientIssue('[admin-dashboard] create manual study session failed', error);
+      toast({
+        variant: 'destructive',
+        title: '세션 만들기 실패',
+        description: error?.details?.userMessage || error?.message || '시간이 겹치지 않는지 확인해 주세요.',
+      });
+    } finally {
+      setIsManualStudySessionSaving(false);
+    }
+  };
+
   const handleRepairFocusStudyTotals = async (options: { silent?: boolean } = {}) => {
     if (!centerId || !selectedFocusStudentId) return;
 
@@ -6670,6 +6894,7 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
           {renderAttendanceDashboardSection()}
           {renderIntegratedClassroomSection()}
           {renderLayoutSeatActionDialog()}
+          {renderManualStudySessionDialog()}
           {renderHomeInsightsSection()}
 
           <Dialog
@@ -8484,6 +8709,21 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
                       <Badge className="h-7 rounded-full border-none bg-[#FFF8F2] px-3 text-[10px] font-black text-[#C95A08]">
                         합계 {formatFocusSessionDurationLabel(selectedFocusTodaySessionTotalMinutes)}
                       </Badge>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        className="h-7 rounded-full border-[#FFD7BA] bg-white px-3 text-[10px] font-black text-[#C95A08]"
+                        disabled={!selectedFocusStudentId || isManualStudySessionSaving}
+                        onClick={handleOpenManualStudySessionDialog}
+                      >
+                        {isManualStudySessionSaving ? (
+                          <Loader2 className="mr-1.5 h-3 w-3 animate-spin" />
+                        ) : (
+                          <PlusCircle className="mr-1.5 h-3 w-3" />
+                        )}
+                        세션 만들기
+                      </Button>
                       <Button
                         type="button"
                         variant="outline"

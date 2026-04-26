@@ -8532,6 +8532,16 @@ type RepairRecentStudySessionTotalsResult = {
   daysSynced: number;
 };
 
+type CreateManualStudySessionResult = {
+  ok: true;
+  sessionId: string;
+  sessionIds: string[];
+  sessionDateKey: string;
+  sessionMinutes: number;
+  totalMinutesAfterSession: number;
+  totalMinutesByDateKey: Record<string, number>;
+};
+
 function buildRecentStudyDayKeys(dayCount: number, baseDate: Date = new Date()): string[] {
   const safeCount = Math.min(7, Math.max(1, Math.round(dayCount)));
   const currentStudyDay = toStudyDayDate(baseDate);
@@ -8541,6 +8551,176 @@ function buildRecentStudyDayKeys(dayCount: number, baseDate: Date = new Date()):
     return toDateKey(day);
   });
 }
+
+function getExistingStudySessionRangeMs(data: Record<string, unknown>, fallbackEndMs: number): { startMs: number; endMs: number } | null {
+  const startMs = toMillisSafe(data.startTime);
+  if (startMs <= 0) return null;
+
+  const explicitEndMs = toMillisSafe(data.endTime);
+  if (explicitEndMs > startMs) {
+    return { startMs, endMs: explicitEndMs };
+  }
+
+  const durationMinutes = getStudySessionDurationMinutesFromData(data);
+  if (durationMinutes > 0) {
+    return {
+      startMs,
+      endMs: startMs + durationMinutes * MINUTE_MS,
+    };
+  }
+
+  if (fallbackEndMs > startMs) {
+    return { startMs, endMs: fallbackEndMs };
+  }
+
+  return { startMs, endMs: startMs + MINUTE_MS };
+}
+
+async function assertNoOverlappingStudySessions(params: {
+  db: admin.firestore.Firestore;
+  centerId: string;
+  studentId: string;
+  startMs: number;
+  endMs: number;
+}): Promise<void> {
+  const { db, centerId, studentId, startMs, endMs } = params;
+  const segments = splitRangeByStudyDayBoundary(startMs, endMs);
+  const dateKeys = Array.from(new Set(segments.map((segment) => segment.dateKey)));
+  const fallbackOpenEndMs = Math.max(Date.now(), endMs);
+
+  for (const dateKey of dateKeys) {
+    const bounds = getStudyDayWindowBounds(dateKey);
+    const relevantSegments = segments.filter((segment) => segment.dateKey === dateKey);
+    const sessionsSnap = await db.collection(`centers/${centerId}/studyLogs/${studentId}/days/${dateKey}/sessions`).get();
+
+    for (const sessionSnap of sessionsSnap.docs) {
+      const range = getExistingStudySessionRangeMs((sessionSnap.data() || {}) as Record<string, unknown>, fallbackOpenEndMs);
+      if (!range) continue;
+      const existingStartMs = Math.max(range.startMs, bounds.startMs);
+      const existingEndMs = Math.min(range.endMs, bounds.endMs);
+
+      const isOverlapping = relevantSegments.some((segment) => {
+        return existingStartMs < segment.endMs && existingEndMs > segment.startMs;
+      });
+      if (isOverlapping) {
+        throw new functions.https.HttpsError("failed-precondition", "Manual session overlaps with an existing session.", {
+          userMessage: "이미 저장된 세션 시간과 겹칩니다. 시작/종료 시간을 다시 확인해 주세요.",
+          sessionId: sessionSnap.id,
+        });
+      }
+    }
+  }
+
+  const liveSeatSnap = await db
+    .collection(`centers/${centerId}/attendanceCurrent`)
+    .where("studentId", "==", studentId)
+    .limit(10)
+    .get();
+  for (const seatDoc of liveSeatSnap.docs) {
+    const seatData = (seatDoc.data() || {}) as Record<string, unknown>;
+    if (asTrimmedString(seatData.status) !== "studying") continue;
+    const liveStartMs = toMillisSafe(seatData.lastCheckInAt);
+    if (liveStartMs <= 0) continue;
+    const liveEndMs = Math.max(Date.now(), liveStartMs + MINUTE_MS);
+    if (liveStartMs < endMs && liveEndMs > startMs) {
+      throw new functions.https.HttpsError("failed-precondition", "Manual session overlaps with the active live session.", {
+        userMessage: "현재 진행 중인 공부 세션과 시간이 겹칩니다. 진행 중 세션을 먼저 종료하거나 겹치지 않는 시간을 입력해 주세요.",
+        seatId: seatDoc.id,
+      });
+    }
+  }
+}
+
+export const createManualStudySessionSecure = functions
+  .region(region)
+  .https.onCall(async (data, context): Promise<CreateManualStudySessionResult> => {
+    const db = admin.firestore();
+    if (!context.auth?.uid) {
+      throw new functions.https.HttpsError("unauthenticated", "로그인이 필요합니다.");
+    }
+
+    const centerId = asTrimmedString(data?.centerId);
+    const studentId = asTrimmedString(data?.studentId);
+    const startMs = Math.floor(parseFiniteNumber(data?.startAtMs) ?? 0);
+    const endMs = Math.floor(parseFiniteNumber(data?.endAtMs) ?? 0);
+    const source = asTrimmedString(data?.source, "admin_focus_board");
+    const note = asTrimmedString(data?.note);
+
+    if (!centerId || !studentId || startMs <= 0 || endMs <= 0) {
+      throw new functions.https.HttpsError("invalid-argument", "Invalid manual session input.", {
+        userMessage: "학생과 세션 시간을 다시 확인해 주세요.",
+      });
+    }
+    if (endMs <= startMs) {
+      throw new functions.https.HttpsError("invalid-argument", "Manual session end must be after start.", {
+        userMessage: "종료 시간은 시작 시간보다 뒤여야 합니다.",
+      });
+    }
+    if (endMs - startMs > MAX_STUDY_SESSION_MINUTES * MINUTE_MS) {
+      throw new functions.https.HttpsError("invalid-argument", "Manual session is too long.", {
+        userMessage: `세션은 한 번에 최대 ${MAX_STUDY_SESSION_MINUTES}분까지만 만들 수 있습니다.`,
+      });
+    }
+    if (endMs > Date.now() + 5 * MINUTE_MS) {
+      throw new functions.https.HttpsError("invalid-argument", "Manual session cannot end in the future.", {
+        userMessage: "아직 지나지 않은 시간으로 세션을 만들 수 없습니다.",
+      });
+    }
+
+    const membership = await resolveCenterMembershipRole(db, centerId, context.auth.uid);
+    if (
+      !membership.role ||
+      !isActiveMembershipStatus(membership.status) ||
+      (membership.role !== "teacher" && !isAdminRole(membership.role))
+    ) {
+      throw new functions.https.HttpsError("permission-denied", "Only active teachers or admins can create manual sessions.", {
+        userMessage: "선생님 또는 관리자 권한으로만 세션을 만들 수 있습니다.",
+      });
+    }
+
+    const [studentSnap, memberSnap] = await Promise.all([
+      db.doc(`centers/${centerId}/students/${studentId}`).get(),
+      db.doc(`centers/${centerId}/members/${studentId}`).get(),
+    ]);
+    if (!studentSnap.exists && !memberSnap.exists) {
+      throw new functions.https.HttpsError("failed-precondition", "Student not found.", {
+        userMessage: "학생 정보를 찾을 수 없습니다.",
+      });
+    }
+
+    await assertNoOverlappingStudySessions({
+      db,
+      centerId,
+      studentId,
+      startMs,
+      endMs,
+    });
+
+    const result = await finalizeStudySession({
+      db,
+      centerId,
+      studentId,
+      startMs,
+      endMs,
+      sessionMetadata: {
+        manualCreated: true,
+        manualCreatedByUid: context.auth.uid,
+        manualCreatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        source,
+        ...(note ? { manualNote: note } : {}),
+      },
+    });
+
+    return {
+      ok: true,
+      sessionId: result.sessionId,
+      sessionIds: result.sessionIds,
+      sessionDateKey: result.sessionDateKey,
+      sessionMinutes: result.sessionMinutes,
+      totalMinutesAfterSession: result.totalMinutesAfterSession,
+      totalMinutesByDateKey: result.totalMinutesByDateKey,
+    };
+  });
 
 type RepairAttendanceEvent = {
   eventType: "check_in" | "away_start" | "away_end" | "check_out";

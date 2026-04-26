@@ -70,6 +70,25 @@ export type RepairRecentStudySessionTotalsResult = {
   daysSynced?: number;
 };
 
+export type CreateManualStudySessionInput = {
+  centerId: string;
+  studentId: string;
+  startAtMs: number;
+  endAtMs: number;
+  source: 'admin_focus_board';
+  note?: string;
+};
+
+export type CreateManualStudySessionResult = {
+  ok?: boolean;
+  sessionId?: string;
+  sessionIds?: string[];
+  sessionDateKey?: string;
+  sessionMinutes?: number;
+  totalMinutesAfterSession?: number;
+  totalMinutesByDateKey?: Record<string, number>;
+};
+
 export async function stopStudentStudySessionSecure(
   input: StopStudentStudySessionSecureInput
 ): Promise<StopStudentStudySessionSecureResult> {
@@ -89,6 +108,18 @@ export async function setStudentAttendanceStatusSecure(
   const callable = httpsCallable<SetStudentAttendanceStatusSecureInput, SetStudentAttendanceStatusSecureResult>(
     functions,
     'setStudentAttendanceStatusSecure'
+  );
+  const result = await callable(input);
+  return result.data || {};
+}
+
+export async function createManualStudySessionSecure(
+  input: CreateManualStudySessionInput
+): Promise<CreateManualStudySessionResult> {
+  const { functions } = initializeFirebase();
+  const callable = httpsCallable<CreateManualStudySessionInput, CreateManualStudySessionResult>(
+    functions,
+    'createManualStudySessionSecure'
   );
   const result = await callable(input);
   return result.data || {};
