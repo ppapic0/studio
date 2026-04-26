@@ -1331,6 +1331,7 @@ export default function NotificationSettingsPage() {
     const actionKey = `${row.studentId}:${row.parentUid}`;
     setPreferenceActionKey(actionKey);
     try {
+      const resolvedPhoneNumberOverride = normalizePhoneNumber(phoneNumberOverride || row.phoneNumber || '');
       const updateSmsRecipientPreference = httpsCallable(functions, 'updateSmsRecipientPreference');
       await updateSmsRecipientPreference({
         centerId,
@@ -1338,7 +1339,7 @@ export default function NotificationSettingsPage() {
         parentUid: row.parentUid,
         enabled: nextEnabled,
         eventToggles: nextEventToggles,
-        phoneNumberOverride: phoneNumberOverride || undefined,
+        phoneNumberOverride: resolvedPhoneNumberOverride || undefined,
         parentNameOverride: row.parentName,
         isManualRecipient: row.isManualRecipient === true || row.parentUid === MANUAL_PARENT_SMS_UID,
       });

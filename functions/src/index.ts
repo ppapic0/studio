@@ -6516,7 +6516,11 @@ export const updateSmsRecipientPreference = functions.region(region).https.onCal
       return { ok: true, deleted: true };
     }
 
-    if (!phoneNumberOverride) {
+    const existingPrefSnap = await prefRef.get();
+    const existingPrefData = existingPrefSnap.exists ? (existingPrefSnap.data() || {}) as SmsRecipientPreferenceDoc : null;
+    const manualPhoneNumber = phoneNumberOverride || normalizePhoneNumber(existingPrefData?.phoneNumber || "");
+
+    if (!manualPhoneNumber) {
       throw new functions.https.HttpsError("invalid-argument", "보호자 휴대폰 번호가 필요합니다.");
     }
 
@@ -6524,8 +6528,8 @@ export const updateSmsRecipientPreference = functions.region(region).https.onCal
       studentId,
       studentName,
       parentUid,
-      parentName: parentNameOverride || "보호자",
-      phoneNumber: phoneNumberOverride,
+      parentName: parentNameOverride || existingPrefData?.parentName || "보호자",
+      phoneNumber: manualPhoneNumber,
       enabled,
       eventToggles,
       isManualRecipient: true,
