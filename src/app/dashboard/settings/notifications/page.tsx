@@ -208,6 +208,7 @@ type StudentSmsBoardEventSummary = {
   status: 'sent' | 'queued' | 'failed' | 'suppressed' | 'missing_phone' | 'recorded' | 'none';
   timeLabel: string;
   badgeLabel: string;
+  attendanceAt: Date | null;
   queueRows: SmsQueueRow[];
   logRows: SmsDeliveryLogRow[];
 };
@@ -962,7 +963,7 @@ export default function NotificationSettingsPage() {
           const latestQueue = queueRowsForEvent[0];
           const attendanceTime = resolveAttendanceTime(item.value);
 
-          let summary: StudentSmsBoardEventSummary;
+          let summary: Omit<StudentSmsBoardEventSummary, 'attendanceAt'>;
           if (latestSent) {
             summary = {
               eventType: item.value,
@@ -1037,7 +1038,7 @@ export default function NotificationSettingsPage() {
             };
           }
 
-          acc[item.value] = summary;
+          acc[item.value] = { ...summary, attendanceAt: attendanceTime };
           return acc;
         }, {} as Record<TodayBoardEventType, StudentSmsBoardEventSummary>);
 
@@ -1482,16 +1483,25 @@ export default function NotificationSettingsPage() {
     }
   };
 
-  const handleResendStudentEvent = async (studentId: string, eventType: TodayBoardEventType) => {
+  const handleResendStudentEvent = async (studentId: string, eventType: TodayBoardEventType, attendanceAt?: Date | null) => {
     if (!functions || !centerId) return;
     const actionKey = `resend-${studentId}-${eventType}`;
     setManualSmsActionKey(actionKey);
     try {
       const notifyAttendanceSms = httpsCallable(functions, 'notifyAttendanceSms');
-      await notifyAttendanceSms({ centerId, studentId, eventType, force: true });
+      const eventDate = attendanceAt && Number.isFinite(attendanceAt.getTime()) ? attendanceAt : null;
+      await notifyAttendanceSms({
+        centerId,
+        studentId,
+        eventType,
+        force: true,
+        ...(eventDate ? { eventAt: eventDate.toISOString(), dateKey: toDateInputValue(eventDate) } : { dateKey: todayDateKey }),
+      });
       toast({
         title: '문자 재발송 요청 완료',
-        description: `${getEventLabel(eventType)} 문자를 다시 발송 대기열에 넣었습니다.`,
+        description: eventDate
+          ? `${getEventLabel(eventType)} 문자를 ${formatTimeLabelFromDate(eventDate)} 기준으로 다시 발송 대기열에 넣었습니다.`
+          : `${getEventLabel(eventType)} 문자를 다시 발송 대기열에 넣었습니다.`,
       });
     } catch (error: any) {
       toast({
@@ -2125,7 +2135,7 @@ export default function NotificationSettingsPage() {
                               variant="outline"
                               className="h-8 rounded-lg px-3 text-xs font-black"
                               disabled={manualSmsActionKey === `resend-${selectedBoardStudent.studentId}-${event.value}`}
-                              onClick={() => void handleResendStudentEvent(selectedBoardStudent.studentId, event.value)}
+                              onClick={() => void handleResendStudentEvent(selectedBoardStudent.studentId, event.value, summary.attendanceAt)}
                             >
                               {manualSmsActionKey === `resend-${selectedBoardStudent.studentId}-${event.value}` ? <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" /> : <RefreshCcw className="mr-1 h-3.5 w-3.5" />}
                               다시 보내기

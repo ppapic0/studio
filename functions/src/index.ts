@@ -2097,6 +2097,7 @@ async function resolveAttendanceSmsEventAt(
     if (toDateKey(candidate) !== dateKey) return;
     candidates.push(candidate);
   };
+  addCandidate(params.fallbackEventAt);
 
   const [dailyStatSnap, attendanceRecordSnap, attendanceEventsSnap, liveAttendanceSnap] = await Promise.all([
     db.doc(`centers/${params.centerId}/attendanceDailyStats/${dateKey}/students/${params.studentId}`).get(),
@@ -2666,6 +2667,7 @@ async function queueParentSmsNotification(
     expectedTime?: string;
     settings?: NotificationSettingsDoc;
     force?: boolean;
+    dateKeyOverride?: string | null;
   }
 ): Promise<{ queuedCount: number; recipientCount: number; suppressedCount: number; message: string; deduped?: boolean }> {
   const {
@@ -2689,6 +2691,7 @@ async function queueParentSmsNotification(
     studentId,
     eventType,
     fallbackEventAt: eventAt,
+    dateKeyOverride: params.dateKeyOverride,
   });
 
   const eventTimeLabel = toTimeLabel(smsEventAt);
@@ -6984,6 +6987,8 @@ export const notifyAttendanceSms = functions.region(region).https.onCall(async (
   const callerRole = callerMemberSnap.exists ? callerMemberSnap.data()?.role : null;
   const isTeacherOrAdminCaller = callerRole === "teacher" || isAdminRole(callerRole);
   const forceResend = data?.force === true && isTeacherOrAdminCaller;
+  const requestedEventAt = isTeacherOrAdminCaller ? toKstDateFromUnknownTimestamp(data?.eventAt) : null;
+  const requestedDateKey = isTeacherOrAdminCaller ? asTrimmedString(data?.dateKey) : "";
   const callerIdentity = callerRole === "student"
     ? await resolveCenterStudentIdentity(db, centerId, context.auth.uid)
     : null;
@@ -7033,9 +7038,10 @@ export const notifyAttendanceSms = functions.region(region).https.onCall(async (
     studentId: effectiveStudentId,
     studentName,
     eventType,
-    eventAt: nowKst,
+    eventAt: requestedEventAt || nowKst,
     settings,
     force: forceResend,
+    dateKeyOverride: requestedDateKey || null,
   });
 
   return {
