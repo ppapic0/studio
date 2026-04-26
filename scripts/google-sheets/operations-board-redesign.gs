@@ -280,7 +280,6 @@ function buildTaskQueueSheet_(spreadsheet, sheet) {
 
   setWidths_(sheet, [110, 105, 120, 90, 120, 135, 135, 95, 300, 110, 95, 105, 260, 150]);
   sheet.setFrozenRows(5);
-  sheet.setFrozenColumns(2);
   createFilter_(sheet, 5, 1, rowCount + 1, headers.length);
 }
 
@@ -300,7 +299,6 @@ function buildHandoffSheet_(spreadsheet, sheet) {
 
   setWidths_(sheet, [105, 90, 90, 110, 130, 360, 110, 95, 260, 110]);
   sheet.setFrozenRows(5);
-  sheet.setFrozenColumns(1);
   createFilter_(sheet, 5, 1, rowCount + 1, headers.length);
 }
 
@@ -376,7 +374,6 @@ function buildContactSheet_(spreadsheet, sheet) {
 
   setWidths_(sheet, [70, 105, 105, 120, 110, 135, 110, 110, 360, 105, 105, 250, 120]);
   sheet.setFrozenRows(5);
-  sheet.setFrozenColumns(3);
   createFilter_(sheet, 5, 1, rowCount + 1, headers.length);
 }
 
@@ -415,7 +412,6 @@ function buildBillingSheet_(spreadsheet, sheet) {
 
   setWidths_(sheet, [120, 115, 90, 100, 110, 120, 105, 110, 95, 135, 135, 280]);
   sheet.setFrozenRows(5);
-  sheet.setFrozenColumns(1);
   createFilter_(sheet, 5, 1, rowCount + 1, headers.length);
 }
 
