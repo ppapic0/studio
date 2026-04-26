@@ -3061,33 +3061,25 @@ export const onAttendanceEventCreated = functions
     return null;
   });
 
-export const repairTodayAttendanceSmsQueue = functions.region(region).https.onCall(async (data, context) => {
-  const db = admin.firestore();
+type AttendanceSmsRepairResult = {
+  centerId: string;
+  dateKey: string;
+  scannedCount: number;
+  targetCount: number;
+  queuedCount: number;
+  suppressedCount: number;
+  skippedCount: number;
+  noRecipientCount: number;
+};
 
-  if (!context.auth) {
-    throw new functions.https.HttpsError("unauthenticated", "로그인이 필요합니다.");
-  }
-
-  const centerId = asTrimmedString(data?.centerId);
-  if (!centerId) {
-    throw new functions.https.HttpsError("invalid-argument", "centerId가 필요합니다.");
-  }
-
-  const callerMemberSnap = await db.doc(`centers/${centerId}/members/${context.auth.uid}`).get();
-  const callerRole = callerMemberSnap.exists ? callerMemberSnap.data()?.role : null;
-  if (!isAdminRole(callerRole)) {
-    throw new functions.https.HttpsError("permission-denied", "센터 관리자만 문자 접수 복구를 실행할 수 있습니다.");
-  }
-
-  const todayKey = toDateKey(toKstDate());
-  const requestedDateKey = asTrimmedString(data?.dateKey, todayKey);
-  if (requestedDateKey !== todayKey) {
-    throw new functions.https.HttpsError("invalid-argument", "오늘 날짜의 문자 접수만 복구할 수 있습니다.");
-  }
-
+async function repairAttendanceSmsQueueForCenter(
+  db: admin.firestore.Firestore,
+  centerId: string,
+  dateKey: string
+): Promise<AttendanceSmsRepairResult> {
   const eventsSnap = await db
     .collection(`centers/${centerId}/attendanceEvents`)
-    .where("dateKey", "==", todayKey)
+    .where("dateKey", "==", dateKey)
     .limit(1500)
     .get();
   const targetEvents = eventsSnap.docs
@@ -3158,15 +3150,137 @@ export const repairTodayAttendanceSmsQueue = functions.region(region).https.onCa
   }
 
   return {
-    ok: true,
     centerId,
-    dateKey: todayKey,
+    dateKey,
     scannedCount: eventsSnap.size,
     targetCount: targetEvents.length,
     queuedCount,
     suppressedCount,
     skippedCount,
     noRecipientCount,
+  };
+}
+
+async function repairRecentAttendanceSmsQueueForCenter(
+  db: admin.firestore.Firestore,
+  centerId: string,
+  dateKey: string,
+  windowStartMs: number
+): Promise<AttendanceSmsRepairResult> {
+  const baseResult = {
+    centerId,
+    dateKey,
+    scannedCount: 0,
+    targetCount: 0,
+    queuedCount: 0,
+    suppressedCount: 0,
+    skippedCount: 0,
+    noRecipientCount: 0,
+  };
+
+  const eventsSnap = await db
+    .collection(`centers/${centerId}/attendanceEvents`)
+    .where("dateKey", "==", dateKey)
+    .limit(300)
+    .get();
+  const recentEvents = eventsSnap.docs
+    .map((eventDoc) => {
+      const eventData = eventDoc.data() || {};
+      const eventType = normalizeAttendanceEventForParentSms(eventData.eventType);
+      const studentId = asTrimmedString(eventData.studentId);
+      const eventAt =
+        toKstDateFromUnknownTimestamp(eventData.occurredAt)
+        || toKstDateFromUnknownTimestamp(eventData.createdAt);
+      if (!eventType || !studentId || !eventAt || eventAt.getTime() < windowStartMs) return null;
+      return {
+        data: eventData,
+        studentId,
+        eventType,
+        eventAt,
+      };
+    })
+    .filter((event): event is {
+      data: FirebaseFirestore.DocumentData;
+      studentId: string;
+      eventType: AttendanceSmsEventType;
+      eventAt: Date;
+    } => Boolean(event))
+    .sort((left, right) => left.eventAt.getTime() - right.eventAt.getTime());
+
+  baseResult.scannedCount = eventsSnap.size;
+  baseResult.targetCount = recentEvents.length;
+  if (recentEvents.length === 0) {
+    return baseResult;
+  }
+
+  const studentIds = Array.from(new Set(recentEvents.map((event) => event.studentId)));
+  const studentRefs = studentIds.map((studentId) => db.doc(`centers/${centerId}/students/${studentId}`));
+  const [settings, studentSnaps] = await Promise.all([
+    loadNotificationSettings(db, centerId),
+    studentRefs.length > 0 ? db.getAll(...studentRefs) : Promise.resolve([]),
+  ]);
+  const studentNameById = new Map<string, string>();
+  studentSnaps.forEach((studentSnap) => {
+    const studentData = studentSnap.exists ? studentSnap.data() || {} : {};
+    studentNameById.set(studentSnap.id, asTrimmedString(studentData.name, "학생"));
+  });
+
+  for (const event of recentEvents) {
+    const studentName = studentNameById.get(event.studentId) || asTrimmedString(event.data.studentName, "학생");
+    const queueResult = await queueParentSmsNotification(db, {
+      centerId,
+      studentId: event.studentId,
+      studentName,
+      eventType: event.eventType,
+      eventAt: event.eventAt,
+      settings,
+    });
+
+    if (queueResult.deduped) {
+      baseResult.skippedCount += 1;
+      continue;
+    }
+    if (queueResult.recipientCount === 0) {
+      baseResult.noRecipientCount += 1;
+      continue;
+    }
+
+    baseResult.queuedCount += queueResult.queuedCount;
+    baseResult.suppressedCount += queueResult.suppressedCount;
+  }
+
+  return baseResult;
+}
+
+export const repairTodayAttendanceSmsQueue = functions.region(region).https.onCall(async (data, context) => {
+  const db = admin.firestore();
+
+  if (!context.auth) {
+    throw new functions.https.HttpsError("unauthenticated", "로그인이 필요합니다.");
+  }
+
+  const centerId = asTrimmedString(data?.centerId);
+  if (!centerId) {
+    throw new functions.https.HttpsError("invalid-argument", "centerId가 필요합니다.");
+  }
+
+  const callerMemberSnap = await db.doc(`centers/${centerId}/members/${context.auth.uid}`).get();
+  const callerRole = callerMemberSnap.exists ? callerMemberSnap.data()?.role : null;
+  if (!isAdminRole(callerRole)) {
+    throw new functions.https.HttpsError("permission-denied", "센터 관리자만 문자 접수 복구를 실행할 수 있습니다.");
+  }
+
+  const todayKey = toDateKey(toKstDate());
+  const requestedDateKey = asTrimmedString(data?.dateKey, todayKey);
+  if (requestedDateKey !== todayKey) {
+    throw new functions.https.HttpsError("invalid-argument", "오늘 날짜의 문자 접수만 복구할 수 있습니다.");
+  }
+
+  const result = await repairAttendanceSmsQueueForCenter(db, centerId, todayKey);
+
+  return {
+    ok: true,
+    ...result,
   };
 });
 
@@ -6880,16 +6994,69 @@ export const scheduledSmsQueueDispatcher = functions
   .onRun(async () => {
     const db = admin.firestore();
     const now = new Date();
+    const todayKey = toDateKey(toKstDate(now));
+    const repairWindowStartMs = toKstDate(new Date(now.getTime() - 2 * 60 * 60 * 1000)).getTime();
     const nowTs = admin.firestore.Timestamp.fromDate(now);
     const processingLeaseUntil = admin.firestore.Timestamp.fromDate(new Date(now.getTime() + 60 * 1000));
-    const [queuedSnap, processingSnap] = await Promise.all([
-      db.collectionGroup("smsQueue").where("status", "==", "queued").limit(120).get(),
-      db.collectionGroup("smsQueue").where("status", "==", "processing").limit(120).get(),
-    ]);
+    let repairedQueuedCount = 0;
+    let repairedSuppressedCount = 0;
+    let repairedSkippedCount = 0;
+    let centerDocs: admin.firestore.QueryDocumentSnapshot[] = [];
+    try {
+      const centersSnap = await db.collection("centers").get();
+      centerDocs = centersSnap.docs;
+      for (const centerDoc of centersSnap.docs) {
+        const repairResult = await repairRecentAttendanceSmsQueueForCenter(db, centerDoc.id, todayKey, repairWindowStartMs);
+        repairedQueuedCount += repairResult.queuedCount;
+        repairedSuppressedCount += repairResult.suppressedCount;
+        repairedSkippedCount += repairResult.skippedCount;
+      }
+    } catch (error: any) {
+      console.error("[sms-dispatcher] attendance repair failed", {
+        message: error?.message || String(error),
+      });
+    }
+
+    if (centerDocs.length === 0) {
+      try {
+        centerDocs = (await db.collection("centers").get()).docs;
+      } catch (error: any) {
+        console.error("[sms-dispatcher] center query failed", {
+          message: error?.message || String(error),
+        });
+        return null;
+      }
+    }
+
+    const queuedDocs: admin.firestore.QueryDocumentSnapshot[] = [];
+    const processingDocs: admin.firestore.QueryDocumentSnapshot[] = [];
+    try {
+      for (const centerDoc of centerDocs) {
+        const queuedLimit = Math.max(0, 120 - queuedDocs.length);
+        const processingLimit = Math.max(0, 120 - processingDocs.length);
+        if (queuedLimit === 0 && processingLimit === 0) break;
+
+        const [queuedSnap, processingSnap] = await Promise.all([
+          queuedLimit > 0
+            ? centerDoc.ref.collection("smsQueue").where("status", "==", "queued").limit(queuedLimit).get()
+            : Promise.resolve(null),
+          processingLimit > 0
+            ? centerDoc.ref.collection("smsQueue").where("status", "==", "processing").limit(processingLimit).get()
+            : Promise.resolve(null),
+        ]);
+        if (queuedSnap) queuedDocs.push(...queuedSnap.docs);
+        if (processingSnap) processingDocs.push(...processingSnap.docs);
+      }
+    } catch (error: any) {
+      console.error("[sms-dispatcher] queue query failed", {
+        message: error?.message || String(error),
+      });
+      return null;
+    }
 
     let processed = 0;
     const touchedCenterIds = new Set<string>();
-    const candidateDocs = [...queuedSnap.docs, ...processingSnap.docs];
+    const candidateDocs = [...queuedDocs, ...processingDocs];
 
     for (const queueDoc of candidateDocs) {
       const claimed = await db.runTransaction(async (tx) => {
@@ -6951,10 +7118,13 @@ export const scheduledSmsQueueDispatcher = functions
     }
 
     console.log("[sms-dispatcher] run complete", {
-      queuedCandidates: queuedSnap.size,
-      processingCandidates: processingSnap.size,
+      queuedCandidates: queuedDocs.length,
+      processingCandidates: processingDocs.length,
       touchedCenterCount: touchedCenterIds.size,
       processed,
+      repairedQueuedCount,
+      repairedSuppressedCount,
+      repairedSkippedCount,
     });
     return null;
   });
