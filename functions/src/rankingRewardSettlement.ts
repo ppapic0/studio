@@ -52,7 +52,9 @@ type RankingNotificationTarget = {
 const WEEKDAY_DAILY_RANK_START_HOUR = 17;
 const WEEKEND_DAILY_RANK_START_HOUR = 8;
 const DAILY_RANK_END_HOUR = 1;
-const ACTIVE_LIVE_RANK_STATUSES = new Set(["studying", "away", "break"]);
+const ACTIVE_LIVE_RANK_STATUSES = new Set(["studying"]);
+const MONTHLY_RANK_REWARD_FIRST_ELIGIBLE_PERIOD_KEY = "2026-05";
+const MONTHLY_RANK_REWARD_PRELAUNCH_SKIP_REASON = "monthly_rank_rewards_start_from_2026_05";
 
 const STUDENT_RANK_REWARD_TIERS: Record<StudentRankingRange, StudentRankRewardTier[]> = {
   daily: [{ rank: 1, points: 500 }],
@@ -706,6 +708,10 @@ function formatMonthKeyLabel(monthKey?: string | null) {
   return `${year}년 ${month}월`;
 }
 
+function isMonthlyRankRewardEligiblePeriod(periodKey: string) {
+  return periodKey >= MONTHLY_RANK_REWARD_FIRST_ELIGIBLE_PERIOD_KEY;
+}
+
 function buildRankingRewardPeriodLabel(range: StudentRankingRange, periodKey?: string | null, awardDateKey?: string | null) {
   if (range === "daily") {
     return formatDateKeyLabel(periodKey || awardDateKey);
@@ -1272,15 +1278,21 @@ export const scheduledRankingRewardSettlement = functions
           periodKey: monthlyCandidate.periodKey,
           sourceMonthKey: monthlyCandidate.monthKey,
           awardDateKey,
+          firstEligiblePeriodKey: MONTHLY_RANK_REWARD_FIRST_ELIGIBLE_PERIOD_KEY,
         });
 
         if (claimed) {
           try {
-            const awards = await buildMonthlyAwardEntries(db, centerId, monthlyCandidate.monthKey, await getContext());
-            const appliedAwards = await applyAwardEntries(db, centerId, "monthly", {
-              periodKey: monthlyCandidate.periodKey,
-              awardDateKey,
-            }, awards);
+            const isRewardEligible = isMonthlyRankRewardEligiblePeriod(monthlyCandidate.periodKey);
+            const awards = isRewardEligible
+              ? await buildMonthlyAwardEntries(db, centerId, monthlyCandidate.monthKey, await getContext())
+              : [];
+            const appliedAwards = isRewardEligible
+              ? await applyAwardEntries(db, centerId, "monthly", {
+                periodKey: monthlyCandidate.periodKey,
+                awardDateKey,
+              }, awards)
+              : [];
             await completeSettlement(settlementRef, {
               awardDateKey,
               awardCount: appliedAwards.length,
@@ -1291,6 +1303,9 @@ export const scheduledRankingRewardSettlement = functions
                 value: award.value,
                 displayNameSnapshot: award.displayNameSnapshot,
               })),
+              skipped: !isRewardEligible,
+              skippedReason: isRewardEligible ? null : MONTHLY_RANK_REWARD_PRELAUNCH_SKIP_REASON,
+              firstEligiblePeriodKey: MONTHLY_RANK_REWARD_FIRST_ELIGIBLE_PERIOD_KEY,
             });
           } catch (error) {
             functions.logger.error("monthly ranking settlement failed", { centerId, periodKey: monthlyCandidate.periodKey, error });

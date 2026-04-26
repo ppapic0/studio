@@ -40,9 +40,12 @@ const region = "asia-northeast3";
 if (admin.apps.length === 0) {
     admin.initializeApp();
 }
-const DAILY_RANK_START_HOUR = 17;
+const WEEKDAY_DAILY_RANK_START_HOUR = 17;
+const WEEKEND_DAILY_RANK_START_HOUR = 8;
 const DAILY_RANK_END_HOUR = 1;
-const ACTIVE_LIVE_RANK_STATUSES = new Set(["studying", "away", "break"]);
+const ACTIVE_LIVE_RANK_STATUSES = new Set(["studying"]);
+const MONTHLY_RANK_REWARD_FIRST_ELIGIBLE_PERIOD_KEY = "2026-05";
+const MONTHLY_RANK_REWARD_PRELAUNCH_SKIP_REASON = "monthly_rank_rewards_start_from_2026_05";
 const STUDENT_RANK_REWARD_TIERS = {
     daily: [{ rank: 1, points: 500 }],
     weekly: [
@@ -141,7 +144,7 @@ function normalizeDailyPointEventEntry(value) {
     const createdAt = asNonEmptyString(value.createdAt);
     if (!id || !source || !label || points <= 0 || !createdAt)
         return null;
-    if (!["study_box", "daily_rank", "weekly_rank", "monthly_rank", "manual_adjustment", "legacy"].includes(source)) {
+    if (!["study_box", "daily_rank", "weekly_rank", "monthly_rank", "plan_completion", "manual_adjustment", "legacy"].includes(source)) {
         return null;
     }
     const event = {
@@ -299,13 +302,17 @@ function shouldExcludeFromCompetitionRecord(value, studentId) {
     const exclusions = asRecord(record.operationalExclusions);
     return (exclusions === null || exclusions === void 0 ? void 0 : exclusions.rankings) === true || (exclusions === null || exclusions === void 0 ? void 0 : exclusions.competition) === true;
 }
-function getCompetitionStartHour() {
-    return DAILY_RANK_START_HOUR;
+function isWeekendCompetitionDate(date) {
+    const day = date.getDay();
+    return day === 0 || day === 6;
+}
+function getCompetitionStartHour(targetDate) {
+    return isWeekendCompetitionDate(targetDate) ? WEEKEND_DAILY_RANK_START_HOUR : WEEKDAY_DAILY_RANK_START_HOUR;
 }
 function buildCompetitionWindow(targetDate) {
     const competitionDate = startOfKstDay(targetDate);
     const startsAt = cloneDate(competitionDate);
-    startsAt.setHours(getCompetitionStartHour(), 0, 0, 0);
+    startsAt.setHours(getCompetitionStartHour(competitionDate), 0, 0, 0);
     const endsAt = cloneDate(competitionDate);
     endsAt.setDate(endsAt.getDate() + 1);
     endsAt.setHours(DAILY_RANK_END_HOUR, 0, 0, 0);
@@ -416,6 +423,51 @@ function getSessionReferenceMillis(session) {
         startedAtMs,
         referenceMs: durationMinutes > 0 ? startedAtMs + durationMinutes * 60000 : 0,
     };
+}
+function buildStudentDateRankKey(studentId, dateKey) {
+    return `${studentId}\u001f${dateKey}`;
+}
+function addRankMinutesByDate(target, studentId, dateKey, minutes) {
+    if (!studentId || !dateKey || minutes <= 0)
+        return;
+    const key = buildStudentDateRankKey(studentId, dateKey);
+    target.set(key, (target.get(key) || 0) + minutes);
+}
+function mergeRankMinutesByDate(target, studentId, dateKey, minutes) {
+    if (!studentId || !dateKey || minutes <= 0)
+        return;
+    const key = buildStudentDateRankKey(studentId, dateKey);
+    target.set(key, Math.max(target.get(key) || 0, minutes));
+}
+function foldRankMinutesByDate(source) {
+    const totals = new Map();
+    source.forEach((minutes, compositeKey) => {
+        const separatorIndex = compositeKey.indexOf("\u001f");
+        const studentId = separatorIndex >= 0 ? compositeKey.slice(0, separatorIndex) : compositeKey;
+        if (!studentId || minutes <= 0)
+            return;
+        totals.set(studentId, (totals.get(studentId) || 0) + minutes);
+    });
+    return totals;
+}
+function getStudyLogDayStudentId(docSnap, data) {
+    var _a;
+    const directStudentId = typeof data.studentId === "string" && data.studentId.trim()
+        ? data.studentId.trim()
+        : "";
+    return directStudentId || ((_a = docSnap.ref.parent.parent) === null || _a === void 0 ? void 0 : _a.id) || "";
+}
+function getStudyLogDayDateKey(docSnap, data) {
+    return typeof data.dateKey === "string" && data.dateKey.trim()
+        ? data.dateKey.trim()
+        : docSnap.id;
+}
+function getStudyLogDayTotalMinutes(data) {
+    var _a, _b, _c;
+    const baseValue = Number((_b = (_a = data.totalMinutes) !== null && _a !== void 0 ? _a : data.totalStudyMinutes) !== null && _b !== void 0 ? _b : 0);
+    const adjustment = Number((_c = data.manualAdjustmentMinutes) !== null && _c !== void 0 ? _c : 0);
+    const value = (Number.isFinite(baseValue) ? baseValue : 0) + (Number.isFinite(adjustment) ? adjustment : 0);
+    return Number.isFinite(value) ? Math.max(0, Math.round(value)) : 0;
 }
 function applyCompetitionRanks(entries) {
     const sorted = [...entries].sort((left, right) => right.value - left.value);
@@ -539,6 +591,9 @@ function formatMonthKeyLabel(monthKey) {
         return null;
     return `${year}년 ${month}월`;
 }
+function isMonthlyRankRewardEligiblePeriod(periodKey) {
+    return periodKey >= MONTHLY_RANK_REWARD_FIRST_ELIGIBLE_PERIOD_KEY;
+}
 function buildRankingRewardPeriodLabel(range, periodKey, awardDateKey) {
     if (range === "daily") {
         return formatDateKeyLabel(periodKey || awardDateKey);
@@ -582,44 +637,56 @@ async function buildDailyAwardEntries(db, centerId, competitionDate, context) {
         dailyDayDocs.push(...chunkSnapshots);
     }
     const sessionRequests = dailyDayDocs.flatMap((docSnap) => {
-        var _a, _b, _c, _d;
         if (!docSnap.exists)
             return [];
         const data = docSnap.data();
-        const studentId = typeof data.studentId === "string" && data.studentId.trim()
-            ? data.studentId.trim()
-            : (_b = (_a = docSnap.ref.parent.parent) === null || _a === void 0 ? void 0 : _a.id) !== null && _b !== void 0 ? _b : "";
-        const persistedMinutes = Math.max(0, Number((_d = (_c = data.totalMinutes) !== null && _c !== void 0 ? _c : data.totalStudyMinutes) !== null && _d !== void 0 ? _d : 0));
-        if (!studentId || isSyntheticStudentId(studentId) || !context.shouldInclude(studentId))
-            return [];
-        if (persistedMinutes <= 0 && !data.firstSessionStartAt && !data.lastSessionEndAt)
+        const studentId = getStudyLogDayStudentId(docSnap, data);
+        const dateKey = getStudyLogDayDateKey(docSnap, data);
+        if (!studentId || !dateKey || isSyntheticStudentId(studentId) || !context.shouldInclude(studentId))
             return [];
         return [{
                 studentId,
+                dateKey,
                 snapshotRef: docSnap.ref.collection("sessions"),
             }];
     });
-    const totals = new Map();
+    const minutesByStudentDate = new Map();
     for (const chunk of chunkItems(sessionRequests, 40)) {
         if (chunk.length === 0)
             continue;
         const chunkSnapshots = await Promise.all(chunk.map(({ snapshotRef }) => snapshotRef.get()));
         chunkSnapshots.forEach((snapshot, index) => {
-            var _a, _b;
+            var _a, _b, _c, _d;
             const fallbackStudentId = (_b = (_a = chunk[index]) === null || _a === void 0 ? void 0 : _a.studentId) !== null && _b !== void 0 ? _b : "";
+            const fallbackDateKey = (_d = (_c = chunk[index]) === null || _c === void 0 ? void 0 : _c.dateKey) !== null && _d !== void 0 ? _d : "";
             snapshot.forEach((docSnap) => {
                 const data = docSnap.data();
                 const studentId = typeof data.studentId === "string" && data.studentId.trim()
                     ? data.studentId.trim()
                     : fallbackStudentId;
+                const dateKey = typeof data.dateKey === "string" && data.dateKey.trim()
+                    ? data.dateKey.trim()
+                    : fallbackDateKey;
                 const { startedAtMs, referenceMs } = getSessionReferenceMillis(data);
                 const value = getDailyWindowOverlapMinutes(startedAtMs, referenceMs, dailyWindow);
-                if (!studentId || isSyntheticStudentId(studentId) || !context.shouldInclude(studentId) || value <= 0)
+                if (!studentId || !dateKey || isSyntheticStudentId(studentId) || !context.shouldInclude(studentId) || value <= 0)
                     return;
-                totals.set(studentId, (totals.get(studentId) || 0) + value);
+                addRankMinutesByDate(minutesByStudentDate, studentId, dateKey, value);
             });
         });
     }
+    dailyDayDocs.forEach((docSnap) => {
+        if (!docSnap.exists)
+            return;
+        const data = docSnap.data();
+        const studentId = getStudyLogDayStudentId(docSnap, data);
+        const dateKey = getStudyLogDayDateKey(docSnap, data);
+        const value = getStudyLogDayTotalMinutes(data);
+        if (!studentId || !dateKey || isSyntheticStudentId(studentId) || !context.shouldInclude(studentId) || value <= 0)
+            return;
+        mergeRankMinutesByDate(minutesByStudentDate, studentId, dateKey, value);
+    });
+    const totals = foldRankMinutesByDate(minutesByStudentDate);
     const attendanceBuckets = new Map();
     const attendanceSnap = await db.collection(`centers/${centerId}/attendanceCurrent`).get();
     attendanceSnap.forEach((docSnap) => {
@@ -659,10 +726,12 @@ async function buildWeeklyAwardEntries(db, centerId, startDate, endDate, context
     const totals = new Map();
     snapshots.forEach((snapshot) => {
         snapshot.forEach((docSnap) => {
-            var _a;
+            var _a, _b;
             const data = docSnap.data();
             const studentId = typeof data.studentId === "string" ? data.studentId : docSnap.id;
-            const value = Math.max(0, Number((_a = data.totalStudyMinutes) !== null && _a !== void 0 ? _a : 0));
+            const baseValue = Number((_a = data.totalStudyMinutes) !== null && _a !== void 0 ? _a : 0);
+            const adjustment = Number((_b = data.manualAdjustmentMinutes) !== null && _b !== void 0 ? _b : 0);
+            const value = Math.max(0, (Number.isFinite(baseValue) ? baseValue : 0) + (Number.isFinite(adjustment) ? adjustment : 0));
             if (!studentId || isSyntheticStudentId(studentId) || !context.shouldInclude(studentId) || value <= 0)
                 return;
             totals.set(studentId, (totals.get(studentId) || 0) + value);
@@ -961,14 +1030,20 @@ exports.scheduledRankingRewardSettlement = functions
                 periodKey: monthlyCandidate.periodKey,
                 sourceMonthKey: monthlyCandidate.monthKey,
                 awardDateKey,
+                firstEligiblePeriodKey: MONTHLY_RANK_REWARD_FIRST_ELIGIBLE_PERIOD_KEY,
             });
             if (claimed) {
                 try {
-                    const awards = await buildMonthlyAwardEntries(db, centerId, monthlyCandidate.monthKey, await getContext());
-                    const appliedAwards = await applyAwardEntries(db, centerId, "monthly", {
-                        periodKey: monthlyCandidate.periodKey,
-                        awardDateKey,
-                    }, awards);
+                    const isRewardEligible = isMonthlyRankRewardEligiblePeriod(monthlyCandidate.periodKey);
+                    const awards = isRewardEligible
+                        ? await buildMonthlyAwardEntries(db, centerId, monthlyCandidate.monthKey, await getContext())
+                        : [];
+                    const appliedAwards = isRewardEligible
+                        ? await applyAwardEntries(db, centerId, "monthly", {
+                            periodKey: monthlyCandidate.periodKey,
+                            awardDateKey,
+                        }, awards)
+                        : [];
                     await completeSettlement(settlementRef, {
                         awardDateKey,
                         awardCount: appliedAwards.length,
@@ -979,6 +1054,9 @@ exports.scheduledRankingRewardSettlement = functions
                             value: award.value,
                             displayNameSnapshot: award.displayNameSnapshot,
                         })),
+                        skipped: !isRewardEligible,
+                        skippedReason: isRewardEligible ? null : MONTHLY_RANK_REWARD_PRELAUNCH_SKIP_REASON,
+                        firstEligiblePeriodKey: MONTHLY_RANK_REWARD_FIRST_ELIGIBLE_PERIOD_KEY,
                     });
                 }
                 catch (error) {

@@ -87,7 +87,7 @@ const RANGE_META: Record<
   monthly: {
     label: '월간',
     title: '월간 랭킹',
-    subtitle: '월간 페이스와 추격 여지를 한 화면에서 확인합니다.',
+    subtitle: '월간 페이스와 추격 여지를 확인합니다. 포인트는 2026년 5월 랭킹부터 지급됩니다.',
   },
 };
 
@@ -1438,6 +1438,33 @@ function EmptyRankingState({
   );
 }
 
+function MonthlyRewardPolicyNotice({ isMobile }: { isMobile: boolean }) {
+  return (
+    <section className={cn(
+      'relative overflow-hidden border border-[#F5C97B]/28 bg-[linear-gradient(135deg,rgba(255,198,112,0.14),rgba(255,255,255,0.055))] text-white shadow-[0_20px_48px_-34px_rgba(245,201,123,0.55)]',
+      isMobile ? 'mx-4 rounded-[1.4rem] px-4 py-3.5' : 'rounded-[26px] px-5 py-4'
+    )}>
+      <div className="pointer-events-none absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-[#F5C97B] via-[#FFB660]/70 to-transparent" />
+      <div className={cn('relative flex gap-3', isMobile ? 'items-start' : 'items-center justify-between')}>
+        <div className="min-w-0 space-y-1">
+          <div className="text-[10px] font-black tracking-[0.2em] text-[#FFD89A]">MONTHLY REWARD NOTICE</div>
+          <p className={cn('font-black leading-snug text-white', isMobile ? 'text-sm' : 'text-base')}>
+            2026년 4월 월간 랭킹은 포인트 지급 없이 순위 확인용으로 운영됩니다.
+          </p>
+          <p className="text-xs font-semibold leading-relaxed text-[#D8E4FF]">
+            월간 랭킹 포인트는 2026년 5월 랭킹부터 지급됩니다.
+          </p>
+        </div>
+        {!isMobile ? (
+          <div className="shrink-0 rounded-full border border-[#F5C97B]/35 bg-[rgba(255,198,112,0.12)] px-4 py-2 text-xs font-black text-[#FFE0A6]">
+            5월부터 지급
+          </div>
+        ) : null}
+      </div>
+    </section>
+  );
+}
+
 function RecommendationChip({
   recommendation,
   onApply,
@@ -1816,6 +1843,8 @@ export default function RankingBattlePage() {
             </div>
           ) : null}
 
+          {range === 'monthly' ? <MonthlyRewardPolicyNotice isMobile={isMobile} /> : null}
+
           <div className={cn(isMobile ? 'space-y-4' : 'grid gap-5 xl:grid-cols-[minmax(0,1.08fr)_320px]')}>
             <div className="space-y-5">
               <EmptyRankingState range={range} />
@@ -1849,6 +1878,8 @@ export default function RankingBattlePage() {
             {fetchError}
           </div>
         ) : null}
+
+        {range === 'monthly' ? <MonthlyRewardPolicyNotice isMobile={isMobile} /> : null}
 
         {isMobile ? (
           <div className="space-y-4">
