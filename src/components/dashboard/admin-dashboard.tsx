@@ -86,7 +86,7 @@ import {
 import { useFirestore, useCollection, useFunctions, useDoc, useUser } from '@/firebase';
 import { useAppContext } from '@/contexts/app-context';
 import { useMemoFirebase } from '@/hooks/use-memo-firebase';
-import { addDoc, collection, query, where, Timestamp, doc, limit, getDoc, getDocs, orderBy, serverTimestamp, documentId, writeBatch, deleteField } from 'firebase/firestore';
+import { addDoc, collection, query, where, Timestamp, doc, limit, getDoc, getDocs, orderBy, serverTimestamp, documentId, writeBatch, deleteField, increment } from 'firebase/firestore';
 import { httpsCallable } from 'firebase/functions';
 import { AttendanceCurrent, AttendanceRequest, CounselingReservation, DailyStudentStat, DailyReport, CenterMembership, InviteCode, GrowthProgress, ParentActivityEvent, CounselingLog, LayoutRoomConfig, StudentProfile, StudyLogDay, OpenClawIntegrationDoc, OpenClawSnapshotRecordCounts, PointBoostEvent } from '@/lib/types';
 import { format, subDays } from 'date-fns';
@@ -111,6 +111,8 @@ import { buildNoShowFlag } from '@/features/schedules/lib/buildNoShowFlag';
 import { useCenterAdminAttendanceBoard } from '@/hooks/use-center-admin-attendance-board';
 import { useCenterAdminHeatmap } from '@/hooks/use-center-admin-heatmap';
 import { getAttendanceRequestTypeLabel, getScheduleChangeReasonLabel } from '@/lib/attendance-request';
+import { syncAutoAttendanceRecord } from '@/lib/attendance-auto';
+import { appendAttendanceEventToBatch, mergeAttendanceDailyStatToBatch } from '@/lib/attendance-events';
 import {
   buildCounselingTrackOverview,
   type DashboardCounselTrackTab,
@@ -136,6 +138,7 @@ import { createPointBoostEventSecure, cancelPointBoostEventSecure } from '@/lib/
 import { getDailyPointBreakdown } from '@/lib/student-rewards';
 
 const ADMIN_DASHBOARD_REFRESH_INTERVAL_MS = 60 * 1000;
+const MAX_STUDY_SESSION_MINUTES = 360;
 const MANUAL_PARENT_SMS_UID = '__manual_parent__';
 const STUDENT_SMS_FALLBACK_UID = '__student__';
 
@@ -262,6 +265,19 @@ const getAdminSmsEventLabel = (eventType?: string | null): string => {
       return '위험 알림';
     default:
       return '문자';
+  }
+};
+
+const getAdminAttendanceStatusLabel = (status?: AttendanceCurrent['status'] | null): string => {
+  switch (status) {
+    case 'studying':
+      return '등원';
+    case 'away':
+    case 'break':
+      return '외출';
+    case 'absent':
+    default:
+      return '퇴실/미입실';
   }
 };
 
@@ -701,6 +717,7 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
   const [pointBoostEndDraft, setPointBoostEndDraft] = useState('');
   const [pointBoostMultiplierDraft, setPointBoostMultiplierDraft] = useState('2');
   const [pointBoostMessageDraft, setPointBoostMessageDraft] = useState('');
+  const [focusAttendanceActionSaving, setFocusAttendanceActionSaving] = useState<AttendanceCurrent['status'] | null>(null);
   const [isCreatingPointBoost, setIsCreatingPointBoost] = useState(false);
   const [cancellingPointBoostId, setCancellingPointBoostId] = useState<string | null>(null);
   const [isOpenClawExporting, setIsOpenClawExporting] = useState(false);
@@ -2553,6 +2570,14 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
   const topFocusPreview = metrics.focusTop10.slice(0, 4);
   const bottomFocusPreview = metrics.focusBottom10.slice(0, 4);
 
+  const selectedFocusAttendanceSeat = useMemo(
+    () =>
+      selectedFocusStudentId
+        ? resolvedAttendanceList.find((seat) => seat.studentId === selectedFocusStudentId) || null
+        : null,
+    [resolvedAttendanceList, selectedFocusStudentId]
+  );
+
   const selectedFocusStudent = useMemo(() => {
     if (!selectedFocusStudentId || !metrics) return null;
     return (
@@ -2563,7 +2588,7 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
         const studentProfile = studentsById.get(selectedFocusStudentId);
         const focusStat = (todayStats || []).find((row) => row.studentId === selectedFocusStudentId) || null;
         const focusProgress = (progressList || []).find((row) => row.id === selectedFocusStudentId) || null;
-        const seat = (attendanceList || []).find((row) => row.studentId === selectedFocusStudentId);
+        const seat = selectedFocusAttendanceSeat;
         const liveSession = getLiveRoundedMinutes(seat);
         const signalMinutes = Math.max(0, Math.round(Number(attendanceSeatSignalsByStudentId.get(selectedFocusStudentId)?.todayStudyMinutes || 0)));
         const todayMinutes = signalMinutes > 0
@@ -2582,12 +2607,13 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
       })()
       || null
     );
-  }, [metrics, selectedFocusStudentId, studentMembersById, studentsById, todayStats, progressList, weeklyStudyMinutesByStudent, attendanceList, attendanceSeatSignalsByStudentId]);
+  }, [metrics, selectedFocusStudentId, studentMembersById, studentsById, todayStats, progressList, weeklyStudyMinutesByStudent, selectedFocusAttendanceSeat, attendanceSeatSignalsByStudentId]);
 
   const selectedFocusOperationsSummary = useMemo(() => {
     if (!selectedFocusStudentId) return null;
 
     const signal = attendanceSeatSignalsByStudentId.get(selectedFocusStudentId) || null;
+    const seat = selectedFocusAttendanceSeat;
     const student = studentsById.get(selectedFocusStudentId) || null;
     const studentMember = studentMembersById.get(selectedFocusStudentId) || null;
     const parentUidSet = new Set(student?.parentUids || []);
@@ -2638,8 +2664,12 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
 
     return {
       signal,
+      seat,
       student,
       studentMember,
+      currentStatus: seat?.status || signal?.seatStatus || 'absent',
+      currentStatusLabel: getAdminAttendanceStatusLabel(seat?.status || signal?.seatStatus || 'absent'),
+      seatId: seat?.id || signal?.seatId || '',
       plannedArrival: signal?.routineExpectedArrivalTime || student?.expectedArrivalTime || '-',
       firstCheckInLabel: signal?.firstCheckInLabel || signal?.checkedAtLabel || '-',
       plannedDeparture: signal?.plannedDepartureTime || '-',
@@ -2659,6 +2689,7 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
     attendanceSeatSignalsByStudentId,
     parentMembers,
     selectedFocusStudentId,
+    selectedFocusAttendanceSeat,
     smsDeliveryLogs,
     smsRecipientPreferencesByKey,
     studentMembersById,
@@ -3998,6 +4029,242 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
 
     if (normalizedSeat.studentId) {
       setSelectedFocusStudentId(normalizedSeat.studentId);
+    }
+  };
+  const handleFocusAttendanceAction = async (nextStatus: AttendanceCurrent['status']) => {
+    if (!firestore || !centerId || !selectedFocusStudentId) return;
+
+    const studentId = selectedFocusStudentId;
+    const seat = selectedFocusAttendanceSeat;
+    const signal = selectedFocusOperationsSummary?.signal || attendanceSeatSignalsByStudentId.get(studentId) || null;
+    const prevStatus = seat?.status || signal?.seatStatus || 'absent';
+    const studentName =
+      selectedFocusStudent?.name
+      || studentsById.get(studentId)?.name
+      || studentMembersById.get(studentId)?.displayName
+      || '학생';
+    const nextStatusLabel = getAdminAttendanceStatusLabel(nextStatus);
+
+    if (prevStatus === nextStatus) {
+      toast({
+        title: '이미 반영된 상태입니다.',
+        description: `${studentName} 학생은 이미 ${nextStatusLabel} 상태입니다.`,
+      });
+      return;
+    }
+
+    const roomId = seat?.roomId || signal?.roomId || '';
+    const roomSeatNo = seat?.roomSeatNo || signal?.roomSeatNo || 0;
+    const seatDocId = seat?.id || signal?.seatId || (roomId && roomSeatNo ? buildSeatId(roomId, roomSeatNo) : '');
+    const seatNo = seat?.seatNo || (roomId && roomSeatNo ? getGlobalSeatNo(roomId, roomSeatNo) : 0);
+
+    if (!seatDocId || (!roomSeatNo && !seatNo)) {
+      toast({
+        variant: 'destructive',
+        title: '출결 처리 불가',
+        description: '좌석이 배정된 학생만 여기서 바로 출결을 처리할 수 있습니다.',
+      });
+      return;
+    }
+
+    setFocusAttendanceActionSaving(nextStatus);
+    try {
+      const batch = writeBatch(firestore);
+      const nowDate = new Date();
+      const nowMs = nowDate.getTime();
+      const todayDateKey = format(nowDate, 'yyyy-MM-dd');
+      const lastCheckInAt = seat?.lastCheckInAt || null;
+      const seatRef = doc(firestore, 'centers', centerId, 'attendanceCurrent', seatDocId);
+
+      if (prevStatus === 'studying' && nextStatus !== 'studying' && lastCheckInAt) {
+        const startTimeMs = lastCheckInAt.toMillis();
+        const sessionDateKey = format(lastCheckInAt.toDate(), 'yyyy-MM-dd');
+        const sessionMinutes = Math.min(
+          MAX_STUDY_SESSION_MINUTES,
+          Math.max(1, Math.ceil((nowMs - startTimeMs) / 60000))
+        );
+
+        if (sessionMinutes > 0) {
+          const logRef = doc(firestore, 'centers', centerId, 'studyLogs', studentId, 'days', sessionDateKey);
+          batch.set(
+            logRef,
+            {
+              studentId,
+              centerId,
+              dateKey: sessionDateKey,
+              totalMinutes: increment(sessionMinutes),
+              updatedAt: serverTimestamp(),
+            },
+            { merge: true }
+          );
+
+          const statRef = doc(firestore, 'centers', centerId, 'dailyStudentStats', sessionDateKey, 'students', studentId);
+          batch.set(
+            statRef,
+            {
+              studentId,
+              centerId,
+              dateKey: sessionDateKey,
+              totalStudyMinutes: increment(sessionMinutes),
+              updatedAt: serverTimestamp(),
+            },
+            { merge: true }
+          );
+
+          const sessionId = `session_${lastCheckInAt.toMillis()}`;
+          const sessionRef = doc(firestore, 'centers', centerId, 'studyLogs', studentId, 'days', sessionDateKey, 'sessions', sessionId);
+          batch.set(sessionRef, {
+            startTime: lastCheckInAt,
+            endTime: Timestamp.fromMillis(nowMs),
+            durationMinutes: sessionMinutes,
+            sessionId,
+            createdAt: serverTimestamp(),
+          });
+
+          const progressRef = doc(firestore, 'centers', centerId, 'growthProgress', studentId);
+          batch.set(
+            progressRef,
+            {
+              'stats.focus': increment((sessionMinutes / 60) * 0.1),
+              updatedAt: serverTimestamp(),
+            },
+            { merge: true }
+          );
+        }
+      }
+
+      const shouldStartNewSession = nextStatus === 'studying' && (prevStatus !== 'studying' || !lastCheckInAt);
+      const seatPayload: Record<string, unknown> = {
+        studentId,
+        seatNo,
+        roomId: roomId || null,
+        roomSeatNo: roomSeatNo || undefined,
+        type: seat?.type || 'seat',
+        seatZone: seat?.seatZone || null,
+        status: nextStatus,
+        updatedAt: serverTimestamp(),
+      };
+      if (seat?.seatLabel) {
+        seatPayload.seatLabel = seat.seatLabel;
+      }
+      if (shouldStartNewSession) {
+        seatPayload.lastCheckInAt = serverTimestamp();
+      } else if (nextStatus !== 'studying') {
+        seatPayload.lastCheckInAt = deleteField();
+      }
+
+      batch.set(seatRef, seatPayload, { merge: true });
+
+      const legacySeatDocId = getLegacySeatDocId(seat);
+      if (legacySeatDocId) {
+        batch.delete(doc(firestore, 'centers', centerId, 'attendanceCurrent', legacySeatDocId));
+      }
+
+      appendAttendanceEventToBatch(batch, firestore, centerId, {
+        studentId,
+        dateKey: todayDateKey,
+        eventType: 'status_override',
+        occurredAt: nowDate,
+        source: 'admin_focus_board',
+        seatId: seatDocId,
+        statusBefore: prevStatus,
+        statusAfter: nextStatus,
+      });
+
+      if (prevStatus === 'absent' && nextStatus === 'studying') {
+        appendAttendanceEventToBatch(batch, firestore, centerId, {
+          studentId,
+          dateKey: todayDateKey,
+          eventType: 'check_in',
+          occurredAt: nowDate,
+          source: 'admin_focus_board',
+          seatId: seatDocId,
+          statusBefore: prevStatus,
+          statusAfter: nextStatus,
+        });
+        mergeAttendanceDailyStatToBatch(batch, firestore, centerId, studentId, todayDateKey, {
+          attendanceStatus: nextStatus,
+          checkInAt: nowDate,
+          source: 'admin_focus_board',
+        });
+      } else if ((prevStatus === 'away' || prevStatus === 'break') && nextStatus === 'studying') {
+        appendAttendanceEventToBatch(batch, firestore, centerId, {
+          studentId,
+          dateKey: todayDateKey,
+          eventType: 'away_end',
+          occurredAt: nowDate,
+          source: 'admin_focus_board',
+          seatId: seatDocId,
+          statusBefore: prevStatus,
+          statusAfter: nextStatus,
+        });
+        mergeAttendanceDailyStatToBatch(batch, firestore, centerId, studentId, todayDateKey, {
+          attendanceStatus: nextStatus,
+          source: 'admin_focus_board',
+        });
+      } else if ((nextStatus === 'away' || nextStatus === 'break') && prevStatus === 'studying') {
+        appendAttendanceEventToBatch(batch, firestore, centerId, {
+          studentId,
+          dateKey: todayDateKey,
+          eventType: 'away_start',
+          occurredAt: nowDate,
+          source: 'admin_focus_board',
+          seatId: seatDocId,
+          statusBefore: prevStatus,
+          statusAfter: nextStatus,
+        });
+        mergeAttendanceDailyStatToBatch(batch, firestore, centerId, studentId, todayDateKey, {
+          attendanceStatus: nextStatus,
+          source: 'admin_focus_board',
+        });
+      } else if (nextStatus === 'absent' && prevStatus !== 'absent') {
+        appendAttendanceEventToBatch(batch, firestore, centerId, {
+          studentId,
+          dateKey: todayDateKey,
+          eventType: 'check_out',
+          occurredAt: nowDate,
+          source: 'admin_focus_board',
+          seatId: seatDocId,
+          statusBefore: prevStatus,
+          statusAfter: nextStatus,
+        });
+        mergeAttendanceDailyStatToBatch(batch, firestore, centerId, studentId, todayDateKey, {
+          attendanceStatus: nextStatus,
+          checkOutAt: nowDate,
+          hasCheckOutRecord: true,
+          source: 'admin_focus_board',
+        });
+      } else {
+        mergeAttendanceDailyStatToBatch(batch, firestore, centerId, studentId, todayDateKey, {
+          attendanceStatus: nextStatus,
+          source: 'admin_focus_board',
+        });
+      }
+
+      await batch.commit();
+      setLiveTickMs(Date.now());
+
+      void syncAutoAttendanceRecord({
+        firestore,
+        centerId,
+        studentId,
+        studentName,
+        targetDate: nowDate,
+        checkInAt: nextStatus === 'studying' ? nowDate : null,
+        confirmedByUserId: user?.uid,
+      }).catch((syncError: unknown) => {
+        logHandledClientIssue('[admin-dashboard] focus attendance auto sync skipped', syncError);
+      });
+
+      toast({
+        title: '출결 처리를 저장했습니다.',
+        description: `${studentName} 학생 상태를 ${nextStatusLabel}으로 반영했습니다.`,
+      });
+    } catch (error) {
+      logHandledClientIssue('[admin-dashboard] focus attendance action failed', error);
+      toast({ variant: 'destructive', title: '출결 처리 실패' });
+    } finally {
+      setFocusAttendanceActionSaving(null);
     }
   };
   const handleToggleClassroomEditMode = () => {
@@ -7218,6 +7485,80 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
                     <Badge className="h-8 rounded-full border-none bg-[#14295F] px-3 text-[11px] font-black text-white">
                       문자 {selectedFocusOperationsSummary.smsLogs.length}건
                     </Badge>
+                  </div>
+
+                  <div className="mt-4 rounded-2xl border border-[#DCE7FF] bg-[#F7FAFF] p-3">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <div className="min-w-0">
+                        <p className="text-[10px] font-black uppercase tracking-[0.14em] text-[#5C6E97]">바로 출결 처리</p>
+                        <p className="mt-1 text-xs font-bold text-[#6E7EA3]">
+                          현재 상태 <span className="font-black text-[#14295F]">{selectedFocusOperationsSummary.currentStatusLabel}</span>
+                        </p>
+                      </div>
+                      {!selectedFocusOperationsSummary.seatId ? (
+                        <Badge className="h-7 rounded-full border-none bg-[#FFF2E8] px-3 text-[10px] font-black text-[#C95A08]">
+                          좌석 배정 필요
+                        </Badge>
+                      ) : null}
+                    </div>
+                    <div className="mt-3 grid grid-cols-3 gap-2">
+                      <Button
+                        type="button"
+                        size="sm"
+                        className="h-10 rounded-xl bg-[#14295F] px-2 text-xs font-black text-white hover:bg-[#1E3A7A]"
+                        disabled={
+                          Boolean(focusAttendanceActionSaving)
+                          || !selectedFocusOperationsSummary.seatId
+                          || selectedFocusOperationsSummary.currentStatus === 'studying'
+                        }
+                        onClick={() => void handleFocusAttendanceAction('studying')}
+                      >
+                        {focusAttendanceActionSaving === 'studying' ? (
+                          <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
+                        ) : (
+                          <CheckCircle2 className="mr-1.5 h-3.5 w-3.5" />
+                        )}
+                        등원
+                      </Button>
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        className="h-10 rounded-xl border-emerald-200 bg-white px-2 text-xs font-black text-emerald-700 hover:bg-emerald-50 hover:text-emerald-800"
+                        disabled={
+                          Boolean(focusAttendanceActionSaving)
+                          || !selectedFocusOperationsSummary.seatId
+                          || selectedFocusOperationsSummary.currentStatus !== 'studying'
+                        }
+                        onClick={() => void handleFocusAttendanceAction('away')}
+                      >
+                        {focusAttendanceActionSaving === 'away' ? (
+                          <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
+                        ) : (
+                          <ArrowRightLeft className="mr-1.5 h-3.5 w-3.5" />
+                        )}
+                        외출
+                      </Button>
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        className="h-10 rounded-xl border-rose-200 bg-white px-2 text-xs font-black text-rose-600 hover:bg-rose-50 hover:text-rose-700"
+                        disabled={
+                          Boolean(focusAttendanceActionSaving)
+                          || !selectedFocusOperationsSummary.seatId
+                          || selectedFocusOperationsSummary.currentStatus === 'absent'
+                        }
+                        onClick={() => void handleFocusAttendanceAction('absent')}
+                      >
+                        {focusAttendanceActionSaving === 'absent' ? (
+                          <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
+                        ) : (
+                          <UserX className="mr-1.5 h-3.5 w-3.5" />
+                        )}
+                        퇴실
+                      </Button>
+                    </div>
                   </div>
 
                   <div className="mt-4 grid gap-3 sm:grid-cols-3">
