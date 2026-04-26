@@ -128,6 +128,7 @@ import { submitAttendanceRequestSecure } from '@/lib/penalty-actions';
 import { getAttendanceRequestTypeLabel } from '@/lib/attendance-request';
 import { openStudyRewardBoxSecure } from '@/lib/study-box-actions';
 import { stopStudentStudySessionSecure } from '@/lib/study-session-actions';
+import { sumStudySessionDurationMinutes } from '@/lib/study-session-time';
 import {
   claimPlannerCompletionRewardWithFallback,
   PLANNER_COMPLETION_DAILY_REWARD_LIMIT,
@@ -1524,28 +1525,18 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
   const { data: activeStudyDaySessions } = useCollection<StudySession>(activeStudyDaySessionsQuery, { enabled: isActive });
 
   const activeStudyDaySessionMinutes = useMemo(() => {
-    return (activeStudyDaySessions || []).reduce((sum, session) => {
-      const directMinutes = Number(session.durationMinutes || 0);
-      if (Number.isFinite(directMinutes) && directMinutes > 0) {
-        return sum + Math.max(0, Math.round(directMinutes));
-      }
-      const startAt = session.startTime?.toDate?.();
-      const endAt = session.endTime?.toDate?.();
-      if (!startAt || !endAt) return sum;
-      const diffMs = endAt.getTime() - startAt.getTime();
-      return sum + (diffMs > 0 ? Math.max(1, Math.ceil(diffMs / 60000)) : 0);
-    }, 0);
+    return sumStudySessionDurationMinutes(activeStudyDaySessions);
   }, [activeStudyDaySessions]);
 
   const activeStudyDayBaseMinutes = useMemo(() => {
     const storedMinutes = Number(todayStudyLog?.totalMinutes || 0);
     const adjustmentMinutes = Number(todayStudyLog?.manualAdjustmentMinutes || 0);
-    const baseMinutes = Math.max(
-      Number.isFinite(storedMinutes) ? storedMinutes : 0,
-      activeStudyDaySessionMinutes
-    );
+    const hasSessionDocs = (activeStudyDaySessions || []).length > 0;
+    const baseMinutes = hasSessionDocs
+      ? activeStudyDaySessionMinutes
+      : Number.isFinite(storedMinutes) ? storedMinutes : 0;
     return Math.round(baseMinutes + (Number.isFinite(adjustmentMinutes) ? adjustmentMinutes : 0));
-  }, [activeStudyDaySessionMinutes, todayStudyLog?.manualAdjustmentMinutes, todayStudyLog?.totalMinutes]);
+  }, [activeStudyDaySessionMinutes, activeStudyDaySessions, todayStudyLog?.manualAdjustmentMinutes, todayStudyLog?.totalMinutes]);
 
   const recordedTodayStudyMinutes = Math.max(0, activeStudyDayBaseMinutes);
 
@@ -1584,7 +1575,7 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
       map.set(log.dateKey, Math.max(0, Math.round(log.totalMinutes || 0)));
     });
     if (activeStudyDayKey) {
-      map.set(activeStudyDayKey, Math.max(map.get(activeStudyDayKey) || 0, recordedTodayStudyMinutes));
+      map.set(activeStudyDayKey, recordedTodayStudyMinutes);
     }
     return map;
   }, [activeStudyDayKey, recentLogs, recordedTodayStudyMinutes]);

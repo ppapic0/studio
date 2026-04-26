@@ -2861,7 +2861,7 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
   const selectedFocusBreakdown = useMemo(() => {
     if (!selectedFocusStudent) return null;
     const completionRate = clampScore(selectedFocusStat?.todayPlanCompletionRate || 0);
-    const studyMinutes = Math.max(0, selectedFocusStat?.totalStudyMinutes || selectedFocusStudent.studyMinutes || 0);
+    const studyMinutes = Math.max(0, selectedFocusStudent.todayMinutes || selectedFocusStat?.totalStudyMinutes || 0);
     const growthRate = Number(selectedFocusStat?.studyTimeGrowthRate || 0);
     const focusStat = clampScore(selectedFocusProgress?.stats?.focus || 0);
     const penaltyPoints = Math.max(0, selectedFocusProgress?.penaltyPoints || 0);
@@ -2905,7 +2905,10 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
       const day = subDays(baseDate, 6 - index);
       const dateKey = format(day, 'yyyy-MM-dd');
       const stat = statByDateKey.get(dateKey);
-      const minutes = minutesByDateKey.get(dateKey) ?? Math.round(stat?.totalStudyMinutes || 0);
+      const rawMinutes = minutesByDateKey.get(dateKey) ?? Math.round(stat?.totalStudyMinutes || 0);
+      const minutes = dateKey === todayKey && selectedFocusStudent?.todayMinutes != null
+        ? Math.max(0, Math.round(selectedFocusStudent.todayMinutes))
+        : rawMinutes;
       const score = stat
         ? calculateStudentFocusScore(
             {
@@ -2922,7 +2925,7 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
         minutes,
       };
     });
-  }, [focusStudentTrendRaw, focusStudyLogDaysRaw, progressList, selectedFocusStudentId, today]);
+  }, [focusStudentTrendRaw, focusStudyLogDaysRaw, progressList, selectedFocusStudentId, selectedFocusStudent?.todayMinutes, today, todayKey]);
 
   // ── 선택 학생 세션 데이터 로드 (시작시간 분포·외출시간 산출용) ──
   useEffect(() => {

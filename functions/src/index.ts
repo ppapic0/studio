@@ -7704,8 +7704,21 @@ async function syncStudyLogDayTotalMinutes(
 ): Promise<void> {
   const sessionsSnap = await db.collection(`centers/${centerId}/studyLogs/${studentId}/days/${dateKey}/sessions`).get();
   const sessionTotalMinutes = sessionsSnap.docs.reduce((sum, docSnap) => {
-    const raw = Number((docSnap.data() as Record<string, unknown>)?.durationMinutes ?? 0);
-    return sum + (Number.isFinite(raw) ? Math.max(0, Math.round(raw)) : 0);
+    const data = (docSnap.data() || {}) as Record<string, unknown>;
+    const rawMinutes = Number(data.durationMinutes ?? 0);
+    if (Number.isFinite(rawMinutes) && rawMinutes > 0) {
+      return sum + Math.max(0, Math.round(rawMinutes));
+    }
+    const rawSeconds = Number(data.durationSeconds ?? 0);
+    if (Number.isFinite(rawSeconds) && rawSeconds > 0) {
+      return sum + Math.max(1, Math.ceil(rawSeconds / 60));
+    }
+    const startMs = toMillisSafe(data.startTime);
+    const endMs = toMillisSafe(data.endTime);
+    if (startMs > 0 && endMs > startMs) {
+      return sum + Math.max(1, Math.ceil((endMs - startMs) / MINUTE_MS));
+    }
+    return sum;
   }, 0);
   const firstSessionStartAt = sessionsSnap.docs
     .map((docSnap) => toTimestampOrNow((docSnap.data() as Record<string, unknown>)?.startTime))

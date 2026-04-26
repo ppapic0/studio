@@ -7,6 +7,7 @@ import { collection, collectionGroup, doc, getDoc, getDocs, limit, query, where 
 import { useCollection, useFirestore } from '@/firebase';
 import { useMemoFirebase } from '@/hooks/use-memo-firebase';
 import { logHandledClientIssue } from '@/lib/handled-client-log';
+import { getStudySessionDurationMinutes } from '@/lib/study-session-time';
 import {
   buildAttendanceRoutineInfo,
   deriveAttendanceDisplayState,
@@ -100,21 +101,6 @@ function getScheduleTemplateTimestampMs(template: StudentScheduleTemplate) {
   if (raw instanceof Date) return raw.getTime();
   if (typeof (raw as any).toDate === 'function') return (raw as any).toDate().getTime();
   return 0;
-}
-
-function getStudySessionDurationMinutes(data: Record<string, unknown>) {
-  const directMinutes = Number(data.durationMinutes ?? 0);
-  if (Number.isFinite(directMinutes) && directMinutes > 0) {
-    return Math.max(0, Math.round(directMinutes));
-  }
-
-  const startAt = toDateSafe(data.startTime);
-  const endAt = toDateSafe(data.endTime);
-  if (!startAt || !endAt) return 0;
-
-  const diffMs = endAt.getTime() - startAt.getTime();
-  if (!Number.isFinite(diffMs) || diffMs <= 0) return 0;
-  return Math.max(1, Math.ceil(diffMs / 60000));
 }
 
 function pickDateByMode(values: Array<Date | null | undefined>, mode: 'earliest' | 'latest') {
@@ -699,7 +685,7 @@ export function useCenterAdminAttendanceBoard({
         const fallbackStudyLogMinutes = Math.round(Number(fallbackStudyLogEntry?.minutes || 0));
         const eventClosedStudyMinutes = calculateClosedStudyMinutesFromAttendanceEvents(todayEventsForStudent);
         const recordedStudyMinutes = fallbackStudyLogEntry?.hasSessions
-          ? Math.max(fallbackStudyLogMinutes, eventClosedStudyMinutes)
+          ? fallbackStudyLogMinutes
           : eventClosedStudyMinutes > 0
             ? eventClosedStudyMinutes
             : Math.max(storedStudyMinutes, fallbackStudyLogMinutes);

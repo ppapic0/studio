@@ -99,6 +99,7 @@ import {
   buildWeeklyStudyInsight,
 } from '@/lib/learning-insights';
 import { getInvoiceCollectionEndDate } from '@/lib/invoice-collection-window';
+import { sumStudySessionDurationMinutes } from '@/lib/study-session-time';
 import {
   PENALTY_RECOVERY_INTERVAL_DAYS,
   REQUEST_PENALTY_POINTS,
@@ -451,7 +452,6 @@ const PARENT_HOME_METRIC_TONE_STYLES: Record<ParentMetricTone, ParentHomeMetricT
 const PARENT_PORTAL_TABS: ParentPortalTab[] = ['home', 'studyDetail', 'data', 'communication', 'billing'];
 const PARENT_POST_LOGIN_ENTRY_MOTION_KEY = 'track-parent-dashboard-entry';
 const PARENT_POST_LOGIN_ENTRY_MAX_AGE_MS = 15000;
-const PARENT_ACTIVE_STUDY_STATUSES: AttendanceCurrent['status'][] = ['studying', 'away', 'break'];
 
 const PARENT_DASHBOARD_TAB_META = {
   home: {
@@ -2038,6 +2038,11 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
 
   const todayLogRef = useMemoFirebase(() => (!firestore || !centerId || !studentId || !todayKey ? null : doc(firestore, 'centers', centerId, 'studyLogs', studentId, 'days', todayKey)), [firestore, centerId, studentId, todayKey]);
   const { data: todayLog } = useDoc<StudyLogDay>(todayLogRef, { enabled: isActive && !!studentId });
+  const todaySessionsQuery = useMemoFirebase(() => {
+    if (!firestore || !centerId || !studentId || !todayKey) return null;
+    return collection(firestore, 'centers', centerId, 'studyLogs', studentId, 'days', todayKey, 'sessions');
+  }, [firestore, centerId, studentId, todayKey]);
+  const { data: todaySessions } = useCollection<StudySession>(todaySessionsQuery, { enabled: isActive && !!studentId });
 
   const analyticsLookbackDays = tab === 'data' ? 42 : 35;
   const recentAnalyticsStartKey = today ? format(subDays(today, analyticsLookbackDays - 1), 'yyyy-MM-dd') : '';
@@ -2489,9 +2494,10 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
 
   const studyPlans = (todayPlans || []).filter((item) => item.category === 'study' || !item.category);
   const persistedTodayMinutes = Math.max(0, Number(todayLog?.totalMinutes || 0));
+  const todaySessionMinutes = useMemo(() => sumStudySessionDurationMinutes(todaySessions), [todaySessions]);
   const liveStudySessionMinutes = useMemo(() => {
     if (!today || liveNowMs <= 0) return 0;
-    if (!attendanceCurrent?.status || !PARENT_ACTIVE_STUDY_STATUSES.includes(attendanceCurrent.status)) return 0;
+    if (attendanceCurrent?.status !== 'studying') return 0;
 
     const checkInAt = toDateSafe(attendanceCurrent.lastCheckInAt as TimestampLike);
     if (!checkInAt) return 0;
@@ -2504,7 +2510,7 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
 
     return Math.max(1, Math.ceil(elapsedMs / 60000));
   }, [attendanceCurrent?.lastCheckInAt, attendanceCurrent?.status, liveNowMs, today]);
-  const totalMinutes = persistedTodayMinutes + liveStudySessionMinutes;
+  const totalMinutes = ((todaySessions || []).length > 0 ? todaySessionMinutes : persistedTodayMinutes) + liveStudySessionMinutes;
   
   const planTotal = studyPlans.length;
   const planDone = studyPlans.filter((item) => item.done).length;

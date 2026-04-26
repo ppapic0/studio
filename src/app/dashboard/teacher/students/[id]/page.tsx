@@ -726,7 +726,7 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
 
         const missingRecentKeys = recentKeys.filter((dateKey) => {
           const stat = next[dateKey];
-          return !stat || stat.totalStudyMinutes <= 0 || stat.startHour === undefined || stat.endHour === undefined || stat.awayMinutes === undefined;
+          return dateKey === todayKey || !stat || stat.totalStudyMinutes <= 0 || stat.startHour === undefined || stat.endHour === undefined || stat.awayMinutes === undefined;
         });
 
         if (missingRecentKeys.length === 0) return;
@@ -792,9 +792,9 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
             const existing = merged[dateKey] || { totalStudyMinutes: 0 };
             merged[dateKey] = {
               ...existing,
-              totalStudyMinutes: existing.totalStudyMinutes > 0
-                ? existing.totalStudyMinutes
-                : Math.max(0, Math.round(Number(totalStudyMinutes || 0))),
+              totalStudyMinutes: totalStudyMinutes !== undefined
+                ? Math.max(0, Math.round(Number(totalStudyMinutes || 0)))
+                : existing.totalStudyMinutes,
               startHour: existing.startHour ?? startHour,
               endHour: existing.endHour ?? endHour,
               awayMinutes: existing.awayMinutes ?? awayMinutes,

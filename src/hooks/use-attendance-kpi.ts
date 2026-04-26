@@ -36,6 +36,7 @@ import {
   type AttendanceStudentKpiRow,
 } from '@/lib/attendance-kpi';
 import { getRoomLabel } from '@/lib/seat-layout';
+import { getStudySessionDurationMinutes } from '@/lib/study-session-time';
 import { AttendanceCurrent, AttendanceRequest, CenterMembership } from '@/lib/types';
 
 type AttendanceRecordDoc = {
@@ -299,15 +300,6 @@ function buildSessionGroups(sessions: StudySessionDoc[]) {
     bucket.sort((a, b) => (a.startTime?.getTime() || 0) - (b.startTime?.getTime() || 0));
   });
   return mapped;
-}
-
-function getStudySessionDurationMinutes(session: StudySessionDoc) {
-  const directMinutes = Number(session.durationMinutes ?? 0);
-  if (Number.isFinite(directMinutes) && directMinutes > 0) {
-    return Math.max(0, Math.round(directMinutes));
-  }
-  if (!session.startTime || !session.endTime) return 0;
-  return Math.max(0, differenceInMinutes(session.endTime, session.startTime));
 }
 
 function calculateSessionGapMetrics(sessions: StudySessionDoc[]) {
@@ -728,7 +720,7 @@ export function useAttendanceKpi({
           'earliest'
         );
         const studyMinutesBase = sessions.length > 0
-          ? Math.max(sessionStudyMinutes, eventClosedStudyMinutes)
+          ? sessionStudyMinutes
           : eventClosedStudyMinutes > 0
             ? eventClosedStudyMinutes
             : Math.max(
