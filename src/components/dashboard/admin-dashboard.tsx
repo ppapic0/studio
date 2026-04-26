@@ -3353,7 +3353,8 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
     + pendingOtherAttendanceRequests.length
     + counselingTrackOverview.consultationCount
     + counselingTrackOverview.wifiCount
-    + counselingTrackOverview.parentRequestCount;
+    + counselingTrackOverview.parentRequestCount
+    + counselingTrackOverview.studentRequestCount;
   const adminOperationsInboxStatusTone =
     adminNoShowSignals.length > 0 || adminLateSignals.length > 0
       ? 'urgent'
@@ -3523,6 +3524,17 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
               onClick: () => openCounselTrackDialog('inquiries'),
             }
           : null,
+        counselingTrackOverview.studentRequestCount > 0
+          ? {
+              key: 'queue-student-request',
+              label: '학생 건의·질문',
+              title: `학생 건의·질문 ${counselingTrackOverview.studentRequestCount}건`,
+              detail: `${counselingTrackOverview.studentRequests[0]?.studentName || '학생'} 문의부터 바로 열어 답변과 후속 처리를 이어갈 수 있습니다.`,
+              meta: counselingTrackOverview.studentRequests[0]?.timeLabel || '최근 접수 순',
+              tone: 'blue' as const,
+              onClick: () => openCounselTrackDialog('inquiries'),
+            }
+          : null,
         counselingTrackOverview.parentRequestCount > 0
           ? {
               key: 'queue-parent-request',
@@ -3680,6 +3692,27 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
         onOpenAll:
           counselingTrackOverview.parentRequestCount > 0
             ? () => openCounselTrackDialog('parent')
+            : undefined,
+      },
+      {
+        key: 'panel-student-request',
+        label: '학생',
+        title: '학생 건의·질문',
+        count: counselingTrackOverview.studentRequestCount,
+        emptyLabel: '열린 학생 건의나 질문이 없습니다.',
+        tone: 'blue' as const,
+        rows: counselingTrackOverview.studentRequests.map((item) => ({
+          key: item.id,
+          title: item.studentName,
+          detail: item.preview,
+          meta: item.timeLabel,
+          badge: item.badge,
+          tone: item.tone,
+          onClick: () => openCounselTrackDialog(item.targetTab),
+        })),
+        onOpenAll:
+          counselingTrackOverview.studentRequestCount > 0
+            ? () => openCounselTrackDialog('inquiries')
             : undefined,
       },
     ],

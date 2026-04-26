@@ -71,10 +71,12 @@ export interface CounselingTrackOverview {
   parentContactCount: number;
   consultationCount: number;
   parentRequestCount: number;
+  studentRequestCount: number;
   wifiRequests: CounselingTrackPreviewRow[];
   recentContacts: CounselingTrackPreviewRow[];
   consultationInbox: CounselingTrackPreviewRow[];
   parentRequests: CounselingTrackPreviewRow[];
+  studentRequests: CounselingTrackPreviewRow[];
 }
 
 export function toDashboardTimestampDateSafe(value: TimestampLike): Date | null {
@@ -315,12 +317,38 @@ export function buildCounselingTrackOverview({
       supportKind: item.supportKind,
     }));
 
+  const studentRequests = scopedCommunications
+    .filter((item) => {
+      const status = typeof item?.status === 'string' ? item.status : 'requested';
+      return item.senderRole === 'student'
+        && item.type !== 'consultation'
+        && item.supportKind !== 'wifi_unblock'
+        && status !== 'done';
+    })
+    .map((item) => ({
+      id: `student-${item.id || item.studentId}`,
+      studentName: item.studentName,
+      preview: item.preview || '학생 문의가 접수되었습니다.',
+      timeLabel: item.activityLabel,
+      timeMs: item.activityMs,
+      targetTab: 'inquiries' as const,
+      badge: item.supportKind === 'student_suggestion' || item.type === 'suggestion' ? '학생 건의' : '학생 질문',
+      tone: 'blue' as const,
+      activityLabel: item.activityLabel,
+      roleLabel: item.roleLabel,
+      senderRole: item.senderRole,
+      parentName: item.parentName,
+      type: item.type,
+      supportKind: item.supportKind,
+    }));
+
   return {
     wifiCount: wifiRequests.length,
     studentContactCount: scopedCommunications.filter((item) => item.senderRole === 'student').length,
     parentContactCount: scopedCommunications.filter((item) => item.senderRole !== 'student').length,
     consultationCount: consultationThreads.length + reservationThreads.length,
     parentRequestCount: parentRequests.length,
+    studentRequestCount: studentRequests.length,
     wifiRequests: wifiRequests.slice(0, listLimit),
     recentContacts: scopedCommunications
       .filter((item) => item.preview.length > 0 || (typeof item?.title === 'string' && item.title.trim().length > 0))
@@ -346,6 +374,9 @@ export function buildCounselingTrackOverview({
       .sort((left, right) => right.timeMs - left.timeMs)
       .slice(0, listLimit),
     parentRequests: parentRequests
+      .sort((left, right) => right.timeMs - left.timeMs)
+      .slice(0, listLimit),
+    studentRequests: studentRequests
       .sort((left, right) => right.timeMs - left.timeMs)
       .slice(0, listLimit),
   };
