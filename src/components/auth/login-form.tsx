@@ -75,6 +75,29 @@ export function LoginForm() {
     return value.trim().toLowerCase().replace(/[\s_-]+/g, '');
   };
 
+  const isActiveMembershipStatusValue = (value: unknown): boolean => {
+    const normalized = normalizeMembershipStatus(value);
+    return (
+      !normalized ||
+      normalized === 'active' ||
+      normalized === 'approved' ||
+      normalized === 'enabled' ||
+      normalized === 'current'
+    );
+  };
+
+  const normalizeMembershipRole = (value: unknown): string => {
+    if (typeof value !== 'string') return '';
+    const normalized = value.trim().toLowerCase().replace(/[\s_-]+/g, '');
+    if (normalized === 'owner' || normalized === 'admin' || normalized === 'centermanager' || normalized === 'centeradmin') {
+      return 'centerAdmin';
+    }
+    if (normalized === 'teacher' || normalized === 'parent' || normalized === 'student') {
+      return normalized;
+    }
+    return '';
+  };
+
   const fetchMembershipRecords = async (uid: string) => {
     if (!firestore) return [] as { role?: string; status?: string }[];
 
@@ -83,16 +106,20 @@ export function LoginForm() {
   };
 
   const validateStudentMembershipStatus = (memberships: { role?: string; status?: string }[]) => {
-    const studentMemberships = memberships.filter((membership) => membership.role === 'student');
+    const studentMemberships = memberships.filter((membership) => normalizeMembershipRole(membership.role) === 'student');
 
     if (studentMemberships.length === 0) return { allowed: true as const };
 
-    const hasActiveMembership = studentMemberships.some((membership) => {
-      const normalized = normalizeMembershipStatus(membership.status);
-      return !normalized || normalized === 'active';
-    });
+    const hasActiveMembership = studentMemberships.some((membership) => isActiveMembershipStatusValue(membership.status));
 
     if (hasActiveMembership) return { allowed: true as const };
+
+    const hasActiveNonStudentMembership = memberships.some((membership) => {
+      const normalizedRole = normalizeMembershipRole(membership.role);
+      return normalizedRole && normalizedRole !== 'student' && isActiveMembershipStatusValue(membership.status);
+    });
+
+    if (hasActiveNonStudentMembership) return { allowed: true as const };
 
     const hasOnHold = studentMemberships.some((membership) => {
       const normalized = normalizeMembershipStatus(membership.status);
@@ -110,8 +137,7 @@ export function LoginForm() {
     const activeRoles = new Set(
       memberships
         .filter((membership) => {
-          const normalized = normalizeMembershipStatus(membership.status);
-          return !normalized || normalized === 'active';
+          return isActiveMembershipStatusValue(membership.status);
         })
         .map((membership) => membership.role)
         .filter((role): role is string => typeof role === 'string')
