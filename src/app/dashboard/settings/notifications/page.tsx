@@ -102,6 +102,7 @@ type SmsQueueRow = {
   attemptCount?: number;
   manualRetryCount?: number;
   nextAttemptAt?: { toDate?: () => Date };
+  eventAt?: { toDate?: () => Date };
   sentAt?: { toDate?: () => Date };
   failedAt?: { toDate?: () => Date };
   createdAt?: { toDate?: () => Date };
@@ -123,6 +124,7 @@ type SmsDeliveryLogRow = {
   attemptNo?: number;
   status?: 'sent' | 'failed' | 'suppressed_opt_out' | string;
   dateKey?: string;
+  eventAt?: { toDate?: () => Date };
   createdAt?: { toDate?: () => Date };
   sentAt?: { toDate?: () => Date };
   failedAt?: { toDate?: () => Date };
@@ -396,6 +398,11 @@ function formatDateLabel(value?: { toDate?: () => Date }) {
   return `${date.getMonth() + 1}.${String(date.getDate()).padStart(2, '0')} ${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`;
 }
 
+function formatDateLabelFromDate(date?: Date | null) {
+  if (!date) return '-';
+  return `${date.getMonth() + 1}.${String(date.getDate()).padStart(2, '0')} ${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`;
+}
+
 function formatPhone(value?: string) {
   const digits = String(value || '').replace(/\D/g, '');
   if (digits.length === 11) return `${digits.slice(0, 3)}-${digits.slice(3, 7)}-${digits.slice(7)}`;
@@ -415,12 +422,6 @@ function resolveFirstValidPhoneNumber(...values: Array<string | undefined>) {
     if (normalized) return normalized;
   }
   return '';
-}
-
-function formatTimeLabel(value?: { toDate?: () => Date }) {
-  const date = value?.toDate?.();
-  if (!date) return '-';
-  return `${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`;
 }
 
 function toDateSafe(value?: { toDate?: () => Date } | Date | null) {
@@ -453,6 +454,14 @@ function pickAttendanceEventTime(
 function formatTimeLabelFromDate(date?: Date | null) {
   if (!date) return '-';
   return `${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`;
+}
+
+function resolveSmsEventDisplayDate(
+  explicitEventAt: { toDate?: () => Date } | undefined,
+  attendanceAt: Date | null,
+  fallback?: { toDate?: () => Date }
+) {
+  return toDateSafe(explicitEventAt) || attendanceAt || toDateSafe(fallback);
 }
 
 function formatShortDateLabel(date: Date) {
@@ -962,14 +971,17 @@ export default function NotificationSettingsPage() {
           const latestFailedLog = logRows.find((row) => row.status === 'failed');
           const latestQueue = queueRowsForEvent[0];
           const attendanceTime = resolveAttendanceTime(item.value);
+          const sentEventTime = latestSent
+            ? resolveSmsEventDisplayDate(latestSent.eventAt, attendanceTime, latestSent.sentAt || latestSent.createdAt)
+            : attendanceTime;
 
           let summary: Omit<StudentSmsBoardEventSummary, 'attendanceAt'>;
           if (latestSent) {
             summary = {
               eventType: item.value,
               status: 'sent',
-              timeLabel: formatTimeLabel(latestSent.sentAt || latestSent.createdAt),
-              badgeLabel: formatTimeLabel(latestSent.sentAt || latestSent.createdAt),
+              timeLabel: formatTimeLabelFromDate(sentEventTime),
+              badgeLabel: formatTimeLabelFromDate(sentEventTime),
               queueRows: queueRowsForEvent,
               logRows,
             };
@@ -2061,7 +2073,9 @@ export default function NotificationSettingsPage() {
                         message: row.renderedMessage || '-',
                         statusLabel: getDeliveryStatusLabel(row.status),
                         statusTone: row.status === 'sent' ? 'bg-emerald-100 text-emerald-700' : row.status === 'failed' ? 'bg-rose-100 text-rose-700' : 'bg-amber-100 text-amber-700',
-                        timeLabel: formatDateLabel(row.sentAt || row.failedAt || row.createdAt),
+                        timeLabel: formatDateLabelFromDate(
+                          resolveSmsEventDisplayDate(row.eventAt, summary.attendanceAt, row.sentAt || row.failedAt || row.createdAt)
+                        ),
                         errorMessage: row.errorMessage || row.suppressedReason || '',
                         queueId: null as string | null,
                         queueStatus: null as string | null,
@@ -2076,7 +2090,9 @@ export default function NotificationSettingsPage() {
                           message: row.renderedMessage || row.message || '-',
                           statusLabel: getQueueStatusLabel(row.status, row.providerStatus, row.nextAttemptAt, row.attemptCount),
                           statusTone: getStatusTone(row.status, row.providerStatus, row.nextAttemptAt, row.attemptCount),
-                          timeLabel: formatDateLabel(row.nextAttemptAt || row.createdAt),
+                          timeLabel: formatDateLabelFromDate(
+                            resolveSmsEventDisplayDate(row.eventAt, summary.attendanceAt, row.nextAttemptAt || row.createdAt)
+                          ),
                           errorMessage: row.failedReason || row.lastErrorMessage || '',
                           queueId: row.id,
                           queueStatus: String(row.status || ''),

@@ -2516,6 +2516,7 @@ async function appendSmsDeliveryLog(
     attemptNo?: number | null;
     status: SmsDeliveryLogStatus;
     createdAt?: admin.firestore.Timestamp;
+    eventAt?: admin.firestore.Timestamp | null;
     sentAt?: admin.firestore.Timestamp | null;
     failedAt?: admin.firestore.Timestamp | null;
     errorCode?: string | null;
@@ -2524,6 +2525,7 @@ async function appendSmsDeliveryLog(
   }
 ): Promise<void> {
   const createdAt = params.createdAt || admin.firestore.Timestamp.now();
+  const eventAt = params.eventAt || null;
   const logRef = db.collection(`centers/${params.centerId}/smsDeliveryLogs`).doc();
   await logRef.set({
     centerId: params.centerId,
@@ -2539,7 +2541,8 @@ async function appendSmsDeliveryLog(
     provider: params.provider || null,
     attemptNo: params.attemptNo || 0,
     status: params.status,
-    dateKey: toDateKey(createdAt.toDate()),
+    dateKey: toDateKey((eventAt || createdAt).toDate()),
+    eventAt,
     createdAt,
     sentAt: params.sentAt || null,
     failedAt: params.failedAt || null,
@@ -2803,6 +2806,7 @@ async function queueParentSmsNotification(
   });
 
   const eventTimeLabel = toTimeLabel(smsEventAt);
+  const eventAtTs = admin.firestore.Timestamp.fromDate(smsEventAt);
   const expectedTimeLabel = expectedTime || "학생이 정한 시간";
   const message = buildParentSmsTemplateMessage(template, {
     studentName,
@@ -2875,6 +2879,7 @@ async function queueParentSmsNotification(
       dedupeKey,
       eventType,
       dateKey: toDateKey(smsEventAt),
+      eventAt: eventAtTs,
       status: initialStatus.status,
       providerStatus: initialStatus.providerStatus,
       attemptCount: 0,
@@ -2890,6 +2895,7 @@ async function queueParentSmsNotification(
         studentName,
         centerName,
         eventTime: eventTimeLabel,
+        eventAt: eventAtTs,
         expectedTime: expectedTime || null,
       },
     });
@@ -2927,6 +2933,7 @@ async function queueParentSmsNotification(
         attemptNo: 0,
         status: "suppressed_opt_out",
         createdAt: ts,
+        eventAt: eventAtTs,
         suppressedReason: recipient.suppressedReason,
       })
     )
@@ -3620,6 +3627,7 @@ async function dispatchSmsQueueItem(
   const sender = asTrimmedString(settings.smsSender || queueData.sender || "");
   const receiver = normalizePhoneNumber(queueData.phoneNumber || queueData.to || "");
   const queueId = queueRef.id;
+  const queueEventAt = toTimestampOrNow(queueData.eventAt || queueData?.metadata?.eventAt);
   const studentId = asTrimmedString(queueData.studentId);
   const studentName = asTrimmedString(queueData.studentName || queueData?.metadata?.studentName, "학생");
   const parentUid = asTrimmedString(queueData.parentUid);
@@ -3659,6 +3667,7 @@ async function dispatchSmsQueueItem(
       attemptNo: attemptCount,
       status: "suppressed_opt_out",
       createdAt: nowTs,
+      eventAt: queueEventAt,
       suppressedReason: "student_fallback_blocked",
     });
     return;
@@ -3690,6 +3699,7 @@ async function dispatchSmsQueueItem(
       attemptNo: attemptCount,
       status: "failed",
       createdAt: nowTs,
+      eventAt: queueEventAt,
       failedAt: nowTs,
       errorCode: "INVALID_QUEUE_ITEM",
       errorMessage: "수신번호 또는 문자 본문이 비어 있습니다.",
@@ -3810,6 +3820,7 @@ async function dispatchSmsQueueItem(
       attemptNo: attemptCount,
       status: "sent",
       createdAt: nowTs,
+      eventAt: queueEventAt,
       sentAt: nowTs,
     });
     return;
@@ -3871,6 +3882,7 @@ async function dispatchSmsQueueItem(
     attemptNo: attemptCount,
     status: "failed",
     createdAt: nowTs,
+    eventAt: queueEventAt,
     failedAt: nowTs,
     errorCode: lastErrorCode,
     errorMessage: lastErrorMessage,
