@@ -39,7 +39,7 @@ export function getLiveAdjustedStudentRankValue({
 }) {
   const baseValue = getSafeRankValue(entry.value);
   const serverLiveStartedAtMs = Number(entry.liveStartedAtMs || 0);
-  const hasServerLive = Boolean(entry.liveStatus && serverLiveStartedAtMs > 0);
+  const hasServerLive = Boolean(entry.liveStatus === 'studying' && serverLiveStartedAtMs > 0);
   const hasSelfLive = entry.studentId === viewerId && selfLiveStartedAtMs > 0;
 
   if (!hasServerLive && !hasSelfLive) {

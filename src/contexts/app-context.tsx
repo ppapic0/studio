@@ -28,7 +28,7 @@ export const TIERS = [
   { name: '\uCC4C\uB9B0\uC800', min: 25000, color: 'text-cyan-400', bg: 'bg-cyan-400', border: 'border-cyan-200', gradient: 'from-[#4EB8EE] via-[#2E8FCD] to-[#153E73]' },
 ];
 
-const ACTIVE_ATTENDANCE_STATUSES = ['studying', 'away', 'break'] as const;
+const ACTIVE_STUDY_TIMER_STATUSES = ['studying'] as const;
 
 function getSeatActivityRank(status?: string | null): number {
   if (status === 'studying') return 0;
@@ -331,7 +331,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
             return bTime - aTime;
           })[0]?.data() as Record<string, any> | undefined;
 
-        if (seat?.lastCheckInAt && ACTIVE_ATTENDANCE_STATUSES.includes(seat.status)) {
+        if (seat?.lastCheckInAt && ACTIVE_STUDY_TIMER_STATUSES.includes(seat.status)) {
           setIsTimerActive(true);
           setStartTime(seat.lastCheckInAt.toMillis());
         } else {

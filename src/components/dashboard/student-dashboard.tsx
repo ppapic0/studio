@@ -2540,7 +2540,7 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
           const isServerLive = Boolean(
             allowLiveTrack
             && studentId
-            && ['studying', 'away', 'break'].includes(String(entry.liveStatus || ''))
+            && entry.liveStatus === 'studying'
             && Number(entry.liveStartedAtMs || 0) > 0
           );
 

@@ -8,7 +8,7 @@ import { resolveSeatIdentity } from '@/lib/seat-layout';
 import { getDailyRankWindowOverlapMinutes, getDailyRankWindowState, toKstDate, type DailyRankWindowState } from '@/lib/student-ranking-policy';
 
 type RankRange = 'daily' | 'weekly' | 'monthly';
-type ActiveLiveRankStatus = 'studying' | 'away' | 'break';
+type ActiveLiveRankStatus = 'studying';
 
 type RankEntry = {
   id: string;
@@ -40,8 +40,6 @@ const EMPTY_SNAPSHOT: StudentRankingSnapshot = {
 
 export const dynamic = 'force-dynamic';
 
-const ACTIVE_LIVE_RANK_STATUSES = new Set<ActiveLiveRankStatus>(['studying', 'away', 'break']);
-
 function getAttendanceStatusRank(value: unknown) {
   if (value === 'studying') return 0;
   if (value === 'away' || value === 'break') return 1;
@@ -50,7 +48,7 @@ function getAttendanceStatusRank(value: unknown) {
 }
 
 function getActiveLiveRankStatus(value: unknown): ActiveLiveRankStatus | null {
-  if (value === 'studying' || value === 'away' || value === 'break') return value;
+  if (value === 'studying') return value;
   return null;
 }
 
