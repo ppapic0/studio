@@ -312,6 +312,96 @@ type FinalizeStudySessionResult = {
   bonus6hAchieved: boolean;
 };
 
+type AttendanceSeatStatus = "studying" | "away" | "break" | "absent";
+type AttendanceTransitionSource =
+  | "student_dashboard"
+  | "kiosk"
+  | "teacher_dashboard"
+  | "admin_focus_board"
+  | "student_index";
+type AttendanceSeatHint = {
+  seatNo?: number | null;
+  roomId?: string | null;
+  roomSeatNo?: number | null;
+};
+type ApplyAttendanceStatusTransitionParams = {
+  db: admin.firestore.Firestore;
+  centerId: string;
+  studentId: string;
+  nextStatus: AttendanceSeatStatus;
+  source: AttendanceTransitionSource;
+  actorUid?: string | null;
+  seatId?: string | null;
+  seatHint?: AttendanceSeatHint | null;
+  fallbackStartTimeMs?: number | null;
+  nowMs?: number;
+};
+type ApplyAttendanceStatusTransitionResult = {
+  ok: true;
+  noop: boolean;
+  previousStatus: AttendanceSeatStatus;
+  nextStatus: AttendanceSeatStatus;
+  seatId: string | null;
+  eventType: "check_in" | "away_start" | "away_end" | "check_out" | null;
+  duplicatedSession: boolean;
+  sessionId: string | null;
+  sessionDateKey: string | null;
+  sessionMinutes: number;
+  totalMinutesAfterSession: number;
+  attendanceAchieved: boolean;
+  bonus6hAchieved: boolean;
+};
+
+function normalizeAttendanceSeatStatus(value: unknown): AttendanceSeatStatus {
+  const normalized = asTrimmedString(value).toLowerCase();
+  if (normalized === "studying") return "studying";
+  if (normalized === "away") return "away";
+  if (normalized === "break") return "break";
+  return "absent";
+}
+
+function parseAttendanceSeatStatus(value: unknown): AttendanceSeatStatus | null {
+  const normalized = asTrimmedString(value).toLowerCase();
+  if (normalized === "studying" || normalized === "away" || normalized === "break" || normalized === "absent") {
+    return normalized;
+  }
+  return null;
+}
+
+function parseAttendanceTransitionSource(value: unknown): AttendanceTransitionSource | null {
+  const normalized = asTrimmedString(value);
+  if (
+    normalized === "student_dashboard" ||
+    normalized === "kiosk" ||
+    normalized === "teacher_dashboard" ||
+    normalized === "admin_focus_board" ||
+    normalized === "student_index"
+  ) {
+    return normalized;
+  }
+  return null;
+}
+
+function getStudySessionDurationMinutesFromData(data: Record<string, unknown>): number {
+  const rawMinutes = Number(data.durationMinutes ?? 0);
+  if (Number.isFinite(rawMinutes) && rawMinutes > 0) {
+    return Math.max(0, Math.round(rawMinutes));
+  }
+
+  const rawSeconds = Number(data.durationSeconds ?? 0);
+  if (Number.isFinite(rawSeconds) && rawSeconds > 0) {
+    return Math.max(1, Math.ceil(rawSeconds / 60));
+  }
+
+  const startMs = toMillisSafe(data.startTime);
+  const endMs = toMillisSafe(data.endTime);
+  if (startMs > 0 && endMs > startMs) {
+    return Math.max(1, Math.ceil((endMs - startMs) / MINUTE_MS));
+  }
+
+  return 0;
+}
+
 const STUDY_BOX_REWARD_RANGE_BY_RARITY: Record<StudyBoxRarity, readonly [number, number]> = {
   common: [1, 10],
   rare: [10, 20],
@@ -762,12 +852,25 @@ async function finalizeStudySession(params: FinalizeStudySessionParams): Promise
 
   return db.runTransaction(async (transaction) => {
     const progressSnap = await transaction.get(progressRef);
+    const uniqueSessionDayRefs = Array.from(new Map(sessionEntries.map((entry) => [entry.dateKey, entry.dayRef])).entries());
+    const existingSessionSnaps = await Promise.all(
+      uniqueSessionDayRefs.map(([, dayRef]) => transaction.get(dayRef.collection("sessions")))
+    );
     const daySnapshots = await Promise.all(sessionEntries.map((entry) => transaction.get(entry.dayRef)));
     const sessionSnapshots = await Promise.all(sessionEntries.map((entry) => transaction.get(entry.sessionRef)));
     const progressData = progressSnap.exists ? (progressSnap.data() as Record<string, unknown>) : {};
     const dailyPointStatus = isPlainObject(progressData.dailyPointStatus)
       ? (progressData.dailyPointStatus as Record<string, unknown>)
       : {};
+    const existingSessionTotalMinutesByDateKey = Object.fromEntries(
+      uniqueSessionDayRefs.map(([dateKey], index) => [
+        dateKey,
+        existingSessionSnaps[index].docs.reduce(
+          (sum, docSnap) => sum + getStudySessionDurationMinutesFromData((docSnap.data() || {}) as Record<string, unknown>),
+          0
+        ),
+      ])
+    ) as Record<string, number>;
 
     const totalMinutesByDateKey: Record<string, number> = {};
     const dailyPointStatusUpdates: Record<string, Record<string, unknown>> = {};
@@ -782,7 +885,7 @@ async function finalizeStudySession(params: FinalizeStudySessionParams): Promise
       const previousLastSessionAt = toTimestampOrNow(dayData.lastSessionEndAt);
       const existingTotalMinutes =
         totalMinutesByDateKey[entry.dateKey] ??
-        Math.max(0, Math.floor(parseFiniteNumber(dayData.totalMinutes) ?? 0));
+        Math.max(0, Math.floor(existingSessionTotalMinutesByDateKey[entry.dateKey] ?? 0));
 
       totalMinutesByDateKey[entry.dateKey] = existingTotalMinutes;
 
@@ -7708,21 +7811,7 @@ async function syncStudyLogDayTotalMinutes(
 ): Promise<void> {
   const sessionsSnap = await db.collection(`centers/${centerId}/studyLogs/${studentId}/days/${dateKey}/sessions`).get();
   const sessionTotalMinutes = sessionsSnap.docs.reduce((sum, docSnap) => {
-    const data = (docSnap.data() || {}) as Record<string, unknown>;
-    const rawMinutes = Number(data.durationMinutes ?? 0);
-    if (Number.isFinite(rawMinutes) && rawMinutes > 0) {
-      return sum + Math.max(0, Math.round(rawMinutes));
-    }
-    const rawSeconds = Number(data.durationSeconds ?? 0);
-    if (Number.isFinite(rawSeconds) && rawSeconds > 0) {
-      return sum + Math.max(1, Math.ceil(rawSeconds / 60));
-    }
-    const startMs = toMillisSafe(data.startTime);
-    const endMs = toMillisSafe(data.endTime);
-    if (startMs > 0 && endMs > startMs) {
-      return sum + Math.max(1, Math.ceil((endMs - startMs) / MINUTE_MS));
-    }
-    return sum;
+    return sum + getStudySessionDurationMinutesFromData((docSnap.data() || {}) as Record<string, unknown>);
   }, 0);
   const firstSessionStartAt = sessionsSnap.docs
     .map((docSnap) => toTimestampOrNow((docSnap.data() as Record<string, unknown>)?.startTime))
@@ -7757,8 +7846,8 @@ async function syncStudyLogDayTotalMinutes(
         dateKey,
         totalMinutes: sessionTotalMinutes,
         manualAdjustmentMinutes,
-        ...(firstSessionStartAt ? { firstSessionStartAt } : {}),
-        ...(lastSessionEndAt ? { lastSessionEndAt } : {}),
+        firstSessionStartAt: firstSessionStartAt ?? admin.firestore.FieldValue.delete(),
+        lastSessionEndAt: lastSessionEndAt ?? admin.firestore.FieldValue.delete(),
         updatedAt: admin.firestore.FieldValue.serverTimestamp(),
       },
       { merge: true }
@@ -7842,7 +7931,6 @@ export const onSessionCreated = functions
       const currentLongestSessionMinutes = Math.max(0, Number(statData.longestSessionMinutes || 0));
 
       t.set(statRef, {
-        totalStudyMinutes: admin.firestore.FieldValue.increment(normalizedDuration),
         sessionCount: admin.firestore.FieldValue.increment(1),
         longestSessionMinutes: Math.max(normalizedDuration, currentLongestSessionMinutes),
         studentId,
@@ -7895,6 +7983,544 @@ export const onSessionWritten = functions
     const db = admin.firestore();
     await syncStudyLogDayTotalMinutes(db, centerId, studentId, dateKey);
     return null;
+  });
+
+async function resolveAttendanceSeatDocForTransition(params: {
+  db: admin.firestore.Firestore;
+  centerId: string;
+  studentId: string;
+  seatId?: string | null;
+}): Promise<admin.firestore.QueryDocumentSnapshot | admin.firestore.DocumentSnapshot | null> {
+  const { db, centerId, studentId } = params;
+  const seatId = asTrimmedString(params.seatId);
+
+  if (seatId) {
+    const directSnap = await db.doc(`centers/${centerId}/attendanceCurrent/${seatId}`).get();
+    if (directSnap.exists) {
+      const directData = directSnap.data() as Record<string, unknown>;
+      const directStudentId = asTrimmedString(directData.studentId);
+      if (!directStudentId || directStudentId === studentId) {
+        return directSnap;
+      }
+    }
+  }
+
+  const seatSnap = await db
+    .collection(`centers/${centerId}/attendanceCurrent`)
+    .where("studentId", "==", studentId)
+    .limit(10)
+    .get();
+  return pickPreferredAttendanceSeatDoc(seatSnap.docs);
+}
+
+function resolveAttendanceTransitionEventType(
+  prevStatus: AttendanceSeatStatus,
+  nextStatus: AttendanceSeatStatus
+): "check_in" | "away_start" | "away_end" | "check_out" | null {
+  if (prevStatus === nextStatus) return null;
+  if (prevStatus === "absent" && nextStatus === "studying") return "check_in";
+  if ((prevStatus === "away" || prevStatus === "break") && nextStatus === "studying") return "away_end";
+  if (prevStatus === "studying" && (nextStatus === "away" || nextStatus === "break")) return "away_start";
+  if (nextStatus === "absent" && prevStatus !== "absent") return "check_out";
+  return null;
+}
+
+function buildAttendanceSeatPatch(params: {
+  studentId: string;
+  nextStatus: AttendanceSeatStatus;
+  seatData: Record<string, unknown>;
+  seatHint?: AttendanceSeatHint | null;
+  nowTs: admin.firestore.Timestamp;
+}): Record<string, unknown> {
+  const seatNo = Math.max(
+    0,
+    Math.round(
+      parseFiniteNumber(params.seatData.seatNo) ??
+      parseFiniteNumber(params.seatHint?.seatNo) ??
+      0
+    )
+  );
+  const roomId = asTrimmedString(params.seatData.roomId) || asTrimmedString(params.seatHint?.roomId) || null;
+  const roomSeatNo = Math.max(
+    0,
+    Math.round(
+      parseFiniteNumber(params.seatData.roomSeatNo) ??
+      parseFiniteNumber(params.seatHint?.roomSeatNo) ??
+      0
+    )
+  );
+  const patch: Record<string, unknown> = {
+    studentId: params.studentId,
+    status: params.nextStatus,
+    updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+  };
+
+  if (seatNo > 0) patch.seatNo = seatNo;
+  if (roomId) patch.roomId = roomId;
+  if (roomSeatNo > 0) patch.roomSeatNo = roomSeatNo;
+  patch.type = asTrimmedString(params.seatData.type) || "seat";
+  const seatZone = asTrimmedString(params.seatData.seatZone);
+  if (seatZone) patch.seatZone = seatZone;
+  const seatLabel = asTrimmedString(params.seatData.seatLabel);
+  if (seatLabel) patch.seatLabel = seatLabel;
+
+  if (params.nextStatus === "studying") {
+    patch.lastCheckInAt = params.nowTs;
+  } else {
+    patch.lastCheckInAt = admin.firestore.FieldValue.delete();
+  }
+
+  return patch;
+}
+
+async function applyAttendanceStatusTransition(
+  params: ApplyAttendanceStatusTransitionParams
+): Promise<ApplyAttendanceStatusTransitionResult> {
+  const db = params.db;
+  const centerId = asTrimmedString(params.centerId);
+  const studentId = asTrimmedString(params.studentId);
+  const nextStatus = params.nextStatus;
+  const nowMs = Math.max(0, Math.floor(params.nowMs ?? Date.now()));
+  const nowTs = admin.firestore.Timestamp.fromMillis(nowMs);
+  const attendanceDateKey = toDateKey(toKstDate(new Date(nowMs)));
+  const seatDoc = await resolveAttendanceSeatDocForTransition({
+    db,
+    centerId,
+    studentId,
+    seatId: params.seatId,
+  });
+
+  if (!seatDoc) {
+    const fallbackStartTimeMs = Math.max(0, Math.floor(params.fallbackStartTimeMs ?? 0));
+    if (nextStatus === "absent" && fallbackStartTimeMs > 0 && nowMs > fallbackStartTimeMs) {
+      const fallbackResult = await finalizeStudySession({
+        db,
+        centerId,
+        studentId,
+        startMs: fallbackStartTimeMs,
+        endMs: nowMs,
+        sessionMetadata: {
+          closedReason: "fallback_no_seat",
+          closedBySource: params.source,
+          ...(params.actorUid ? { closedByUid: params.actorUid } : {}),
+        },
+      });
+      return {
+        ok: true,
+        noop: false,
+        previousStatus: "studying",
+        nextStatus,
+        seatId: null,
+        eventType: null,
+        duplicatedSession: fallbackResult.duplicatedSession,
+        sessionId: fallbackResult.sessionId,
+        sessionDateKey: fallbackResult.sessionDateKey,
+        sessionMinutes: fallbackResult.sessionMinutes,
+        totalMinutesAfterSession: fallbackResult.totalMinutesAfterSession,
+        attendanceAchieved: fallbackResult.attendanceAchieved,
+        bonus6hAchieved: fallbackResult.bonus6hAchieved,
+      };
+    }
+
+    throw new functions.https.HttpsError("failed-precondition", "Attendance seat not found.", {
+      userMessage: "좌석이 배정된 학생만 출결 상태를 변경할 수 있습니다.",
+    });
+  }
+
+  const initialSeatData = (seatDoc.data() || {}) as Record<string, unknown>;
+  const initialStatus = normalizeAttendanceSeatStatus(initialSeatData.status);
+  const initialStartMs = toMillisSafe(initialSeatData.lastCheckInAt);
+  let finalized: FinalizeStudySessionResult | null = null;
+
+  if (initialStatus === "studying" && nextStatus !== "studying" && initialStartMs > 0 && nowMs > initialStartMs) {
+    finalized = await finalizeStudySession({
+      db,
+      centerId,
+      studentId,
+      startMs: initialStartMs,
+      endMs: nowMs,
+      sessionMetadata: {
+        closedReason: nextStatus === "absent" ? "check_out" : "away_start",
+        closedBySource: params.source,
+        ...(params.actorUid ? { closedByUid: params.actorUid } : {}),
+      },
+    });
+  }
+
+  return db.runTransaction(async (transaction) => {
+    const freshSeatSnap = await transaction.get(seatDoc.ref);
+    const freshSeatData = freshSeatSnap.exists ? ((freshSeatSnap.data() || {}) as Record<string, unknown>) : initialSeatData;
+    const freshStudentId = asTrimmedString(freshSeatData.studentId);
+    if (freshStudentId && freshStudentId !== studentId) {
+      throw new functions.https.HttpsError("failed-precondition", "Seat belongs to another student.", {
+        userMessage: "선택한 좌석이 다른 학생에게 배정되어 있습니다.",
+      });
+    }
+
+    const prevStatus = normalizeAttendanceSeatStatus(freshSeatData.status);
+    if (prevStatus === nextStatus) {
+      return {
+        ok: true,
+        noop: true,
+        previousStatus: prevStatus,
+        nextStatus,
+        seatId: seatDoc.id,
+        eventType: null,
+        duplicatedSession: finalized?.duplicatedSession ?? true,
+        sessionId: finalized?.sessionId ?? null,
+        sessionDateKey: finalized?.sessionDateKey ?? null,
+        sessionMinutes: finalized?.sessionMinutes ?? 0,
+        totalMinutesAfterSession: finalized?.totalMinutesAfterSession ?? 0,
+        attendanceAchieved: finalized?.attendanceAchieved ?? false,
+        bonus6hAchieved: finalized?.bonus6hAchieved ?? false,
+      };
+    }
+
+    const eventType = resolveAttendanceTransitionEventType(prevStatus, nextStatus);
+    const statRef = db.doc(`centers/${centerId}/attendanceDailyStats/${attendanceDateKey}/students/${studentId}`);
+    const progressRef = db.doc(`centers/${centerId}/growthProgress/${studentId}`);
+    const [statSnap, progressSnap] = await Promise.all([
+      transaction.get(statRef),
+      eventType === "check_in" ? transaction.get(progressRef) : Promise.resolve(null),
+    ]);
+    const seatPatch = buildAttendanceSeatPatch({
+      studentId,
+      nextStatus,
+      seatData: freshSeatData,
+      seatHint: params.seatHint,
+      nowTs,
+    });
+    transaction.set(seatDoc.ref, seatPatch, { merge: true });
+
+    const statData = statSnap.exists ? ((statSnap.data() || {}) as Record<string, unknown>) : {};
+    const existingCheckInAt = toTimestampOrNow(statData.checkInAt);
+    const statPatch: Record<string, unknown> = {
+      centerId,
+      studentId,
+      dateKey: attendanceDateKey,
+      attendanceStatus: nextStatus,
+      source: params.source,
+      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+    };
+
+    if (eventType === "check_in") {
+      statPatch.checkInAt =
+        existingCheckInAt && existingCheckInAt.toMillis() <= nowMs
+          ? existingCheckInAt
+          : nowTs;
+    }
+    if (eventType === "check_out") {
+      statPatch.checkOutAt = nowTs;
+      statPatch.hasCheckOutRecord = true;
+    }
+    transaction.set(statRef, statPatch, { merge: true });
+
+    if (eventType) {
+      const eventRef = db.collection(`centers/${centerId}/attendanceEvents`).doc();
+      transaction.set(eventRef, {
+        studentId,
+        dateKey: attendanceDateKey,
+        eventType,
+        occurredAt: nowTs,
+        createdAt: admin.firestore.FieldValue.serverTimestamp(),
+        source: params.source,
+        seatId: seatDoc.id,
+        statusBefore: prevStatus,
+        statusAfter: nextStatus,
+        ...(params.actorUid ? { actorUid: params.actorUid } : {}),
+      });
+    }
+
+    if (eventType === "check_in" && progressSnap) {
+      const progressData = progressSnap.exists ? ((progressSnap.data() || {}) as Record<string, unknown>) : {};
+      const dailyPointStatus = isPlainObject(progressData.dailyPointStatus)
+        ? (progressData.dailyPointStatus as Record<string, unknown>)
+        : {};
+      const currentDayStatus = isPlainObject(dailyPointStatus[attendanceDateKey])
+        ? { ...(dailyPointStatus[attendanceDateKey] as Record<string, unknown>) }
+        : {};
+      if (currentDayStatus.checkedIn !== true) {
+        transaction.set(progressRef, {
+          dailyPointStatus: {
+            [attendanceDateKey]: {
+              ...currentDayStatus,
+              checkedIn: true,
+              updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+            },
+          },
+          updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        }, { merge: true });
+      }
+    }
+
+    return {
+      ok: true,
+      noop: false,
+      previousStatus: prevStatus,
+      nextStatus,
+      seatId: seatDoc.id,
+      eventType,
+      duplicatedSession: finalized?.duplicatedSession ?? false,
+      sessionId: finalized?.sessionId ?? null,
+      sessionDateKey: finalized?.sessionDateKey ?? null,
+      sessionMinutes: finalized?.sessionMinutes ?? 0,
+      totalMinutesAfterSession: finalized?.totalMinutesAfterSession ?? 0,
+      attendanceAchieved: finalized?.attendanceAchieved ?? false,
+      bonus6hAchieved: finalized?.bonus6hAchieved ?? false,
+    };
+  });
+}
+
+export const setStudentAttendanceStatusSecure = functions.region(region).https.onCall(async (data, context) => {
+  const db = admin.firestore();
+  if (!context.auth?.uid) {
+    throw new functions.https.HttpsError("unauthenticated", "로그인이 필요합니다.");
+  }
+
+  const centerId = asTrimmedString(data?.centerId);
+  const requestedStudentId = asTrimmedString(data?.studentId);
+  const nextStatus = parseAttendanceSeatStatus(data?.nextStatus);
+  const source = parseAttendanceTransitionSource(data?.source);
+  if (!centerId || !requestedStudentId || !nextStatus || !source) {
+    throw new functions.https.HttpsError("invalid-argument", "Invalid attendance transition input.", {
+      userMessage: "출결 변경 정보를 다시 확인해 주세요.",
+    });
+  }
+
+  const membership = await resolveCenterMembershipRole(db, centerId, context.auth.uid);
+  if (!membership.role || !isActiveMembershipStatus(membership.status)) {
+    throw new functions.https.HttpsError("permission-denied", "Inactive membership.", {
+      userMessage: "현재 계정 상태로는 출결을 변경할 수 없습니다.",
+    });
+  }
+  if (membership.role === "parent") {
+    throw new functions.https.HttpsError("permission-denied", "Parents cannot update attendance.", {
+      userMessage: "학부모 계정에서는 출결을 변경할 수 없습니다.",
+    });
+  }
+
+  const callerIdentity = membership.role === "student"
+    ? await resolveCenterStudentIdentity(db, centerId, context.auth.uid)
+    : null;
+  const effectiveStudentId = membership.role === "student"
+    ? (callerIdentity?.studentId || context.auth.uid)
+    : requestedStudentId;
+  if (membership.role === "student" && requestedStudentId !== effectiveStudentId && requestedStudentId !== context.auth.uid) {
+    throw new functions.https.HttpsError("permission-denied", "Students can only update self attendance.", {
+      userMessage: "학생 본인 출결만 변경할 수 있습니다.",
+    });
+  }
+  if (membership.role === "student" && source !== "student_dashboard") {
+    throw new functions.https.HttpsError("permission-denied", "Invalid student attendance source.", {
+      userMessage: "학생 대시보드에서만 본인 출결을 변경할 수 있습니다.",
+    });
+  }
+  if (membership.role === "teacher" || isAdminRole(membership.role)) {
+    // Allowed.
+  } else if (membership.role !== "student") {
+    throw new functions.https.HttpsError("permission-denied", "Unsupported attendance caller role.");
+  }
+
+  const [studentSnap, memberSnap] = await Promise.all([
+    db.doc(`centers/${centerId}/students/${effectiveStudentId}`).get(),
+    db.doc(`centers/${centerId}/members/${effectiveStudentId}`).get(),
+  ]);
+  if (!studentSnap.exists && !memberSnap.exists) {
+    throw new functions.https.HttpsError("failed-precondition", "Student not found.", {
+      userMessage: "학생 정보를 찾을 수 없습니다.",
+    });
+  }
+
+  const seatHintRaw = isPlainObject(data?.seatHint) ? (data.seatHint as Record<string, unknown>) : {};
+  const result = await applyAttendanceStatusTransition({
+    db,
+    centerId,
+    studentId: effectiveStudentId,
+    nextStatus,
+    source,
+    actorUid: context.auth.uid,
+    seatId: asTrimmedString(data?.seatId) || null,
+    seatHint: {
+      seatNo: parseFiniteNumber(seatHintRaw.seatNo),
+      roomId: asTrimmedString(seatHintRaw.roomId) || null,
+      roomSeatNo: parseFiniteNumber(seatHintRaw.roomSeatNo),
+    },
+  });
+
+  return result;
+});
+
+type RepairRecentStudySessionTotalsResult = {
+  ok: true;
+  studentCount: number;
+  dayCount: number;
+  sessionsCreated: number;
+  daysSynced: number;
+};
+
+function buildRecentStudyDayKeys(dayCount: number, baseDate: Date = new Date()): string[] {
+  const safeCount = Math.min(7, Math.max(1, Math.round(dayCount)));
+  const currentStudyDay = toStudyDayDate(baseDate);
+  return Array.from({ length: safeCount }, (_, index) => {
+    const day = new Date(currentStudyDay);
+    day.setDate(day.getDate() - index);
+    return toDateKey(day);
+  });
+}
+
+type RepairAttendanceEvent = {
+  eventType: "check_in" | "away_start" | "away_end" | "check_out";
+  occurredAtMs: number;
+};
+
+async function repairMissingStudySessionsFromAttendanceEvents(params: {
+  db: admin.firestore.Firestore;
+  centerId: string;
+  studentId: string;
+  dateKey: string;
+  events: RepairAttendanceEvent[];
+}): Promise<number> {
+  const { db, centerId, studentId, dateKey } = params;
+  const dayRef = db.doc(`centers/${centerId}/studyLogs/${studentId}/days/${dateKey}`);
+  const sessionsCol = dayRef.collection("sessions");
+  const existingSessionsSnap = await sessionsCol.limit(1).get();
+  if (!existingSessionsSnap.empty) return 0;
+
+  const bounds = getStudyDayWindowBounds(dateKey);
+  const dayEvents = params.events
+    .filter((event) => event.occurredAtMs >= bounds.startMs && event.occurredAtMs < bounds.endMs)
+    .sort((left, right) => left.occurredAtMs - right.occurredAtMs);
+
+  let openStartMs: number | null = null;
+  let sessionsCreated = 0;
+
+  for (const event of dayEvents) {
+    if (event.eventType === "check_in" || event.eventType === "away_end") {
+      if (openStartMs === null) {
+        openStartMs = event.occurredAtMs;
+      }
+      continue;
+    }
+
+    if ((event.eventType === "away_start" || event.eventType === "check_out") && openStartMs !== null) {
+      const endMs = Math.min(event.occurredAtMs, openStartMs + MAX_STUDY_SESSION_MINUTES * MINUTE_MS);
+      if (endMs > openStartMs) {
+        const sessionSeconds = Math.max(1, Math.floor((endMs - openStartMs) / 1000));
+        const sessionMinutes = Math.max(1, Math.ceil(sessionSeconds / 60));
+        const sessionId = `repaired_${openStartMs}_${endMs}`;
+        const sessionRef = sessionsCol.doc(sessionId);
+        const sessionSnap = await sessionRef.get();
+        if (!sessionSnap.exists) {
+          await sessionRef.set({
+            studentId,
+            centerId,
+            dateKey,
+            sessionId,
+            startTime: admin.firestore.Timestamp.fromMillis(openStartMs),
+            endTime: admin.firestore.Timestamp.fromMillis(endMs),
+            durationSeconds: sessionSeconds,
+            durationMinutes: sessionMinutes,
+            repairedFromAttendanceEvents: true,
+            createdAt: admin.firestore.FieldValue.serverTimestamp(),
+            updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+          });
+          sessionsCreated += 1;
+        }
+      }
+      openStartMs = null;
+    }
+  }
+
+  return sessionsCreated;
+}
+
+export const repairRecentStudySessionTotals = functions
+  .region(region)
+  .runWith({ timeoutSeconds: 540, memory: "1GB" })
+  .https.onCall(async (data, context): Promise<RepairRecentStudySessionTotalsResult> => {
+    const db = admin.firestore();
+    if (!context.auth?.uid) {
+      throw new functions.https.HttpsError("unauthenticated", "로그인이 필요합니다.");
+    }
+
+    const centerId = asTrimmedString(data?.centerId);
+    if (!centerId) {
+      throw new functions.https.HttpsError("invalid-argument", "centerId is required.", {
+        userMessage: "센터 정보를 다시 확인해 주세요.",
+      });
+    }
+
+    const membership = await resolveCenterMembershipRole(db, centerId, context.auth.uid);
+    if (!membership.role || !isActiveMembershipStatus(membership.status) || !isAdminRole(membership.role)) {
+      throw new functions.https.HttpsError("permission-denied", "Only active admins can repair study sessions.", {
+        userMessage: "관리자 권한으로만 학습시간 보정을 실행할 수 있습니다.",
+      });
+    }
+
+    const requestedStudentId = asTrimmedString(data?.studentId);
+    const dayCount = Math.min(7, Math.max(1, Math.round(parseFiniteNumber(data?.days) ?? 7)));
+    const dateKeys = buildRecentStudyDayKeys(dayCount);
+    let studentIds: string[] = [];
+
+    if (requestedStudentId) {
+      studentIds = [requestedStudentId];
+    } else {
+      const [studentsSnap, membersSnap] = await Promise.all([
+        db.collection(`centers/${centerId}/students`).get(),
+        db.collection(`centers/${centerId}/members`).where("role", "==", "student").get(),
+      ]);
+      studentIds = Array.from(new Set([
+        ...studentsSnap.docs.map((docSnap) => docSnap.id),
+        ...membersSnap.docs.map((docSnap) => docSnap.id),
+      ])).filter(Boolean);
+    }
+
+    let sessionsCreated = 0;
+    let daysSynced = 0;
+
+    for (const studentId of studentIds) {
+      const eventSnap = await db.collection(`centers/${centerId}/attendanceEvents`).where("studentId", "==", studentId).get();
+      const repairEvents = eventSnap.docs
+        .map((docSnap): RepairAttendanceEvent | null => {
+          const eventData = (docSnap.data() || {}) as Record<string, unknown>;
+          const eventType = asTrimmedString(eventData.eventType);
+          if (
+            eventType !== "check_in" &&
+            eventType !== "away_start" &&
+            eventType !== "away_end" &&
+            eventType !== "check_out"
+          ) {
+            return null;
+          }
+          const occurredAtMs = toMillisSafe(eventData.occurredAt) || toMillisSafe(eventData.createdAt);
+          if (occurredAtMs <= 0) return null;
+          return {
+            eventType,
+            occurredAtMs,
+          };
+        })
+        .filter((event): event is RepairAttendanceEvent => Boolean(event));
+
+      for (const dateKey of dateKeys) {
+        sessionsCreated += await repairMissingStudySessionsFromAttendanceEvents({
+          db,
+          centerId,
+          studentId,
+          dateKey,
+          events: repairEvents,
+        });
+        await syncStudyLogDayTotalMinutes(db, centerId, studentId, dateKey);
+        daysSynced += 1;
+      }
+    }
+
+    return {
+      ok: true,
+      studentCount: studentIds.length,
+      dayCount: dateKeys.length,
+      sessionsCreated,
+      daysSynced,
+    };
   });
 
 /**
@@ -9174,49 +9800,20 @@ export const stopStudentStudySessionSecure = functions.region(region).https.onCa
   }
 
   const studentId = studentIdentity.studentId;
-  const attendanceSnap = await db.collection(`centers/${centerId}/attendanceCurrent`).where("studentId", "==", studentId).limit(10).get();
-
-  const preferredSeatDoc = pickPreferredAttendanceSeatDoc(attendanceSnap.docs);
-  const seatData = preferredSeatDoc?.data() as Record<string, unknown> | undefined;
-  const seatStatus = asTrimmedString(seatData?.status);
-  const seatStartTimeMs = toMillisSafe(seatData?.lastCheckInAt);
-  const nowMs = Date.now();
-  const hasActiveSeatSession = ACTIVE_STUDY_ATTENDANCE_STATUSES.has(seatStatus) && seatStartTimeMs > 0;
-
-  let resolvedStartTimeMs = hasActiveSeatSession ? seatStartTimeMs : fallbackStartTimeMs;
-  if (!Number.isFinite(resolvedStartTimeMs) || resolvedStartTimeMs <= 0) {
-    throw new functions.https.HttpsError("failed-precondition", "Active session not found.", {
-      userMessage: "종료할 공부 세션을 찾지 못했습니다. 잠시 후 다시 시도해 주세요.",
-    });
-  }
-  if (resolvedStartTimeMs > nowMs) {
-    resolvedStartTimeMs = nowMs;
-  }
-
-  const result = await finalizeStudySession({
+  const result = await applyAttendanceStatusTransition({
     db,
     centerId,
     studentId,
-    startMs: resolvedStartTimeMs,
-    endMs: nowMs,
-    closeSeatRef: preferredSeatDoc?.ref ?? null,
-    shouldCloseSeat: hasActiveSeatSession,
-    closeAttendanceEvent: hasActiveSeatSession
-      ? {
-          dateKey: toDateKey(toKstDate(new Date(nowMs))),
-          eventAtMs: nowMs,
-          source: "student_dashboard_secure",
-          seatId: preferredSeatDoc?.id || null,
-          statusBefore: seatStatus || null,
-          statusAfter: "absent",
-        }
-      : undefined,
+    nextStatus: "absent",
+    source: "student_dashboard",
+    actorUid: authUid,
+    fallbackStartTimeMs,
   });
 
   return {
     ok: true,
     duplicatedSession: result.duplicatedSession,
-    sessionId: result.sessionId,
+    sessionId: result.sessionId || undefined,
     sessionDateKey: result.sessionDateKey,
     sessionMinutes: result.sessionMinutes,
     totalMinutesAfterSession: result.totalMinutesAfterSession,

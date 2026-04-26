@@ -51,7 +51,7 @@ import { Badge } from '@/components/ui/badge';
 import { Slider } from '@/components/ui/slider';
 import { useDoc, useCollection, useFirestore, useUser, useMemoFirebase } from '@/firebase';
 import { useAppContext } from '@/contexts/app-context';
-import { doc, collection, query, where, updateDoc, setDoc, serverTimestamp, increment, writeBatch, Timestamp, getDoc, orderBy, addDoc, limit, getDocs } from 'firebase/firestore';
+import { doc, collection, query, where, updateDoc, setDoc, serverTimestamp, Timestamp, getDoc, orderBy, addDoc, limit, getDocs } from 'firebase/firestore';
 import { addDays, subDays, format, isSameDay, parse, isAfter, eachDayOfInterval, startOfWeek } from 'date-fns';
 import { ko } from 'date-fns/locale';
 import { useEffect, useState, useMemo, useCallback, useRef } from 'react';
@@ -89,10 +89,6 @@ import {
   syncAutoAttendanceRecord,
   toDateSafe as toDateSafeAttendance,
 } from '@/lib/attendance-auto';
-import {
-  appendAttendanceEventToBatch,
-  mergeAttendanceDailyStatToBatch,
-} from '@/lib/attendance-events';
 import { resolveSeatIdentity } from '@/lib/seat-layout';
 import {
   NAVY_REWARD_THEME,
@@ -127,7 +123,7 @@ import {
 import { submitAttendanceRequestSecure } from '@/lib/penalty-actions';
 import { getAttendanceRequestTypeLabel } from '@/lib/attendance-request';
 import { openStudyRewardBoxSecure } from '@/lib/study-box-actions';
-import { stopStudentStudySessionSecure } from '@/lib/study-session-actions';
+import { setStudentAttendanceStatusSecure, stopStudentStudySessionSecure } from '@/lib/study-session-actions';
 import { sumStudySessionDurationMinutes } from '@/lib/study-session-time';
 import {
   claimPlannerCompletionRewardWithFallback,
@@ -1924,7 +1920,7 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
   );
 
   const handleStudyStartStop = useCallback(async () => {
-    if (!firestore || !user || !activeMembership || !studentUid || !progressRef || !activeStudyDayKey) return;
+    if (!firestore || !user || !activeMembership || !studentUid || !activeStudyDayKey) return;
     if (isProcessingAction) {
       const lockAgeMs = actionLockAtRef.current ? Date.now() - actionLockAtRef.current : 0;
       if (lockAgeMs < 15000) return;
@@ -1939,14 +1935,6 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
       return;
     }
 
-    if (!isTimerActive) {
-      toast({
-        title: '키오스크에서 시작해 주세요.',
-        description: '공부 시작은 준비된 키오스크에서 진행할 수 있어요.',
-      });
-      return;
-    }
-
     actionLockAtRef.current = Date.now();
     setIsProcessingAction(true);
     try {
@@ -1954,7 +1942,6 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
       let seatDoc: any = null;
       let fallbackSeatRef: any = null;
       let fallbackSeatIdentity: ReturnType<typeof resolveSeatIdentity> | null = null;
-      let fallbackSeatZone: string | null = null;
       try {
         const studentRef = studentDocId
           ? doc(firestore, 'centers', centerId, 'students', studentDocId)
@@ -1966,7 +1953,6 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
             const identity = resolveSeatIdentity(studentData);
             if (identity.seatId && identity.seatNo > 0) {
               fallbackSeatIdentity = identity;
-              fallbackSeatZone = studentData?.seatZone || null;
               fallbackSeatRef = doc(firestore, 'centers', centerId, 'attendanceCurrent', identity.seatId);
             }
           }
@@ -2067,110 +2053,26 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
       } else {
         const nowTs = Date.now();
         const nowDate = new Date(nowTs);
-        const batch = writeBatch(firestore);
-        const startSeatStatus = seatDoc?.data?.()?.status as AttendanceCurrent['status'] | undefined;
-        const todayPointStatus = (progress?.dailyPointStatus?.[activeStudyDayKey] || {}) as Record<string, any>;
-        const isFirstCheckInToday = !todayPointStatus.checkedIn;
-        const checkInProgressUpdate: Record<string, any> = {
-          updatedAt: serverTimestamp(),
-          dailyPointStatus: {
-            [activeStudyDayKey]: {
-              ...todayPointStatus,
-              checkedIn: true,
-            },
-          },
-        };
-        let wroteSomething = false;
-
-        const canWriteProgressDirectly = Boolean(progress);
-
-        if (isFirstCheckInToday && canWriteProgressDirectly) {
-          // Students can mark today's check-in status directly, but stat bonuses stay server-managed.
-          batch.set(progressRef, checkInProgressUpdate, { merge: true });
-          wroteSomething = true;
-        }
         const startSeatRef = seatDoc?.ref || fallbackSeatRef;
-        if (startSeatRef) {
-          const startSeatPayload: Record<string, any> = {
-            studentId: studentUid,
-            status: 'studying',
-            lastCheckInAt: Timestamp.fromMillis(nowTs),
-            updatedAt: serverTimestamp(),
-          };
-          if (fallbackSeatIdentity) {
-            startSeatPayload.seatNo = fallbackSeatIdentity.seatNo;
-            startSeatPayload.roomId = fallbackSeatIdentity.roomId;
-            startSeatPayload.roomSeatNo = fallbackSeatIdentity.roomSeatNo;
-            startSeatPayload.type = 'seat';
-          }
-          if (fallbackSeatZone) {
-            startSeatPayload.seatZone = fallbackSeatZone;
-          }
-          batch.set(startSeatRef, startSeatPayload, { merge: true });
-          wroteSomething = true;
-        }
-
-        if (!wroteSomething && studyLogRef) {
-          batch.set(studyLogRef, {
-            studentId: studentUid,
-            centerId: activeMembership.id,
-            dateKey: activeStudyDayKey,
-            updatedAt: serverTimestamp(),
-          }, { merge: true });
-          wroteSomething = true;
-        }
-
-        if (!wroteSomething && canWriteProgressDirectly) {
-          batch.set(progressRef, { updatedAt: serverTimestamp() }, { merge: true });
-          wroteSomething = true;
-        }
-
-        const startAttendanceEventType = startSeatStatus === 'away' || startSeatStatus === 'break' ? 'away_end' : 'check_in';
-        appendAttendanceEventToBatch(batch, firestore, centerId, {
-          studentId: studentUid,
-          dateKey: activeStudyDayKey,
-          eventType: startAttendanceEventType,
-          occurredAt: nowDate,
-          source: 'student_dashboard',
-          seatId: startSeatRef?.id || null,
-          statusBefore: startSeatStatus || null,
-          statusAfter: 'studying',
-          meta: {
-            studentName: user.displayName || '학생',
-          },
-        });
-        mergeAttendanceDailyStatToBatch(batch, firestore, centerId, studentUid, activeStudyDayKey, {
-          attendanceStatus: 'studying',
-          checkInAt: startAttendanceEventType === 'check_in' ? nowDate : undefined,
-          source: 'student_dashboard',
-        });
-        wroteSomething = true;
 
         let startCommitError: any = null;
-        let usedStartFallback = false;
         try {
-          await batch.commit();
+          await setStudentAttendanceStatusSecure({
+            centerId,
+            studentId: studentUid,
+            nextStatus: 'studying',
+            source: 'student_dashboard',
+            seatId: startSeatRef?.id,
+            seatHint: fallbackSeatIdentity
+              ? {
+                  seatNo: fallbackSeatIdentity.seatNo,
+                  roomId: fallbackSeatIdentity.roomId || null,
+                  roomSeatNo: fallbackSeatIdentity.roomSeatNo || null,
+                }
+              : undefined,
+          });
         } catch (commitError: any) {
           startCommitError = commitError;
-        }
-
-        if (startCommitError && studyLogRef) {
-          try {
-            await setDoc(studyLogRef, {
-              studentId: studentUid,
-              centerId: activeMembership.id,
-              dateKey: activeStudyDayKey,
-              updatedAt: serverTimestamp(),
-            }, { merge: true });
-            if (isFirstCheckInToday && canWriteProgressDirectly) {
-              await setDoc(progressRef, checkInProgressUpdate, { merge: true });
-            }
-            usedStartFallback = true;
-            startCommitError = null;
-          logHandledClientIssue('[student-track] start fallback kept study-day doc in sync', 'attendance sync skipped');
-          } catch (fallbackError: any) {
-            logHandledClientIssue('[student-track] start fallback failed', fallbackError);
-          }
         }
 
         if (startCommitError) {
@@ -2178,7 +2080,7 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
           toast({
             variant: 'destructive',
             title: '트랙 시작 실패',
-            description: '학생 데이터 저장 권한을 확인해 주세요.',
+            description: '좌석 배정 또는 출결 권한을 확인해 주세요.',
           });
           return;
         }
@@ -2197,18 +2099,7 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
 
         setStartTime(nowTs);
         setIsTimerActive(true);
-        if (!seatDoc && !fallbackSeatRef) {
-          toast({
-            variant: 'destructive',
-            title: '트랙 시작됨 (좌석 연동 대기)',
-            description: '좌석이 아직 배정되지 않았습니다. 선생님/관리자에게 좌석 배정을 요청해 주세요.',
-          });
-        } else if (usedStartFallback) {
-          toast({
-            title: '트랙 시작됨',
-            description: '핵심 학습 데이터 저장은 완료되었고, 출결 연동은 건너뛰었습니다.',
-          });
-        }
+        toast({ title: '트랙 시작됨', description: '오늘 학습 세션을 새로 시작했습니다.' });
       }
     } catch (e: any) {
       const detail = typeof e?.message === 'string' ? e.message : '\uC54C \uC218 \uC5C6\uB294 \uC624\uB958\uAC00 \uBC1C\uC0DD\uD588\uC2B5\uB2C8\uB2E4.';

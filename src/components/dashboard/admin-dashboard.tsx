@@ -112,7 +112,7 @@ import { useCenterAdminAttendanceBoard } from '@/hooks/use-center-admin-attendan
 import { useCenterAdminHeatmap } from '@/hooks/use-center-admin-heatmap';
 import { getAttendanceRequestTypeLabel, getScheduleChangeReasonLabel } from '@/lib/attendance-request';
 import { syncAutoAttendanceRecord } from '@/lib/attendance-auto';
-import { appendAttendanceEventToBatch, mergeAttendanceDailyStatToBatch } from '@/lib/attendance-events';
+import { setStudentAttendanceStatusSecure } from '@/lib/study-session-actions';
 import {
   buildCounselingTrackOverview,
   type DashboardCounselTrackTab,
@@ -138,7 +138,6 @@ import { createPointBoostEventSecure, cancelPointBoostEventSecure } from '@/lib/
 import { getDailyPointBreakdown } from '@/lib/student-rewards';
 
 const ADMIN_DASHBOARD_REFRESH_INTERVAL_MS = 60 * 1000;
-const MAX_STUDY_SESSION_MINUTES = 360;
 const MANUAL_PARENT_SMS_UID = '__manual_parent__';
 const STUDENT_SMS_FALLBACK_UID = '__student__';
 
@@ -4223,179 +4222,19 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
 
     setFocusAttendanceActionSaving(nextStatus);
     try {
-      const batch = writeBatch(firestore);
       const nowDate = new Date();
-      const nowMs = nowDate.getTime();
-      const todayDateKey = format(nowDate, 'yyyy-MM-dd');
-      const lastCheckInAt = seat?.lastCheckInAt || null;
-      const seatRef = doc(firestore, 'centers', centerId, 'attendanceCurrent', seatDocId);
-
-      if (prevStatus === 'studying' && nextStatus !== 'studying' && lastCheckInAt) {
-        const startTimeMs = lastCheckInAt.toMillis();
-        const sessionDateKey = format(lastCheckInAt.toDate(), 'yyyy-MM-dd');
-        const sessionMinutes = Math.min(
-          MAX_STUDY_SESSION_MINUTES,
-          Math.max(1, Math.ceil((nowMs - startTimeMs) / 60000))
-        );
-
-        if (sessionMinutes > 0) {
-          const logRef = doc(firestore, 'centers', centerId, 'studyLogs', studentId, 'days', sessionDateKey);
-          batch.set(
-            logRef,
-            {
-              studentId,
-              centerId,
-              dateKey: sessionDateKey,
-              totalMinutes: increment(sessionMinutes),
-              updatedAt: serverTimestamp(),
-            },
-            { merge: true }
-          );
-
-          const statRef = doc(firestore, 'centers', centerId, 'dailyStudentStats', sessionDateKey, 'students', studentId);
-          batch.set(
-            statRef,
-            {
-              studentId,
-              centerId,
-              dateKey: sessionDateKey,
-              totalStudyMinutes: increment(sessionMinutes),
-              updatedAt: serverTimestamp(),
-            },
-            { merge: true }
-          );
-
-          const sessionId = `session_${lastCheckInAt.toMillis()}`;
-          const sessionRef = doc(firestore, 'centers', centerId, 'studyLogs', studentId, 'days', sessionDateKey, 'sessions', sessionId);
-          batch.set(sessionRef, {
-            startTime: lastCheckInAt,
-            endTime: Timestamp.fromMillis(nowMs),
-            durationMinutes: sessionMinutes,
-            sessionId,
-            createdAt: serverTimestamp(),
-          });
-
-          const progressRef = doc(firestore, 'centers', centerId, 'growthProgress', studentId);
-          batch.set(
-            progressRef,
-            {
-              'stats.focus': increment((sessionMinutes / 60) * 0.1),
-              updatedAt: serverTimestamp(),
-            },
-            { merge: true }
-          );
-        }
-      }
-
-      const shouldStartNewSession = nextStatus === 'studying' && (prevStatus !== 'studying' || !lastCheckInAt);
-      const seatPayload: Record<string, unknown> = {
+      await setStudentAttendanceStatusSecure({
+        centerId,
         studentId,
-        seatNo,
-        roomId: roomId || null,
-        roomSeatNo: roomSeatNo || undefined,
-        type: seat?.type || 'seat',
-        seatZone: seat?.seatZone || null,
-        status: nextStatus,
-        updatedAt: serverTimestamp(),
-      };
-      if (seat?.seatLabel) {
-        seatPayload.seatLabel = seat.seatLabel;
-      }
-      if (shouldStartNewSession) {
-        seatPayload.lastCheckInAt = serverTimestamp();
-      } else if (nextStatus !== 'studying') {
-        seatPayload.lastCheckInAt = deleteField();
-      }
-
-      batch.set(seatRef, seatPayload, { merge: true });
-
-      const legacySeatDocId = getLegacySeatDocId(seat);
-      if (legacySeatDocId) {
-        batch.delete(doc(firestore, 'centers', centerId, 'attendanceCurrent', legacySeatDocId));
-      }
-
-      appendAttendanceEventToBatch(batch, firestore, centerId, {
-        studentId,
-        dateKey: todayDateKey,
-        eventType: 'status_override',
-        occurredAt: nowDate,
+        nextStatus,
         source: 'admin_focus_board',
         seatId: seatDocId,
-        statusBefore: prevStatus,
-        statusAfter: nextStatus,
+        seatHint: {
+          seatNo,
+          roomId: roomId || null,
+          roomSeatNo: roomSeatNo || null,
+        },
       });
-
-      if (prevStatus === 'absent' && nextStatus === 'studying') {
-        appendAttendanceEventToBatch(batch, firestore, centerId, {
-          studentId,
-          dateKey: todayDateKey,
-          eventType: 'check_in',
-          occurredAt: nowDate,
-          source: 'admin_focus_board',
-          seatId: seatDocId,
-          statusBefore: prevStatus,
-          statusAfter: nextStatus,
-        });
-        mergeAttendanceDailyStatToBatch(batch, firestore, centerId, studentId, todayDateKey, {
-          attendanceStatus: nextStatus,
-          checkInAt: nowDate,
-          source: 'admin_focus_board',
-        });
-      } else if ((prevStatus === 'away' || prevStatus === 'break') && nextStatus === 'studying') {
-        appendAttendanceEventToBatch(batch, firestore, centerId, {
-          studentId,
-          dateKey: todayDateKey,
-          eventType: 'away_end',
-          occurredAt: nowDate,
-          source: 'admin_focus_board',
-          seatId: seatDocId,
-          statusBefore: prevStatus,
-          statusAfter: nextStatus,
-        });
-        mergeAttendanceDailyStatToBatch(batch, firestore, centerId, studentId, todayDateKey, {
-          attendanceStatus: nextStatus,
-          source: 'admin_focus_board',
-        });
-      } else if ((nextStatus === 'away' || nextStatus === 'break') && prevStatus === 'studying') {
-        appendAttendanceEventToBatch(batch, firestore, centerId, {
-          studentId,
-          dateKey: todayDateKey,
-          eventType: 'away_start',
-          occurredAt: nowDate,
-          source: 'admin_focus_board',
-          seatId: seatDocId,
-          statusBefore: prevStatus,
-          statusAfter: nextStatus,
-        });
-        mergeAttendanceDailyStatToBatch(batch, firestore, centerId, studentId, todayDateKey, {
-          attendanceStatus: nextStatus,
-          source: 'admin_focus_board',
-        });
-      } else if (nextStatus === 'absent' && prevStatus !== 'absent') {
-        appendAttendanceEventToBatch(batch, firestore, centerId, {
-          studentId,
-          dateKey: todayDateKey,
-          eventType: 'check_out',
-          occurredAt: nowDate,
-          source: 'admin_focus_board',
-          seatId: seatDocId,
-          statusBefore: prevStatus,
-          statusAfter: nextStatus,
-        });
-        mergeAttendanceDailyStatToBatch(batch, firestore, centerId, studentId, todayDateKey, {
-          attendanceStatus: nextStatus,
-          checkOutAt: nowDate,
-          hasCheckOutRecord: true,
-          source: 'admin_focus_board',
-        });
-      } else {
-        mergeAttendanceDailyStatToBatch(batch, firestore, centerId, studentId, todayDateKey, {
-          attendanceStatus: nextStatus,
-          source: 'admin_focus_board',
-        });
-      }
-
-      await batch.commit();
       setLiveTickMs(Date.now());
 
       void syncAutoAttendanceRecord({

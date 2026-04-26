@@ -7,7 +7,7 @@ import { collection, collectionGroup, doc, getDoc, getDocs, limit, query, where 
 import { useCollection, useFirestore } from '@/firebase';
 import { useMemoFirebase } from '@/hooks/use-memo-firebase';
 import { logHandledClientIssue } from '@/lib/handled-client-log';
-import { getStudySessionDurationMinutes } from '@/lib/study-session-time';
+import { getLiveStudySessionDurationMinutes, getStudySessionDurationMinutes } from '@/lib/study-session-time';
 import {
   buildAttendanceRoutineInfo,
   deriveAttendanceDisplayState,
@@ -671,10 +671,11 @@ export function useCenterAdminAttendanceBoard({
         );
         const lastCheckOutAt = toDateSafe(todayStat?.checkOutAt);
         const hasCheckOutRecord = Boolean(todayStat?.hasCheckOutRecord || lastCheckOutAt);
-        const liveSessionMinutes =
-          seat.status === 'studying' && sameDayLiveCheckInAt
-            ? Math.max(0, Math.ceil((nowMs - sameDayLiveCheckInAt.getTime()) / 60000))
-            : 0;
+        const liveSessionMinutes = getLiveStudySessionDurationMinutes({
+          status: seat.status,
+          lastCheckInAt: sameDayLiveCheckInAt,
+          nowMs,
+        });
         const storedBaseMinutes = Number(todayStat?.totalStudyMinutes || 0);
         const storedAdjustmentMinutes = Number(todayStat?.manualAdjustmentMinutes || 0);
         const storedStudyMinutes = Math.round(

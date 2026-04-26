@@ -5,6 +5,8 @@ type StudySessionLike = {
   endTime?: unknown;
 };
 
+type StudyAttendanceStatus = 'studying' | 'away' | 'break' | 'absent' | string | null | undefined;
+
 function toDateSafe(value: unknown): Date | null {
   if (!value) return null;
   if (value instanceof Date) return Number.isFinite(value.getTime()) ? value : null;
@@ -52,5 +54,57 @@ export function sumStudySessionDurationMinutes(sessions: StudySessionLike[] | nu
   return Math.max(
     0,
     Math.round((sessions || []).reduce((sum, session) => sum + getStudySessionDurationMinutes(session), 0))
+  );
+}
+
+export function getLiveStudySessionDurationMinutes(input: {
+  status?: StudyAttendanceStatus;
+  lastCheckInAt?: unknown;
+  nowMs?: number;
+  dayStartMs?: number;
+  rounding?: 'floor' | 'ceil';
+}): number {
+  if (input.status !== 'studying') return 0;
+
+  const checkedAt = toDateSafe(input.lastCheckInAt);
+  if (!checkedAt) return 0;
+
+  const nowMs = Number.isFinite(input.nowMs) ? Number(input.nowMs) : Date.now();
+  const dayStartMs = Number.isFinite(input.dayStartMs) ? Number(input.dayStartMs) : checkedAt.getTime();
+  const startMs = Math.max(checkedAt.getTime(), dayStartMs);
+  const diffMs = nowMs - startMs;
+  if (!Number.isFinite(diffMs) || diffMs <= 0) return 0;
+
+  const rawMinutes = diffMs / 60000;
+  return Math.max(0, input.rounding === 'floor' ? Math.floor(rawMinutes) : Math.ceil(rawMinutes));
+}
+
+export function getEffectiveTodayStudyMinutes(input: {
+  sessions?: StudySessionLike[] | null;
+  persistedMinutes?: number | null;
+  manualAdjustmentMinutes?: number | null;
+  status?: StudyAttendanceStatus;
+  lastCheckInAt?: unknown;
+  nowMs?: number;
+  dayStartMs?: number;
+}): number {
+  const sessionMinutes = sumStudySessionDurationMinutes(input.sessions);
+  const persistedMinutes = Number(input.persistedMinutes ?? 0);
+  const baseMinutes = sessionMinutes > 0
+    ? sessionMinutes
+    : Number.isFinite(persistedMinutes)
+      ? Math.max(0, Math.round(persistedMinutes))
+      : 0;
+  const adjustmentMinutes = Number(input.manualAdjustmentMinutes ?? 0);
+  const liveMinutes = getLiveStudySessionDurationMinutes({
+    status: input.status,
+    lastCheckInAt: input.lastCheckInAt,
+    nowMs: input.nowMs,
+    dayStartMs: input.dayStartMs,
+  });
+
+  return Math.max(
+    0,
+    Math.round(baseMinutes + (Number.isFinite(adjustmentMinutes) ? adjustmentMinutes : 0) + liveMinutes)
   );
 }

@@ -136,7 +136,7 @@ import {
   syncAutoAttendanceRecord,
   toDateSafe as toDateSafeAttendance,
 } from '@/lib/attendance-auto';
-import { appendAttendanceEventToBatch, mergeAttendanceDailyStatToBatch } from '@/lib/attendance-events';
+import { setStudentAttendanceStatusSecure } from '@/lib/study-session-actions';
 import {
   PRIMARY_ROOM_ID,
   buildSeatId,
@@ -178,8 +178,6 @@ const REQUEST_PENALTY_POINTS: Record<'late' | 'absence', number> = {
   late: 1,
   absence: 2,
 };
-const MAX_STUDY_SESSION_MINUTES = 360;
-
 const ATTENDANCE_STATUS_LABEL: Record<string, string> = {
   studying: '입실',
   away: '외출',
@@ -3465,162 +3463,24 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
 
     setIsSaving(true);
     try {
-      const batch = writeBatch(firestore);
-      const seatRef = doc(firestore, 'centers', centerId, 'attendanceCurrent', selectedSeat.id);
-      const legacySeatDocId = getLegacySeatDocId(selectedSeat);
-      const prevStatus = selectedSeat.status;
-      const nowDate = new Date();
-      const todayDateKey = format(nowDate, 'yyyy-MM-dd');
-
-      // 퇴실 처리 시 공부 시간 강제 저장 로직
-      if (prevStatus === 'studying' && nextStatus !== 'studying' && selectedSeat.lastCheckInAt) {
-        const nowTs = Date.now();
-        const startTime = selectedSeat.lastCheckInAt.toMillis();
-        const sessionDateKey = format(selectedSeat.lastCheckInAt.toDate(), 'yyyy-MM-dd');
-        const sessionSeconds = Math.max(0, Math.floor((nowTs - startTime) / 1000));
-        const sessionMinutes = Math.min(MAX_STUDY_SESSION_MINUTES, Math.max(1, Math.ceil(sessionSeconds / 60)));
-
-        if (sessionSeconds > 0) {
-          const logRef = doc(firestore, 'centers', centerId, 'studyLogs', studentId, 'days', sessionDateKey);
-          batch.set(logRef, { studentId, centerId, dateKey: sessionDateKey, totalMinutes: increment(sessionMinutes), updatedAt: serverTimestamp() }, { merge: true });
-
-          const statRef = doc(firestore, 'centers', centerId, 'dailyStudentStats', sessionDateKey, 'students', studentId);
-          batch.set(
-            statRef,
-            {
-              studentId,
-              centerId,
-              dateKey: sessionDateKey,
-              totalStudyMinutes: increment(sessionMinutes),
-              updatedAt: serverTimestamp(),
-            },
-            { merge: true }
-          );
-
-          const sessionId = `session_${selectedSeat.lastCheckInAt.toMillis()}`;
-          const sessionRef = doc(firestore, 'centers', centerId, 'studyLogs', studentId, 'days', sessionDateKey, 'sessions', sessionId);
-          batch.set(sessionRef, { startTime: selectedSeat.lastCheckInAt, endTime: Timestamp.fromMillis(nowTs), durationMinutes: sessionMinutes, sessionId, createdAt: serverTimestamp() });
-
-          const progressRef = doc(firestore, 'centers', centerId, 'growthProgress', studentId);
-          const progressUpdate: Record<string, any> = {
-            stats: {
-              focus: increment((sessionMinutes / 60) * 0.1),
-            },
-            updatedAt: serverTimestamp(),
-          };
-          batch.set(progressRef, progressUpdate, { merge: true });
-        }
-      }
-
-      const shouldStartNewSession =
-        nextStatus === 'studying' && (prevStatus !== 'studying' || !selectedSeat.lastCheckInAt);
-      const updateData: any = {
+      await setStudentAttendanceStatusSecure({
+        centerId,
         studentId,
-        seatNo: selectedSeat.seatNo,
-        roomId: selectedSeat.roomId,
-        roomSeatNo: selectedSeat.roomSeatNo,
-        type: selectedSeat.type || 'seat',
-        status: nextStatus,
-        updatedAt: serverTimestamp(),
-      };
-      if (shouldStartNewSession) {
-        updateData.lastCheckInAt = serverTimestamp();
-      } else if (nextStatus !== 'studying') {
-        updateData.lastCheckInAt = deleteField();
-      }
-
-      batch.set(seatRef, updateData, { merge: true });
-      if (legacySeatDocId) {
-        batch.delete(doc(firestore, 'centers', centerId, 'attendanceCurrent', legacySeatDocId));
-      }
-
-      appendAttendanceEventToBatch(batch, firestore, centerId, {
-        studentId,
-        dateKey: todayDateKey,
-        eventType: 'status_override',
-        occurredAt: nowDate,
+        nextStatus,
         source: 'teacher_dashboard',
         seatId: selectedSeat.id,
-        statusBefore: prevStatus,
-        statusAfter: nextStatus,
+        seatHint: {
+          seatNo: selectedSeat.seatNo,
+          roomId: selectedSeat.roomId || null,
+          roomSeatNo: selectedSeat.roomSeatNo || null,
+        },
       });
-
-      if (prevStatus === 'absent' && nextStatus === 'studying') {
-        appendAttendanceEventToBatch(batch, firestore, centerId, {
-          studentId,
-          dateKey: todayDateKey,
-          eventType: 'check_in',
-          occurredAt: nowDate,
-          source: 'teacher_dashboard',
-          seatId: selectedSeat.id,
-          statusBefore: prevStatus,
-          statusAfter: nextStatus,
-        });
-        mergeAttendanceDailyStatToBatch(batch, firestore, centerId, studentId, todayDateKey, {
-          attendanceStatus: nextStatus,
-          checkInAt: nowDate,
-          source: 'teacher_dashboard',
-        });
-      } else if ((prevStatus === 'away' || prevStatus === 'break') && nextStatus === 'studying') {
-        appendAttendanceEventToBatch(batch, firestore, centerId, {
-          studentId,
-          dateKey: todayDateKey,
-          eventType: 'away_end',
-          occurredAt: nowDate,
-          source: 'teacher_dashboard',
-          seatId: selectedSeat.id,
-          statusBefore: prevStatus,
-          statusAfter: nextStatus,
-        });
-        mergeAttendanceDailyStatToBatch(batch, firestore, centerId, studentId, todayDateKey, {
-          attendanceStatus: nextStatus,
-          source: 'teacher_dashboard',
-        });
-      } else if ((nextStatus === 'away' || nextStatus === 'break') && prevStatus === 'studying') {
-        appendAttendanceEventToBatch(batch, firestore, centerId, {
-          studentId,
-          dateKey: todayDateKey,
-          eventType: 'away_start',
-          occurredAt: nowDate,
-          source: 'teacher_dashboard',
-          seatId: selectedSeat.id,
-          statusBefore: prevStatus,
-          statusAfter: nextStatus,
-        });
-        mergeAttendanceDailyStatToBatch(batch, firestore, centerId, studentId, todayDateKey, {
-          attendanceStatus: nextStatus,
-          source: 'teacher_dashboard',
-        });
-      } else if (nextStatus === 'absent' && prevStatus !== 'absent') {
-        appendAttendanceEventToBatch(batch, firestore, centerId, {
-          studentId,
-          dateKey: todayDateKey,
-          eventType: 'check_out',
-          occurredAt: nowDate,
-          source: 'teacher_dashboard',
-          seatId: selectedSeat.id,
-          statusBefore: prevStatus,
-          statusAfter: nextStatus,
-        });
-        mergeAttendanceDailyStatToBatch(batch, firestore, centerId, studentId, todayDateKey, {
-          attendanceStatus: nextStatus,
-          checkOutAt: nowDate,
-          hasCheckOutRecord: true,
-          source: 'teacher_dashboard',
-        });
-      } else {
-        mergeAttendanceDailyStatToBatch(batch, firestore, centerId, studentId, todayDateKey, {
-          attendanceStatus: nextStatus,
-          source: 'teacher_dashboard',
-        });
-      }
-
-      await batch.commit();
       // 카카오 알림톡 발송 (선생님 수동 조작)
       const studentName = studentsById.get(studentId)?.name || '학생';
+      const nowDate = new Date();
       const autoCheckInAt =
         nextStatus === 'studying'
-          ? new Date()
+          ? nowDate
           : (toDateSafeAttendance(selectedSeat.lastCheckInAt) || null);
       void syncAutoAttendanceRecord({
         firestore,

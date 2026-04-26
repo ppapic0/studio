@@ -36,7 +36,7 @@ import {
   type AttendanceStudentKpiRow,
 } from '@/lib/attendance-kpi';
 import { getRoomLabel } from '@/lib/seat-layout';
-import { getStudySessionDurationMinutes } from '@/lib/study-session-time';
+import { getLiveStudySessionDurationMinutes, getStudySessionDurationMinutes } from '@/lib/study-session-time';
 import { AttendanceCurrent, AttendanceRequest, CenterMembership } from '@/lib/types';
 
 type AttendanceRecordDoc = {
@@ -727,10 +727,14 @@ export function useAttendanceKpi({
                 asNumber(studyLogDay?.totalMinutes),
                 asNumber(dayStat?.totalStudyMinutes)
               );
-        const activeSessionMinutes =
-          dateKey === todayKey && liveSeat?.status === 'studying' && liveCheckedAt
-            ? Math.max(0, differenceInMinutes(new Date(), liveCheckedAt))
-            : 0;
+        const activeSessionMinutes = dateKey === todayKey
+          ? getLiveStudySessionDurationMinutes({
+              status: liveSeat?.status,
+              lastCheckInAt: liveCheckedAt,
+              nowMs: Date.now(),
+              rounding: 'floor',
+            })
+          : 0;
         const studyMinutes = Math.max(0, Math.round(studyMinutesBase + activeSessionMinutes));
         const studyLogCheckedAt = toDateSafe(
           studyLogDay?.updatedAt || studyLogDay?.createdAt || dayStat?.updatedAt || dayStat?.createdAt
