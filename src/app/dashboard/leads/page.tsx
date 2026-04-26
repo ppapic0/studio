@@ -39,7 +39,7 @@ export default function LeadsPage() {
         <div className="grid gap-0.5">
           <h1 className="text-2xl font-black tracking-tight text-primary">홍보/상담 리드 DB</h1>
           <p className="text-xs font-semibold text-muted-foreground">
-            선생님과 관리자가 홍보상담, 방문상담 접수, 입학 대기 데이터를 한 화면에서 보고 함께 관리합니다.
+            선생님과 관리자가 홍보상담, 웹 상담폼 접수, 입학 대기 데이터를 한 화면에서 보고 함께 관리합니다.
           </p>
         </div>
         <Badge className="rounded-full border border-slate-200 bg-white px-3 py-1 text-[11px] font-black text-slate-600">

@@ -274,8 +274,8 @@ export function CenterAdminAttendanceBoard({
                     signal?.boardStatus === 'checked_out'
                       ? [
                           signal.wasLateToday ? '오늘 지각O' : '오늘 지각X',
-                          signal.firstCheckInLabel ? `최초 ${signal.firstCheckInLabel}` : null,
-                          signal.lastCheckOutLabel ? `마지막 ${signal.lastCheckOutLabel}` : null,
+                          signal.firstCheckInLabel ? `최초 등원 ${signal.firstCheckInLabel}` : null,
+                          signal.lastCheckOutLabel ? `마지막 하원 ${signal.lastCheckOutLabel}` : null,
                         ].filter(Boolean).join(' · ')
                       : null;
                   const attendanceTimeLabel = signal
@@ -352,6 +352,7 @@ export function CenterAdminAttendanceBoard({
                           <span
                             className={cn(
                               'inline-flex max-w-full items-center rounded-full border border-white/85 bg-white/90 px-2 py-0.5 font-black tracking-tight text-slate-700 shadow-[0_10px_18px_-16px_rgba(20,41,95,0.35)]',
+                              signal?.wasLateToday && 'border-[#FFD9B6] bg-[#FFF6EC] text-[#C95A08]',
                               isMobile ? 'text-[7.5px]' : 'text-[8.5px]'
                             )}
                           >

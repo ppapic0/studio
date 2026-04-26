@@ -491,16 +491,13 @@ export function useCenterAdminAttendanceBoard({
                 (Number.isFinite(dayAdjustmentMinutes) ? dayAdjustmentMinutes : 0)
               );
 
-              if (dayTotal > 0) {
-                return [studentId, dayTotal] as const;
-              }
-
               const sessionsSnap = await getDocs(collection(firestore, 'centers', centerId, 'studyLogs', studentId, 'days', todayKey, 'sessions'));
               const sessionTotal = sessionsSnap.docs.reduce((sum, sessionDoc) => {
                 return sum + getStudySessionDurationMinutes(sessionDoc.data() as Record<string, unknown>);
               }, 0);
+              const adjustedSessionTotal = Math.round(sessionTotal + (Number.isFinite(dayAdjustmentMinutes) ? dayAdjustmentMinutes : 0));
 
-              return [studentId, Math.round(sessionTotal + (Number.isFinite(dayAdjustmentMinutes) ? dayAdjustmentMinutes : 0))] as const;
+              return [studentId, Math.max(0, dayTotal, adjustedSessionTotal)] as const;
             } catch (error) {
               logHandledClientIssue('[center-admin-attendance-board] today study log load failed', error);
               return [studentId, 0] as const;

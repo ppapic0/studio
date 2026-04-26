@@ -161,6 +161,14 @@ const PRESENTATION_BY_STATUS: Record<CenterAdminAttendanceBoardStatus, Attendanc
   },
 };
 
+const CHECKED_OUT_LATE_PRESENTATION: AttendanceBoardPresentation = {
+  surfaceClass: 'border-[#FF9A42] bg-[#FFE5C8] text-[#14295F]',
+  chipClass: 'bg-slate-800 text-white',
+  chipLabel: '퇴실',
+  flagClass: 'bg-white/95 text-[#C95A08]',
+  isDark: false,
+};
+
 const BOARD_STATUS_LABELS: Record<CenterAdminAttendanceBoardStatus, string> = {
   present: '공부중',
   late: '지각 입실',
@@ -421,6 +429,10 @@ export function resolveAttendanceOperationalException(params: {
 }
 
 export function getAttendanceBoardPresentation(signal: CenterAdminAttendanceSeatSignal) {
+  if (signal.boardStatus === 'checked_out' && signal.wasLateToday) {
+    return CHECKED_OUT_LATE_PRESENTATION;
+  }
+
   return PRESENTATION_BY_STATUS[signal.boardStatus];
 }
 

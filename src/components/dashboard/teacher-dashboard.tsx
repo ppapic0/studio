@@ -198,6 +198,48 @@ function formatDurationMinutes(totalMinutes: number): string {
   return `${Math.floor(safeMinutes / 60)}시간 ${safeMinutes % 60}분`;
 }
 
+function parsePositivePointValue(value: unknown): number {
+  const numeric = typeof value === 'number' ? value : typeof value === 'string' ? Number(value) : 0;
+  if (!Number.isFinite(numeric)) return 0;
+  return Math.max(0, Math.floor(numeric));
+}
+
+function getCenterPointEvents(dayStatus: unknown): Record<string, any>[] {
+  if (!dayStatus || typeof dayStatus !== 'object') return [];
+  const events = (dayStatus as Record<string, any>).pointEvents;
+  return Array.isArray(events)
+    ? events.filter((event): event is Record<string, any> => Boolean(event && typeof event === 'object'))
+    : [];
+}
+
+function getCenterPointDayAmount(dayStatus: unknown): number {
+  if (!dayStatus || typeof dayStatus !== 'object') return 0;
+  const status = dayStatus as Record<string, any>;
+  const directAmount = parsePositivePointValue(status.dailyPointAmount);
+  const eventAmount = getCenterPointEvents(status).reduce(
+    (sum, event) => sum + parsePositivePointValue(event.points),
+    0
+  );
+  return Math.max(directAmount, eventAmount);
+}
+
+function getCenterPointDayDetail(dayStatus: unknown): string {
+  const labels = getCenterPointEvents(dayStatus)
+    .map((event) => {
+      const label = typeof event.label === 'string' ? event.label.trim() : '';
+      const reason = typeof event.reason === 'string' ? event.reason.trim() : '';
+      const source = typeof event.source === 'string' ? event.source.trim() : '';
+      if (label) return label;
+      if (reason) return reason;
+      if (source === 'plan_completion') return '계획 완수';
+      if (source === 'study_box') return '공부상자';
+      if (source.includes('rank')) return '랭킹 보상';
+      return '';
+    })
+    .filter(Boolean);
+  return Array.from(new Set(labels)).slice(0, 3).join(' · ') || '포인트 적립';
+}
+
 function getManualSeatOccupantName(seat?: Pick<AttendanceCurrent, 'manualOccupantName'> | null) {
   return typeof seat?.manualOccupantName === 'string' ? seat.manualOccupantName.trim() : '';
 }
@@ -269,6 +311,21 @@ type ResolvedAttendanceSeat = AttendanceCurrent & {
   roomSeatNo: number;
   seatDocId?: string;
   seatGenderPolicy?: SeatGenderPolicy;
+};
+
+type CenterPointGrantRow = {
+  key: string;
+  dateKey: string;
+  studentId: string;
+  studentName: string;
+  points: number;
+  detail: string;
+};
+
+type CenterPointDailySummary = {
+  dateKey: string;
+  total: number;
+  grants: CenterPointGrantRow[];
 };
 
 const SEAT_OVERLAY_OPTIONS: Array<{ value: CenterAdminSeatOverlayMode; label: string }> = [
@@ -481,6 +538,8 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
   const [isHeroRoomsDialogOpen, setIsHeroRoomsDialogOpen] = useState(false);
   const [isCounselTrackDialogOpen, setIsCounselTrackDialogOpen] = useState(false);
   const [counselTrackDialogTab, setCounselTrackDialogTab] = useState<DashboardCounselTrackTab>('reservations');
+  const [selectedAttendanceDetailSignal, setSelectedAttendanceDetailSignal] = useState<CenterAdminAttendanceSeatSignal | null>(null);
+  const [isCenterPointDialogOpen, setIsCenterPointDialogOpen] = useState(false);
   const [sessionsLoading, setSessionsLoading] = useState(false);
   const [historicalCenterMinutes, setHistoricalCenterMinutes] = useState<Record<string, number>>({});
   const [trendLoading, setTrendLoading] = useState(false);
@@ -694,6 +753,12 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
   }, [firestore, centerId]);
   const { data: studentMembers } = useCollection<CenterMembership>(studentMembersQuery, { enabled: isActive });
 
+  const parentMembersQuery = useMemoFirebase(() => {
+    if (!firestore || !centerId) return null;
+    return query(collection(firestore, 'centers', centerId, 'members'), where('role', '==', 'parent'));
+  }, [firestore, centerId]);
+  const { data: parentMembers } = useCollection<CenterMembership>(parentMembersQuery, { enabled: isActive });
+
   const availableClasses = useMemo(() => {
     if (!studentMembers) return [];
     const classes = new Set<string>();
@@ -840,6 +905,54 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
     [studentMembers]
   );
 
+  const selectedAttendanceDetail = useMemo(() => {
+    const signal = selectedAttendanceDetailSignal;
+    if (!signal?.studentId) return null;
+
+    const student = studentsById.get(signal.studentId) || null;
+    const studentMember = studentMembersById.get(signal.studentId) || null;
+    const parentUidSet = new Set(student?.parentUids || []);
+    const parentMember =
+      (parentMembers || []).find((member) => {
+        if (parentUidSet.has(member.id)) return true;
+        return (member.linkedStudentIds || []).includes(signal.studentId);
+      }) || null;
+    const seatLabel =
+      signal.roomId && signal.roomSeatNo
+        ? formatSeatLabel(
+            { roomId: signal.roomId, roomSeatNo: signal.roomSeatNo, seatId: signal.seatId },
+            roomConfigs,
+            '좌석 미배정',
+            persistedSeatLabelsBySeatId
+          )
+        : '좌석 미배정';
+    const scheduleLabel = [
+      signal.classScheduleName,
+      signal.scheduleMovementSummary,
+    ].filter(Boolean).join(' · ');
+
+    return {
+      signal,
+      student,
+      studentMember,
+      parentMember,
+      seatLabel,
+      plannedArrival: signal.routineExpectedArrivalTime || student?.expectedArrivalTime || '-',
+      plannedDeparture: signal.plannedDepartureTime || '-',
+      scheduleLabel: scheduleLabel || '등록된 일정 없음',
+      parentName: parentMember?.displayName || '학부모',
+      parentPhone: parentMember?.phoneNumber || '-',
+      studentPhone: student?.phoneNumber || studentMember?.phoneNumber || '-',
+    };
+  }, [
+    parentMembers,
+    persistedSeatLabelsBySeatId,
+    roomConfigs,
+    selectedAttendanceDetailSignal,
+    studentMembersById,
+    studentsById,
+  ]);
+
   const seatById = useMemo(
     () => {
       const mapped = new Map<string, ResolvedAttendanceSeat>();
@@ -928,6 +1041,14 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
     return collection(firestore, 'centers', centerId, 'dailyStudentStats', todayKey, 'students');
   }, [firestore, centerId, todayKey]);
   const { data: todayStats } = useCollection<DailyStudentStat>(todayStatsQuery, { enabled: isActive });
+
+  const growthProgressQuery = useMemoFirebase(() => {
+    if (!firestore || !centerId) return null;
+    return collection(firestore, 'centers', centerId, 'growthProgress');
+  }, [firestore, centerId]);
+  const { data: growthProgressRecords } = useCollection<GrowthProgress & { id: string }>(growthProgressQuery, {
+    enabled: isActive,
+  });
 
   const {
     seatSignals: attendanceSeatSignals,
@@ -1392,6 +1513,9 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
     }
     scrollToSection(liveBoardSectionRef);
   };
+  const openTeacherAttendanceSignalDetails = (signal: CenterAdminAttendanceSeatSignal) => {
+    setSelectedAttendanceDetailSignal(signal);
+  };
   const handleQuickStudySessionAdjustment = async (
     signal: CenterAdminAttendanceSeatSignal,
     requestedDeltaMinutes: number
@@ -1494,6 +1618,53 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
         ),
     [attendanceSeatSignals]
   );
+  const centerPointDistribution = useMemo(() => {
+    const dailyMap = new Map<string, CenterPointDailySummary>();
+
+    (growthProgressRecords || []).forEach((progress) => {
+      const studentId = typeof progress.id === 'string' ? progress.id : '';
+      if (!studentId) return;
+      const dailyPointStatus = progress.dailyPointStatus || {};
+      const studentName = teacherStudentNameById.get(studentId) || studentId;
+
+      Object.entries(dailyPointStatus).forEach(([dateKey, dayStatus]) => {
+        if (!/^\d{4}-\d{2}-\d{2}$/.test(dateKey)) return;
+        if (dateKey < thirtyDaysAgoKey || dateKey > todayKey) return;
+
+        const points = getCenterPointDayAmount(dayStatus);
+        if (points <= 0) return;
+
+        const summary = dailyMap.get(dateKey) || { dateKey, total: 0, grants: [] };
+        const grant: CenterPointGrantRow = {
+          key: `${dateKey}-${studentId}`,
+          dateKey,
+          studentId,
+          studentName,
+          points,
+          detail: getCenterPointDayDetail(dayStatus),
+        };
+        summary.total += points;
+        summary.grants.push(grant);
+        dailyMap.set(dateKey, summary);
+      });
+    });
+
+    const dailyRows = Array.from(dailyMap.values())
+      .map((row) => ({
+        ...row,
+        grants: row.grants.sort((left, right) => right.points - left.points || left.studentName.localeCompare(right.studentName, 'ko')),
+      }))
+      .sort((left, right) => right.dateKey.localeCompare(left.dateKey));
+    const monthTotal = dailyRows.reduce((sum, row) => sum + row.total, 0);
+    const todayTotal = dailyMap.get(todayKey)?.total || 0;
+
+    return {
+      todayTotal,
+      monthTotal,
+      dailyRows,
+      studentGrantCount: dailyRows.reduce((sum, row) => sum + row.grants.length, 0),
+    };
+  }, [growthProgressRecords, teacherStudentNameById, thirtyDaysAgoKey, todayKey]);
   const teacherOperationsInboxTotalOpenCount =
     teacherNoShowSignals.length
     + teacherLateSignals.length
@@ -1514,7 +1685,7 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
         value: `${teacherNoShowSignals.length}명`,
         caption: teacherNoShowSignals.length > 0 ? '예정 등원 +15분 경과' : '현재 대상 없음',
         tone: teacherNoShowSignals.length > 0 ? 'rose' : 'blue',
-        onClick: teacherNoShowSignals.length > 0 ? () => openTeacherAttendanceSignal(teacherNoShowSignals[0]) : undefined,
+        onClick: teacherNoShowSignals.length > 0 ? () => openTeacherAttendanceSignalDetails(teacherNoShowSignals[0]) : undefined,
       },
       {
         key: 'late',
@@ -1522,7 +1693,7 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
         value: `${teacherLateSignals.length}명`,
         caption: teacherLateSignals.length > 0 ? '입실 시간 확인 필요' : '현재 대상 없음',
         tone: teacherLateSignals.length > 0 ? 'orange' : 'blue',
-        onClick: teacherLateSignals.length > 0 ? () => openTeacherAttendanceSignal(teacherLateSignals[0]) : undefined,
+        onClick: teacherLateSignals.length > 0 ? () => openTeacherAttendanceSignalDetails(teacherLateSignals[0]) : undefined,
       },
       {
         key: 'consultation',
@@ -1557,8 +1728,16 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
             ? () => openCounselTrackDialog('parent')
             : undefined,
       },
+      {
+        key: 'center-points',
+        label: '오늘 포인트',
+        value: `${centerPointDistribution.todayTotal.toLocaleString()}P`,
+        caption: '센터 배부 합계',
+        tone: centerPointDistribution.todayTotal > 0 ? 'emerald' : 'blue',
+        onClick: () => setIsCenterPointDialogOpen(true),
+      },
     ],
-    [teacherCounselingTrackOverview, teacherLateSignals, teacherNoShowSignals]
+    [centerPointDistribution.todayTotal, teacherCounselingTrackOverview, teacherLateSignals, teacherNoShowSignals]
   );
   const teacherOperationsInboxQueueItems = useMemo<OperationsInboxQueueItem[]>(
     () =>
@@ -1573,7 +1752,7 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
                 ? `예정 등원 ${teacherNoShowSignals[0].routineExpectedArrivalTime}`
                 : '예정 시간 미등록',
               tone: 'rose' as const,
-              onClick: () => openTeacherAttendanceSignal(teacherNoShowSignals[0]),
+              onClick: () => openTeacherAttendanceSignalDetails(teacherNoShowSignals[0]),
             }
           : null,
         teacherLateSignals.length > 0
@@ -1584,7 +1763,7 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
               detail: `${teacherLateSignals[0].studentName} 학생부터 지각 입실 이후 수업 흐름을 확인하세요.`,
               meta: teacherLateSignals[0].checkedAtLabel ? `입실 ${teacherLateSignals[0].checkedAtLabel}` : '입실 시간 확인 필요',
               tone: 'orange' as const,
-              onClick: () => openTeacherAttendanceSignal(teacherLateSignals[0]),
+              onClick: () => openTeacherAttendanceSignalDetails(teacherLateSignals[0]),
             }
           : null,
         teacherCounselingTrackOverview.consultationCount > 0
@@ -1655,7 +1834,7 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
                 )
               : '좌석 미배정',
           tone: 'rose' as const,
-          onClick: () => openTeacherAttendanceSignal(signal),
+          onClick: () => openTeacherAttendanceSignalDetails(signal),
         })),
         onOpenAll: teacherNoShowSignals.length > 0 ? () => setIsHeroPriorityDialogOpen(true) : undefined,
       },
@@ -1681,7 +1860,7 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
                 )
               : '좌석 미배정',
           tone: 'orange' as const,
-          onClick: () => openTeacherAttendanceSignal(signal),
+          onClick: () => openTeacherAttendanceSignalDetails(signal),
         })),
         onOpenAll: teacherLateSignals.length > 0 ? () => setIsHeroPriorityDialogOpen(true) : undefined,
       },
@@ -1810,7 +1989,13 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
                           </Badge>
                         ) : null}
                       </div>
-                      <p className="mt-2 text-sm font-black text-[#14295F]">{signal.studentName}</p>
+                      <button
+                        type="button"
+                        className="mt-2 text-left text-sm font-black text-[#14295F] underline-offset-4 hover:underline"
+                        onClick={() => openTeacherAttendanceSignalDetails(signal)}
+                      >
+                        {signal.studentName}
+                      </button>
                       <p className="mt-1 text-[11px] font-bold leading-5 text-[#5c6e97]">
                         {signal.note || emptyLabel}
                       </p>
@@ -3273,6 +3458,19 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
         if (sessionSeconds > 0) {
           const logRef = doc(firestore, 'centers', centerId, 'studyLogs', studentId, 'days', sessionDateKey);
           batch.set(logRef, { studentId, centerId, dateKey: sessionDateKey, totalMinutes: increment(sessionMinutes), updatedAt: serverTimestamp() }, { merge: true });
+
+          const statRef = doc(firestore, 'centers', centerId, 'dailyStudentStats', sessionDateKey, 'students', studentId);
+          batch.set(
+            statRef,
+            {
+              studentId,
+              centerId,
+              dateKey: sessionDateKey,
+              totalStudyMinutes: increment(sessionMinutes),
+              updatedAt: serverTimestamp(),
+            },
+            { merge: true }
+          );
 
           const sessionRef = doc(collection(firestore, 'centers', centerId, 'studyLogs', studentId, 'days', sessionDateKey, 'sessions'));
           batch.set(sessionRef, { startTime: selectedSeat.lastCheckInAt, endTime: Timestamp.fromMillis(nowTs), durationMinutes: sessionMinutes, createdAt: serverTimestamp() });
@@ -5436,6 +5634,169 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
               닫기
             </Button>
           </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={!!selectedAttendanceDetailSignal}
+        onOpenChange={(open) => {
+          if (!open) setSelectedAttendanceDetailSignal(null);
+        }}
+      >
+        <DialogContent className={cn("overflow-hidden border-none p-0 shadow-2xl", isMobile ? "w-[calc(100vw-1rem)] rounded-[2rem]" : "sm:max-w-xl rounded-[2.2rem]")}>
+          {selectedAttendanceDetail ? (
+            <>
+              <div className="bg-[linear-gradient(135deg,#14295F_0%,#1E4DB7_72%,#FF8B2B_100%)] p-6 text-white">
+                <DialogHeader className="text-left">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <Badge className="border border-white/14 bg-white/10 px-3 py-1 text-[10px] font-black text-white">
+                      {selectedAttendanceDetail.seatLabel}
+                    </Badge>
+                    <Badge className="border border-white/14 bg-white/10 px-3 py-1 text-[10px] font-black text-white">
+                      {selectedAttendanceDetail.signal.boardLabel}
+                    </Badge>
+                    {selectedAttendanceDetail.signal.wasLateToday ? (
+                      <Badge className="border border-white/20 bg-[#FF7A16] px-3 py-1 text-[10px] font-black text-white">
+                        오늘 지각O
+                      </Badge>
+                    ) : null}
+                  </div>
+                  <DialogTitle className="mt-4 text-2xl font-black tracking-tight">
+                    {selectedAttendanceDetail.signal.studentName}
+                  </DialogTitle>
+                  <DialogDescription className="mt-2 text-sm font-semibold leading-6 text-white/82">
+                    {selectedAttendanceDetail.signal.note || '오늘 출결과 연락 정보를 바로 확인합니다.'}
+                  </DialogDescription>
+                </DialogHeader>
+              </div>
+
+              <div className="space-y-3 bg-[#F7FAFF] p-5">
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <div className="rounded-2xl border border-[#DCE7FF] bg-white p-4">
+                    <p className="text-[10px] font-black uppercase tracking-[0.16em] text-[#5C6E97]">원래 등원 예정</p>
+                    <p className="mt-2 text-lg font-black text-[#14295F]">{selectedAttendanceDetail.plannedArrival}</p>
+                  </div>
+                  <div className="rounded-2xl border border-[#DCE7FF] bg-white p-4">
+                    <p className="text-[10px] font-black uppercase tracking-[0.16em] text-[#5C6E97]">원래 하원 예정</p>
+                    <p className="mt-2 text-lg font-black text-[#14295F]">{selectedAttendanceDetail.plannedDeparture}</p>
+                  </div>
+                </div>
+
+                <div className="rounded-2xl border border-[#DCE7FF] bg-white p-4">
+                  <p className="text-[10px] font-black uppercase tracking-[0.16em] text-[#5C6E97]">오늘 일정</p>
+                  <p className="mt-2 text-sm font-black leading-6 text-[#14295F]">{selectedAttendanceDetail.scheduleLabel}</p>
+                </div>
+
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <div className="rounded-2xl border border-[#DCE7FF] bg-white p-4">
+                    <p className="text-[10px] font-black uppercase tracking-[0.16em] text-[#5C6E97]">어머님 연락처</p>
+                    <p className="mt-2 text-base font-black text-[#14295F]">{selectedAttendanceDetail.parentPhone}</p>
+                    <p className="mt-1 text-[11px] font-bold text-[#6E7EA3]">{selectedAttendanceDetail.parentName}</p>
+                  </div>
+                  <div className="rounded-2xl border border-[#DCE7FF] bg-white p-4">
+                    <p className="text-[10px] font-black uppercase tracking-[0.16em] text-[#5C6E97]">학생 연락처</p>
+                    <p className="mt-2 text-base font-black text-[#14295F]">{selectedAttendanceDetail.studentPhone}</p>
+                    <p className="mt-1 text-[11px] font-bold text-[#6E7EA3]">{selectedAttendanceDetail.studentMember?.className || selectedAttendanceDetail.student?.className || '반 정보 없음'}</p>
+                  </div>
+                </div>
+              </div>
+
+              <DialogFooter className="border-t border-[#D7E4FF] bg-white px-5 py-4">
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="h-11 rounded-xl font-black text-[#14295F]"
+                  onClick={() => setSelectedAttendanceDetailSignal(null)}
+                >
+                  닫기
+                </Button>
+                <Button
+                  type="button"
+                  className="h-11 rounded-xl bg-[#14295F] font-black text-white hover:bg-[#10224C]"
+                  onClick={() => {
+                    const signal = selectedAttendanceDetail.signal;
+                    setSelectedAttendanceDetailSignal(null);
+                    openTeacherAttendanceSignal(signal);
+                  }}
+                >
+                  교실에서 보기
+                </Button>
+              </DialogFooter>
+            </>
+          ) : null}
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={isCenterPointDialogOpen} onOpenChange={setIsCenterPointDialogOpen}>
+        <DialogContent className={cn("flex min-h-0 flex-col overflow-hidden border-none p-0 shadow-2xl", isMobile ? "fixed inset-0 h-full w-full max-w-none rounded-none" : "max-h-[calc(100dvh-2rem)] sm:max-w-2xl rounded-[2.2rem]")}>
+          <div className="shrink-0 bg-[linear-gradient(135deg,#14295F_0%,#1E4DB7_65%,#20A66B_100%)] p-6 text-white">
+            <DialogHeader className="text-left">
+              <div className="flex flex-wrap items-center gap-2">
+                <Badge className="border border-white/14 bg-white/10 px-3 py-1 text-[10px] font-black text-white">
+                  센터 포인트
+                </Badge>
+                <Badge className="border border-white/14 bg-white/10 px-3 py-1 text-[10px] font-black text-white">
+                  최근 30일
+                </Badge>
+              </div>
+              <DialogTitle className="mt-4 text-2xl font-black tracking-tight">
+                포인트 배부 현황
+              </DialogTitle>
+              <DialogDescription className="mt-2 text-sm font-semibold leading-6 text-white/82">
+                오늘 센터에서 나간 포인트와 최근 한달 일자별 학생 적립 내역입니다.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="mt-5 grid gap-3 sm:grid-cols-3">
+              <div className="rounded-[1.35rem] border border-white/10 bg-white/10 px-4 py-3">
+                <p className="text-[10px] font-black uppercase tracking-[0.18em] text-white/62">오늘 배부</p>
+                <p className="dashboard-number mt-1.5 text-2xl text-white">{centerPointDistribution.todayTotal.toLocaleString()}P</p>
+              </div>
+              <div className="rounded-[1.35rem] border border-white/10 bg-white/10 px-4 py-3">
+                <p className="text-[10px] font-black uppercase tracking-[0.18em] text-white/62">한달 합계</p>
+                <p className="dashboard-number mt-1.5 text-2xl text-white">{centerPointDistribution.monthTotal.toLocaleString()}P</p>
+              </div>
+              <div className="rounded-[1.35rem] border border-white/10 bg-white/10 px-4 py-3">
+                <p className="text-[10px] font-black uppercase tracking-[0.18em] text-white/62">학생별 기록</p>
+                <p className="dashboard-number mt-1.5 text-2xl text-white">{centerPointDistribution.studentGrantCount.toLocaleString()}건</p>
+              </div>
+            </div>
+          </div>
+
+          <div className="min-h-0 flex-1 overflow-y-auto bg-[#F7FAFF] p-5">
+            {centerPointDistribution.dailyRows.length === 0 ? (
+              <div className="rounded-[1.5rem] border border-dashed border-[#DCE7FF] bg-white px-5 py-10 text-center">
+                <p className="text-sm font-black text-[#14295F]">최근 한달 포인트 배부 기록이 없습니다.</p>
+                <p className="mt-2 text-xs font-bold leading-5 text-[#6E7EA3]">계획 완수, 공부상자, 랭킹 보상 등이 발생하면 여기에 쌓입니다.</p>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {centerPointDistribution.dailyRows.map((day) => (
+                  <div key={day.dateKey} className="rounded-[1.5rem] border border-[#DCE7FF] bg-white p-4 shadow-[0_18px_34px_-32px_rgba(20,41,95,0.2)]">
+                    <div className="flex items-start justify-between gap-3 border-b border-[#EEF4FF] pb-3">
+                      <div>
+                        <p className="text-sm font-black text-[#14295F]">{day.dateKey}</p>
+                        <p className="mt-1 text-[11px] font-bold text-[#6E7EA3]">{day.grants.length}명 적립</p>
+                      </div>
+                      <Badge className="border-none bg-emerald-100 px-3 py-1 text-[11px] font-black text-emerald-700">
+                        {day.total.toLocaleString()}P
+                      </Badge>
+                    </div>
+                    <div className="mt-3 space-y-2">
+                      {day.grants.map((grant) => (
+                        <div key={grant.key} className="flex items-start justify-between gap-3 rounded-2xl border border-[#EEF4FF] bg-[#F8FBFF] px-3 py-2.5">
+                          <div className="min-w-0">
+                            <p className="text-sm font-black text-[#14295F]">{grant.studentName}</p>
+                            <p className="mt-1 truncate text-[11px] font-bold text-[#6E7EA3]">{grant.detail}</p>
+                          </div>
+                          <span className="shrink-0 text-sm font-black text-emerald-700">{grant.points.toLocaleString()}P</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
         </DialogContent>
       </Dialog>
 
