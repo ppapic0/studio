@@ -33,8 +33,8 @@ var __importStar = (this && this.__importStar) || (function () {
     };
 })();
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.resendGiftishowOrderSecure = exports.rejectGiftishowOrderSecure = exports.reconcilePendingGiftishowOrders = exports.getGiftishowBizmoneySecure = exports.createGiftishowOrderRequestSecure = exports.cancelGiftishowOrderSecure = exports.cancelGiftishowSendFailSecure = exports.approveGiftishowOrderSecure = exports.scheduledRankingRewardSettlement = exports.ensureCurrentUserMemberships = exports.scheduledOpenClawSnapshotExport = exports.generateOpenClawSnapshot = exports.refreshClassroomSignals = exports.stopStudentStudySessionSecure = exports.scheduledStudyBoxCarryoverExpiry = exports.openStudyRewardBoxSecure = exports.claimPlannerCompletionRewardSecure = exports.submitAttendanceRequestSecure = exports.applyPenaltyEventSecure = exports.cancelPointBoostEventSecure = exports.createPointBoostEventSecure = exports.scheduledClassroomSignalsRefresh = exports.scheduledDailyRiskAlert = exports.repairRecentStudySessionTotals = exports.setStudentAttendanceStatusSecure = exports.onSessionWritten = exports.onSessionCreated = exports.scheduledWeeklyReport = exports.cleanupOldDocuments = exports.scheduledAttendanceCheck = exports.runLateArrivalCheck = exports.sendPaymentReminderBatch = exports.notifyDailyReportReady = exports.notifyAttendanceSms = exports.scheduledSmsQueueDispatcher = exports.sendManualStudentSms = exports.updateSmsRecipientPreference = exports.cancelSmsQueueItem = exports.retrySmsQueueItem = exports.saveNotificationSettingsSecure = exports.confirmInvoicePayment = exports.completeSignupWithInvite = exports.redeemInviteCode = exports.createCounselingDemoBundle = exports.registerStudent = exports.updateStudentAccount = exports.deleteTeacherAccount = exports.deleteStudentAccount = exports.repairTodayAttendanceSmsQueue = exports.onAttendanceEventCreated = void 0;
-exports.generateStudyPlan = exports.syncGiftishowCatalogSecure = exports.scheduledGiftishowCatalogSync = exports.saveGiftishowSettingsSecure = void 0;
+exports.rejectGiftishowOrderSecure = exports.reconcilePendingGiftishowOrders = exports.getGiftishowBizmoneySecure = exports.createGiftishowOrderRequestSecure = exports.cancelGiftishowOrderSecure = exports.cancelGiftishowSendFailSecure = exports.approveGiftishowOrderSecure = exports.scheduledRankingRewardSettlement = exports.ensureCurrentUserMemberships = exports.scheduledOpenClawSnapshotExport = exports.generateOpenClawSnapshot = exports.refreshClassroomSignals = exports.stopStudentStudySessionSecure = exports.scheduledStudyBoxCarryoverExpiry = exports.openStudyRewardBoxSecure = exports.claimPlannerCompletionRewardSecure = exports.submitAttendanceRequestSecure = exports.applyPenaltyEventSecure = exports.cancelPointBoostEventSecure = exports.createPointBoostEventSecure = exports.scheduledClassroomSignalsRefresh = exports.scheduledDailyRiskAlert = exports.repairRecentStudySessionTotals = exports.createManualStudySessionSecure = exports.setStudentAttendanceStatusSecure = exports.onSessionWritten = exports.onSessionCreated = exports.scheduledWeeklyReport = exports.cleanupOldDocuments = exports.scheduledAttendanceCheck = exports.runLateArrivalCheck = exports.sendPaymentReminderBatch = exports.notifyDailyReportReady = exports.notifyAttendanceSms = exports.scheduledSmsQueueDispatcher = exports.sendManualStudentSms = exports.updateSmsRecipientPreference = exports.cancelSmsQueueItem = exports.retrySmsQueueItem = exports.saveNotificationSettingsSecure = exports.confirmInvoicePayment = exports.completeSignupWithInvite = exports.redeemInviteCode = exports.createCounselingDemoBundle = exports.registerStudent = exports.updateStudentAccount = exports.deleteTeacherAccount = exports.deleteStudentAccount = exports.repairTodayAttendanceSmsQueue = exports.onAttendanceEventCreated = void 0;
+exports.generateStudyPlan = exports.syncGiftishowCatalogSecure = exports.scheduledGiftishowCatalogSync = exports.saveGiftishowSettingsSecure = exports.resendGiftishowOrderSecure = void 0;
 const params_1 = require("firebase-functions/params");
 const functions = __importStar(require("firebase-functions"));
 const admin = __importStar(require("firebase-admin"));
@@ -1858,6 +1858,12 @@ function buildSmsDedupeKey(params) {
     }
     return `${params.centerId}_${params.studentId}_${params.eventType}_${dateKey}_${minuteKey}`;
 }
+function buildAttendanceEventSmsDedupeKey(params) {
+    const normalizedEventType = normalizeSmsEventType(params.eventType);
+    const dateKey = toDateKey(params.eventAt);
+    const eventId = asTrimmedString(params.eventId).replace(/[^A-Za-z0-9_-]/g, "_").slice(0, 120);
+    return `${params.centerId}_${params.studentId}_${normalizedEventType}_${dateKey}_event_${eventId}`;
+}
 function buildSmsQueueInitialStatus(settings) {
     const provider = settings.smsProvider || "none";
     if (settings.smsEnabled === false || provider === "none") {
@@ -2057,13 +2063,15 @@ async function queueParentSmsNotification(db, params) {
     }
     const centerName = await loadCenterName(db, centerId);
     const template = resolveTemplateByEvent(settings, eventType);
-    const smsEventAt = await resolveAttendanceSmsEventAt(db, {
-        centerId,
-        studentId,
-        eventType,
-        fallbackEventAt: eventAt,
-        dateKeyOverride: params.dateKeyOverride,
-    });
+    const smsEventAt = params.useExactEventAt
+        ? eventAt
+        : await resolveAttendanceSmsEventAt(db, {
+            centerId,
+            studentId,
+            eventType,
+            fallbackEventAt: eventAt,
+            dateKeyOverride: params.dateKeyOverride,
+        });
     const eventTimeLabel = toTimeLabel(smsEventAt);
     const eventAtTs = admin.firestore.Timestamp.fromDate(smsEventAt);
     const expectedTimeLabel = expectedTime || "학생이 정한 시간";
@@ -2074,7 +2082,7 @@ async function queueParentSmsNotification(db, params) {
         centerName,
     });
     const messageBytes = calculateSmsBytes(message);
-    const dedupeKey = buildSmsDedupeKey({
+    const dedupeKey = asTrimmedString(params.dedupeKeyOverride) || buildSmsDedupeKey({
         centerId,
         studentId,
         eventType,
@@ -2090,6 +2098,7 @@ async function queueParentSmsNotification(db, params) {
         createdAt: ts,
         renderedMessage: message,
         messageBytes,
+        sourceEventId: asTrimmedString(params.sourceEventId) || null,
     };
     if (!params.force) {
         const shouldQueue = await db.runTransaction(async (tx) => {
@@ -2147,6 +2156,7 @@ async function queueParentSmsNotification(db, params) {
                 eventTime: eventTimeLabel,
                 eventAt: eventAtTs,
                 expectedTime: expectedTime || null,
+                sourceEventId: asTrimmedString(params.sourceEventId) || null,
             },
         });
         const parentNotificationRef = db.collection(`centers/${centerId}/parentNotifications`).doc();
@@ -2353,6 +2363,15 @@ exports.onAttendanceEventCreated = functions
             eventType,
             eventAt,
             settings,
+            useExactEventAt: true,
+            dedupeKeyOverride: buildAttendanceEventSmsDedupeKey({
+                centerId,
+                studentId,
+                eventType,
+                eventAt,
+                eventId,
+            }),
+            sourceEventId: eventId,
         });
         await snap.ref.set({
             smsAutoQueuedAt: admin.firestore.FieldValue.serverTimestamp(),
@@ -2427,6 +2446,15 @@ async function repairAttendanceSmsQueueForCenter(db, centerId, dateKey) {
             eventType: event.eventType,
             eventAt: event.eventAt,
             settings,
+            useExactEventAt: true,
+            dedupeKeyOverride: buildAttendanceEventSmsDedupeKey({
+                centerId,
+                studentId: event.studentId,
+                eventType: event.eventType,
+                eventAt: event.eventAt,
+                eventId: event.eventId,
+            }),
+            sourceEventId: event.eventId,
         });
         if (queueResult.deduped) {
             skippedCount += 1;
@@ -2476,6 +2504,7 @@ async function repairRecentAttendanceSmsQueueForCenter(db, centerId, dateKey, wi
         if (!eventType || !studentId || !eventAt || eventAt.getTime() < windowStartMs)
             return null;
         return {
+            eventId: eventDoc.id,
             data: eventData,
             studentId,
             eventType,
@@ -2506,6 +2535,7 @@ async function repairRecentAttendanceSmsQueueForCenter(db, centerId, dateKey, wi
             if (alreadyHasRecentAwayEvent)
                 return null;
             return {
+                eventId: "",
                 data: seatData,
                 studentId,
                 eventType: "away_start",
@@ -2542,14 +2572,18 @@ async function repairRecentAttendanceSmsQueueForCenter(db, centerId, dateKey, wi
     });
     for (const event of recentEvents) {
         const studentName = studentNameById.get(event.studentId) || asTrimmedString(event.data.studentName, "학생");
-        const queueResult = await queueParentSmsNotification(db, {
-            centerId,
-            studentId: event.studentId,
-            studentName,
-            eventType: event.eventType,
-            eventAt: event.eventAt,
-            settings,
-        });
+        const queueResult = await queueParentSmsNotification(db, Object.assign({ centerId, studentId: event.studentId, studentName, eventType: event.eventType, eventAt: event.eventAt, settings, useExactEventAt: true }, (event.eventId
+            ? {
+                dedupeKeyOverride: buildAttendanceEventSmsDedupeKey({
+                    centerId,
+                    studentId: event.studentId,
+                    eventType: event.eventType,
+                    eventAt: event.eventAt,
+                    eventId: event.eventId,
+                }),
+                sourceEventId: event.eventId,
+            }
+            : {})));
         if (queueResult.deduped) {
             baseResult.skippedCount += 1;
             continue;
@@ -6854,6 +6888,149 @@ function buildRecentStudyDayKeys(dayCount, baseDate = new Date()) {
         return toDateKey(day);
     });
 }
+function getExistingStudySessionRangeMs(data, fallbackEndMs) {
+    const startMs = toMillisSafe(data.startTime);
+    if (startMs <= 0)
+        return null;
+    const explicitEndMs = toMillisSafe(data.endTime);
+    if (explicitEndMs > startMs) {
+        return { startMs, endMs: explicitEndMs };
+    }
+    const durationMinutes = getStudySessionDurationMinutesFromData(data);
+    if (durationMinutes > 0) {
+        return {
+            startMs,
+            endMs: startMs + durationMinutes * MINUTE_MS,
+        };
+    }
+    if (fallbackEndMs > startMs) {
+        return { startMs, endMs: fallbackEndMs };
+    }
+    return { startMs, endMs: startMs + MINUTE_MS };
+}
+async function assertNoOverlappingStudySessions(params) {
+    const { db, centerId, studentId, startMs, endMs } = params;
+    const segments = splitRangeByStudyDayBoundary(startMs, endMs);
+    const dateKeys = Array.from(new Set(segments.map((segment) => segment.dateKey)));
+    const fallbackOpenEndMs = Math.max(Date.now(), endMs);
+    for (const dateKey of dateKeys) {
+        const bounds = getStudyDayWindowBounds(dateKey);
+        const relevantSegments = segments.filter((segment) => segment.dateKey === dateKey);
+        const sessionsSnap = await db.collection(`centers/${centerId}/studyLogs/${studentId}/days/${dateKey}/sessions`).get();
+        for (const sessionSnap of sessionsSnap.docs) {
+            const range = getExistingStudySessionRangeMs((sessionSnap.data() || {}), fallbackOpenEndMs);
+            if (!range)
+                continue;
+            const existingStartMs = Math.max(range.startMs, bounds.startMs);
+            const existingEndMs = Math.min(range.endMs, bounds.endMs);
+            const isOverlapping = relevantSegments.some((segment) => {
+                return existingStartMs < segment.endMs && existingEndMs > segment.startMs;
+            });
+            if (isOverlapping) {
+                throw new functions.https.HttpsError("failed-precondition", "Manual session overlaps with an existing session.", {
+                    userMessage: "이미 저장된 세션 시간과 겹칩니다. 시작/종료 시간을 다시 확인해 주세요.",
+                    sessionId: sessionSnap.id,
+                });
+            }
+        }
+    }
+    const liveSeatSnap = await db
+        .collection(`centers/${centerId}/attendanceCurrent`)
+        .where("studentId", "==", studentId)
+        .limit(10)
+        .get();
+    for (const seatDoc of liveSeatSnap.docs) {
+        const seatData = (seatDoc.data() || {});
+        if (asTrimmedString(seatData.status) !== "studying")
+            continue;
+        const liveStartMs = toMillisSafe(seatData.lastCheckInAt);
+        if (liveStartMs <= 0)
+            continue;
+        const liveEndMs = Math.max(Date.now(), liveStartMs + MINUTE_MS);
+        if (liveStartMs < endMs && liveEndMs > startMs) {
+            throw new functions.https.HttpsError("failed-precondition", "Manual session overlaps with the active live session.", {
+                userMessage: "현재 진행 중인 공부 세션과 시간이 겹칩니다. 진행 중 세션을 먼저 종료하거나 겹치지 않는 시간을 입력해 주세요.",
+                seatId: seatDoc.id,
+            });
+        }
+    }
+}
+exports.createManualStudySessionSecure = functions
+    .region(region)
+    .https.onCall(async (data, context) => {
+    var _a, _b, _c;
+    const db = admin.firestore();
+    if (!((_a = context.auth) === null || _a === void 0 ? void 0 : _a.uid)) {
+        throw new functions.https.HttpsError("unauthenticated", "로그인이 필요합니다.");
+    }
+    const centerId = asTrimmedString(data === null || data === void 0 ? void 0 : data.centerId);
+    const studentId = asTrimmedString(data === null || data === void 0 ? void 0 : data.studentId);
+    const startMs = Math.floor((_b = parseFiniteNumber(data === null || data === void 0 ? void 0 : data.startAtMs)) !== null && _b !== void 0 ? _b : 0);
+    const endMs = Math.floor((_c = parseFiniteNumber(data === null || data === void 0 ? void 0 : data.endAtMs)) !== null && _c !== void 0 ? _c : 0);
+    const source = asTrimmedString(data === null || data === void 0 ? void 0 : data.source, "admin_focus_board");
+    const note = asTrimmedString(data === null || data === void 0 ? void 0 : data.note);
+    if (!centerId || !studentId || startMs <= 0 || endMs <= 0) {
+        throw new functions.https.HttpsError("invalid-argument", "Invalid manual session input.", {
+            userMessage: "학생과 세션 시간을 다시 확인해 주세요.",
+        });
+    }
+    if (endMs <= startMs) {
+        throw new functions.https.HttpsError("invalid-argument", "Manual session end must be after start.", {
+            userMessage: "종료 시간은 시작 시간보다 뒤여야 합니다.",
+        });
+    }
+    if (endMs - startMs > MAX_STUDY_SESSION_MINUTES * MINUTE_MS) {
+        throw new functions.https.HttpsError("invalid-argument", "Manual session is too long.", {
+            userMessage: `세션은 한 번에 최대 ${MAX_STUDY_SESSION_MINUTES}분까지만 만들 수 있습니다.`,
+        });
+    }
+    if (endMs > Date.now() + 5 * MINUTE_MS) {
+        throw new functions.https.HttpsError("invalid-argument", "Manual session cannot end in the future.", {
+            userMessage: "아직 지나지 않은 시간으로 세션을 만들 수 없습니다.",
+        });
+    }
+    const membership = await resolveCenterMembershipRole(db, centerId, context.auth.uid);
+    if (!membership.role ||
+        !isActiveMembershipStatus(membership.status) ||
+        (membership.role !== "teacher" && !isAdminRole(membership.role))) {
+        throw new functions.https.HttpsError("permission-denied", "Only active teachers or admins can create manual sessions.", {
+            userMessage: "선생님 또는 관리자 권한으로만 세션을 만들 수 있습니다.",
+        });
+    }
+    const [studentSnap, memberSnap] = await Promise.all([
+        db.doc(`centers/${centerId}/students/${studentId}`).get(),
+        db.doc(`centers/${centerId}/members/${studentId}`).get(),
+    ]);
+    if (!studentSnap.exists && !memberSnap.exists) {
+        throw new functions.https.HttpsError("failed-precondition", "Student not found.", {
+            userMessage: "학생 정보를 찾을 수 없습니다.",
+        });
+    }
+    await assertNoOverlappingStudySessions({
+        db,
+        centerId,
+        studentId,
+        startMs,
+        endMs,
+    });
+    const result = await finalizeStudySession({
+        db,
+        centerId,
+        studentId,
+        startMs,
+        endMs,
+        sessionMetadata: Object.assign({ manualCreated: true, manualCreatedByUid: context.auth.uid, manualCreatedAt: admin.firestore.FieldValue.serverTimestamp(), source }, (note ? { manualNote: note } : {})),
+    });
+    return {
+        ok: true,
+        sessionId: result.sessionId,
+        sessionIds: result.sessionIds,
+        sessionDateKey: result.sessionDateKey,
+        sessionMinutes: result.sessionMinutes,
+        totalMinutesAfterSession: result.totalMinutesAfterSession,
+        totalMinutesByDateKey: result.totalMinutesByDateKey,
+    };
+});
 async function repairMissingStudySessionsFromAttendanceEvents(params) {
     const { db, centerId, studentId, dateKey } = params;
     const dayRef = db.doc(`centers/${centerId}/studyLogs/${studentId}/days/${dateKey}`);

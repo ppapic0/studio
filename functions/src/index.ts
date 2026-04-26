@@ -2587,6 +2587,19 @@ function buildSmsDedupeKey(params: {
   return `${params.centerId}_${params.studentId}_${params.eventType}_${dateKey}_${minuteKey}`;
 }
 
+function buildAttendanceEventSmsDedupeKey(params: {
+  centerId: string;
+  studentId: string;
+  eventType: AttendanceSmsEventType;
+  eventAt: Date;
+  eventId: string;
+}): string {
+  const normalizedEventType = normalizeSmsEventType(params.eventType);
+  const dateKey = toDateKey(params.eventAt);
+  const eventId = asTrimmedString(params.eventId).replace(/[^A-Za-z0-9_-]/g, "_").slice(0, 120);
+  return `${params.centerId}_${params.studentId}_${normalizedEventType}_${dateKey}_event_${eventId}`;
+}
+
 function buildSmsQueueInitialStatus(settings: NotificationSettingsDoc): {
   status: SmsQueueStatus;
   providerStatus: string;
@@ -2884,6 +2897,9 @@ async function queueParentSmsNotification(
     settings?: NotificationSettingsDoc;
     force?: boolean;
     dateKeyOverride?: string | null;
+    useExactEventAt?: boolean;
+    dedupeKeyOverride?: string | null;
+    sourceEventId?: string | null;
   }
 ): Promise<{ queuedCount: number; recipientCount: number; suppressedCount: number; message: string; deduped?: boolean }> {
   const {
@@ -2902,13 +2918,15 @@ async function queueParentSmsNotification(
   }
   const centerName = await loadCenterName(db, centerId);
   const template = resolveTemplateByEvent(settings, eventType);
-  const smsEventAt = await resolveAttendanceSmsEventAt(db, {
-    centerId,
-    studentId,
-    eventType,
-    fallbackEventAt: eventAt,
-    dateKeyOverride: params.dateKeyOverride,
-  });
+  const smsEventAt = params.useExactEventAt
+    ? eventAt
+    : await resolveAttendanceSmsEventAt(db, {
+        centerId,
+        studentId,
+        eventType,
+        fallbackEventAt: eventAt,
+        dateKeyOverride: params.dateKeyOverride,
+      });
 
   const eventTimeLabel = toTimeLabel(smsEventAt);
   const eventAtTs = admin.firestore.Timestamp.fromDate(smsEventAt);
@@ -2920,7 +2938,7 @@ async function queueParentSmsNotification(
     centerName,
   });
   const messageBytes = calculateSmsBytes(message);
-  const dedupeKey = buildSmsDedupeKey({
+  const dedupeKey = asTrimmedString(params.dedupeKeyOverride) || buildSmsDedupeKey({
     centerId,
     studentId,
     eventType,
@@ -2936,6 +2954,7 @@ async function queueParentSmsNotification(
     createdAt: ts,
     renderedMessage: message,
     messageBytes,
+    sourceEventId: asTrimmedString(params.sourceEventId) || null,
   };
   if (!params.force) {
     const shouldQueue = await db.runTransaction(async (tx) => {
@@ -3002,6 +3021,7 @@ async function queueParentSmsNotification(
         eventTime: eventTimeLabel,
         eventAt: eventAtTs,
         expectedTime: expectedTime || null,
+        sourceEventId: asTrimmedString(params.sourceEventId) || null,
       },
     });
 
@@ -3254,6 +3274,15 @@ export const onAttendanceEventCreated = functions
         eventType,
         eventAt,
         settings,
+        useExactEventAt: true,
+        dedupeKeyOverride: buildAttendanceEventSmsDedupeKey({
+          centerId,
+          studentId,
+          eventType,
+          eventAt,
+          eventId,
+        }),
+        sourceEventId: eventId,
       });
 
       await snap.ref.set({
@@ -3354,6 +3383,15 @@ async function repairAttendanceSmsQueueForCenter(
       eventType: event.eventType,
       eventAt: event.eventAt,
       settings,
+      useExactEventAt: true,
+      dedupeKeyOverride: buildAttendanceEventSmsDedupeKey({
+        centerId,
+        studentId: event.studentId,
+        eventType: event.eventType,
+        eventAt: event.eventAt,
+        eventId: event.eventId,
+      }),
+      sourceEventId: event.eventId,
     });
 
     if (queueResult.deduped) {
@@ -3413,6 +3451,7 @@ async function repairRecentAttendanceSmsQueueForCenter(
         || toKstDateFromUnknownTimestamp(eventData.createdAt);
       if (!eventType || !studentId || !eventAt || eventAt.getTime() < windowStartMs) return null;
       return {
+        eventId: eventDoc.id,
         data: eventData,
         studentId,
         eventType,
@@ -3420,6 +3459,7 @@ async function repairRecentAttendanceSmsQueueForCenter(
       };
     })
     .filter((event): event is {
+      eventId: string;
       data: FirebaseFirestore.DocumentData;
       studentId: string;
       eventType: AttendanceSmsEventType;
@@ -3450,6 +3490,7 @@ async function repairRecentAttendanceSmsQueueForCenter(
         );
         if (alreadyHasRecentAwayEvent) return null;
         return {
+          eventId: "",
           data: seatData,
           studentId,
           eventType: "away_start" as AttendanceSmsEventType,
@@ -3457,6 +3498,7 @@ async function repairRecentAttendanceSmsQueueForCenter(
         };
       })
       .filter((event): event is {
+        eventId: string;
         data: FirebaseFirestore.DocumentData;
         studentId: string;
         eventType: AttendanceSmsEventType;
@@ -3500,6 +3542,19 @@ async function repairRecentAttendanceSmsQueueForCenter(
       eventType: event.eventType,
       eventAt: event.eventAt,
       settings,
+      useExactEventAt: true,
+      ...(event.eventId
+        ? {
+            dedupeKeyOverride: buildAttendanceEventSmsDedupeKey({
+              centerId,
+              studentId: event.studentId,
+              eventType: event.eventType,
+              eventAt: event.eventAt,
+              eventId: event.eventId,
+            }),
+            sourceEventId: event.eventId,
+          }
+        : {}),
     });
 
     if (queueResult.deduped) {
