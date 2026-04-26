@@ -94,6 +94,7 @@ import { useToast } from '@/hooks/use-toast';
 import { AdminWorkbenchCommandBar } from '@/components/dashboard/admin-workbench-command-bar';
 import { CenterAdminAttendanceBoard } from '@/components/dashboard/center-admin-attendance-board';
 import { CenterAdminHeatmapCharts } from '@/components/dashboard/center-admin-heatmap-charts';
+import type { CenterAdminAttendanceSeatSignal } from '@/lib/center-admin-attendance-board';
 import { AppointmentsPageContent } from '@/app/dashboard/appointments/appointments-page-content';
 import {
   OperationsInbox,
@@ -125,6 +126,21 @@ import { createPointBoostEventSecure, cancelPointBoostEventSecure } from '@/lib/
 import { getDailyPointBreakdown } from '@/lib/student-rewards';
 
 const ADMIN_DASHBOARD_REFRESH_INTERVAL_MS = 60 * 1000;
+const MANUAL_PARENT_SMS_UID = '__manual_parent__';
+const STUDENT_SMS_FALLBACK_UID = '__student__';
+
+type AdminSmsRecipientPreference = {
+  id: string;
+  studentId?: string;
+  parentUid?: string;
+  parentName?: string;
+  phoneNumber?: string;
+  enabled?: boolean;
+  isManualRecipient?: boolean;
+  isFallbackRecipient?: boolean;
+};
+
+const buildSmsRecipientPreferenceId = (studentId: string, parentUid: string) => `${studentId}_${parentUid}`;
 
 const isLikelyUid = (value: string): boolean => {
   const normalized = value.trim();
@@ -524,6 +540,7 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
   const [isParentTrustDialogOpen, setIsParentTrustDialogOpen] = useState(false);
   const [parentTrustSearch, setParentTrustSearch] = useState('');
   const [selectedFocusStudentId, setSelectedFocusStudentId] = useState<string | null>(null);
+  const [selectedAttendanceDetailSignal, setSelectedAttendanceDetailSignal] = useState<CenterAdminAttendanceSeatSignal | null>(null);
   const [isStudyingStudentsDialogOpen, setIsStudyingStudentsDialogOpen] = useState(false);
   const [isAttendanceFullscreenOpen, setIsAttendanceFullscreenOpen] = useState(false);
   const [isOperationsMemoOpen, setIsOperationsMemoOpen] = useState(false);
@@ -716,6 +733,12 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
   }, [firestore, centerId]);
   const { data: parentMembers } = useCollection<CenterMembership>(parentMembersQuery, { enabled: isActive });
 
+  const smsRecipientPreferencesQuery = useMemoFirebase(() => {
+    if (!firestore || !centerId) return null;
+    return query(collection(firestore, 'centers', centerId, 'smsRecipientPreferences'), limit(800));
+  }, [firestore, centerId]);
+  const { data: smsRecipientPreferences } = useCollection<AdminSmsRecipientPreference>(smsRecipientPreferencesQuery, { enabled: isActive });
+
   // 2. 벌점 데이터 소스
   const progressQuery = useMemoFirebase(() => {
     if (!firestore || !centerId) return null;
@@ -784,6 +807,82 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
     () => new Map((activeMembers || []).map((member) => [member.id, member])),
     [activeMembers]
   );
+
+  const smsRecipientPreferencesByKey = useMemo(
+    () => new Map((smsRecipientPreferences || []).map((preference) => [preference.id, preference])),
+    [smsRecipientPreferences]
+  );
+
+  const selectedAttendanceDetail = useMemo(() => {
+    const signal = selectedAttendanceDetailSignal;
+    if (!signal?.studentId) return null;
+
+    const student = studentsById.get(signal.studentId) || null;
+    const studentMember = studentMembersById.get(signal.studentId) || null;
+    const parentUidSet = new Set(student?.parentUids || []);
+    const parentMember =
+      (parentMembers || []).find((member) => {
+        if (parentUidSet.has(member.id)) return true;
+        return (member.linkedStudentIds || []).includes(signal.studentId);
+      }) || null;
+    const parentPreference = parentMember
+      ? smsRecipientPreferencesByKey.get(buildSmsRecipientPreferenceId(signal.studentId, parentMember.id))
+      : null;
+    const manualParentPreference = smsRecipientPreferencesByKey.get(
+      buildSmsRecipientPreferenceId(signal.studentId, MANUAL_PARENT_SMS_UID)
+    );
+    const studentFallbackPreference = smsRecipientPreferencesByKey.get(
+      buildSmsRecipientPreferenceId(signal.studentId, STUDENT_SMS_FALLBACK_UID)
+    );
+    const manualParentPhone = normalizePhoneNumber(manualParentPreference?.phoneNumber);
+    const parentPhone =
+      manualParentPhone
+      || normalizePhoneNumber(parentPreference?.phoneNumber)
+      || normalizePhoneNumber(parentMember?.phoneNumber)
+      || '-';
+    const studentPhone =
+      normalizePhoneNumber(student?.phoneNumber)
+      || normalizePhoneNumber(studentMember?.phoneNumber)
+      || normalizePhoneNumber(studentFallbackPreference?.phoneNumber)
+      || '-';
+    const roomName = signal.roomId ? roomNameById.get(signal.roomId) || signal.roomId : '좌석 미배정';
+    const seatLabel = signal.roomSeatNo ? `${roomName} ${signal.roomSeatNo}번` : roomName;
+    const classScheduleLabel = signal.classScheduleName?.trim()
+      ? toStudyRoomTrackScheduleName(signal.classScheduleName)
+      : '';
+    const outingLabel =
+      signal.scheduleMovementSummary
+      || (
+        signal.excursionStartAt && signal.excursionEndAt
+          ? `학원/외출 ${signal.excursionStartAt} ~ ${signal.excursionEndAt}${signal.excursionReason ? ` · ${signal.excursionReason}` : ''}`
+          : '오늘 등록된 외출/학원 시간이 없습니다.'
+      );
+    const scheduleLabel = [classScheduleLabel, signal.scheduleMovementSummary].filter(Boolean).join(' · ');
+
+    return {
+      signal,
+      student,
+      studentMember,
+      seatLabel,
+      plannedArrival: signal.routineExpectedArrivalTime || student?.expectedArrivalTime || '-',
+      plannedDeparture: signal.plannedDepartureTime || '-',
+      outingLabel,
+      scheduleLabel: scheduleLabel || classScheduleLabel || '등록된 일정 없음',
+      parentName:
+        manualParentPhone
+          ? manualParentPreference?.parentName || '보호자'
+          : parentPreference?.parentName || parentMember?.displayName || '어머님',
+      parentPhone,
+      studentPhone,
+    };
+  }, [
+    parentMembers,
+    roomNameById,
+    selectedAttendanceDetailSignal,
+    smsRecipientPreferencesByKey,
+    studentMembersById,
+    studentsById,
+  ]);
 
   const progressById = useMemo(
     () => new Map((progressList || []).map((progress) => [progress.id, progress])),
@@ -2769,6 +2868,7 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
           studentName: signal.studentName,
           issueLabel,
           detailLabel,
+          signal,
         };
       });
   }, [attendanceSeatSignals]);
@@ -3166,10 +3266,13 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
     setSelectedPointHistoryWindow(window);
     setIsTodayPointsDialogOpen(true);
   };
-  const openAdminAttendanceSignal = (signal: {
+  const openAdminAttendanceBoardFromSignal = (signal: {
     roomId?: string;
   }) => {
     handleOpenAttendanceOverview(signal.roomId || 'all');
+  };
+  const openAdminAttendanceSignal = (signal: CenterAdminAttendanceSeatSignal) => {
+    setSelectedAttendanceDetailSignal(signal);
   };
   const adminNoShowSignals = useMemo(
     () =>
@@ -5361,10 +5464,18 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
                 ) : (
                   <div className="space-y-3">
                     {todayAttendanceContactTargets.map((target, index) => (
-                      <div key={target.studentId} className={cn(
-                        'rounded-[1.45rem] border px-4 py-4 shadow-[0_18px_32px_-28px_rgba(20,41,95,0.16)]',
-                        index === 0 ? 'border-[#FFD7BA] bg-[#FFF8F2]' : 'border-[#DCE7FF] bg-white'
-                      )}>
+                      <button
+                        key={target.studentId}
+                        type="button"
+                        onClick={() => {
+                          setIsAttendancePriorityDialogOpen(false);
+                          openAdminAttendanceSignal(target.signal);
+                        }}
+                        className={cn(
+                          'w-full rounded-[1.45rem] border px-4 py-4 text-left shadow-[0_18px_32px_-28px_rgba(20,41,95,0.16)] transition-[transform,box-shadow,border-color] duration-200 hover:-translate-y-0.5 hover:border-[#FF7A16]/30 hover:shadow-[0_22px_36px_-28px_rgba(20,41,95,0.22)]',
+                          index === 0 ? 'border-[#FFD7BA] bg-[#FFF8F2]' : 'border-[#DCE7FF] bg-white'
+                        )}
+                      >
                         <div className="flex items-start justify-between gap-3">
                           <div className="min-w-0">
                             <div className="flex flex-wrap items-center gap-2">
@@ -5383,7 +5494,7 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
                           </div>
                           <Phone className="mt-1 h-4 w-4 text-[#C95A08]" />
                         </div>
-                      </div>
+                      </button>
                     ))}
                   </div>
                 )}
@@ -5395,6 +5506,109 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
                   </Button>
                 </DialogClose>
               </DialogFooter>
+            </DialogContent>
+          </Dialog>
+
+          <Dialog
+            open={!!selectedAttendanceDetailSignal}
+            onOpenChange={(open) => {
+              if (!open) setSelectedAttendanceDetailSignal(null);
+            }}
+          >
+            <DialogContent
+              motionPreset="dashboard-premium"
+              className={cn(
+                studioDialogContentClassName,
+                isMobile ? 'w-[calc(100vw-1rem)] rounded-[2rem]' : 'sm:max-w-xl'
+              )}
+            >
+              {selectedAttendanceDetail ? (
+                <>
+                  <div className={studioDialogHeaderClassName}>
+                    <DialogHeader className="text-left">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <Badge className="border border-white/14 bg-white/10 px-3 py-1 text-[10px] font-black text-white">
+                          {selectedAttendanceDetail.seatLabel}
+                        </Badge>
+                        <Badge className="border border-white/14 bg-white/10 px-3 py-1 text-[10px] font-black text-white">
+                          {selectedAttendanceDetail.signal.boardLabel}
+                        </Badge>
+                        {selectedAttendanceDetail.signal.wasLateToday ? (
+                          <Badge className="border border-white/20 bg-[#FF7A16] px-3 py-1 text-[10px] font-black text-white">
+                            오늘 지각O
+                          </Badge>
+                        ) : null}
+                      </div>
+                      <DialogTitle className="mt-4 text-2xl font-black tracking-tight">
+                        {selectedAttendanceDetail.signal.studentName}
+                      </DialogTitle>
+                      <DialogDescription className="mt-2 text-sm font-semibold leading-6 text-white/82">
+                        오늘 학생이 설정한 등원·하원·외출 시간과 연락처를 바로 확인합니다.
+                      </DialogDescription>
+                    </DialogHeader>
+                  </div>
+
+                  <div className="space-y-3 bg-[#F7FAFF] p-5">
+                    <div className="grid gap-3 sm:grid-cols-2">
+                      <div className="rounded-2xl border border-[#DCE7FF] bg-white p-4">
+                        <p className="text-[10px] font-black uppercase tracking-[0.16em] text-[#5C6E97]">오늘 등원 예정</p>
+                        <p className="mt-2 text-lg font-black text-[#14295F]">{selectedAttendanceDetail.plannedArrival}</p>
+                      </div>
+                      <div className="rounded-2xl border border-[#DCE7FF] bg-white p-4">
+                        <p className="text-[10px] font-black uppercase tracking-[0.16em] text-[#5C6E97]">오늘 하원 예정</p>
+                        <p className="mt-2 text-lg font-black text-[#14295F]">{selectedAttendanceDetail.plannedDeparture}</p>
+                      </div>
+                    </div>
+
+                    <div className="rounded-2xl border border-[#FFD7BA] bg-white p-4">
+                      <p className="text-[10px] font-black uppercase tracking-[0.16em] text-[#C95A08]">오늘 외출/학원 시간</p>
+                      <p className="mt-2 text-sm font-black leading-6 text-[#14295F]">{selectedAttendanceDetail.outingLabel}</p>
+                    </div>
+
+                    <div className="rounded-2xl border border-[#DCE7FF] bg-white p-4">
+                      <p className="text-[10px] font-black uppercase tracking-[0.16em] text-[#5C6E97]">오늘 일정</p>
+                      <p className="mt-2 text-sm font-black leading-6 text-[#14295F]">{selectedAttendanceDetail.scheduleLabel}</p>
+                    </div>
+
+                    <div className="grid gap-3 sm:grid-cols-2">
+                      <div className="rounded-2xl border border-[#DCE7FF] bg-white p-4">
+                        <p className="text-[10px] font-black uppercase tracking-[0.16em] text-[#5C6E97]">어머님 연락처</p>
+                        <p className="mt-2 text-base font-black text-[#14295F]">{selectedAttendanceDetail.parentPhone}</p>
+                        <p className="mt-1 text-[11px] font-bold text-[#6E7EA3]">{selectedAttendanceDetail.parentName}</p>
+                      </div>
+                      <div className="rounded-2xl border border-[#DCE7FF] bg-white p-4">
+                        <p className="text-[10px] font-black uppercase tracking-[0.16em] text-[#5C6E97]">학생 연락처</p>
+                        <p className="mt-2 text-base font-black text-[#14295F]">{selectedAttendanceDetail.studentPhone}</p>
+                        <p className="mt-1 text-[11px] font-bold text-[#6E7EA3]">
+                          {selectedAttendanceDetail.studentMember?.className || selectedAttendanceDetail.student?.className || '반 정보 없음'}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+
+                  <DialogFooter className="border-t border-[#D7E4FF] bg-white px-5 py-4">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      className="h-11 rounded-xl border-[#DCE7FF] font-black text-[#14295F]"
+                      onClick={() => setSelectedAttendanceDetailSignal(null)}
+                    >
+                      닫기
+                    </Button>
+                    <Button
+                      type="button"
+                      className="h-11 rounded-xl bg-[#14295F] font-black text-white hover:bg-[#10224C]"
+                      onClick={() => {
+                        const signal = selectedAttendanceDetail.signal;
+                        setSelectedAttendanceDetailSignal(null);
+                        openAdminAttendanceBoardFromSignal(signal);
+                      }}
+                    >
+                      교실에서 보기
+                    </Button>
+                  </DialogFooter>
+                </>
+              ) : null}
             </DialogContent>
           </Dialog>
         </>
