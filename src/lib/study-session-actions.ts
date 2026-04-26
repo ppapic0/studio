@@ -36,6 +36,8 @@ export type SetStudentAttendanceStatusSecureResult = {
   nextStatus?: AttendanceSeatStatus;
   seatId?: string | null;
   eventType?: 'check_in' | 'away_start' | 'away_end' | 'check_out' | null;
+  eventId?: string | null;
+  eventAtMillis?: number | null;
   duplicatedSession?: boolean;
   sessionId?: string | null;
   sessionDateKey?: string | null;
@@ -43,6 +45,10 @@ export type SetStudentAttendanceStatusSecureResult = {
   totalMinutesAfterSession?: number;
   attendanceAchieved?: boolean;
   bonus6hAchieved?: boolean;
+  smsDirectQueuedCount?: number;
+  smsDirectRecipientCount?: number;
+  smsDirectSuppressedCount?: number;
+  smsDirectDeduped?: boolean;
 };
 
 export type StopStudentStudySessionSecureResult = {
@@ -54,6 +60,10 @@ export type StopStudentStudySessionSecureResult = {
   totalMinutesAfterSession?: number;
   attendanceAchieved?: boolean;
   bonus6hAchieved?: boolean;
+  smsDirectQueuedCount?: number;
+  smsDirectRecipientCount?: number;
+  smsDirectSuppressedCount?: number;
+  smsDirectDeduped?: boolean;
 };
 
 export type RepairRecentStudySessionTotalsInput = {

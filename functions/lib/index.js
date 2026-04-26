@@ -1883,11 +1883,10 @@ function resolveTemplateByEvent(settings, eventType) {
 }
 function buildSmsDedupeKey(params) {
     const dateKey = toDateKey(params.eventAt);
-    const minuteKey = `${String(params.eventAt.getHours()).padStart(2, "0")}${String(params.eventAt.getMinutes()).padStart(2, "0")}`;
-    if (params.eventType === "study_start" || params.eventType === "study_end" || params.eventType === "late_alert") {
+    if (params.eventType === "late_alert") {
         return `${params.centerId}_${params.studentId}_${params.eventType}_${dateKey}`;
     }
-    return `${params.centerId}_${params.studentId}_${params.eventType}_${dateKey}_${minuteKey}`;
+    return `${params.centerId}_${params.studentId}_${params.eventType}_${dateKey}_${params.eventAt.getTime()}`;
 }
 function buildAttendanceEventSmsDedupeKey(params) {
     const normalizedEventType = normalizeSmsEventType(params.eventType);
@@ -2363,6 +2362,82 @@ function normalizeAttendanceEventForParentSms(value) {
         return normalized;
     return null;
 }
+async function queueAttendanceTransitionSmsDirectly(db, params) {
+    const smsEventType = normalizeAttendanceEventForParentSms(params.eventType);
+    const eventId = asTrimmedString(params.eventId);
+    const eventAtMillis = Math.max(0, Math.floor(params.eventAtMillis || 0));
+    if (!params.centerId || !params.studentId || !smsEventType || !eventId || eventAtMillis <= 0) {
+        return null;
+    }
+    const eventAt = new Date(eventAtMillis);
+    const eventRef = db.doc(`centers/${params.centerId}/attendanceEvents/${eventId}`);
+    try {
+        const [settings, studentSnap] = await Promise.all([
+            loadNotificationSettings(db, params.centerId),
+            db.doc(`centers/${params.centerId}/students/${params.studentId}`).get(),
+        ]);
+        const studentData = studentSnap.exists ? studentSnap.data() || {} : {};
+        const studentName = asTrimmedString(studentData.name, "학생");
+        const queueResult = await queueParentSmsNotification(db, {
+            centerId: params.centerId,
+            studentId: params.studentId,
+            studentName,
+            eventType: smsEventType,
+            eventAt,
+            settings,
+            useExactEventAt: true,
+            dedupeKeyOverride: buildAttendanceEventSmsDedupeKey({
+                centerId: params.centerId,
+                studentId: params.studentId,
+                eventType: smsEventType,
+                eventAt,
+                eventId,
+            }),
+            sourceEventId: eventId,
+        });
+        await eventRef.set({
+            smsCallableQueuedAt: admin.firestore.FieldValue.serverTimestamp(),
+            smsCallableQueuedCount: queueResult.queuedCount,
+            smsCallableRecipientCount: queueResult.recipientCount,
+            smsCallableSuppressedCount: queueResult.suppressedCount,
+            smsCallableDeduped: queueResult.deduped === true,
+            smsCallableEventType: smsEventType,
+            smsCallableMessage: queueResult.message || null,
+        }, { merge: true });
+        console.log("[attendance-sms-direct] queued", {
+            centerId: params.centerId,
+            studentId: params.studentId,
+            eventId,
+            eventType: smsEventType,
+            queuedCount: queueResult.queuedCount,
+            recipientCount: queueResult.recipientCount,
+            suppressedCount: queueResult.suppressedCount,
+            deduped: queueResult.deduped === true,
+        });
+        return {
+            queuedCount: queueResult.queuedCount,
+            recipientCount: queueResult.recipientCount,
+            suppressedCount: queueResult.suppressedCount,
+            deduped: queueResult.deduped,
+        };
+    }
+    catch (error) {
+        const message = (error === null || error === void 0 ? void 0 : error.message) || String(error);
+        console.error("[attendance-sms-direct] failed", {
+            centerId: params.centerId,
+            studentId: params.studentId,
+            eventId,
+            eventType: smsEventType,
+            message,
+        });
+        await eventRef.set({
+            smsCallableQueuedAt: admin.firestore.FieldValue.serverTimestamp(),
+            smsCallableError: message,
+            smsCallableEventType: smsEventType,
+        }, { merge: true });
+        return null;
+    }
+}
 exports.onAttendanceEventCreated = functions
     .region(region)
     .firestore.document("centers/{centerId}/attendanceEvents/{eventId}")
@@ -2411,6 +2486,16 @@ exports.onAttendanceEventCreated = functions
             smsAutoEventType: eventType,
             smsAutoMessage: queueResult.message || null,
         }, { merge: true });
+        console.log("[attendance-sms-auto] queued", {
+            centerId,
+            eventId,
+            studentId,
+            eventType,
+            queuedCount: queueResult.queuedCount,
+            recipientCount: queueResult.recipientCount,
+            suppressedCount: queueResult.suppressedCount,
+            deduped: queueResult.deduped === true,
+        });
     }
     catch (error) {
         console.error("[attendance-sms-auto] failed", {
@@ -6765,6 +6850,8 @@ async function applyAttendanceStatusTransition(params) {
                 nextStatus,
                 seatId: null,
                 eventType: null,
+                eventId: null,
+                eventAtMillis: null,
                 duplicatedSession: fallbackResult.duplicatedSession,
                 sessionId: fallbackResult.sessionId,
                 sessionDateKey: fallbackResult.sessionDateKey,
@@ -6811,6 +6898,8 @@ async function applyAttendanceStatusTransition(params) {
                 nextStatus,
                 seatId: seatDoc.id,
                 eventType: null,
+                eventId: null,
+                eventAtMillis: null,
                 duplicatedSession: (_a = finalized === null || finalized === void 0 ? void 0 : finalized.duplicatedSession) !== null && _a !== void 0 ? _a : true,
                 sessionId: (_b = finalized === null || finalized === void 0 ? void 0 : finalized.sessionId) !== null && _b !== void 0 ? _b : null,
                 sessionDateKey: (_c = finalized === null || finalized === void 0 ? void 0 : finalized.sessionDateKey) !== null && _c !== void 0 ? _c : null,
@@ -6821,6 +6910,7 @@ async function applyAttendanceStatusTransition(params) {
             };
         }
         const eventType = resolveAttendanceTransitionEventType(prevStatus, nextStatus);
+        const eventRef = eventType ? db.collection(`centers/${centerId}/attendanceEvents`).doc() : null;
         const statRef = db.doc(`centers/${centerId}/attendanceDailyStats/${attendanceDateKey}/students/${studentId}`);
         const progressRef = db.doc(`centers/${centerId}/growthProgress/${studentId}`);
         const [statSnap, progressSnap] = await Promise.all([
@@ -6856,8 +6946,7 @@ async function applyAttendanceStatusTransition(params) {
             statPatch.hasCheckOutRecord = true;
         }
         transaction.set(statRef, statPatch, { merge: true });
-        if (eventType) {
-            const eventRef = db.collection(`centers/${centerId}/attendanceEvents`).doc();
+        if (eventType && eventRef) {
             transaction.set(eventRef, Object.assign({ studentId, dateKey: attendanceDateKey, eventType, occurredAt: nowTs, createdAt: admin.firestore.FieldValue.serverTimestamp(), source: params.source, seatId: seatDoc.id, statusBefore: prevStatus, statusAfter: nextStatus }, (params.actorUid ? { actorUid: params.actorUid } : {})));
         }
         if (eventType === "check_in" && progressSnap) {
@@ -6883,6 +6972,8 @@ async function applyAttendanceStatusTransition(params) {
             nextStatus,
             seatId: seatDoc.id,
             eventType,
+            eventId: (eventRef === null || eventRef === void 0 ? void 0 : eventRef.id) || null,
+            eventAtMillis: eventType ? nowMs : null,
             duplicatedSession: (_h = finalized === null || finalized === void 0 ? void 0 : finalized.duplicatedSession) !== null && _h !== void 0 ? _h : false,
             sessionId: (_j = finalized === null || finalized === void 0 ? void 0 : finalized.sessionId) !== null && _j !== void 0 ? _j : null,
             sessionDateKey: (_k = finalized === null || finalized === void 0 ? void 0 : finalized.sessionDateKey) !== null && _k !== void 0 ? _k : null,
@@ -6965,6 +7056,16 @@ exports.setStudentAttendanceStatusSecure = functions.region(region).https.onCall
             roomSeatNo: parseFiniteNumber(seatHintRaw.roomSeatNo),
         },
     });
+    const smsDirectResult = await queueAttendanceTransitionSmsDirectly(db, {
+        centerId,
+        studentId: effectiveStudentId,
+        eventType: result.eventType,
+        eventId: result.eventId,
+        eventAtMillis: result.eventAtMillis,
+    });
+    if (smsDirectResult) {
+        return Object.assign(Object.assign({}, result), { smsDirectQueuedCount: smsDirectResult.queuedCount, smsDirectRecipientCount: smsDirectResult.recipientCount, smsDirectSuppressedCount: smsDirectResult.suppressedCount, smsDirectDeduped: smsDirectResult.deduped === true });
+    }
     return result;
 });
 function buildRecentStudyDayKeys(dayCount, baseDate = new Date()) {
@@ -8304,7 +8405,7 @@ exports.scheduledStudyBoxCarryoverExpiry = functions
     return null;
 });
 exports.stopStudentStudySessionSecure = functions.region(region).https.onCall(async (data, context) => {
-    var _a, _b;
+    var _a, _b, _c, _d, _e;
     const db = admin.firestore();
     if (!((_a = context.auth) === null || _a === void 0 ? void 0 : _a.uid)) {
         throw new functions.https.HttpsError("unauthenticated", "로그인이 필요합니다.");
@@ -8339,6 +8440,13 @@ exports.stopStudentStudySessionSecure = functions.region(region).https.onCall(as
         actorUid: authUid,
         fallbackStartTimeMs,
     });
+    const smsDirectResult = await queueAttendanceTransitionSmsDirectly(db, {
+        centerId,
+        studentId,
+        eventType: result.eventType,
+        eventId: result.eventId,
+        eventAtMillis: result.eventAtMillis,
+    });
     return {
         ok: true,
         duplicatedSession: result.duplicatedSession,
@@ -8348,6 +8456,10 @@ exports.stopStudentStudySessionSecure = functions.region(region).https.onCall(as
         totalMinutesAfterSession: result.totalMinutesAfterSession,
         attendanceAchieved: result.attendanceAchieved,
         bonus6hAchieved: result.bonus6hAchieved,
+        smsDirectQueuedCount: (_c = smsDirectResult === null || smsDirectResult === void 0 ? void 0 : smsDirectResult.queuedCount) !== null && _c !== void 0 ? _c : 0,
+        smsDirectRecipientCount: (_d = smsDirectResult === null || smsDirectResult === void 0 ? void 0 : smsDirectResult.recipientCount) !== null && _d !== void 0 ? _d : 0,
+        smsDirectSuppressedCount: (_e = smsDirectResult === null || smsDirectResult === void 0 ? void 0 : smsDirectResult.suppressedCount) !== null && _e !== void 0 ? _e : 0,
+        smsDirectDeduped: (smsDirectResult === null || smsDirectResult === void 0 ? void 0 : smsDirectResult.deduped) === true,
     };
 });
 exports.refreshClassroomSignals = functions
