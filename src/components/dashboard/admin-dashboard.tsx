@@ -113,6 +113,7 @@ import { useCenterAdminHeatmap } from '@/hooks/use-center-admin-heatmap';
 import { getAttendanceRequestTypeLabel, getScheduleChangeReasonLabel } from '@/lib/attendance-request';
 import { syncAutoAttendanceRecord } from '@/lib/attendance-auto';
 import { setStudentAttendanceStatusSecure } from '@/lib/study-session-actions';
+import { getStudySessionDurationMinutes } from '@/lib/study-session-time';
 import {
   buildCounselingTrackOverview,
   type DashboardCounselTrackTab,
@@ -176,6 +177,24 @@ type AdminSmsDeliveryLog = {
   suppressedReason?: string | null;
 };
 
+type FocusStudySessionDoc = {
+  id: string;
+  startTime?: unknown;
+  endTime?: unknown;
+  durationMinutes?: unknown;
+  durationSeconds?: unknown;
+  autoClosed?: boolean;
+};
+
+type FocusTodaySessionRow = {
+  id: string;
+  startAt: Date;
+  endAt: Date | null;
+  durationMinutes: number;
+  isLive: boolean;
+  isAutoClosed: boolean;
+};
+
 const buildSmsRecipientPreferenceId = (studentId: string, parentUid: string) => `${studentId}_${parentUid}`;
 
 const buildAdminCheckInTimeLabel = (
@@ -230,6 +249,20 @@ const toTimestampDateSafe = (value: unknown): Date | null => {
     return Number.isNaN(date.getTime()) ? null : date;
   }
   return null;
+};
+
+const formatFocusSessionDurationLabel = (minutes: number): string => {
+  const safeMinutes = Math.max(0, Math.round(Number(minutes || 0)));
+  if (safeMinutes < 60) return `${safeMinutes}분`;
+  const hours = Math.floor(safeMinutes / 60);
+  const remainingMinutes = safeMinutes % 60;
+  return remainingMinutes > 0 ? `${hours}h ${remainingMinutes}m` : `${hours}h`;
+};
+
+const formatFocusSessionRangeLabel = (session: FocusTodaySessionRow): string => {
+  const startLabel = format(session.startAt, 'HH:mm');
+  const endLabel = session.endAt ? format(session.endAt, 'HH:mm') : '진행중';
+  return `${startLabel}~${endLabel}`;
 };
 
 const getFocusPlanCategoryLabel = (category?: StudyPlanItem['category']): string => {
@@ -852,6 +885,18 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
   const { data: selectedFocusPreviousWeekPlans, isLoading: selectedFocusPreviousWeekPlansLoading } =
     useCollection<StudyPlanItem>(selectedFocusPreviousWeekPlansQuery, {
       enabled: isActive && Boolean(selectedFocusStudentId && selectedFocusPlanWeekKeys.previous),
+    });
+
+  const selectedFocusTodaySessionsQuery = useMemoFirebase(() => {
+    if (!firestore || !centerId || !selectedFocusStudentId || !todayKey) return null;
+    return query(
+      collection(firestore, 'centers', centerId, 'studyLogs', selectedFocusStudentId, 'days', todayKey, 'sessions'),
+      orderBy('startTime', 'asc')
+    );
+  }, [firestore, centerId, selectedFocusStudentId, todayKey]);
+  const { data: selectedFocusTodaySessionDocs, isLoading: selectedFocusTodaySessionsLoading } =
+    useCollection<FocusStudySessionDoc>(selectedFocusTodaySessionsQuery, {
+      enabled: isActive && Boolean(selectedFocusStudentId && todayKey),
     });
 
   useEffect(() => {
@@ -2656,6 +2701,54 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
         ? resolvedAttendanceList.find((seat) => seat.studentId === selectedFocusStudentId) || null
         : null,
     [resolvedAttendanceList, selectedFocusStudentId]
+  );
+
+  const selectedFocusTodaySessions = useMemo<FocusTodaySessionRow[]>(() => {
+    const rows = (selectedFocusTodaySessionDocs || [])
+      .map((session) => {
+        const startAt = toTimestampDateSafe(session.startTime);
+        if (!startAt) return null;
+        const endAt = toTimestampDateSafe(session.endTime);
+        const durationMinutes = endAt
+          ? getStudySessionDurationMinutes(session)
+          : Math.max(0, Math.floor(((now || Date.now()) - startAt.getTime()) / 60000));
+
+        return {
+          id: session.id,
+          startAt,
+          endAt,
+          durationMinutes,
+          isLive: !endAt,
+          isAutoClosed: Boolean(session.autoClosed),
+        };
+      })
+      .filter((session): session is FocusTodaySessionRow => Boolean(session));
+
+    const liveStartAt = toTimestampDateSafe(selectedFocusAttendanceSeat?.lastCheckInAt);
+    const hasOpenSessionDoc = rows.some((session) => session.isLive);
+    if (
+      selectedFocusAttendanceSeat?.status === 'studying'
+      && liveStartAt
+      && todayKey
+      && format(liveStartAt, 'yyyy-MM-dd') === todayKey
+      && !hasOpenSessionDoc
+    ) {
+      rows.push({
+        id: `live-${selectedFocusAttendanceSeat.id}`,
+        startAt: liveStartAt,
+        endAt: null,
+        durationMinutes: Math.max(0, Math.floor(((now || Date.now()) - liveStartAt.getTime()) / 60000)),
+        isLive: true,
+        isAutoClosed: false,
+      });
+    }
+
+    return rows.sort((left, right) => left.startAt.getTime() - right.startAt.getTime());
+  }, [now, selectedFocusAttendanceSeat, selectedFocusTodaySessionDocs, todayKey]);
+
+  const selectedFocusTodaySessionTotalMinutes = useMemo(
+    () => selectedFocusTodaySessions.reduce((sum, session) => sum + Math.max(0, session.durationMinutes), 0),
+    [selectedFocusTodaySessions]
   );
 
   const selectedFocusStudent = useMemo(() => {
@@ -7855,6 +7948,74 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
                         : '현재는 안정 구간입니다.'}
                     </p>
                   </div>
+                </div>
+
+                <div className="rounded-[1.7rem] border border-[#DCE7FF] bg-white p-4 shadow-[0_18px_34px_-30px_rgba(20,41,95,0.18)]">
+                  <div className="flex flex-wrap items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-2">
+                        <span className="inline-flex h-9 w-9 items-center justify-center rounded-[1rem] bg-[#EEF4FF] text-[#2554D7]">
+                          <Activity className="h-4 w-4" />
+                        </span>
+                        <div>
+                          <p className={studioSectionEyebrowClassName}>오늘 세션</p>
+                          <p className="mt-1 text-sm font-black text-[#14295F]">입실·외출로 나뉜 오늘 학습 세션 전체</p>
+                        </div>
+                      </div>
+                    </div>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <Badge className="h-7 rounded-full border-none bg-[#EEF4FF] px-3 text-[10px] font-black text-[#2554D7]">
+                        {selectedFocusTodaySessions.length}개
+                      </Badge>
+                      <Badge className="h-7 rounded-full border-none bg-[#FFF8F2] px-3 text-[10px] font-black text-[#C95A08]">
+                        합계 {formatFocusSessionDurationLabel(selectedFocusTodaySessionTotalMinutes)}
+                      </Badge>
+                    </div>
+                  </div>
+
+                  {selectedFocusTodaySessionsLoading ? (
+                    <div className="mt-3 flex h-24 items-center justify-center rounded-[1.2rem] border border-dashed border-[#DCE7FF] bg-[#F7FAFF]">
+                      <Loader2 className="h-4 w-4 animate-spin text-[#5C6E97]" />
+                    </div>
+                  ) : selectedFocusTodaySessions.length > 0 ? (
+                    <div className="mt-3 space-y-2">
+                      {selectedFocusTodaySessions.map((session, index) => (
+                        <div key={session.id} className="rounded-[1.2rem] border border-[#E4ECFA] bg-[#FBFCFF] px-3 py-2.5">
+                          <div className="flex flex-wrap items-center justify-between gap-2">
+                            <div className="min-w-0 flex items-center gap-2">
+                              <Badge className="h-6 shrink-0 rounded-full border-none bg-white px-2.5 text-[10px] font-black text-[#14295F]">
+                                세션 {index + 1}
+                              </Badge>
+                              {session.isLive ? (
+                                <Badge className="h-6 shrink-0 rounded-full border-none bg-emerald-50 px-2.5 text-[10px] font-black text-emerald-700">
+                                  진행중
+                                </Badge>
+                              ) : session.isAutoClosed ? (
+                                <Badge className="h-6 shrink-0 rounded-full border-none bg-[#FFF8F2] px-2.5 text-[10px] font-black text-[#C95A08]">
+                                  자동종료
+                                </Badge>
+                              ) : null}
+                            </div>
+                            <p className="shrink-0 text-[11px] font-black text-[#2554D7]">
+                              {formatFocusSessionDurationLabel(session.durationMinutes)}
+                            </p>
+                          </div>
+                          <div className="mt-2 flex flex-wrap items-center justify-between gap-2">
+                            <p className="truncate text-sm font-black text-[#14295F]">
+                              {formatFocusSessionRangeLabel(session)}
+                            </p>
+                            <p className="text-[10px] font-bold text-[#6E7EA3]">
+                              {session.endAt ? '종료된 공부 블록' : '현재 공부 중인 블록'}
+                            </p>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="mt-3 rounded-[1.2rem] border border-dashed border-[#DCE7FF] bg-[#F7FAFF] px-3 py-6 text-center text-xs font-bold text-[#5C6E97]">
+                      오늘 저장된 학습 세션이 없습니다.
+                    </div>
+                  )}
                 </div>
               </div>
 
