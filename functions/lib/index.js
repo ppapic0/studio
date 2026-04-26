@@ -33,8 +33,8 @@ var __importStar = (this && this.__importStar) || (function () {
     };
 })();
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.rejectGiftishowOrderSecure = exports.reconcilePendingGiftishowOrders = exports.getGiftishowBizmoneySecure = exports.createGiftishowOrderRequestSecure = exports.cancelGiftishowOrderSecure = exports.cancelGiftishowSendFailSecure = exports.approveGiftishowOrderSecure = exports.scheduledRankingRewardSettlement = exports.ensureCurrentUserMemberships = exports.scheduledOpenClawSnapshotExport = exports.generateOpenClawSnapshot = exports.refreshClassroomSignals = exports.stopStudentStudySessionSecure = exports.scheduledStudyBoxCarryoverExpiry = exports.openStudyRewardBoxSecure = exports.claimPlannerCompletionRewardSecure = exports.submitAttendanceRequestSecure = exports.applyPenaltyEventSecure = exports.cancelPointBoostEventSecure = exports.createPointBoostEventSecure = exports.scheduledClassroomSignalsRefresh = exports.scheduledDailyRiskAlert = exports.repairRecentStudySessionTotals = exports.createManualStudySessionSecure = exports.setStudentAttendanceStatusSecure = exports.onSessionWritten = exports.onSessionCreated = exports.scheduledWeeklyReport = exports.cleanupOldDocuments = exports.scheduledAttendanceCheck = exports.runLateArrivalCheck = exports.sendPaymentReminderBatch = exports.notifyDailyReportReady = exports.notifyAttendanceSms = exports.scheduledSmsQueueDispatcher = exports.sendManualStudentSms = exports.updateSmsRecipientPreference = exports.cancelSmsQueueItem = exports.retrySmsQueueItem = exports.saveNotificationSettingsSecure = exports.confirmInvoicePayment = exports.completeSignupWithInvite = exports.redeemInviteCode = exports.createCounselingDemoBundle = exports.registerStudent = exports.updateStudentAccount = exports.deleteTeacherAccount = exports.deleteStudentAccount = exports.repairTodayAttendanceSmsQueue = exports.onAttendanceEventCreated = void 0;
-exports.generateStudyPlan = exports.syncGiftishowCatalogSecure = exports.scheduledGiftishowCatalogSync = exports.saveGiftishowSettingsSecure = exports.resendGiftishowOrderSecure = void 0;
+exports.getGiftishowBizmoneySecure = exports.createGiftishowOrderRequestSecure = exports.cancelGiftishowOrderSecure = exports.cancelGiftishowSendFailSecure = exports.approveGiftishowOrderSecure = exports.scheduledRankingRewardSettlement = exports.ensureCurrentUserMemberships = exports.scheduledOpenClawSnapshotExport = exports.generateOpenClawSnapshot = exports.refreshClassroomSignals = exports.stopStudentStudySessionSecure = exports.scheduledStudyBoxCarryoverExpiry = exports.openStudyRewardBoxSecure = exports.claimPlannerCompletionRewardSecure = exports.submitAttendanceRequestSecure = exports.applyPenaltyEventSecure = exports.cancelPointBoostEventSecure = exports.createPointBoostEventSecure = exports.scheduledClassroomSignalsRefresh = exports.scheduledDailyRiskAlert = exports.repairRecentStudySessionTotals = exports.deleteManualStudySessionSecure = exports.updateManualStudySessionSecure = exports.createManualStudySessionSecure = exports.setStudentAttendanceStatusSecure = exports.onSessionWritten = exports.onSessionCreated = exports.scheduledWeeklyReport = exports.cleanupOldDocuments = exports.scheduledAttendanceCheck = exports.runLateArrivalCheck = exports.sendPaymentReminderBatch = exports.notifyDailyReportReady = exports.notifyAttendanceSms = exports.scheduledSmsQueueDispatcher = exports.sendManualStudentSms = exports.updateSmsRecipientPreference = exports.cancelSmsQueueItem = exports.retrySmsQueueItem = exports.saveNotificationSettingsSecure = exports.confirmInvoicePayment = exports.completeSignupWithInvite = exports.redeemInviteCode = exports.createCounselingDemoBundle = exports.registerStudent = exports.updateStudentAccount = exports.deleteTeacherAccount = exports.deleteStudentAccount = exports.repairTodayAttendanceSmsQueue = exports.onAttendanceEventCreated = void 0;
+exports.generateStudyPlan = exports.syncGiftishowCatalogSecure = exports.scheduledGiftishowCatalogSync = exports.saveGiftishowSettingsSecure = exports.resendGiftishowOrderSecure = exports.rejectGiftishowOrderSecure = exports.reconcilePendingGiftishowOrders = void 0;
 const params_1 = require("firebase-functions/params");
 const functions = __importStar(require("firebase-functions"));
 const admin = __importStar(require("firebase-admin"));
@@ -187,6 +187,9 @@ async function hasStudySessionDeletionAllowance(params) {
         return false;
     const allowanceData = (allowanceSnap.data() || {});
     const expiresAtMs = toMillisSafe(allowanceData.expiresAt);
+    const allowedSessionId = asTrimmedString(allowanceData.sessionId);
+    if (allowedSessionId && params.sessionId && allowedSessionId !== params.sessionId)
+        return false;
     return expiresAtMs <= 0 || expiresAtMs > Date.now();
 }
 async function archiveProtectedStudySessionMutation(params) {
@@ -6642,21 +6645,34 @@ exports.scheduledWeeklyReport = functions
 async function syncStudyLogDayTotalMinutes(db, centerId, studentId, dateKey) {
     var _a, _b;
     const sessionsSnap = await db.collection(`centers/${centerId}/studyLogs/${studentId}/days/${dateKey}/sessions`).get();
-    const sessionTotalMinutes = Math.max(0, Math.round(sessionsSnap.docs.reduce((sum, docSnap) => {
-        return sum + getStudySessionDurationMinutesFromData((docSnap.data() || {}));
-    }, 0)));
-    const firstSessionStartAt = (_a = sessionsSnap.docs
-        .map((docSnap) => { var _a; return toTimestampOrNow((_a = docSnap.data()) === null || _a === void 0 ? void 0 : _a.startTime); })
-        .filter((value) => Boolean(value))
-        .sort((left, right) => left.toMillis() - right.toMillis())[0]) !== null && _a !== void 0 ? _a : null;
-    const lastSessionEndAt = (_b = sessionsSnap.docs
-        .map((docSnap) => { var _a; return toTimestampOrNow((_a = docSnap.data()) === null || _a === void 0 ? void 0 : _a.endTime); })
-        .filter((value) => Boolean(value))
-        .sort((left, right) => right.toMillis() - left.toMillis())[0]) !== null && _b !== void 0 ? _b : null;
+    const sessionRows = sessionsSnap.docs
+        .map((docSnap) => {
+        const data = (docSnap.data() || {});
+        return {
+            startMs: toMillisSafe(data.startTime),
+            endMs: toMillisSafe(data.endTime),
+            minutes: getStudySessionDurationMinutesFromData(data),
+        };
+    })
+        .filter((session) => session.startMs > 0 && session.minutes > 0)
+        .sort((left, right) => left.startMs - right.startMs);
+    const sessionTotalMinutes = Math.max(0, Math.round(sessionRows.reduce((sum, session) => sum + session.minutes, 0)));
+    const firstSessionStartMs = (_a = sessionRows.map((session) => session.startMs).filter((value) => value > 0)[0]) !== null && _a !== void 0 ? _a : 0;
+    const lastSessionEndMs = (_b = sessionRows
+        .map((session) => session.endMs)
+        .filter((value) => value > 0)
+        .sort((left, right) => right - left)[0]) !== null && _b !== void 0 ? _b : 0;
+    const longestSessionMinutes = sessionRows.reduce((max, session) => Math.max(max, session.minutes), 0);
+    const awayMinutes = sessionRows.reduce((sum, session, index) => {
+        const nextSession = sessionRows[index + 1];
+        if (!nextSession || session.endMs <= 0 || nextSession.startMs <= session.endMs)
+            return sum;
+        return sum + Math.max(0, Math.round((nextSession.startMs - session.endMs) / MINUTE_MS));
+    }, 0);
     const dayRef = db.doc(`centers/${centerId}/studyLogs/${studentId}/days/${dateKey}`);
     const statRef = db.doc(`centers/${centerId}/dailyStudentStats/${dateKey}/students/${studentId}`);
     await db.runTransaction(async (transaction) => {
-        var _a, _b;
+        var _a, _b, _c, _d;
         const [daySnap, statSnap] = await Promise.all([
             transaction.get(dayRef),
             transaction.get(statRef),
@@ -6669,23 +6685,101 @@ async function syncStudyLogDayTotalMinutes(db, centerId, studentId, dateKey) {
         const manualAdjustmentMinutes = hasManualCorrection
             ? (dayManualAdjustment !== 0 ? dayManualAdjustment : statManualAdjustment)
             : 0;
+        const hasManualSessionCorrection = dayData.manualSessionCorrection === true;
         const storedTotalMinutes = Math.max(getStoredStudyTotalMinutes(dayData, ["totalMinutes", "totalStudyMinutes"]), getStoredStudyTotalMinutes(statData, ["totalStudyMinutes", "totalMinutes"]));
-        const legacyCarryoverMinutes = getLegacyStudyCarryoverMinutes(storedTotalMinutes, sessionTotalMinutes);
+        const legacyCarryoverMinutes = hasManualSessionCorrection
+            ? 0
+            : getLegacyStudyCarryoverMinutes(storedTotalMinutes, sessionTotalMinutes);
         const effectiveTotalMinutes = sessionTotalMinutes + legacyCarryoverMinutes;
-        const preservedFirstSessionStartAt = firstSessionStartAt !== null && firstSessionStartAt !== void 0 ? firstSessionStartAt : (legacyCarryoverMinutes > 0 ? toTimestampOrNow(dayData.firstSessionStartAt) : null);
-        const preservedLastSessionEndAt = lastSessionEndAt !== null && lastSessionEndAt !== void 0 ? lastSessionEndAt : (legacyCarryoverMinutes > 0 ? toTimestampOrNow(dayData.lastSessionEndAt) : null);
-        transaction.set(dayRef, Object.assign(Object.assign({ studentId,
+        const previousFirstSessionMs = legacyCarryoverMinutes > 0 ? toMillisSafe(dayData.firstSessionStartAt) : 0;
+        const previousLastSessionMs = legacyCarryoverMinutes > 0 ? toMillisSafe(dayData.lastSessionEndAt) : 0;
+        const preservedFirstSessionStartMs = (_c = [previousFirstSessionMs, firstSessionStartMs]
+            .filter((value) => value > 0)
+            .sort((left, right) => left - right)[0]) !== null && _c !== void 0 ? _c : 0;
+        const preservedLastSessionEndMs = (_d = [previousLastSessionMs, lastSessionEndMs]
+            .filter((value) => value > 0)
+            .sort((left, right) => right - left)[0]) !== null && _d !== void 0 ? _d : 0;
+        transaction.set(dayRef, {
+            studentId,
             centerId,
-            dateKey, totalMinutes: effectiveTotalMinutes, manualAdjustmentMinutes }, (legacyCarryoverMinutes > 0 ? { legacyCarryoverMinutes } : {})), { firstSessionStartAt: preservedFirstSessionStartAt !== null && preservedFirstSessionStartAt !== void 0 ? preservedFirstSessionStartAt : admin.firestore.FieldValue.delete(), lastSessionEndAt: preservedLastSessionEndAt !== null && preservedLastSessionEndAt !== void 0 ? preservedLastSessionEndAt : admin.firestore.FieldValue.delete(), updatedAt: admin.firestore.FieldValue.serverTimestamp() }), { merge: true });
+            dateKey,
+            totalMinutes: effectiveTotalMinutes,
+            manualAdjustmentMinutes,
+            sessionCount: sessionRows.length,
+            longestSessionMinutes,
+            awayMinutes: awayMinutes > 0 ? awayMinutes : admin.firestore.FieldValue.delete(),
+            legacyCarryoverMinutes: legacyCarryoverMinutes > 0 ? legacyCarryoverMinutes : admin.firestore.FieldValue.delete(),
+            firstSessionStartAt: preservedFirstSessionStartMs > 0
+                ? admin.firestore.Timestamp.fromMillis(preservedFirstSessionStartMs)
+                : admin.firestore.FieldValue.delete(),
+            lastSessionEndAt: preservedLastSessionEndMs > 0
+                ? admin.firestore.Timestamp.fromMillis(preservedLastSessionEndMs)
+                : admin.firestore.FieldValue.delete(),
+            updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        }, { merge: true });
         transaction.set(statRef, {
             studentId,
             centerId,
             dateKey,
             totalStudyMinutes: effectiveTotalMinutes,
             manualAdjustmentMinutes,
+            sessionCount: sessionRows.length,
+            longestSessionMinutes,
+            awayMinutes: awayMinutes > 0 ? awayMinutes : admin.firestore.FieldValue.delete(),
             updatedAt: admin.firestore.FieldValue.serverTimestamp(),
         }, { merge: true });
     });
+    await syncMonthlyStudyTimeLeaderboardEntry(db, centerId, studentId, dateKey);
+}
+function buildMonthDateKeys(monthKey) {
+    const match = /^(\d{4})-(\d{2})$/.exec(monthKey);
+    if (!match)
+        return [];
+    const year = Number(match[1]);
+    const monthIndex = Number(match[2]) - 1;
+    const firstDay = new Date(year, monthIndex, 1);
+    if (firstDay.getFullYear() !== year || firstDay.getMonth() !== monthIndex)
+        return [];
+    const keys = [];
+    const cursor = new Date(firstDay);
+    while (cursor.getMonth() === monthIndex) {
+        keys.push(toDateKey(cursor));
+        cursor.setDate(cursor.getDate() + 1);
+    }
+    return keys;
+}
+async function syncMonthlyStudyTimeLeaderboardEntry(db, centerId, studentId, dateKey) {
+    const monthKey = dateKey.slice(0, 7);
+    const dateKeys = buildMonthDateKeys(monthKey);
+    if (dateKeys.length === 0)
+        return;
+    const statRefs = dateKeys.map((dayKey) => db.doc(`centers/${centerId}/dailyStudentStats/${dayKey}/students/${studentId}`));
+    const [studentSnap, ...statSnaps] = await db.getAll(db.doc(`centers/${centerId}/students/${studentId}`), ...statRefs);
+    const totalMinutes = statSnaps.reduce((sum, statSnap) => {
+        return sum + getStoredStudyTotalMinutes((statSnap.data() || {}), ["totalStudyMinutes", "totalMinutes"]);
+    }, 0);
+    const leaderboardRef = db.doc(`centers/${centerId}/leaderboards/${monthKey}_study-time/entries/${studentId}`);
+    if (totalMinutes <= 0) {
+        await leaderboardRef.delete();
+        return;
+    }
+    const studentData = (studentSnap.data() || {});
+    await leaderboardRef.set({
+        studentId,
+        displayNameSnapshot: typeof studentData.name === "string" && studentData.name.trim().length > 0
+            ? studentData.name.trim()
+            : typeof studentData.displayName === "string" && studentData.displayName.trim().length > 0
+                ? studentData.displayName.trim()
+                : "학생",
+        classNameSnapshot: typeof studentData.className === "string" && studentData.className.trim().length > 0
+            ? studentData.className.trim()
+            : null,
+        schoolNameSnapshot: typeof studentData.schoolName === "string" && studentData.schoolName.trim().length > 0
+            ? studentData.schoolName.trim()
+            : null,
+        value: Math.max(0, Math.round(totalMinutes)),
+        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+    }, { merge: true });
 }
 /**
  * 세션 문서 생성 시 durationMinutes 유효성 검증 및 서버 집계 보정
@@ -6789,7 +6883,7 @@ exports.onSessionWritten = functions
     if (change.before.exists && !change.after.exists) {
         const beforeData = (change.before.data() || {});
         const beforeMinutes = getStudySessionDurationMinutesFromData(beforeData);
-        const deletionAllowed = await hasStudySessionDeletionAllowance({ db, centerId, studentId });
+        const deletionAllowed = await hasStudySessionDeletionAllowance({ db, centerId, studentId, sessionId });
         if (beforeMinutes > 0 && !deletionAllowed) {
             await archiveProtectedStudySessionMutation({
                 db,
@@ -7165,6 +7259,61 @@ exports.setStudentAttendanceStatusSecure = functions.region(region).https.onCall
     }
     return result;
 });
+async function assertManualStudySessionMutationAllowed(params) {
+    const membership = await resolveCenterMembershipRole(params.db, params.centerId, params.authUid);
+    if (!membership.role ||
+        !isActiveMembershipStatus(membership.status) ||
+        (membership.role !== "teacher" && !isAdminRole(membership.role))) {
+        throw new functions.https.HttpsError("permission-denied", `Only active teachers or admins can ${params.action} manual sessions.`, {
+            userMessage: "선생님 또는 관리자 권한으로만 세션을 조정할 수 있습니다.",
+        });
+    }
+    const [studentSnap, memberSnap] = await Promise.all([
+        params.db.doc(`centers/${params.centerId}/students/${params.studentId}`).get(),
+        params.db.doc(`centers/${params.centerId}/members/${params.studentId}`).get(),
+    ]);
+    if (!studentSnap.exists && !memberSnap.exists) {
+        throw new functions.https.HttpsError("failed-precondition", "Student not found.", {
+            userMessage: "학생 정보를 찾을 수 없습니다.",
+        });
+    }
+}
+function assertManualSessionTimeInput(params) {
+    if (!params.centerId || !params.studentId || params.startMs <= 0 || params.endMs <= 0) {
+        throw new functions.https.HttpsError("invalid-argument", "Invalid manual session input.", {
+            userMessage: "학생과 세션 시간을 다시 확인해 주세요.",
+        });
+    }
+    if (params.endMs <= params.startMs) {
+        throw new functions.https.HttpsError("invalid-argument", "Manual session end must be after start.", {
+            userMessage: "종료 시간은 시작 시간보다 뒤여야 합니다.",
+        });
+    }
+    if (params.endMs - params.startMs > MAX_STUDY_SESSION_MINUTES * MINUTE_MS) {
+        throw new functions.https.HttpsError("invalid-argument", "Manual session is too long.", {
+            userMessage: `세션은 한 번에 최대 ${MAX_STUDY_SESSION_MINUTES}분까지만 만들 수 있습니다.`,
+        });
+    }
+    if (params.endMs > Date.now() + 5 * MINUTE_MS) {
+        throw new functions.https.HttpsError("invalid-argument", "Manual session cannot end in the future.", {
+            userMessage: "아직 지나지 않은 시간으로 세션을 저장할 수 없습니다.",
+        });
+    }
+    if (params.dateKey) {
+        if (!isValidDateKey(params.dateKey)) {
+            throw new functions.https.HttpsError("invalid-argument", "Invalid dateKey.", {
+                userMessage: "날짜 정보를 다시 확인해 주세요.",
+            });
+        }
+        const startDateKey = toStudyDayKey(new Date(params.startMs));
+        const endDateKey = toStudyDayKey(new Date(params.endMs - 1));
+        if (startDateKey !== params.dateKey || endDateKey !== params.dateKey) {
+            throw new functions.https.HttpsError("invalid-argument", "Manual session must stay inside the selected study day.", {
+                userMessage: "현재 선택한 날짜 안의 시작/종료 시간만 입력해 주세요.",
+            });
+        }
+    }
+}
 function buildRecentStudyDayKeys(dayCount, baseDate = new Date()) {
     const safeCount = Math.min(7, Math.max(1, Math.round(dayCount)));
     const currentStudyDay = toStudyDayDate(baseDate);
@@ -7196,6 +7345,7 @@ function getExistingStudySessionRangeMs(data, fallbackEndMs) {
 }
 async function assertNoOverlappingStudySessions(params) {
     const { db, centerId, studentId, startMs, endMs } = params;
+    const ignoredSessionIds = new Set((params.ignoreSessionIds || []).map((value) => asTrimmedString(value)).filter(Boolean));
     const segments = splitRangeByStudyDayBoundary(startMs, endMs);
     const dateKeys = Array.from(new Set(segments.map((segment) => segment.dateKey)));
     const fallbackOpenEndMs = Math.max(Date.now(), endMs);
@@ -7204,6 +7354,8 @@ async function assertNoOverlappingStudySessions(params) {
         const relevantSegments = segments.filter((segment) => segment.dateKey === dateKey);
         const sessionsSnap = await db.collection(`centers/${centerId}/studyLogs/${studentId}/days/${dateKey}/sessions`).get();
         for (const sessionSnap of sessionsSnap.docs) {
+            if (ignoredSessionIds.has(sessionSnap.id))
+                continue;
             const range = getExistingStudySessionRangeMs((sessionSnap.data() || {}), fallbackOpenEndMs);
             if (!range)
                 continue;
@@ -7255,43 +7407,14 @@ exports.createManualStudySessionSecure = functions
     const endMs = Math.floor((_c = parseFiniteNumber(data === null || data === void 0 ? void 0 : data.endAtMs)) !== null && _c !== void 0 ? _c : 0);
     const source = asTrimmedString(data === null || data === void 0 ? void 0 : data.source, "admin_focus_board");
     const note = asTrimmedString(data === null || data === void 0 ? void 0 : data.note);
-    if (!centerId || !studentId || startMs <= 0 || endMs <= 0) {
-        throw new functions.https.HttpsError("invalid-argument", "Invalid manual session input.", {
-            userMessage: "학생과 세션 시간을 다시 확인해 주세요.",
-        });
-    }
-    if (endMs <= startMs) {
-        throw new functions.https.HttpsError("invalid-argument", "Manual session end must be after start.", {
-            userMessage: "종료 시간은 시작 시간보다 뒤여야 합니다.",
-        });
-    }
-    if (endMs - startMs > MAX_STUDY_SESSION_MINUTES * MINUTE_MS) {
-        throw new functions.https.HttpsError("invalid-argument", "Manual session is too long.", {
-            userMessage: `세션은 한 번에 최대 ${MAX_STUDY_SESSION_MINUTES}분까지만 만들 수 있습니다.`,
-        });
-    }
-    if (endMs > Date.now() + 5 * MINUTE_MS) {
-        throw new functions.https.HttpsError("invalid-argument", "Manual session cannot end in the future.", {
-            userMessage: "아직 지나지 않은 시간으로 세션을 만들 수 없습니다.",
-        });
-    }
-    const membership = await resolveCenterMembershipRole(db, centerId, context.auth.uid);
-    if (!membership.role ||
-        !isActiveMembershipStatus(membership.status) ||
-        (membership.role !== "teacher" && !isAdminRole(membership.role))) {
-        throw new functions.https.HttpsError("permission-denied", "Only active teachers or admins can create manual sessions.", {
-            userMessage: "선생님 또는 관리자 권한으로만 세션을 만들 수 있습니다.",
-        });
-    }
-    const [studentSnap, memberSnap] = await Promise.all([
-        db.doc(`centers/${centerId}/students/${studentId}`).get(),
-        db.doc(`centers/${centerId}/members/${studentId}`).get(),
-    ]);
-    if (!studentSnap.exists && !memberSnap.exists) {
-        throw new functions.https.HttpsError("failed-precondition", "Student not found.", {
-            userMessage: "학생 정보를 찾을 수 없습니다.",
-        });
-    }
+    assertManualSessionTimeInput({ centerId, studentId, startMs, endMs });
+    await assertManualStudySessionMutationAllowed({
+        db,
+        centerId,
+        studentId,
+        authUid: context.auth.uid,
+        action: "create",
+    });
     await assertNoOverlappingStudySessions({
         db,
         centerId,
@@ -7315,6 +7438,181 @@ exports.createManualStudySessionSecure = functions
         sessionMinutes: result.sessionMinutes,
         totalMinutesAfterSession: result.totalMinutesAfterSession,
         totalMinutesByDateKey: result.totalMinutesByDateKey,
+    };
+});
+exports.updateManualStudySessionSecure = functions
+    .region(region)
+    .https.onCall(async (data, context) => {
+    var _a, _b, _c;
+    const db = admin.firestore();
+    if (!((_a = context.auth) === null || _a === void 0 ? void 0 : _a.uid)) {
+        throw new functions.https.HttpsError("unauthenticated", "로그인이 필요합니다.");
+    }
+    const centerId = asTrimmedString(data === null || data === void 0 ? void 0 : data.centerId);
+    const studentId = asTrimmedString(data === null || data === void 0 ? void 0 : data.studentId);
+    const dateKey = asTrimmedString(data === null || data === void 0 ? void 0 : data.dateKey);
+    const sessionId = asTrimmedString(data === null || data === void 0 ? void 0 : data.sessionId);
+    const startMs = Math.floor((_b = parseFiniteNumber(data === null || data === void 0 ? void 0 : data.startAtMs)) !== null && _b !== void 0 ? _b : 0);
+    const endMs = Math.floor((_c = parseFiniteNumber(data === null || data === void 0 ? void 0 : data.endAtMs)) !== null && _c !== void 0 ? _c : 0);
+    const source = asTrimmedString(data === null || data === void 0 ? void 0 : data.source, "admin_focus_board");
+    const note = asTrimmedString(data === null || data === void 0 ? void 0 : data.note);
+    if (!sessionId) {
+        throw new functions.https.HttpsError("invalid-argument", "sessionId is required.", {
+            userMessage: "수정할 세션을 다시 선택해 주세요.",
+        });
+    }
+    assertManualSessionTimeInput({ centerId, studentId, startMs, endMs, dateKey });
+    await assertManualStudySessionMutationAllowed({
+        db,
+        centerId,
+        studentId,
+        authUid: context.auth.uid,
+        action: "update",
+    });
+    const sessionRef = db.doc(`centers/${centerId}/studyLogs/${studentId}/days/${dateKey}/sessions/${sessionId}`);
+    const sessionSnap = await sessionRef.get();
+    if (!sessionSnap.exists) {
+        throw new functions.https.HttpsError("not-found", "Study session not found.", {
+            userMessage: "수정할 세션을 찾지 못했습니다. 새로고침 후 다시 시도해 주세요.",
+        });
+    }
+    await assertNoOverlappingStudySessions({
+        db,
+        centerId,
+        studentId,
+        startMs,
+        endMs,
+        ignoreSessionIds: [sessionId],
+    });
+    const sessionSeconds = Math.max(1, Math.floor((endMs - startMs) / SECOND_MS));
+    const sessionMinutes = Math.max(1, Math.ceil(sessionSeconds / 60));
+    const dayRef = db.doc(`centers/${centerId}/studyLogs/${studentId}/days/${dateKey}`);
+    const batch = db.batch();
+    batch.set(dayRef, {
+        studentId,
+        centerId,
+        dateKey,
+        manualSessionCorrection: true,
+        manualSessionCorrectionAt: admin.firestore.FieldValue.serverTimestamp(),
+        manualSessionCorrectionByUid: context.auth.uid,
+        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+    }, { merge: true });
+    batch.set(sessionRef, {
+        studentId,
+        centerId,
+        dateKey,
+        sessionId,
+        startTime: admin.firestore.Timestamp.fromMillis(startMs),
+        endTime: admin.firestore.Timestamp.fromMillis(endMs),
+        durationMinutes: sessionMinutes,
+        durationSeconds: sessionSeconds,
+        allowSessionShrink: true,
+        manualSessionCorrection: true,
+        manualUpdatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        manualUpdatedByUid: context.auth.uid,
+        source,
+        manualNote: note || admin.firestore.FieldValue.delete(),
+        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+    }, { merge: true });
+    await batch.commit();
+    await syncStudyLogDayTotalMinutes(db, centerId, studentId, dateKey);
+    const daySnap = await dayRef.get();
+    const totalMinutesAfterSession = getStoredStudyTotalMinutes((daySnap.data() || {}), ["totalMinutes", "totalStudyMinutes"]);
+    return {
+        ok: true,
+        sessionId,
+        sessionDateKey: dateKey,
+        sessionMinutes,
+        totalMinutesAfterSession,
+    };
+});
+exports.deleteManualStudySessionSecure = functions
+    .region(region)
+    .https.onCall(async (data, context) => {
+    var _a;
+    const db = admin.firestore();
+    if (!((_a = context.auth) === null || _a === void 0 ? void 0 : _a.uid)) {
+        throw new functions.https.HttpsError("unauthenticated", "로그인이 필요합니다.");
+    }
+    const centerId = asTrimmedString(data === null || data === void 0 ? void 0 : data.centerId);
+    const studentId = asTrimmedString(data === null || data === void 0 ? void 0 : data.studentId);
+    const dateKey = asTrimmedString(data === null || data === void 0 ? void 0 : data.dateKey);
+    const sessionId = asTrimmedString(data === null || data === void 0 ? void 0 : data.sessionId);
+    const source = asTrimmedString(data === null || data === void 0 ? void 0 : data.source, "admin_focus_board");
+    const reason = asTrimmedString(data === null || data === void 0 ? void 0 : data.reason) || "manual_session_delete";
+    if (!centerId || !studentId || !isValidDateKey(dateKey) || !sessionId) {
+        throw new functions.https.HttpsError("invalid-argument", "Invalid session delete input.", {
+            userMessage: "삭제할 세션 정보를 다시 확인해 주세요.",
+        });
+    }
+    await assertManualStudySessionMutationAllowed({
+        db,
+        centerId,
+        studentId,
+        authUid: context.auth.uid,
+        action: "delete",
+    });
+    const sessionRef = db.doc(`centers/${centerId}/studyLogs/${studentId}/days/${dateKey}/sessions/${sessionId}`);
+    const sessionSnap = await sessionRef.get();
+    if (!sessionSnap.exists) {
+        throw new functions.https.HttpsError("not-found", "Study session not found.", {
+            userMessage: "삭제할 세션을 찾지 못했습니다. 새로고침 후 다시 시도해 주세요.",
+        });
+    }
+    const sessionData = (sessionSnap.data() || {});
+    const deletedMinutes = getStudySessionDurationMinutesFromData(sessionData);
+    const dayRef = db.doc(`centers/${centerId}/studyLogs/${studentId}/days/${dateKey}`);
+    const allowanceRef = db.doc(`centers/${centerId}/studySessionDeletionAllowances/${studentId}`);
+    const archiveRef = getStudySessionProtectionArchiveRef({
+        db,
+        centerId,
+        studentId,
+        dateKey,
+        sessionId,
+    });
+    const batch = db.batch();
+    batch.set(allowanceRef, {
+        studentId,
+        centerId,
+        sessionId,
+        reason,
+        source,
+        createdByUid: context.auth.uid,
+        createdAt: admin.firestore.FieldValue.serverTimestamp(),
+        expiresAt: admin.firestore.Timestamp.fromMillis(Date.now() + 10 * MINUTE_MS),
+    }, { merge: true });
+    batch.set(dayRef, {
+        studentId,
+        centerId,
+        dateKey,
+        manualSessionCorrection: true,
+        manualSessionCorrectionAt: admin.firestore.FieldValue.serverTimestamp(),
+        manualSessionCorrectionByUid: context.auth.uid,
+        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+    }, { merge: true });
+    batch.set(archiveRef, {
+        centerId,
+        studentId,
+        dateKey,
+        sessionId,
+        reason: "manual_session_deleted",
+        source,
+        beforeData: sessionData,
+        beforeMinutes: deletedMinutes,
+        createdByUid: context.auth.uid,
+        createdAt: admin.firestore.FieldValue.serverTimestamp(),
+    });
+    batch.delete(sessionRef);
+    await batch.commit();
+    await syncStudyLogDayTotalMinutes(db, centerId, studentId, dateKey);
+    const daySnap = await dayRef.get();
+    const totalMinutesAfterSession = getStoredStudyTotalMinutes((daySnap.data() || {}), ["totalMinutes", "totalStudyMinutes"]);
+    return {
+        ok: true,
+        sessionId,
+        sessionDateKey: dateKey,
+        deletedMinutes,
+        totalMinutesAfterSession,
     };
 });
 async function repairMissingStudySessionsFromAttendanceEvents(params) {

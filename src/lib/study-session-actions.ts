@@ -99,6 +99,42 @@ export type CreateManualStudySessionResult = {
   totalMinutesByDateKey?: Record<string, number>;
 };
 
+export type UpdateManualStudySessionInput = {
+  centerId: string;
+  studentId: string;
+  dateKey: string;
+  sessionId: string;
+  startAtMs: number;
+  endAtMs: number;
+  source: 'admin_focus_board';
+  note?: string;
+};
+
+export type UpdateManualStudySessionResult = {
+  ok?: boolean;
+  sessionId?: string;
+  sessionDateKey?: string;
+  sessionMinutes?: number;
+  totalMinutesAfterSession?: number;
+};
+
+export type DeleteManualStudySessionInput = {
+  centerId: string;
+  studentId: string;
+  dateKey: string;
+  sessionId: string;
+  source: 'admin_focus_board';
+  reason?: string;
+};
+
+export type DeleteManualStudySessionResult = {
+  ok?: boolean;
+  sessionId?: string;
+  sessionDateKey?: string;
+  deletedMinutes?: number;
+  totalMinutesAfterSession?: number;
+};
+
 export async function stopStudentStudySessionSecure(
   input: StopStudentStudySessionSecureInput
 ): Promise<StopStudentStudySessionSecureResult> {
@@ -130,6 +166,30 @@ export async function createManualStudySessionSecure(
   const callable = httpsCallable<CreateManualStudySessionInput, CreateManualStudySessionResult>(
     functions,
     'createManualStudySessionSecure'
+  );
+  const result = await callable(input);
+  return result.data || {};
+}
+
+export async function updateManualStudySessionSecure(
+  input: UpdateManualStudySessionInput
+): Promise<UpdateManualStudySessionResult> {
+  const { functions } = initializeFirebase();
+  const callable = httpsCallable<UpdateManualStudySessionInput, UpdateManualStudySessionResult>(
+    functions,
+    'updateManualStudySessionSecure'
+  );
+  const result = await callable(input);
+  return result.data || {};
+}
+
+export async function deleteManualStudySessionSecure(
+  input: DeleteManualStudySessionInput
+): Promise<DeleteManualStudySessionResult> {
+  const { functions } = initializeFirebase();
+  const callable = httpsCallable<DeleteManualStudySessionInput, DeleteManualStudySessionResult>(
+    functions,
+    'deleteManualStudySessionSecure'
   );
   const result = await callable(input);
   return result.data || {};
