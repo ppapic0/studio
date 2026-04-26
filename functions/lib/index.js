@@ -2380,7 +2380,7 @@ async function repairRecentAttendanceSmsQueueForCenter(db, centerId, dateKey, wi
         .where("dateKey", "==", dateKey)
         .limit(300)
         .get();
-    const recentEvents = eventsSnap.docs
+    const recentAttendanceEvents = eventsSnap.docs
         .map((eventDoc) => {
         const eventData = eventDoc.data() || {};
         const eventType = normalizeAttendanceEventForParentSms(eventData.eventType);
@@ -2399,6 +2399,46 @@ async function repairRecentAttendanceSmsQueueForCenter(db, centerId, dateKey, wi
         .filter((event) => Boolean(event))
         .sort((left, right) => left.eventAt.getTime() - right.eventAt.getTime());
     baseResult.scannedCount = eventsSnap.size;
+    let recentEvents = recentAttendanceEvents;
+    try {
+        const currentAwaySnap = await db
+            .collection(`centers/${centerId}/attendanceCurrent`)
+            .where("status", "in", ["away", "break"])
+            .limit(500)
+            .get();
+        const syntheticAwayEvents = currentAwaySnap.docs
+            .map((seatDoc) => {
+            const seatData = seatDoc.data() || {};
+            const studentId = asTrimmedString(seatData.studentId);
+            const eventAt = toKstDateFromUnknownTimestamp(seatData.updatedAt)
+                || toKstDateFromUnknownTimestamp(seatData.lastCheckInAt);
+            if (!studentId || !eventAt || eventAt.getTime() < windowStartMs)
+                return null;
+            const alreadyHasRecentAwayEvent = recentAttendanceEvents.some((event) => event.studentId === studentId &&
+                event.eventType === "away_start" &&
+                Math.abs(event.eventAt.getTime() - eventAt.getTime()) <= 10 * MINUTE_MS);
+            if (alreadyHasRecentAwayEvent)
+                return null;
+            return {
+                data: seatData,
+                studentId,
+                eventType: "away_start",
+                eventAt,
+            };
+        })
+            .filter((event) => Boolean(event));
+        if (syntheticAwayEvents.length > 0) {
+            recentEvents = [...recentAttendanceEvents, ...syntheticAwayEvents]
+                .sort((left, right) => left.eventAt.getTime() - right.eventAt.getTime());
+            baseResult.scannedCount += currentAwaySnap.size;
+        }
+    }
+    catch (error) {
+        console.error("[sms-dispatcher] current away repair skipped", {
+            centerId,
+            message: (error === null || error === void 0 ? void 0 : error.message) || String(error),
+        });
+    }
     baseResult.targetCount = recentEvents.length;
     if (recentEvents.length === 0) {
         return baseResult;
@@ -6449,7 +6489,7 @@ function resolveAttendanceTransitionEventType(prevStatus, nextStatus) {
         return "check_in";
     if ((prevStatus === "away" || prevStatus === "break") && nextStatus === "studying")
         return "away_end";
-    if (prevStatus === "studying" && (nextStatus === "away" || nextStatus === "break"))
+    if ((nextStatus === "away" || nextStatus === "break") && prevStatus !== "away" && prevStatus !== "break")
         return "away_start";
     if (nextStatus === "absent" && prevStatus !== "absent")
         return "check_out";
