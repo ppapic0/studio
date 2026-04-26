@@ -157,20 +157,18 @@ export default function KioskPage() {
         },
       });
 
-      const autoCheckInAt =
-        nextStatus === 'studying'
-          ? nowDate
-          : null;
-      void syncAutoAttendanceRecord({
-        firestore,
-        centerId,
-        studentId: student.id,
-        studentName: student.name,
-        targetDate: nowDate,
-        checkInAt: autoCheckInAt,
-      }).catch((syncError: any) => {
-        console.warn('[kiosk] auto attendance sync skipped', syncError?.message || syncError);
-      });
+      if (nextStatus === 'studying') {
+        void syncAutoAttendanceRecord({
+          firestore,
+          centerId,
+          studentId: student.id,
+          studentName: student.name,
+          targetDate: nowDate,
+          checkInAt: nowDate,
+        }).catch((syncError: any) => {
+          console.warn('[kiosk] auto attendance sync skipped', syncError?.message || syncError);
+        });
+      }
 
       const statusLabels: Record<AttendanceCurrent['status'], string> = {
         studying: '입실',

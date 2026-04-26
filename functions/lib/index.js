@@ -160,6 +160,20 @@ function getStudySessionDurationMinutesFromData(data) {
     }
     return 0;
 }
+function getStoredStudyTotalMinutes(data, keys) {
+    if (!data)
+        return 0;
+    for (const key of keys) {
+        const value = parseFiniteNumber(data[key]);
+        if (value !== null && value > 0) {
+            return Math.max(0, Math.round(value));
+        }
+    }
+    return 0;
+}
+function getLegacyStudyCarryoverMinutes(storedTotalMinutes, sessionTotalMinutes) {
+    return Math.max(0, Math.round(storedTotalMinutes) - Math.max(0, Math.round(sessionTotalMinutes)));
+}
 const STUDY_BOX_REWARD_RANGE_BY_RARITY = {
     common: [1, 10],
     rare: [10, 20],
@@ -537,6 +551,13 @@ async function finalizeStudySession(params) {
         const existingSessionSnaps = await Promise.all(uniqueSessionDayRefs.map(([, dayRef]) => transaction.get(dayRef.collection("sessions"))));
         const daySnapshots = await Promise.all(sessionEntries.map((entry) => transaction.get(entry.dayRef)));
         const sessionSnapshots = await Promise.all(sessionEntries.map((entry) => transaction.get(entry.sessionRef)));
+        const dayDataByDateKey = new Map();
+        sessionEntries.forEach((entry, index) => {
+            if (dayDataByDateKey.has(entry.dateKey))
+                return;
+            const daySnap = daySnapshots[index];
+            dayDataByDateKey.set(entry.dateKey, daySnap.exists ? (daySnap.data() || {}) : {});
+        });
         const progressData = progressSnap.exists ? progressSnap.data() : {};
         const dailyPointStatus = isPlainObject(progressData.dailyPointStatus)
             ? progressData.dailyPointStatus
@@ -545,18 +566,24 @@ async function finalizeStudySession(params) {
             dateKey,
             existingSessionSnaps[index].docs.reduce((sum, docSnap) => sum + getStudySessionDurationMinutesFromData((docSnap.data() || {})), 0),
         ]));
+        const existingDayTotalMinutesByDateKey = Object.fromEntries(uniqueSessionDayRefs.map(([dateKey]) => [
+            dateKey,
+            getStoredStudyTotalMinutes(dayDataByDateKey.get(dateKey), ["totalMinutes", "totalStudyMinutes"]),
+        ]));
         const totalMinutesByDateKey = {};
         const dailyPointStatusUpdates = {};
         let attendanceAchieved = false;
         let bonus6hAchieved = false;
         sessionEntries.forEach((entry, index) => {
-            var _a, _b;
+            var _a, _b, _c;
             const daySnap = daySnapshots[index];
             const sessionSnap = sessionSnapshots[index];
             const dayData = daySnap.exists ? daySnap.data() : {};
             const previousFirstSessionAt = toTimestampOrNow(dayData.firstSessionStartAt);
             const previousLastSessionAt = toTimestampOrNow(dayData.lastSessionEndAt);
-            const existingTotalMinutes = (_a = totalMinutesByDateKey[entry.dateKey]) !== null && _a !== void 0 ? _a : Math.max(0, Math.floor((_b = existingSessionTotalMinutesByDateKey[entry.dateKey]) !== null && _b !== void 0 ? _b : 0));
+            const existingSessionTotalMinutes = Math.max(0, Math.floor((_a = existingSessionTotalMinutesByDateKey[entry.dateKey]) !== null && _a !== void 0 ? _a : 0));
+            const existingDayTotalMinutes = Math.max(0, Math.floor((_b = existingDayTotalMinutesByDateKey[entry.dateKey]) !== null && _b !== void 0 ? _b : 0));
+            const existingTotalMinutes = (_c = totalMinutesByDateKey[entry.dateKey]) !== null && _c !== void 0 ? _c : Math.max(existingSessionTotalMinutes, existingDayTotalMinutes);
             totalMinutesByDateKey[entry.dateKey] = existingTotalMinutes;
             if (sessionSnap.exists || entry.durationMinutes <= 0) {
                 return;
@@ -626,7 +653,11 @@ async function finalizeStudySession(params) {
             return !sessionSnap.exists && entry.durationMinutes > 0;
         });
         uniqueSessionDayRefs.forEach(([dateKey, dayRef], dayIndex) => {
-            var _a, _b;
+            var _a, _b, _c, _d, _e, _f;
+            const dayData = dayDataByDateKey.get(dateKey) || {};
+            const existingSessionTotalMinutes = Math.max(0, Math.floor((_a = existingSessionTotalMinutesByDateKey[dateKey]) !== null && _a !== void 0 ? _a : 0));
+            const existingDayTotalMinutes = Math.max(0, Math.floor((_b = existingDayTotalMinutesByDateKey[dateKey]) !== null && _b !== void 0 ? _b : 0));
+            const legacyCarryoverMinutes = getLegacyStudyCarryoverMinutes(existingDayTotalMinutes, existingSessionTotalMinutes);
             const existingSessionData = existingSessionSnaps[dayIndex].docs.map((docSnap) => {
                 return (docSnap.data() || {});
             });
@@ -641,31 +672,33 @@ async function finalizeStudySession(params) {
             const allSessionData = [...existingSessionData, ...createdSessionData];
             if (allSessionData.length === 0)
                 return;
-            const recomputedTotalMinutes = allSessionData.reduce((sum, sessionData) => {
+            const recomputedSessionMinutes = allSessionData.reduce((sum, sessionData) => {
                 return sum + getStudySessionDurationMinutesFromData(sessionData);
             }, 0);
-            const firstSessionStartMs = (_a = allSessionData
+            const firstSessionStartMsFromSessions = (_c = allSessionData
                 .map((sessionData) => toMillisSafe(sessionData.startTime))
                 .filter((value) => value > 0)
-                .sort((left, right) => left - right)[0]) !== null && _a !== void 0 ? _a : 0;
-            const lastSessionEndMs = (_b = allSessionData
+                .sort((left, right) => left - right)[0]) !== null && _c !== void 0 ? _c : 0;
+            const lastSessionEndMsFromSessions = (_d = allSessionData
                 .map((sessionData) => toMillisSafe(sessionData.endTime))
                 .filter((value) => value > 0)
-                .sort((left, right) => right - left)[0]) !== null && _b !== void 0 ? _b : 0;
-            totalMinutesByDateKey[dateKey] = Math.max(0, Math.round(recomputedTotalMinutes));
-            transaction.set(dayRef, {
-                studentId,
+                .sort((left, right) => right - left)[0]) !== null && _d !== void 0 ? _d : 0;
+            const previousFirstSessionMs = legacyCarryoverMinutes > 0 ? toMillisSafe(dayData.firstSessionStartAt) : 0;
+            const previousLastSessionMs = legacyCarryoverMinutes > 0 ? toMillisSafe(dayData.lastSessionEndAt) : 0;
+            const firstSessionStartMs = (_e = [previousFirstSessionMs, firstSessionStartMsFromSessions]
+                .filter((value) => value > 0)
+                .sort((left, right) => left - right)[0]) !== null && _e !== void 0 ? _e : 0;
+            const lastSessionEndMs = (_f = [previousLastSessionMs, lastSessionEndMsFromSessions]
+                .filter((value) => value > 0)
+                .sort((left, right) => right - left)[0]) !== null && _f !== void 0 ? _f : 0;
+            totalMinutesByDateKey[dateKey] = Math.max(0, Math.round(recomputedSessionMinutes + legacyCarryoverMinutes));
+            transaction.set(dayRef, Object.assign(Object.assign({ studentId,
                 centerId,
-                dateKey,
-                totalMinutes: totalMinutesByDateKey[dateKey],
-                firstSessionStartAt: firstSessionStartMs > 0
+                dateKey, totalMinutes: totalMinutesByDateKey[dateKey] }, (legacyCarryoverMinutes > 0 ? { legacyCarryoverMinutes } : {})), { firstSessionStartAt: firstSessionStartMs > 0
                     ? admin.firestore.Timestamp.fromMillis(firstSessionStartMs)
-                    : admin.firestore.FieldValue.delete(),
-                lastSessionEndAt: lastSessionEndMs > 0
+                    : admin.firestore.FieldValue.delete(), lastSessionEndAt: lastSessionEndMs > 0
                     ? admin.firestore.Timestamp.fromMillis(lastSessionEndMs)
-                    : admin.firestore.FieldValue.delete(),
-                updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-            }, { merge: true });
+                    : admin.firestore.FieldValue.delete(), updatedAt: admin.firestore.FieldValue.serverTimestamp() }), { merge: true });
             transaction.set(db.doc(`centers/${centerId}/dailyStudentStats/${dateKey}/students/${studentId}`), {
                 studentId,
                 centerId,
@@ -6367,9 +6400,9 @@ exports.scheduledWeeklyReport = functions
 async function syncStudyLogDayTotalMinutes(db, centerId, studentId, dateKey) {
     var _a, _b;
     const sessionsSnap = await db.collection(`centers/${centerId}/studyLogs/${studentId}/days/${dateKey}/sessions`).get();
-    const sessionTotalMinutes = sessionsSnap.docs.reduce((sum, docSnap) => {
+    const sessionTotalMinutes = Math.max(0, Math.round(sessionsSnap.docs.reduce((sum, docSnap) => {
         return sum + getStudySessionDurationMinutesFromData((docSnap.data() || {}));
-    }, 0);
+    }, 0)));
     const firstSessionStartAt = (_a = sessionsSnap.docs
         .map((docSnap) => { var _a; return toTimestampOrNow((_a = docSnap.data()) === null || _a === void 0 ? void 0 : _a.startTime); })
         .filter((value) => Boolean(value))
@@ -6394,21 +6427,19 @@ async function syncStudyLogDayTotalMinutes(db, centerId, studentId, dateKey) {
         const manualAdjustmentMinutes = hasManualCorrection
             ? (dayManualAdjustment !== 0 ? dayManualAdjustment : statManualAdjustment)
             : 0;
-        transaction.set(dayRef, {
-            studentId,
+        const storedTotalMinutes = Math.max(getStoredStudyTotalMinutes(dayData, ["totalMinutes", "totalStudyMinutes"]), getStoredStudyTotalMinutes(statData, ["totalStudyMinutes", "totalMinutes"]));
+        const legacyCarryoverMinutes = getLegacyStudyCarryoverMinutes(storedTotalMinutes, sessionTotalMinutes);
+        const effectiveTotalMinutes = sessionTotalMinutes + legacyCarryoverMinutes;
+        const preservedFirstSessionStartAt = firstSessionStartAt !== null && firstSessionStartAt !== void 0 ? firstSessionStartAt : (legacyCarryoverMinutes > 0 ? toTimestampOrNow(dayData.firstSessionStartAt) : null);
+        const preservedLastSessionEndAt = lastSessionEndAt !== null && lastSessionEndAt !== void 0 ? lastSessionEndAt : (legacyCarryoverMinutes > 0 ? toTimestampOrNow(dayData.lastSessionEndAt) : null);
+        transaction.set(dayRef, Object.assign(Object.assign({ studentId,
             centerId,
-            dateKey,
-            totalMinutes: sessionTotalMinutes,
-            manualAdjustmentMinutes,
-            firstSessionStartAt: firstSessionStartAt !== null && firstSessionStartAt !== void 0 ? firstSessionStartAt : admin.firestore.FieldValue.delete(),
-            lastSessionEndAt: lastSessionEndAt !== null && lastSessionEndAt !== void 0 ? lastSessionEndAt : admin.firestore.FieldValue.delete(),
-            updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-        }, { merge: true });
+            dateKey, totalMinutes: effectiveTotalMinutes, manualAdjustmentMinutes }, (legacyCarryoverMinutes > 0 ? { legacyCarryoverMinutes } : {})), { firstSessionStartAt: preservedFirstSessionStartAt !== null && preservedFirstSessionStartAt !== void 0 ? preservedFirstSessionStartAt : admin.firestore.FieldValue.delete(), lastSessionEndAt: preservedLastSessionEndAt !== null && preservedLastSessionEndAt !== void 0 ? preservedLastSessionEndAt : admin.firestore.FieldValue.delete(), updatedAt: admin.firestore.FieldValue.serverTimestamp() }), { merge: true });
         transaction.set(statRef, {
             studentId,
             centerId,
             dateKey,
-            totalStudyMinutes: sessionTotalMinutes,
+            totalStudyMinutes: effectiveTotalMinutes,
             manualAdjustmentMinutes,
             updatedAt: admin.firestore.FieldValue.serverTimestamp(),
         }, { merge: true });
