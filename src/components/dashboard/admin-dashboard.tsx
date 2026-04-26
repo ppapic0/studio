@@ -578,6 +578,7 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
   const [isAnnouncementDialogOpen, setIsAnnouncementDialogOpen] = useState(false);
   const [isTodayPointsDialogOpen, setIsTodayPointsDialogOpen] = useState(false);
   const [selectedPointHistoryWindow, setSelectedPointHistoryWindow] = useState<PointHistoryWindow>('today');
+  const [expandedPointHistoryDateKey, setExpandedPointHistoryDateKey] = useState<string | null>(null);
   const [isPointBoostDialogOpen, setIsPointBoostDialogOpen] = useState(false);
   const [pointBoostModeDraft, setPointBoostModeDraft] = useState<'day' | 'window'>('day');
   const [pointBoostDateDraft, setPointBoostDateDraft] = useState('');
@@ -3279,6 +3280,7 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
   };
   const openPointHistoryDialog = (window: PointHistoryWindow = 'today') => {
     setSelectedPointHistoryWindow(window);
+    setExpandedPointHistoryDateKey(null);
     setIsTodayPointsDialogOpen(true);
   };
   const openAdminAttendanceBoardFromSignal = (signal: {
@@ -4659,7 +4661,13 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
           {renderAttendanceDashboardSection()}
           {renderHomeInsightsSection()}
 
-          <Dialog open={isTodayPointsDialogOpen} onOpenChange={setIsTodayPointsDialogOpen}>
+          <Dialog
+            open={isTodayPointsDialogOpen}
+            onOpenChange={(open) => {
+              setIsTodayPointsDialogOpen(open);
+              if (!open) setExpandedPointHistoryDateKey(null);
+            }}
+          >
             <DialogContent motionPreset="dashboard-premium" className={cn(studioDialogContentClassName, 'sm:max-w-3xl')}>
               <div className={studioDialogHeaderClassName}>
                 <DialogHeader className="text-left">
@@ -4691,7 +4699,10 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
                       <button
                         key={windowKey}
                         type="button"
-                        onClick={() => setSelectedPointHistoryWindow(windowKey)}
+                        onClick={() => {
+                          setSelectedPointHistoryWindow(windowKey);
+                          setExpandedPointHistoryDateKey(null);
+                        }}
                         className={cn(
                           'rounded-[1.35rem] border px-4 py-4 text-left shadow-[0_18px_32px_-28px_rgba(20,41,95,0.16)] transition-colors',
                           isSelected ? 'border-[#FFD7BA] bg-[#FFF8F2]' : 'border-[#DCE7FF] bg-white hover:bg-[#F7FAFF]'
@@ -4727,95 +4738,85 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
                     </div>
                   ) : (
                     <div className="mt-3 space-y-3">
-                      {selectedPointHistoryData.dailyRows.map((day) => (
-                        <div key={day.dateKey} className="rounded-[1.3rem] border border-[#EEF4FF] bg-[#F8FBFF] p-3">
-                          <div className="flex flex-wrap items-center justify-between gap-2">
-                            <div>
-                              <p className="text-sm font-black text-[#14295F]">{day.dateKey}</p>
-                              <p className="mt-1 text-[11px] font-bold text-[#6E7EA3]">지급 학생 {day.earners}명</p>
-                            </div>
-                            <Badge className="border-none bg-[#14295F] px-3 py-1 text-[11px] font-black text-white">
-                              {formatPointsInPt(day.totalPoints)}
-                            </Badge>
-                          </div>
-                          <div className="mt-3 grid gap-2">
-                            {day.grants.map((grant) => (
-                              <div
-                                key={grant.key}
-                                className="flex items-start justify-between gap-3 rounded-[1rem] border border-[#E4ECFF] bg-white px-3 py-2.5"
-                              >
-                                <div className="min-w-0">
-                                  <div className="flex flex-wrap items-center gap-2">
+                      {selectedPointHistoryData.dailyRows.map((day) => {
+                        const isExpanded = expandedPointHistoryDateKey === day.dateKey;
+                        const topGrants = day.grants.slice(0, 3);
+
+                        return (
+                          <div key={day.dateKey} className="rounded-[1.3rem] border border-[#EEF4FF] bg-[#F8FBFF] p-3">
+                            <button
+                              type="button"
+                              aria-expanded={isExpanded}
+                              onClick={() => setExpandedPointHistoryDateKey((current) => (current === day.dateKey ? null : day.dateKey))}
+                              className="flex w-full flex-wrap items-center justify-between gap-2 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#2554D7] focus-visible:ring-offset-2"
+                            >
+                              <div>
+                                <p className="text-sm font-black text-[#14295F]">{day.dateKey}</p>
+                                <p className="mt-1 text-[11px] font-bold text-[#6E7EA3]">
+                                  지급 학생 {day.earners}명 · 클릭하면 학생별 전체 내역
+                                </p>
+                              </div>
+                              <div className="flex shrink-0 items-center gap-2">
+                                <Badge className="border-none bg-[#14295F] px-3 py-1 text-[11px] font-black text-white">
+                                  {formatPointsInPt(day.totalPoints)}
+                                </Badge>
+                                <ChevronRight className={cn('h-4 w-4 text-[#8FA5CF] transition-transform', isExpanded && 'rotate-90')} />
+                              </div>
+                            </button>
+
+                            <div className="mt-3 grid gap-2">
+                              <p className="text-[10px] font-black uppercase tracking-[0.16em] text-[#6E7EA3]">그날 포인트 TOP 3</p>
+                              {topGrants.map((grant, index) => (
+                                <div
+                                  key={`top-${grant.key}`}
+                                  className="flex items-center justify-between gap-3 rounded-[1rem] border border-[#E4ECFF] bg-white px-3 py-2.5"
+                                >
+                                  <div className="flex min-w-0 flex-wrap items-center gap-2">
+                                    <Badge className={cn('h-5 rounded-full border-none px-2 text-[10px] font-black', index === 0 ? 'bg-[#FF7A16] text-white' : 'bg-[#EEF4FF] text-[#2554D7]')}>
+                                      {index + 1}위
+                                    </Badge>
                                     <p className="truncate text-sm font-black text-[#14295F]">{grant.studentName}</p>
                                     <Badge className="h-5 rounded-full border-none bg-[#EEF4FF] px-2 text-[10px] font-black text-[#2554D7]">
                                       {grant.className}
                                     </Badge>
                                   </div>
-                                  <p className="mt-1 truncate text-[11px] font-bold text-[#6E7EA3]">{grant.detail}</p>
+                                  <p className="shrink-0 text-sm font-black text-emerald-700">{formatPointsInPt(grant.totalPoints)}</p>
                                 </div>
-                                <p className="shrink-0 text-sm font-black text-emerald-700">{formatPointsInPt(grant.totalPoints)}</p>
+                              ))}
+                            </div>
+
+                            {isExpanded ? (
+                              <div className="mt-3 grid gap-2 border-t border-[#E4ECFF] pt-3">
+                                <p className="text-[10px] font-black uppercase tracking-[0.16em] text-[#6E7EA3]">학생별 전체 상세</p>
+                                {day.grants.map((grant) => (
+                                  <div
+                                    key={grant.key}
+                                    className="flex items-start justify-between gap-3 rounded-[1rem] border border-[#E4ECFF] bg-white px-3 py-2.5"
+                                  >
+                                    <div className="min-w-0">
+                                      <div className="flex flex-wrap items-center gap-2">
+                                        <p className="truncate text-sm font-black text-[#14295F]">{grant.studentName}</p>
+                                        <Badge className="h-5 rounded-full border-none bg-[#EEF4FF] px-2 text-[10px] font-black text-[#2554D7]">
+                                          {grant.className}
+                                        </Badge>
+                                      </div>
+                                      <p className="mt-1 truncate text-[11px] font-bold text-[#6E7EA3]">{grant.detail}</p>
+                                    </div>
+                                    <p className="shrink-0 text-sm font-black text-emerald-700">{formatPointsInPt(grant.totalPoints)}</p>
+                                  </div>
+                                ))}
                               </div>
-                            ))}
+                            ) : null}
                           </div>
-                        </div>
-                      ))}
+                        );
+                      })}
                     </div>
                   )}
                 </div>
 
-                {selectedPointHistoryData.rows.length === 0 ? (
-                  <div className="rounded-[1.6rem] border border-dashed border-[#DCE7FF] bg-white px-6 py-10 text-center text-sm font-bold text-[#5c6e97]">
-                    {selectedPointHistoryData.headlineLabel} 포인트 집계 대상 학생이 없습니다.
-                  </div>
-                ) : (
-                  <div className="space-y-3">
-                    {selectedPointHistoryData.rows.map((row, index) => (
-                      <div
-                        key={row.studentId}
-                        className={cn(
-                          'rounded-[1.45rem] border px-4 py-4 shadow-[0_18px_32px_-28px_rgba(20,41,95,0.16)]',
-                          index === 0 && row.totalPoints > 0 ? 'border-[#FFD7BA] bg-[#FFF8F2]' : 'border-[#DCE7FF] bg-white'
-                        )}
-                      >
-                        <div className="flex items-start justify-between gap-3">
-                          <div className="min-w-0">
-                            <div className="flex flex-wrap items-center gap-2">
-                              {index < 3 && row.totalPoints > 0 ? (
-                                <Badge className={cn(
-                                  'h-6 rounded-full border-none px-2.5 text-[10px] font-black',
-                                  index === 0 ? 'bg-[#FF7A16] text-white' : 'bg-[#EEF4FF] text-[#2554D7]'
-                                )}>
-                                  {index === 0 ? `${selectedPointHistoryData.leaderboardLabel} 1위` : `${index + 1}위`}
-                                </Badge>
-                              ) : null}
-                              <p className="truncate text-base font-black tracking-tight text-[#14295F]">{row.studentName}</p>
-                              <Badge className="h-6 rounded-full border-none bg-[#EEF4FF] px-2.5 text-[10px] font-black text-[#2554D7]">
-                                {row.className}
-                              </Badge>
-                            </div>
-                            <div className="mt-3 flex flex-wrap gap-2">
-                              <Badge className="h-6 rounded-full border-none bg-[#FFF2E8] px-2.5 text-[10px] font-black text-[#C95A08]">
-                                상자 {formatPointsInPt(row.studyBoxPoints)}
-                              </Badge>
-                              <Badge className="h-6 rounded-full border-none bg-[#EEF4FF] px-2.5 text-[10px] font-black text-[#2554D7]">
-                                랭킹 {formatPointsInPt(row.rankPoints)}
-                              </Badge>
-                              {row.otherPoints > 0 ? (
-                                <Badge className="h-6 rounded-full border-none bg-slate-100 px-2.5 text-[10px] font-black text-slate-700">
-                                  이전 기록 {formatPointsInPt(row.otherPoints)}
-                                </Badge>
-                              ) : null}
-                            </div>
-                          </div>
-                          <div className="shrink-0 text-right">
-                            <p className="text-[10px] font-black uppercase tracking-[0.16em] text-[#5c6e97]">총 지급</p>
-                            <p className="admin-kpi-number mt-2 text-[1.55rem] text-[#14295F]">{formatPointsInPt(row.totalPoints)}</p>
-                          </div>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
+                <div className="rounded-[1.35rem] border border-[#DCE7FF] bg-white px-4 py-3 text-xs font-bold leading-5 text-[#5c6e97]">
+                  학생별 전체 내역은 위 일자 카드를 눌렀을 때만 펼쳐집니다. 기본 화면에는 일자별 합계와 그날 포인트 TOP 3만 표시합니다.
+                </div>
               </div>
               <DialogFooter className="border-t border-[#DCE7FF] bg-white px-5 py-4">
                 <DialogClose asChild>

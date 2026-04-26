@@ -553,6 +553,7 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
   const [counselTrackDialogTab, setCounselTrackDialogTab] = useState<DashboardCounselTrackTab>('reservations');
   const [selectedAttendanceDetailSignal, setSelectedAttendanceDetailSignal] = useState<CenterAdminAttendanceSeatSignal | null>(null);
   const [isCenterPointDialogOpen, setIsCenterPointDialogOpen] = useState(false);
+  const [expandedCenterPointDateKey, setExpandedCenterPointDateKey] = useState<string | null>(null);
   const [sessionsLoading, setSessionsLoading] = useState(false);
   const [historicalCenterMinutes, setHistoricalCenterMinutes] = useState<Record<string, number>>({});
   const [trendLoading, setTrendLoading] = useState(false);
@@ -5745,7 +5746,13 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
         </DialogContent>
       </Dialog>
 
-      <Dialog open={isCenterPointDialogOpen} onOpenChange={setIsCenterPointDialogOpen}>
+      <Dialog
+        open={isCenterPointDialogOpen}
+        onOpenChange={(open) => {
+          setIsCenterPointDialogOpen(open);
+          if (!open) setExpandedCenterPointDateKey(null);
+        }}
+      >
         <DialogContent className={cn("flex min-h-0 flex-col overflow-hidden border-none p-0 shadow-2xl", isMobile ? "fixed inset-0 h-full w-full max-w-none rounded-none" : "max-h-[calc(100dvh-2rem)] sm:max-w-2xl rounded-[2.2rem]")}>
           <div className="shrink-0 bg-[linear-gradient(135deg,#14295F_0%,#1E4DB7_65%,#20A66B_100%)] p-6 text-white">
             <DialogHeader className="text-left">
@@ -5788,30 +5795,64 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
               </div>
             ) : (
               <div className="space-y-3">
-                {centerPointDistribution.dailyRows.map((day) => (
-                  <div key={day.dateKey} className="rounded-[1.5rem] border border-[#DCE7FF] bg-white p-4 shadow-[0_18px_34px_-32px_rgba(20,41,95,0.2)]">
-                    <div className="flex items-start justify-between gap-3 border-b border-[#EEF4FF] pb-3">
-                      <div>
-                        <p className="text-sm font-black text-[#14295F]">{day.dateKey}</p>
-                        <p className="mt-1 text-[11px] font-bold text-[#6E7EA3]">{day.grants.length}명 적립</p>
-                      </div>
-                      <Badge className="border-none bg-emerald-100 px-3 py-1 text-[11px] font-black text-emerald-700">
-                        {day.total.toLocaleString()}P
-                      </Badge>
-                    </div>
-                    <div className="mt-3 space-y-2">
-                      {day.grants.map((grant) => (
-                        <div key={grant.key} className="flex items-start justify-between gap-3 rounded-2xl border border-[#EEF4FF] bg-[#F8FBFF] px-3 py-2.5">
-                          <div className="min-w-0">
-                            <p className="text-sm font-black text-[#14295F]">{grant.studentName}</p>
-                            <p className="mt-1 truncate text-[11px] font-bold text-[#6E7EA3]">{grant.detail}</p>
-                          </div>
-                          <span className="shrink-0 text-sm font-black text-emerald-700">{grant.points.toLocaleString()}P</span>
+                {centerPointDistribution.dailyRows.map((day) => {
+                  const isExpanded = expandedCenterPointDateKey === day.dateKey;
+                  const topGrants = day.grants.slice(0, 3);
+
+                  return (
+                    <div key={day.dateKey} className="rounded-[1.5rem] border border-[#DCE7FF] bg-white p-4 shadow-[0_18px_34px_-32px_rgba(20,41,95,0.2)]">
+                      <button
+                        type="button"
+                        aria-expanded={isExpanded}
+                        onClick={() => setExpandedCenterPointDateKey((current) => (current === day.dateKey ? null : day.dateKey))}
+                        className="flex w-full items-start justify-between gap-3 border-b border-[#EEF4FF] pb-3 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#2554D7] focus-visible:ring-offset-2"
+                      >
+                        <div>
+                          <p className="text-sm font-black text-[#14295F]">{day.dateKey}</p>
+                          <p className="mt-1 text-[11px] font-bold text-[#6E7EA3]">
+                            {day.grants.length}명 적립 · 클릭하면 학생별 전체 내역
+                          </p>
                         </div>
-                      ))}
+                        <div className="flex shrink-0 items-center gap-2">
+                          <Badge className="border-none bg-emerald-100 px-3 py-1 text-[11px] font-black text-emerald-700">
+                            {day.total.toLocaleString()}P
+                          </Badge>
+                          <ChevronRight className={cn("h-4 w-4 text-[#8FA5CF] transition-transform", isExpanded && "rotate-90")} />
+                        </div>
+                      </button>
+
+                      <div className="mt-3 space-y-2">
+                        <p className="text-[10px] font-black uppercase tracking-[0.16em] text-[#6E7EA3]">그날 포인트 TOP 3</p>
+                        {topGrants.map((grant, index) => (
+                          <div key={`top-${grant.key}`} className="flex items-center justify-between gap-3 rounded-2xl border border-[#EEF4FF] bg-[#F8FBFF] px-3 py-2.5">
+                            <div className="flex min-w-0 items-center gap-2">
+                              <Badge className={cn("h-6 rounded-full border-none px-2 text-[10px] font-black", index === 0 ? "bg-[#FF7A16] text-white" : "bg-[#EEF4FF] text-[#2554D7]")}>
+                                {index + 1}위
+                              </Badge>
+                              <p className="truncate text-sm font-black text-[#14295F]">{grant.studentName}</p>
+                            </div>
+                            <span className="shrink-0 text-sm font-black text-emerald-700">{grant.points.toLocaleString()}P</span>
+                          </div>
+                        ))}
+                      </div>
+
+                      {isExpanded ? (
+                        <div className="mt-4 space-y-2 border-t border-[#EEF4FF] pt-3">
+                          <p className="text-[10px] font-black uppercase tracking-[0.16em] text-[#6E7EA3]">학생별 전체 상세</p>
+                          {day.grants.map((grant) => (
+                            <div key={grant.key} className="flex items-start justify-between gap-3 rounded-2xl border border-[#EEF4FF] bg-white px-3 py-2.5">
+                              <div className="min-w-0">
+                                <p className="text-sm font-black text-[#14295F]">{grant.studentName}</p>
+                                <p className="mt-1 truncate text-[11px] font-bold text-[#6E7EA3]">{grant.detail}</p>
+                              </div>
+                              <span className="shrink-0 text-sm font-black text-emerald-700">{grant.points.toLocaleString()}P</span>
+                            </div>
+                          ))}
+                        </div>
+                      ) : null}
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             )}
           </div>
