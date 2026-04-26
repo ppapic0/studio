@@ -208,10 +208,13 @@ export function CenterAdminAttendanceBoard({
 
     for (let roomSeatNo = 1; roomSeatNo <= room.rows * room.cols; roomSeatNo += 1) {
       const seat = getSeatForRoom(room, roomSeatNo);
-      if (seat.type === 'aisle' || !seat.studentId) continue;
+      const manualOccupantName =
+        typeof seat.manualOccupantName === 'string' ? seat.manualOccupantName.trim() : '';
+      if (seat.type === 'aisle' || (!seat.studentId && !manualOccupantName)) continue;
 
-      const member = studentMembersById.get(seat.studentId);
-      const isFilteredOut = selectedClass !== 'all' && member?.className !== selectedClass;
+      const seatStudentId = typeof seat.studentId === 'string' ? seat.studentId : '';
+      const member = seatStudentId ? studentMembersById.get(seatStudentId) : undefined;
+      const isFilteredOut = Boolean(seatStudentId) && selectedClass !== 'all' && member?.className !== selectedClass;
       if (isFilteredOut) continue;
 
       assignedCount += 1;
@@ -271,14 +274,16 @@ export function CenterAdminAttendanceBoard({
                   const seat = getSeatForRoom(room, roomSeatNo);
                   const seatDisplayLabel = getSeatDisplayLabel(seat, roomSeatNo);
                   const studentId = typeof seat.studentId === 'string' ? seat.studentId : '';
+                  const manualOccupantName =
+                    typeof seat.manualOccupantName === 'string' ? seat.manualOccupantName.trim() : '';
                   const student = studentId ? studentsById.get(studentId) : undefined;
                   const member = studentId ? studentMembersById.get(studentId) : undefined;
                   const signal = studentId ? seatSignalsBySeatId.get(seat.id) || null : null;
                   const presentation = signal ? getAttendanceBoardPresentation(signal) : DEFAULT_PRESENTATION;
                   const isAisle = seat.type === 'aisle';
                   const isSelectedSeat = Boolean(selectedSeatId && selectedSeatId === seat.id);
-                  const isFilteredOut = selectedClass !== 'all' && member?.className !== selectedClass;
-                  const displayName = signal?.studentName || student?.name || member?.displayName || '학생';
+                  const isFilteredOut = Boolean(studentId) && selectedClass !== 'all' && member?.className !== selectedClass;
+                  const displayName = manualOccupantName || signal?.studentName || student?.name || member?.displayName || '학생';
                   const scheduleMovementLabel = signal?.scheduleMovementSummary || null;
                   const isNoAttendanceDay = Boolean(signal?.isNoAttendanceDay || signal?.boardStatus === 'excused_absent');
                   const isCheckedOutLate = Boolean(signal?.boardStatus === 'checked_out' && signal.wasLateToday);
@@ -355,8 +360,11 @@ export function CenterAdminAttendanceBoard({
                         : signal.routineExpectedArrivalTime
                           ? `예정 ${signal.routineExpectedArrivalTime}`
                           : signal.boardLabel
-                    : '확인중';
+                    : manualOccupantName
+                      ? '예약 배정'
+                      : '확인중';
                   const shouldShowSeatMeta =
+                    Boolean(manualOccupantName) ||
                     (!isNameOnly && !hasSeatTimeChips) ||
                     isNoAttendanceDay ||
                     Boolean(scheduleMovementLabel) ||
@@ -388,7 +396,7 @@ export function CenterAdminAttendanceBoard({
                     return <div key={`${room.id}_${roomSeatNo}`} className="aspect-square rounded-[1.35rem] bg-transparent" />;
                   }
 
-                  if (!seat.studentId) {
+                  if (!seat.studentId && !manualOccupantName) {
                     if (isLayoutEditMode) {
                       return (
                         <button
@@ -534,16 +542,18 @@ export function CenterAdminAttendanceBoard({
           const roomSeatNo = index + 1;
           const seat = getSeatForRoom(room, roomSeatNo);
           const studentId = typeof seat.studentId === 'string' ? seat.studentId : '';
+          const manualOccupantName =
+            typeof seat.manualOccupantName === 'string' ? seat.manualOccupantName.trim() : '';
           const member = studentId ? studentMembersById.get(studentId) : undefined;
           const signal = studentId ? seatSignalsBySeatId.get(seat.id) || null : null;
-          const isFilteredOut = selectedClass !== 'all' && member?.className !== selectedClass;
+          const isFilteredOut = Boolean(studentId) && selectedClass !== 'all' && member?.className !== selectedClass;
           const presentation = signal ? getAttendanceBoardPresentation(signal) : DEFAULT_PRESENTATION;
 
           if (seat.type === 'aisle') {
             return <div key={`${room.id}_${roomSeatNo}`} className="aspect-square rounded-[0.8rem] bg-transparent" />;
           }
 
-          if (!seat.studentId || isFilteredOut) {
+          if ((!seat.studentId && !manualOccupantName) || isFilteredOut) {
             return (
               <div
                 key={`${room.id}_${roomSeatNo}`}

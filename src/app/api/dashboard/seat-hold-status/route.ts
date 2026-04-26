@@ -11,9 +11,16 @@ import {
 import { isActiveMembershipStatus, isAdminRole } from '@/lib/dashboard-access';
 import { adminDb, isMissingAdminCredentialsError } from '@/lib/firebase-admin';
 import { getVerifiedServerSession } from '@/lib/server-auth-session';
-import { normalizeLayoutRooms } from '@/lib/seat-layout';
+import {
+  buildSeatId,
+  getGlobalSeatNo,
+  normalizeLayoutRooms,
+  normalizeSeatGenderBySeatId,
+  normalizeSeatLabelsBySeatId,
+} from '@/lib/seat-layout';
 import { isAttendanceSeatOccupied } from '@/lib/website-consult';
 import type { AttendanceCurrent, StudentProfile, WebsiteSeatHoldRequest } from '@/lib/types';
+import * as admin from 'firebase-admin';
 
 export const dynamic = 'force-dynamic';
 
@@ -30,6 +37,16 @@ const seatHoldStatusSchema = z.object({
   centerId: z.string().trim().min(1, '센터 정보를 확인해 주세요.'),
   seatHoldId: z.string().trim().min(1, '좌석예약 요청 정보를 확인해 주세요.'),
   nextStatus: z.enum(['held', 'canceled']),
+  seatAssignment: z
+    .object({
+      seatId: z.string().trim().min(1, '좌석 정보를 확인해 주세요.'),
+      roomId: z.string().trim().min(1, '호실 정보를 확인해 주세요.'),
+      roomSeatNo: z.number().int().positive('좌석 번호를 확인해 주세요.'),
+      seatNo: z.number().int().positive('좌석 번호를 확인해 주세요.').optional(),
+      seatLabel: z.string().trim().max(20).optional().nullable(),
+      seatGenderPolicy: z.enum(['all', 'male', 'female']).optional().nullable(),
+    })
+    .optional(),
 });
 
 async function getCenterMembership(uid: string, centerId: string) {
@@ -83,7 +100,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const { centerId, seatHoldId, nextStatus } = parsed.data;
+    const { centerId, seatHoldId, nextStatus, seatAssignment } = parsed.data;
     const membership = await getCenterMembership(session.uid, centerId);
 
     if (!isAdminRole(membership.role) || !isActiveMembershipStatus(membership.status)) {
@@ -133,13 +150,31 @@ export async function POST(request: NextRequest) {
         throw new ApiError(409, '취소된 좌석예약 요청은 다시 확정할 수 없습니다.');
       }
 
-      const rooms = normalizeLayoutRooms(centerSnap.data()?.layoutSettings || null);
+      const centerData = centerSnap.data() || {};
+      const rooms = normalizeLayoutRooms(centerData.layoutSettings || null);
       const fallbackRoomId = rooms[0]?.id || seatHold.roomId || 'room_1';
+      const targetRoomId = seatAssignment?.roomId || seatHold.roomId || fallbackRoomId;
+      const targetRoomSeatNo = Number(seatAssignment?.roomSeatNo || seatHold.roomSeatNo || 0);
+      const targetSeatId = seatAssignment?.seatId || seatHold.seatId;
+      const targetRoom = rooms.find((room) => room.id === targetRoomId);
+
+      if (!targetRoom || targetRoomSeatNo <= 0 || targetRoomSeatNo > targetRoom.rows * targetRoom.cols) {
+        throw new ApiError(400, '배정할 좌석이 현재 호실 배치 범위를 벗어났습니다.');
+      }
+      if (targetSeatId !== buildSeatId(targetRoomId, targetRoomSeatNo)) {
+        throw new ApiError(400, '좌석 정보가 현재 배치와 맞지 않습니다.');
+      }
+
+      const seatLabelsBySeatId = normalizeSeatLabelsBySeatId(centerData.layoutSettings || null);
+      const seatGenderBySeatId = normalizeSeatGenderBySeatId(centerData.layoutSettings || null);
+      const targetSeatNo = seatAssignment?.seatNo || getGlobalSeatNo(targetRoomId, targetRoomSeatNo);
+      const targetSeatLabel = seatAssignment?.seatLabel?.trim() || seatLabelsBySeatId[targetSeatId] || String(targetRoomSeatNo);
+      const targetSeatGenderPolicy = seatAssignment?.seatGenderPolicy || seatGenderBySeatId[targetSeatId] || null;
 
       const occupiedByStudent = studentsSnap.docs.some((doc) => {
         const student = doc.data() as StudentProfile;
         const studentRoomId = student.roomId?.trim() || fallbackRoomId;
-        return Number(student.roomSeatNo) === seatHold.roomSeatNo && studentRoomId === seatHold.roomId;
+        return Number(student.roomSeatNo) === targetRoomSeatNo && studentRoomId === targetRoomId;
       });
       if (occupiedByStudent) {
         throw new ApiError(409, '이미 사용 중인 좌석이라 확정할 수 없습니다.');
@@ -147,9 +182,17 @@ export async function POST(request: NextRequest) {
 
       const occupiedByAttendance = attendanceSnap.docs.some((doc) => {
         const attendance = doc.data() as AttendanceCurrent;
+        if (doc.id === targetSeatId) {
+          const manualName = typeof attendance.manualOccupantName === 'string' ? attendance.manualOccupantName.trim() : '';
+          const isSameReservationHold =
+            manualName === `예약 ${seatHold.studentName}` ||
+            manualName === seatHold.studentName ||
+            (attendance as unknown as Record<string, unknown>).seatHoldRequestId === seatHold.id;
+          if (isSameReservationHold && !attendance.studentId) return false;
+        }
         if (!isAttendanceSeatOccupied(attendance)) return false;
         const attendanceRoomId = attendance.roomId?.trim() || fallbackRoomId;
-        return Number(attendance.roomSeatNo) === seatHold.roomSeatNo && attendanceRoomId === seatHold.roomId;
+        return Number(attendance.roomSeatNo) === targetRoomSeatNo && attendanceRoomId === targetRoomId;
       });
       if (occupiedByAttendance) {
         throw new ApiError(409, '현재 사용 중으로 표시된 좌석이라 확정할 수 없습니다.');
@@ -157,7 +200,7 @@ export async function POST(request: NextRequest) {
 
       const sameSeatQuery = centerRef
         .collection('websiteSeatHoldRequests')
-        .where('seatId', '==', seatHold.seatId)
+        .where('seatId', '==', targetSeatId)
         .limit(30);
       const sameSeatSnapshot = await transaction.get(sameSeatQuery);
 
@@ -172,11 +215,38 @@ export async function POST(request: NextRequest) {
 
       transaction.update(seatHoldRef, {
         status: 'held',
+        seatId: targetSeatId,
+        roomId: targetRoomId,
+        roomSeatNo: targetRoomSeatNo,
+        seatNo: targetSeatNo,
+        seatLabel: targetSeatLabel,
+        seatGenderPolicy: targetSeatGenderPolicy,
         updatedAt: nowIso,
         confirmedAt: nowIso,
         canceledAt: null,
         updatedByUid: session.uid,
       });
+
+      if (seatAssignment) {
+        transaction.set(
+          centerRef.collection('attendanceCurrent').doc(targetSeatId),
+          {
+            studentId: null,
+            manualOccupantName: `예약 ${seatHold.studentName}`,
+            seatHoldRequestId: seatHold.id,
+            type: 'seat',
+            status: 'absent',
+            seatNo: targetSeatNo,
+            roomId: targetRoomId,
+            roomSeatNo: targetRoomSeatNo,
+            seatLabel: targetSeatLabel || admin.firestore.FieldValue.delete(),
+            seatGenderPolicy: targetSeatGenderPolicy || admin.firestore.FieldValue.delete(),
+            lastCheckInAt: admin.firestore.FieldValue.delete(),
+            updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+          },
+          { merge: true }
+        );
+      }
 
       let canceledCompetingCount = 0;
       sameSeatSnapshot.docs.forEach((doc) => {
