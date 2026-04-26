@@ -13,7 +13,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { useCollection, useFirestore, useFunctions, useUser } from '@/firebase';
 import { useAppContext } from '@/contexts/app-context';
 import { useMemoFirebase } from '@/hooks/use-memo-firebase';
-import { addDoc, collection, doc, increment, serverTimestamp, Timestamp, writeBatch, query, where } from 'firebase/firestore';
+import { addDoc, collection, deleteField, doc, serverTimestamp, Timestamp, writeBatch, query, where } from 'firebase/firestore';
 import { httpsCallable } from 'firebase/functions';
 import { 
   UserPlus, 
@@ -542,17 +542,21 @@ export default function StudentListPage() {
             { merge: true }
           );
 
-          const sessionRef = doc(collection(firestore, 'centers', centerId, 'studyLogs', studentId, 'days', sessionDateKey, 'sessions'));
+          const sessionId = `session_${selectedStudentPreview.attendance.lastCheckInAt.toMillis()}`;
+          const sessionRef = doc(firestore, 'centers', centerId, 'studyLogs', studentId, 'days', sessionDateKey, 'sessions', sessionId);
           batch.set(sessionRef, {
             startTime: selectedStudentPreview.attendance.lastCheckInAt,
             endTime: Timestamp.fromMillis(nowMs),
             durationMinutes: sessionMinutes,
+            sessionId,
             createdAt: serverTimestamp(),
           });
 
         }
       }
 
+      const shouldStartNewSession =
+        nextStatus === 'studying' && (prevStatus !== 'studying' || !selectedStudentPreview.attendance?.lastCheckInAt);
       const seatPayload: Record<string, unknown> = {
         studentId,
         seatNo: seatIdentity.seatNo || 0,
@@ -562,8 +566,12 @@ export default function StudentListPage() {
         seatZone: selectedStudentPreview.attendance?.seatZone || null,
         status: nextStatus,
         updatedAt: serverTimestamp(),
-        ...(nextStatus === 'studying' ? { lastCheckInAt: serverTimestamp() } : {}),
       };
+      if (shouldStartNewSession) {
+        seatPayload.lastCheckInAt = serverTimestamp();
+      } else if (nextStatus !== 'studying') {
+        seatPayload.lastCheckInAt = deleteField();
+      }
       batch.set(seatRef, seatPayload, { merge: true });
 
       appendAttendanceEventToBatch(batch, firestore, centerId, {

@@ -76,6 +76,11 @@ type ScheduleMovementInfo = {
 
 type AttendanceRoutineInfoWithMovement = AttendanceRoutineInfo & ScheduleMovementInfo;
 
+type TodayStudyLogMinutesEntry = {
+  minutes: number;
+  hasSessions: boolean;
+};
+
 type UseCenterAdminAttendanceBoardOptions = {
   centerId?: string;
   isActive: boolean;
@@ -131,6 +136,36 @@ function pickAttendanceEventTime(
       .map((event) => toDateSafe(event.occurredAt) || toDateSafe(event.createdAt)),
     mode
   );
+}
+
+function getAttendanceEventDate(event: AttendanceBoardEvent) {
+  return toDateSafe(event.occurredAt) || toDateSafe(event.createdAt);
+}
+
+function calculateClosedStudyMinutesFromAttendanceEvents(events: AttendanceBoardEvent[]) {
+  const sortedEvents = events
+    .map((event) => ({ event, occurredAt: getAttendanceEventDate(event) }))
+    .filter((item): item is { event: AttendanceBoardEvent; occurredAt: Date } => Boolean(item.occurredAt))
+    .sort((a, b) => a.occurredAt.getTime() - b.occurredAt.getTime());
+
+  let activeStartAt: Date | null = null;
+  let totalMinutes = 0;
+
+  sortedEvents.forEach(({ event, occurredAt }) => {
+    if (event.eventType === 'check_in' || event.eventType === 'away_end') {
+      activeStartAt = occurredAt;
+      return;
+    }
+    if ((event.eventType === 'away_start' || event.eventType === 'check_out') && activeStartAt) {
+      const diffMinutes = Math.ceil((occurredAt.getTime() - activeStartAt.getTime()) / 60000);
+      if (diffMinutes > 0) {
+        totalMinutes += Math.min(360, diffMinutes);
+      }
+      activeStartAt = null;
+    }
+  });
+
+  return Math.max(0, Math.round(totalMinutes));
 }
 
 const EMPTY_SCHEDULE_MOVEMENT_INFO: ScheduleMovementInfo = {
@@ -365,7 +400,7 @@ export function useCenterAdminAttendanceBoard({
   const [historyLoading, setHistoryLoading] = useState(false);
   const [routineInfoByStudentId, setRoutineInfoByStudentId] = useState<Record<string, AttendanceRoutineInfoWithMovement>>({});
   const [routineLoading, setRoutineLoading] = useState(false);
-  const [todayStudyLogMinutesByStudentId, setTodayStudyLogMinutesByStudentId] = useState<Record<string, number>>({});
+  const [todayStudyLogMinutesByStudentId, setTodayStudyLogMinutesByStudentId] = useState<Record<string, TodayStudyLogMinutesEntry>>({});
   const [todayStudyLogLoading, setTodayStudyLogLoading] = useState(false);
 
   const attendanceStudyStateSignature = useMemo(
@@ -527,7 +562,8 @@ export function useCenterAdminAttendanceBoard({
               const daySnap = await getDoc(dayRef);
               const dayData = daySnap.exists() ? (daySnap.data() as Record<string, unknown>) : null;
               const dayBaseMinutes = Number(dayData?.totalMinutes ?? dayData?.totalStudyMinutes ?? 0);
-              const dayAdjustmentMinutes = Number(dayData?.manualAdjustmentMinutes ?? 0);
+              const hasManualCorrection = Boolean(dayData?.correctedAt || dayData?.correctedByUserId);
+              const dayAdjustmentMinutes = hasManualCorrection ? Number(dayData?.manualAdjustmentMinutes ?? 0) : 0;
               const dayTotal = Math.round(
                 (Number.isFinite(dayBaseMinutes) ? dayBaseMinutes : 0) +
                 (Number.isFinite(dayAdjustmentMinutes) ? dayAdjustmentMinutes : 0)
@@ -538,11 +574,12 @@ export function useCenterAdminAttendanceBoard({
                 return sum + getStudySessionDurationMinutes(sessionDoc.data() as Record<string, unknown>);
               }, 0);
               const adjustedSessionTotal = Math.round(sessionTotal + (Number.isFinite(dayAdjustmentMinutes) ? dayAdjustmentMinutes : 0));
+              const effectiveTotal = sessionsSnap.empty ? dayTotal : adjustedSessionTotal;
 
-              return [studentId, Math.max(0, dayTotal, adjustedSessionTotal)] as const;
+              return [studentId, { minutes: Math.max(0, effectiveTotal), hasSessions: !sessionsSnap.empty }] as const;
             } catch (error) {
               logHandledClientIssue('[center-admin-attendance-board] today study log load failed', error);
-              return [studentId, 0] as const;
+              return [studentId, { minutes: 0, hasSessions: false }] as const;
             }
           })
         );
@@ -640,6 +677,8 @@ export function useCenterAdminAttendanceBoard({
         const todayStatCheckInAt = toDateSafe(todayStat?.checkInAt);
         const todayRecordCheckInAt = toDateSafe(todayRecord?.checkInAt);
         const firstCheckInEventAt = pickAttendanceEventTime(todayEventsForStudent, 'check_in', 'earliest');
+        const latestAwayStartAt = pickAttendanceEventTime(todayEventsForStudent, 'away_start', 'latest');
+        const latestAwayEndAt = pickAttendanceEventTime(todayEventsForStudent, 'away_end', 'latest');
         const firstCheckInAt = pickDateByMode(
           [firstCheckInEventAt, todayStatCheckInAt, todayRecordCheckInAt, sameDayLiveCheckInAt],
           'earliest'
@@ -656,12 +695,23 @@ export function useCenterAdminAttendanceBoard({
           (Number.isFinite(storedBaseMinutes) ? storedBaseMinutes : 0) +
           (Number.isFinite(storedAdjustmentMinutes) ? storedAdjustmentMinutes : 0)
         );
-        const fallbackStudyLogMinutes = Math.round(Number(todayStudyLogMinutesByStudentId[studentId] || 0));
-        const recordedStudyMinutes = Math.max(storedStudyMinutes, fallbackStudyLogMinutes);
+        const fallbackStudyLogEntry = todayStudyLogMinutesByStudentId[studentId];
+        const fallbackStudyLogMinutes = Math.round(Number(fallbackStudyLogEntry?.minutes || 0));
+        const eventClosedStudyMinutes = calculateClosedStudyMinutesFromAttendanceEvents(todayEventsForStudent);
+        const recordedStudyMinutes = fallbackStudyLogEntry?.hasSessions
+          ? Math.max(fallbackStudyLogMinutes, eventClosedStudyMinutes)
+          : eventClosedStudyMinutes > 0
+            ? eventClosedStudyMinutes
+            : Math.max(storedStudyMinutes, fallbackStudyLogMinutes);
         const totalStudyMinutes = Math.max(0, recordedStudyMinutes + liveSessionMinutes);
+        const currentAwayStartedAt =
+          latestAwayStartAt &&
+          (!latestAwayEndAt || latestAwayStartAt.getTime() > latestAwayEndAt.getTime())
+            ? latestAwayStartAt
+            : null;
         const currentAwayMinutes =
-          (seat.status === 'away' || seat.status === 'break') && sameDayLiveCheckInAt
-            ? Math.max(0, Math.floor((nowMs - sameDayLiveCheckInAt.getTime()) / 60000))
+          (seat.status === 'away' || seat.status === 'break') && currentAwayStartedAt
+            ? Math.max(0, Math.floor((nowMs - currentAwayStartedAt.getTime()) / 60000))
             : 0;
         const isLongAway = currentAwayMinutes >= 20;
         const isReturned =

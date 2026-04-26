@@ -118,6 +118,7 @@ type StudySessionDoc = {
   dateKey: string;
   startTime: Date | null;
   endTime: Date | null;
+  durationMinutes?: number;
 };
 
 interface UseAttendanceKpiOptions {
@@ -241,6 +242,36 @@ function pickAttendanceEventTime(
   );
 }
 
+function getAttendanceEventDate(event: AttendanceEventDoc) {
+  return toDateSafe(event.occurredAt) || toDateSafe(event.createdAt);
+}
+
+function calculateClosedStudyMinutesFromAttendanceEvents(events: AttendanceEventDoc[]) {
+  const sortedEvents = events
+    .map((event) => ({ event, occurredAt: getAttendanceEventDate(event) }))
+    .filter((item): item is { event: AttendanceEventDoc; occurredAt: Date } => Boolean(item.occurredAt))
+    .sort((a, b) => a.occurredAt.getTime() - b.occurredAt.getTime());
+
+  let activeStartAt: Date | null = null;
+  let totalMinutes = 0;
+
+  sortedEvents.forEach(({ event, occurredAt }) => {
+    if (event.eventType === 'check_in' || event.eventType === 'away_end') {
+      activeStartAt = occurredAt;
+      return;
+    }
+    if ((event.eventType === 'away_start' || event.eventType === 'check_out') && activeStartAt) {
+      const diffMinutes = Math.ceil((occurredAt.getTime() - activeStartAt.getTime()) / 60000);
+      if (diffMinutes > 0) {
+        totalMinutes += Math.min(360, diffMinutes);
+      }
+      activeStartAt = null;
+    }
+  });
+
+  return Math.max(0, Math.round(totalMinutes));
+}
+
 function groupNotificationsByStudentAndDate(notifications: ParentNotificationDoc[]) {
   const mapped = new Map<string, ParentNotificationDoc[]>();
   notifications.forEach((item) => {
@@ -268,6 +299,15 @@ function buildSessionGroups(sessions: StudySessionDoc[]) {
     bucket.sort((a, b) => (a.startTime?.getTime() || 0) - (b.startTime?.getTime() || 0));
   });
   return mapped;
+}
+
+function getStudySessionDurationMinutes(session: StudySessionDoc) {
+  const directMinutes = Number(session.durationMinutes ?? 0);
+  if (Number.isFinite(directMinutes) && directMinutes > 0) {
+    return Math.max(0, Math.round(directMinutes));
+  }
+  if (!session.startTime || !session.endTime) return 0;
+  return Math.max(0, differenceInMinutes(session.endTime, session.startTime));
 }
 
 function calculateSessionGapMetrics(sessions: StudySessionDoc[]) {
@@ -438,6 +478,7 @@ async function loadStudySessionsRange(
           dateKey: parts[5] || '',
           startTime: toDateSafe(data.startTime),
           endTime: toDateSafe(data.endTime),
+          durationMinutes: asNumber(data.durationMinutes),
         } as StudySessionDoc;
       })
       .filter((item): item is StudySessionDoc => Boolean(item?.studentId && item?.dateKey));
@@ -675,6 +716,8 @@ export function useAttendanceKpi({
         const latestRequest = dayRequests[0] || null;
 
         const liveCheckedAt = dateKey === todayKey ? toDateSafe(liveSeat?.lastCheckInAt) : null;
+        const sessionStudyMinutes = sessions.reduce((sum, session) => sum + getStudySessionDurationMinutes(session), 0);
+        const eventClosedStudyMinutes = calculateClosedStudyMinutesFromAttendanceEvents(dayEvents);
         const firstCheckInAt = pickDateByMode(
           [
             pickAttendanceEventTime(dayEvents, 'check_in', 'earliest'),
@@ -684,10 +727,14 @@ export function useAttendanceKpi({
           ],
           'earliest'
         );
-        const studyMinutesBase = Math.max(
-          asNumber(studyLogDay?.totalMinutes),
-          asNumber(dayStat?.totalStudyMinutes)
-        );
+        const studyMinutesBase = sessions.length > 0
+          ? Math.max(sessionStudyMinutes, eventClosedStudyMinutes)
+          : eventClosedStudyMinutes > 0
+            ? eventClosedStudyMinutes
+            : Math.max(
+                asNumber(studyLogDay?.totalMinutes),
+                asNumber(dayStat?.totalStudyMinutes)
+              );
         const activeSessionMinutes =
           dateKey === todayKey && liveSeat?.status === 'studying' && liveCheckedAt
             ? Math.max(0, differenceInMinutes(new Date(), liveCheckedAt))

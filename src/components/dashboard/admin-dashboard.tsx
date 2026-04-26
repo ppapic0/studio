@@ -2334,7 +2334,9 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
       const seat = attendanceList.find(a => a.studentId === member.id);
       const liveSession = getLiveRoundedMinutes(seat);
       const signalMinutes = Math.max(0, Math.round(Number(attendanceSeatSignalsByStudentId.get(member.id)?.todayStudyMinutes || 0)));
-      let cumulative = Math.max((studentStat?.totalStudyMinutes || 0) + liveSession, signalMinutes);
+      const cumulative = signalMinutes > 0
+        ? signalMinutes
+        : Math.max(0, Math.round((studentStat?.totalStudyMinutes || 0) + liveSession));
 
       totalTodayMins += cumulative;
 
@@ -2386,8 +2388,13 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
       ? Number((filteredTodayStats.reduce((sum, item) => sum + (item.studyTimeGrowthRate || 0), 0) / filteredTodayStats.length).toFixed(2))
       : 0;
     const awayDurations = attendanceList
-      .filter((seat) => seat.studentId && targetMemberIds.has(seat.studentId) && (seat.status === 'away' || seat.status === 'break') && !!seat.lastCheckInAt)
-      .map((seat) => Math.max(0, Math.floor((now - seat.lastCheckInAt!.toMillis()) / 60000)));
+      .filter((seat) => seat.studentId && targetMemberIds.has(seat.studentId) && (seat.status === 'away' || seat.status === 'break'))
+      .map((seat) => {
+        const signalAwayMinutes = Math.max(0, Math.round(Number(attendanceSeatSignalsByStudentId.get(seat.studentId || '')?.currentAwayMinutes || 0)));
+        if (signalAwayMinutes > 0) return signalAwayMinutes;
+        return seat.lastCheckInAt ? Math.max(0, Math.floor((now - seat.lastCheckInAt.toMillis()) / 60000)) : 0;
+      })
+      .filter((minutes) => minutes > 0);
     const avgAwayMinutes = awayDurations.length > 0
       ? Math.round(awayDurations.reduce((sum, value) => sum + value, 0) / awayDurations.length)
       : 0;
@@ -2468,7 +2475,9 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
       const seat = attendanceList.find((a) => a.studentId === member.id);
       const liveSession = getLiveRoundedMinutes(seat);
       const signalMinutes = Math.max(0, Math.round(Number(attendanceSeatSignalsByStudentId.get(member.id)?.todayStudyMinutes || 0)));
-      const todayMinutes = Math.max(0, Math.round((studentStat?.totalStudyMinutes || 0) + liveSession), signalMinutes);
+      const todayMinutes = signalMinutes > 0
+        ? signalMinutes
+        : Math.max(0, Math.round((studentStat?.totalStudyMinutes || 0) + liveSession));
       const weeklyMinutes = Math.max(
         0,
         Math.round((weeklyStudyMinutesByStudent[member.id] || 0) + liveSession),
@@ -2557,7 +2566,9 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
         const seat = (attendanceList || []).find((row) => row.studentId === selectedFocusStudentId);
         const liveSession = getLiveRoundedMinutes(seat);
         const signalMinutes = Math.max(0, Math.round(Number(attendanceSeatSignalsByStudentId.get(selectedFocusStudentId)?.todayStudyMinutes || 0)));
-        const todayMinutes = Math.max(0, Math.round((focusStat?.totalStudyMinutes || 0) + liveSession), signalMinutes);
+        const todayMinutes = signalMinutes > 0
+          ? signalMinutes
+          : Math.max(0, Math.round((focusStat?.totalStudyMinutes || 0) + liveSession));
         if (!member && !studentProfile && !focusStat) return null;
         return {
           studentId: selectedFocusStudentId,

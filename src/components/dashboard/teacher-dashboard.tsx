@@ -1269,7 +1269,10 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
     }
 
     const sessionMinutes = Math.ceil(sessionSeconds / 60);
-    const totalMinutes = Math.max(cumulativeMinutes + Math.max(0, sessionMinutes), signalMinutes, adjustedSelectedSessionMinutes);
+    const totalMinutes = Math.max(
+      signalMinutes > 0 ? signalMinutes : cumulativeMinutes + Math.max(0, sessionMinutes),
+      adjustedSelectedSessionMinutes
+    );
 
     const formatSession = (secs: number) => {
       const m = Math.floor(secs / 60);
@@ -3494,8 +3497,9 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
             { merge: true }
           );
 
-          const sessionRef = doc(collection(firestore, 'centers', centerId, 'studyLogs', studentId, 'days', sessionDateKey, 'sessions'));
-          batch.set(sessionRef, { startTime: selectedSeat.lastCheckInAt, endTime: Timestamp.fromMillis(nowTs), durationMinutes: sessionMinutes, createdAt: serverTimestamp() });
+          const sessionId = `session_${selectedSeat.lastCheckInAt.toMillis()}`;
+          const sessionRef = doc(firestore, 'centers', centerId, 'studyLogs', studentId, 'days', sessionDateKey, 'sessions', sessionId);
+          batch.set(sessionRef, { startTime: selectedSeat.lastCheckInAt, endTime: Timestamp.fromMillis(nowTs), durationMinutes: sessionMinutes, sessionId, createdAt: serverTimestamp() });
 
           const progressRef = doc(firestore, 'centers', centerId, 'growthProgress', studentId);
           const progressUpdate: Record<string, any> = {
@@ -3508,6 +3512,8 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
         }
       }
 
+      const shouldStartNewSession =
+        nextStatus === 'studying' && (prevStatus !== 'studying' || !selectedSeat.lastCheckInAt);
       const updateData: any = {
         studentId,
         seatNo: selectedSeat.seatNo,
@@ -3516,8 +3522,12 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
         type: selectedSeat.type || 'seat',
         status: nextStatus,
         updatedAt: serverTimestamp(),
-        ...(nextStatus === 'studying' ? { lastCheckInAt: serverTimestamp() } : {})
       };
+      if (shouldStartNewSession) {
+        updateData.lastCheckInAt = serverTimestamp();
+      } else if (nextStatus !== 'studying') {
+        updateData.lastCheckInAt = deleteField();
+      }
 
       batch.set(seatRef, updateData, { merge: true });
       if (legacySeatDocId) {

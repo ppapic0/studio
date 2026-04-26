@@ -13,12 +13,12 @@ import {
   query, 
   where, 
   doc, 
-  updateDoc, 
   serverTimestamp,
   getDocs,
   writeBatch,
   increment,
-  Timestamp
+  Timestamp,
+  deleteField
 } from 'firebase/firestore';
 import { StudentProfile, AttendanceCurrent } from '@/lib/types';
 import { cn } from '@/lib/utils';
@@ -156,39 +156,38 @@ export default function KioskPage() {
       const nowDate = new Date();
       const nowMs = nowDate.getTime();
       const todayKey = format(nowDate, 'yyyy-MM-dd');
-      let stopSessionId: string | null = null;
-      const isReturningFromAway = nextStatus === 'studying' && (prevStatus === 'away' || prevStatus === 'break');
+      const shouldStartNewSession =
+        nextStatus === 'studying' && (prevStatus !== 'studying' || !seat.lastCheckInAt);
 
-      // 퇴실(absent) 처리 시 공부 시간 저장 로직
-      // away/break 상태에서 퇴실해도 lastCheckInAt 기준으로 시간을 기록한다 (T-2 버그 수정)
-      if (nextStatus === 'absent' && (prevStatus === 'studying' || prevStatus === 'away' || prevStatus === 'break') && seat.lastCheckInAt) {
+      if (prevStatus === 'studying' && nextStatus !== 'studying' && seat.lastCheckInAt) {
         const startTime = seat.lastCheckInAt.toMillis();
+        const sessionDateKey = format(seat.lastCheckInAt.toDate(), 'yyyy-MM-dd');
         const durationMinutes = Math.min(
           MAX_STUDY_SESSION_MINUTES,
-          Math.max(1, Math.floor((nowMs - startTime) / 60000))
+          Math.max(1, Math.ceil((nowMs - startTime) / 60000))
         );
 
         if (durationMinutes > 0) {
-          const logRef = doc(firestore, 'centers', centerId, 'studyLogs', student.id, 'days', todayKey);
+          const logRef = doc(firestore, 'centers', centerId, 'studyLogs', student.id, 'days', sessionDateKey);
           batch.set(logRef, {
             studentId: student.id,
             centerId: centerId,
-            dateKey: todayKey,
+            dateKey: sessionDateKey,
             totalMinutes: increment(durationMinutes),
             updatedAt: serverTimestamp()
           }, { merge: true });
 
-          const statRef = doc(firestore, 'centers', centerId, 'dailyStudentStats', todayKey, 'students', student.id);
+          const statRef = doc(firestore, 'centers', centerId, 'dailyStudentStats', sessionDateKey, 'students', student.id);
           batch.set(statRef, {
             studentId: student.id,
             centerId,
-            dateKey: todayKey,
+            dateKey: sessionDateKey,
             totalStudyMinutes: increment(durationMinutes),
             updatedAt: serverTimestamp(),
           }, { merge: true });
 
-          stopSessionId = `session_${seat.lastCheckInAt.toMillis()}`;
-          const sessionRef = doc(firestore, 'centers', centerId, 'studyLogs', student.id, 'days', todayKey, 'sessions', stopSessionId);
+          const stopSessionId = `session_${seat.lastCheckInAt.toMillis()}`;
+          const sessionRef = doc(firestore, 'centers', centerId, 'studyLogs', student.id, 'days', sessionDateKey, 'sessions', stopSessionId);
           batch.set(sessionRef, {
             startTime: seat.lastCheckInAt,
             endTime: Timestamp.fromMillis(nowMs),
@@ -280,8 +279,10 @@ export default function KioskPage() {
         updatedAt: serverTimestamp()
       };
 
-      if (nextStatus === 'studying' && (!isReturningFromAway || !seat.lastCheckInAt)) {
+      if (shouldStartNewSession) {
         updateData.lastCheckInAt = serverTimestamp();
+      } else if (nextStatus !== 'studying') {
+        updateData.lastCheckInAt = deleteField();
       }
 
       batch.set(seatRef, updateData, { merge: true });
@@ -289,8 +290,8 @@ export default function KioskPage() {
 
       const autoCheckInAt =
         nextStatus === 'studying'
-          ? (isReturningFromAway && seat.lastCheckInAt ? seat.lastCheckInAt.toDate() : nowDate)
-          : (seat.lastCheckInAt ? seat.lastCheckInAt.toDate() : null);
+          ? nowDate
+          : null;
       void syncAutoAttendanceRecord({
         firestore,
         centerId,

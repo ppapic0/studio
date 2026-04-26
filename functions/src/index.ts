@@ -894,6 +894,7 @@ async function finalizeStudySession(params: FinalizeStudySessionParams): Promise
         closeSeatRef,
         {
           status: "absent",
+          lastCheckInAt: admin.firestore.FieldValue.delete(),
           updatedAt: admin.firestore.FieldValue.serverTimestamp(),
         },
         { merge: true }
@@ -7550,20 +7551,10 @@ async function syncStudyLogDayTotalMinutes(
     const statData = (statSnap.data() || {}) as Record<string, unknown>;
     const dayManualAdjustment = Math.round(parseFiniteNumber(dayData.manualAdjustmentMinutes) ?? 0);
     const statManualAdjustment = Math.round(parseFiniteNumber(statData.manualAdjustmentMinutes) ?? 0);
-    const existingDayDisplayMinutes =
-      Math.max(0, Math.round(parseFiniteNumber(dayData.totalMinutes) ?? 0)) +
-      dayManualAdjustment;
-    const existingStatDisplayMinutes =
-      Math.max(0, Math.round(parseFiniteNumber(statData.totalStudyMinutes) ?? 0)) +
-      statManualAdjustment;
-    const hasManualAdjustment = dayManualAdjustment !== 0 || statManualAdjustment !== 0;
-    const existingDisplayMinutes = hasManualAdjustment
-      ? Math.max(0, existingDayDisplayMinutes, existingStatDisplayMinutes)
-      : Math.max(0, existingDayDisplayMinutes);
-    const displayTotalMinutes = hasManualAdjustment
-      ? existingDisplayMinutes
-      : Math.max(sessionTotalMinutes, existingDisplayMinutes);
-    const manualAdjustmentMinutes = displayTotalMinutes - sessionTotalMinutes;
+    const hasManualCorrection = Boolean(dayData.correctedAt || dayData.correctedByUserId);
+    const manualAdjustmentMinutes = hasManualCorrection
+      ? (dayManualAdjustment !== 0 ? dayManualAdjustment : statManualAdjustment)
+      : 0;
 
     transaction.set(
       dayRef,
