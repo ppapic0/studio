@@ -49,6 +49,15 @@ type AttendanceBoardRecord = {
   routineMissingAtCheckIn?: boolean;
 };
 
+type AttendanceBoardEvent = {
+  id: string;
+  studentId?: string;
+  dateKey?: string;
+  eventType?: string;
+  occurredAt?: unknown;
+  createdAt?: unknown;
+};
+
 type ResolvedAttendanceSeat = AttendanceCurrent & {
   roomId: string;
   roomSeatNo: number;
@@ -101,6 +110,27 @@ function getStudySessionDurationMinutes(data: Record<string, unknown>) {
   const diffMs = endAt.getTime() - startAt.getTime();
   if (!Number.isFinite(diffMs) || diffMs <= 0) return 0;
   return Math.max(1, Math.ceil(diffMs / 60000));
+}
+
+function pickDateByMode(values: Array<Date | null | undefined>, mode: 'earliest' | 'latest') {
+  const dates = values.filter((value): value is Date => value instanceof Date && Number.isFinite(value.getTime()));
+  if (dates.length === 0) return null;
+  return dates
+    .slice()
+    .sort((a, b) => mode === 'earliest' ? a.getTime() - b.getTime() : b.getTime() - a.getTime())[0] || null;
+}
+
+function pickAttendanceEventTime(
+  events: AttendanceBoardEvent[],
+  eventType: string,
+  mode: 'earliest' | 'latest'
+) {
+  return pickDateByMode(
+    events
+      .filter((event) => event.eventType === eventType)
+      .map((event) => toDateSafe(event.occurredAt) || toDateSafe(event.createdAt)),
+    mode
+  );
 }
 
 const EMPTY_SCHEDULE_MOVEMENT_INFO: ScheduleMovementInfo = {
@@ -304,6 +334,18 @@ export function useCenterAdminAttendanceBoard({
   }, [firestore, centerId, isActive, todayKey]);
   const { data: todayRecords, isLoading: todayRecordsLoading } = useCollection<AttendanceBoardRecord>(
     todayRecordsQuery,
+    { enabled: isActive }
+  );
+  const todayEventsQuery = useMemoFirebase(() => {
+    if (!firestore || !centerId || !isActive) return null;
+    return query(
+      collection(firestore, 'centers', centerId, 'attendanceEvents'),
+      where('dateKey', '==', todayKey),
+      limit(1500)
+    );
+  }, [firestore, centerId, isActive, todayKey]);
+  const { data: todayEvents, isLoading: todayEventsLoading } = useCollection<AttendanceBoardEvent>(
+    todayEventsQuery,
     { enabled: isActive }
   );
   const todaySchedulesQuery = useMemoFirebase(() => {
@@ -532,6 +574,16 @@ export function useCenterAdminAttendanceBoard({
     () => new Map((todayStats || []).map((stat) => [stat.studentId, stat])),
     [todayStats]
   );
+  const todayEventsByStudentId = useMemo(() => {
+    const mapped = new Map<string, AttendanceBoardEvent[]>();
+    (todayEvents || []).forEach((event) => {
+      if (!event.studentId) return;
+      const bucket = mapped.get(event.studentId) || [];
+      bucket.push(event);
+      mapped.set(event.studentId, bucket);
+    });
+    return mapped;
+  }, [todayEvents]);
   const todayScheduleByStudentId = useMemo(() => {
     const mapped = new Map<string, StudentScheduleDoc>();
     (todaySchedules || []).forEach((schedule) => {
@@ -573,6 +625,7 @@ export function useCenterAdminAttendanceBoard({
         const routineInfo = rawRoutineInfo || (todaySchedule ? buildRoutineInfoFromSchedule(todaySchedule) : undefined);
         const scheduleMovementInfo = routineInfo?.isNoAttendanceDay ? EMPTY_SCHEDULE_MOVEMENT_INFO : routineInfo || EMPTY_SCHEDULE_MOVEMENT_INFO;
         const todayRecord = todayRecordByStudentId.get(studentId);
+        const todayEventsForStudent = todayEventsByStudentId.get(studentId) || [];
         const historySummary = historySummaryByStudentId.get(studentId) || {
           lateCount: 0,
           absentCount: 0,
@@ -586,7 +639,11 @@ export function useCenterAdminAttendanceBoard({
             : null;
         const todayStatCheckInAt = toDateSafe(todayStat?.checkInAt);
         const todayRecordCheckInAt = toDateSafe(todayRecord?.checkInAt);
-        const firstCheckInAt = todayStatCheckInAt || todayRecordCheckInAt || sameDayLiveCheckInAt;
+        const firstCheckInEventAt = pickAttendanceEventTime(todayEventsForStudent, 'check_in', 'earliest');
+        const firstCheckInAt = pickDateByMode(
+          [firstCheckInEventAt, todayStatCheckInAt, todayRecordCheckInAt, sameDayLiveCheckInAt],
+          'earliest'
+        );
         const lastCheckOutAt = toDateSafe(todayStat?.checkOutAt);
         const hasCheckOutRecord = Boolean(todayStat?.hasCheckOutRecord || lastCheckOutAt);
         const liveSessionMinutes =
@@ -740,6 +797,7 @@ export function useCenterAdminAttendanceBoard({
     studentById,
     targetMemberIds,
     today,
+    todayEventsByStudentId,
     todayKey,
     todayRecordByStudentId,
     todayScheduleByStudentId,
@@ -770,6 +828,7 @@ export function useCenterAdminAttendanceBoard({
     summary,
     isLoading:
       todayRecordsLoading ||
+      todayEventsLoading ||
       todaySchedulesLoading ||
       historyLoading ||
       routineLoading ||

@@ -98,6 +98,12 @@ export const toDateSafe = (value: any): Date | null => {
   return null;
 };
 
+function pickEarliestDate(...values: Array<Date | null | undefined>) {
+  const dates = values.filter((value): value is Date => value instanceof Date && Number.isFinite(value.getTime()));
+  if (dates.length === 0) return null;
+  return dates.slice().sort((a, b) => a.getTime() - b.getTime())[0] || null;
+}
+
 export const buildAttendanceRoutineInfo = (scheduleTitles: string[]): AttendanceRoutineInfo => {
   const hasRoutine = scheduleTitles.some(
     (title) =>
@@ -379,7 +385,8 @@ export async function syncAutoAttendanceRecord(params: {
   const routine = await fetchAttendanceRoutineInfo(firestore, centerId, studentId, dateKey, weekKey, studyDayDate);
   const studyLogInfo = await fetchStudyLogInfo(firestore, centerId, studentId, dateKey);
   const existingCheckedAt = toDateSafe(existing?.checkInAt || existing?.updatedAt);
-  const accessCheckedAt = checkInAt || existingCheckedAt;
+  const firstCheckedAt = pickEarliestDate(existingCheckedAt, checkInAt) || checkInAt || existingCheckedAt;
+  const accessCheckedAt = firstCheckedAt;
   const derived = deriveAttendanceDisplayState({
     selectedDate: studyDayDate,
     dateKey,
@@ -388,7 +395,7 @@ export async function syncAutoAttendanceRecord(params: {
     recordStatus: existing?.status,
     recordStatusSource: existing?.statusSource,
     recordRoutineMissingAtCheckIn: Boolean(existing?.routineMissingAtCheckIn),
-    recordCheckedAt: existingCheckedAt,
+    recordCheckedAt: firstCheckedAt,
     liveCheckedAt: checkInAt || null,
     accessCheckedAt,
     studyCheckedAt: studyLogInfo.checkedAt,
@@ -409,14 +416,15 @@ export async function syncAutoAttendanceRecord(params: {
         ? 'requested'
         : (derived.status as AttendanceRecordStatus);
 
-  const normalizedExistingCheckInAt = toDateSafe(existing?.checkInAt || existing?.updatedAt);
+  const persistedExistingCheckInAt = toDateSafe(existing?.checkInAt);
+  const nextCheckInAt = pickEarliestDate(existingCheckedAt, derived.checkedAt, checkInAt) || derived.checkedAt;
   const shouldSyncStatus =
     existing?.status !== persistedStatus ||
     Boolean(existing?.routineMissingAtCheckIn) !== isRoutineMissingDay;
   const shouldSyncCheckIn =
     (persistedStatus === 'confirmed_present' || persistedStatus === 'confirmed_late') &&
-    !!derived.checkedAt &&
-    (!normalizedExistingCheckInAt || Math.abs(normalizedExistingCheckInAt.getTime() - derived.checkedAt.getTime()) > 60000);
+    !!nextCheckInAt &&
+    (!persistedExistingCheckInAt || Math.abs(persistedExistingCheckInAt.getTime() - nextCheckInAt.getTime()) > 60000);
   const shouldApplyMissingRoutinePenalty =
     isRoutineMissingDay && !existing?.routineMissingPenaltyApplied;
 
@@ -437,8 +445,8 @@ export async function syncAutoAttendanceRecord(params: {
   if (studentName) payload.studentName = studentName;
   if (confirmedByUserId) payload.confirmedByUserId = confirmedByUserId;
 
-  if ((persistedStatus === 'confirmed_present' || persistedStatus === 'confirmed_late') && derived.checkedAt) {
-    payload.checkInAt = Timestamp.fromDate(derived.checkedAt);
+  if ((persistedStatus === 'confirmed_present' || persistedStatus === 'confirmed_late') && nextCheckInAt) {
+    payload.checkInAt = Timestamp.fromDate(nextCheckInAt);
   } else {
     payload.checkInAt = deleteField();
   }

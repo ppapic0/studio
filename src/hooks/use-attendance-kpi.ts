@@ -220,6 +220,27 @@ function groupListByStudentAndDate<T extends { studentId?: string; dateKey?: str
   return mapped;
 }
 
+function pickDateByMode(values: Array<Date | null | undefined>, mode: 'earliest' | 'latest') {
+  const dates = values.filter((value): value is Date => value instanceof Date && Number.isFinite(value.getTime()));
+  if (dates.length === 0) return null;
+  return dates
+    .slice()
+    .sort((a, b) => mode === 'earliest' ? a.getTime() - b.getTime() : b.getTime() - a.getTime())[0] || null;
+}
+
+function pickAttendanceEventTime(
+  events: AttendanceEventDoc[],
+  eventType: string,
+  mode: 'earliest' | 'latest'
+) {
+  return pickDateByMode(
+    events
+      .filter((event) => event.eventType === eventType)
+      .map((event) => toDateSafe(event.occurredAt) || toDateSafe(event.createdAt)),
+    mode
+  );
+}
+
 function groupNotificationsByStudentAndDate(notifications: ParentNotificationDoc[]) {
   const mapped = new Map<string, ParentNotificationDoc[]>();
   notifications.forEach((item) => {
@@ -654,6 +675,15 @@ export function useAttendanceKpi({
         const latestRequest = dayRequests[0] || null;
 
         const liveCheckedAt = dateKey === todayKey ? toDateSafe(liveSeat?.lastCheckInAt) : null;
+        const firstCheckInAt = pickDateByMode(
+          [
+            pickAttendanceEventTime(dayEvents, 'check_in', 'earliest'),
+            toDateSafe(dayKpi?.checkInAt),
+            toDateSafe(attendanceRecord?.checkInAt),
+            liveCheckedAt,
+          ],
+          'earliest'
+        );
         const studyMinutesBase = Math.max(
           asNumber(studyLogDay?.totalMinutes),
           asNumber(dayStat?.totalStudyMinutes)
@@ -663,9 +693,10 @@ export function useAttendanceKpi({
             ? Math.max(0, differenceInMinutes(new Date(), liveCheckedAt))
             : 0;
         const studyMinutes = Math.max(0, Math.round(studyMinutesBase + activeSessionMinutes));
-        const studyCheckedAt = toDateSafe(
+        const studyLogCheckedAt = toDateSafe(
           studyLogDay?.updatedAt || studyLogDay?.createdAt || dayStat?.updatedAt || dayStat?.createdAt
         );
+        const studyCheckedAt = firstCheckInAt || studyLogCheckedAt;
 
         const derived = deriveAttendanceDisplayState({
           selectedDate: date,
@@ -675,9 +706,9 @@ export function useAttendanceKpi({
           recordStatus: attendanceRecord?.status,
           recordStatusSource: attendanceRecord?.statusSource,
           recordRoutineMissingAtCheckIn: Boolean(attendanceRecord?.routineMissingAtCheckIn),
-          recordCheckedAt: toDateSafe(attendanceRecord?.checkInAt),
+          recordCheckedAt: firstCheckInAt,
           liveCheckedAt,
-          accessCheckedAt: liveCheckedAt,
+          accessCheckedAt: firstCheckInAt || liveCheckedAt,
           studyCheckedAt,
           studyMinutes,
           hasStudyLog: studyMinutes > 0,

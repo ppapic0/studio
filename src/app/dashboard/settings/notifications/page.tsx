@@ -428,6 +428,27 @@ function toDateSafe(value?: { toDate?: () => Date } | Date | null) {
   return value?.toDate?.() || null;
 }
 
+function pickDateByMode(values: Array<Date | null | undefined>, mode: 'earliest' | 'latest') {
+  const dates = values.filter((value): value is Date => value instanceof Date && Number.isFinite(value.getTime()));
+  if (dates.length === 0) return null;
+  return dates
+    .slice()
+    .sort((a, b) => mode === 'earliest' ? a.getTime() - b.getTime() : b.getTime() - a.getTime())[0] || null;
+}
+
+function pickAttendanceEventTime(
+  rows: AttendanceEventRow[],
+  eventType: string,
+  mode: 'earliest' | 'latest'
+) {
+  return pickDateByMode(
+    rows
+      .filter((row) => row.eventType === eventType)
+      .map((row) => toDateSafe(row.occurredAt) || toDateSafe(row.createdAt)),
+    mode
+  );
+}
+
 function formatTimeLabelFromDate(date?: Date | null) {
   if (!date) return '-';
   return `${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`;
@@ -901,31 +922,23 @@ export default function NotificationSettingsPage() {
             : null;
         const resolveAttendanceTime = (eventType: TodayBoardEventType) => {
           if (eventType === 'study_start') {
-            return (
-              toDateSafe(attendanceDailyStat?.checkInAt) ||
-              toDateSafe(attendanceRecord?.checkInAt) ||
-              toDateSafe(attendanceEvents.find((row) => row.eventType === 'check_in')?.occurredAt) ||
-              toDateSafe(attendanceEvents.find((row) => row.eventType === 'check_in')?.createdAt) ||
+            return pickDateByMode([
+              pickAttendanceEventTime(attendanceEvents, 'check_in', 'earliest'),
+              toDateSafe(attendanceDailyStat?.checkInAt),
+              toDateSafe(attendanceRecord?.checkInAt),
               liveCheckInToday
-            );
+            ], 'earliest');
           }
           if (eventType === 'study_end') {
             return (
               toDateSafe(attendanceDailyStat?.checkOutAt) ||
-              toDateSafe(attendanceEvents.find((row) => row.eventType === 'check_out')?.occurredAt) ||
-              toDateSafe(attendanceEvents.find((row) => row.eventType === 'check_out')?.createdAt)
+              pickAttendanceEventTime(attendanceEvents, 'check_out', 'latest')
             );
           }
           if (eventType === 'away_start') {
-            return (
-              toDateSafe(attendanceEvents.find((row) => row.eventType === 'away_start')?.occurredAt) ||
-              toDateSafe(attendanceEvents.find((row) => row.eventType === 'away_start')?.createdAt)
-            );
+            return pickAttendanceEventTime(attendanceEvents, 'away_start', 'latest');
           }
-          return (
-            toDateSafe(attendanceEvents.find((row) => row.eventType === 'away_end')?.occurredAt) ||
-            toDateSafe(attendanceEvents.find((row) => row.eventType === 'away_end')?.createdAt)
-          );
+          return pickAttendanceEventTime(attendanceEvents, 'away_end', 'latest');
         };
         const studentLogs = deliveryRows.filter(
           (row) => row.studentId === student.studentId && row.dateKey === todayKey && TODAY_BOARD_EVENTS.some((item) => item.value === row.eventType)
