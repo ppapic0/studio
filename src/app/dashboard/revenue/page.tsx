@@ -128,6 +128,7 @@ import {
   clearLegacyInvoiceCollectionData,
   createBusinessLedgerEntry,
   deleteBusinessLedgerEntry,
+  issueManualAcademyInvoice,
   issueInvoice,
   resetInvoiceCollectionState,
   updateBusinessLedgerEntry,
@@ -273,6 +274,9 @@ export default function RevenuePage() {
   const [timelineDeleteTarget, setTimelineDeleteTarget] = useState<Invoice | null>(null);
   const [showRiskPanel, setShowRiskPanel] = useState(false);
   const [quickIssueAmount, setQuickIssueAmount] = useState('390000');
+  const [manualAcademyStudentName, setManualAcademyStudentName] = useState('');
+  const [manualAcademyPhone, setManualAcademyPhone] = useState('');
+  const [manualAcademyMemo, setManualAcademyMemo] = useState('');
   const [timelineMonth, setTimelineMonth] = useState(format(new Date(), 'yyyy-MM'));
   const [timelineTrackFilter, setTimelineTrackFilter] = useState<'all' | InvoiceTrackCategory>('all');
   const [priceDrafts, setPriceDrafts] = useState<Record<string, string>>({});
@@ -986,6 +990,47 @@ export default function RevenuePage() {
     }
   };
 
+  const handleManualAcademyInvoiceCreate = async () => {
+    if (!firestore || !centerId) return;
+
+    const studentName = manualAcademyStudentName.trim();
+    const amount = parseDraftPrice(quickIssueAmount);
+    if (!studentName) {
+      toast({ variant: 'destructive', title: '학생 이름을 입력해 주세요.' });
+      return;
+    }
+    if (!amount || amount <= 0) {
+      toast({ variant: 'destructive', title: '금액을 입력해 주세요.', description: '기본 발행 금액에 숫자를 입력하면 됩니다.' });
+      return;
+    }
+
+    setIsSaving(true);
+    try {
+      await issueManualAcademyInvoice(firestore, centerId, {
+        studentName,
+        amount,
+        phoneNumber: manualAcademyPhone,
+        memo: manualAcademyMemo,
+      });
+      toast({
+        title: '트랙 국어 수기 인보이스를 발행했습니다.',
+        description: `${studentName} 학생 청구가 인보이스 타임라인에 추가되었습니다.`,
+      });
+      setManualAcademyStudentName('');
+      setManualAcademyPhone('');
+      setManualAcademyMemo('');
+      setTimelineMonth(format(new Date(), 'yyyy-MM'));
+      setTimelineTrackFilter('academy');
+      setPaymentSubTab('all');
+      setActiveTab('payments');
+      setIsSettingsOpen(false);
+    } catch (e: any) {
+      toast({ variant: 'destructive', title: '수기 발행 실패', description: e?.message || '다시 시도해 주세요.' });
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
   const getStatusBadge = (status: string) => {
     switch (status) {
       case 'paid':
@@ -1304,6 +1349,9 @@ export default function RevenuePage() {
                             <div className="flex items-center gap-2">
                               <span className="truncate text-sm font-black text-slate-800">{invoice.studentName}</span>
                               <Badge className={cn('border text-[10px] font-black', trackMeta.badgeClass)}>{trackMeta.label}</Badge>
+                              {invoice.isManualInvoice ? (
+                                <Badge className="border border-emerald-200 bg-white text-[10px] font-black text-emerald-700">수기</Badge>
+                              ) : null}
                               {getStatusBadge(invoice.status)}
                             </div>
                             <p className="mt-1 text-[11px] font-bold text-slate-400">
@@ -1420,6 +1468,9 @@ export default function RevenuePage() {
                                   <span className="font-black text-xl tracking-tight truncate">{inv.studentName} 학생</span>
                                   {studentSeat && <Badge variant="outline" className="font-black text-[8px] border-primary/20 text-primary/60 whitespace-nowrap">{studentSeat.seatZone || '미정'}</Badge>}
                                   <Badge className={cn("border text-[9px] font-black", trackMeta.badgeClass)}>{trackMeta.label}</Badge>
+                                  {inv.isManualInvoice ? (
+                                    <Badge className="border border-emerald-200 bg-white text-[9px] font-black text-emerald-700">수기</Badge>
+                                  ) : null}
                                   {getStatusBadge(inv.status)}
                                 </div>
                                 <div className="flex items-center gap-3 text-[10px] font-bold text-muted-foreground">
@@ -2178,6 +2229,9 @@ export default function RevenuePage() {
                             <div className="space-y-1">
                               <div className="flex flex-wrap items-center gap-2">
                                 <Badge className={cn('border text-[10px] font-black', trackMeta.badgeClass)}>{trackMeta.label}</Badge>
+                                {invoice.isManualInvoice ? (
+                                  <Badge className="border border-emerald-200 bg-white text-[10px] font-black text-emerald-700">수기</Badge>
+                                ) : null}
                                 {getStatusBadge(invoice.status)}
                               </div>
                               <p className="text-sm font-black text-slate-900">
@@ -2296,7 +2350,7 @@ export default function RevenuePage() {
       </Tabs>
 
       <Dialog open={isSettingsOpen} onOpenChange={setIsSettingsOpen}>
-      <DialogContent motionPreset="dashboard-premium" className="rounded-[2rem] border-none shadow-2xl sm:max-w-lg">
+      <DialogContent motionPreset="dashboard-premium" className="max-h-[90vh] overflow-y-auto rounded-[2rem] border-none shadow-2xl sm:max-w-lg">
           <DialogHeader>
             <DialogTitle className="text-2xl font-black tracking-tight">수납/인보이스 설정</DialogTitle>
             <DialogDescription className="font-semibold">
@@ -2325,6 +2379,67 @@ export default function RevenuePage() {
 
             <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 text-xs font-semibold text-slate-600">
               상세 관리 버튼으로 진입하면 이미 인보이스가 있는 학생도 트랙 스터디센터/트랙 국어 인보이스를 추가 발행할 수 있습니다.
+            </div>
+
+            <div className="rounded-2xl border border-emerald-100 bg-emerald-50/50 p-4">
+              <div className="mb-4 flex items-center justify-between gap-3">
+                <div className="space-y-1">
+                  <Badge className="rounded-full border border-emerald-200 bg-white px-3 py-1 text-[10px] font-black text-emerald-700">
+                    트랙 국어
+                  </Badge>
+                  <p className="text-sm font-black text-emerald-900">국어 전용 수기 인보이스</p>
+                </div>
+                <FileText className="h-5 w-5 text-emerald-600" />
+              </div>
+              <div className="grid gap-3">
+                <div className="grid gap-2">
+                  <Label htmlFor="manualAcademyStudentName" className="text-xs font-black uppercase tracking-wide text-emerald-800">
+                    학생 이름
+                  </Label>
+                  <Input
+                    id="manualAcademyStudentName"
+                    value={manualAcademyStudentName}
+                    onChange={(event) => setManualAcademyStudentName(event.target.value.slice(0, 30))}
+                    placeholder="예: 김트랙"
+                    className="h-11 rounded-xl border-emerald-100 bg-white font-black"
+                  />
+                </div>
+                <div className="grid gap-2">
+                  <Label htmlFor="manualAcademyPhone" className="text-xs font-black uppercase tracking-wide text-emerald-800">
+                    연락처
+                  </Label>
+                  <Input
+                    id="manualAcademyPhone"
+                    type="text"
+                    inputMode="numeric"
+                    value={manualAcademyPhone}
+                    onChange={(event) => setManualAcademyPhone(event.target.value.replace(/[^\d]/g, '').slice(0, 15))}
+                    placeholder="선택 입력"
+                    className="h-11 rounded-xl border-emerald-100 bg-white font-black"
+                  />
+                </div>
+                <div className="grid gap-2">
+                  <Label htmlFor="manualAcademyMemo" className="text-xs font-black uppercase tracking-wide text-emerald-800">
+                    메모
+                  </Label>
+                  <Textarea
+                    id="manualAcademyMemo"
+                    value={manualAcademyMemo}
+                    onChange={(event) => setManualAcademyMemo(event.target.value.slice(0, 300))}
+                    placeholder="선택 입력"
+                    className="min-h-[80px] rounded-xl border-emerald-100 bg-white text-xs font-bold"
+                  />
+                </div>
+                <Button
+                  type="button"
+                  onClick={handleManualAcademyInvoiceCreate}
+                  disabled={isSaving}
+                  className="h-11 rounded-xl bg-emerald-600 font-black text-white hover:bg-emerald-700"
+                >
+                  {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <PlusCircle className="mr-2 h-4 w-4" />}
+                  트랙 국어 수기 발행
+                </Button>
+              </div>
             </div>
           </div>
 

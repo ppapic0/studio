@@ -43,6 +43,13 @@ export type BusinessLedgerEntryInput = {
   memo?: string | null;
 };
 
+export type ManualAcademyInvoiceInput = {
+  studentName: string;
+  amount: number;
+  phoneNumber?: string | null;
+  memo?: string | null;
+};
+
 /**
  * 수납 상태 수동 업데이트 (고도화)
  * 관리자가 인보이스의 상태를 직접 변경할 때 사용 (Paid, Issued, Overdue 등)
@@ -296,6 +303,54 @@ export async function issueInvoice(
   await setDoc(invoiceRef, invoiceData);
   
   return { ok: true, invoiceId: invoiceRef.id };
+}
+
+export async function issueManualAcademyInvoice(
+  db: Firestore,
+  centerId: string,
+  input: ManualAcademyInvoiceInput
+) {
+  const studentName = input.studentName.trim();
+  const amount = Math.max(0, Math.round(Number(input.amount) || 0));
+  const phoneNumber = (input.phoneNumber || '').replace(/[^\d]/g, '').slice(0, 15);
+  const memo = (input.memo || '').trim().slice(0, 300);
+
+  if (!studentName) throw new Error('학생 이름을 입력해 주세요.');
+  if (amount <= 0) throw new Error('인보이스 금액을 입력해 주세요.');
+
+  const invoiceRef = doc(collection(db, `centers/${centerId}/invoices`));
+  const now = serverTimestamp();
+  const startDate = new Date();
+  const endDate = addDays(startDate, 28);
+  const studentId = `manual-academy-${invoiceRef.id}`;
+
+  await setDoc(invoiceRef, {
+    studentId,
+    studentName,
+    cycleStartDate: Timestamp.fromDate(startDate),
+    cycleEndDate: Timestamp.fromDate(endDate),
+    collectionStartDate: Timestamp.fromDate(startDate),
+    collectionEndDate: Timestamp.fromDate(endOfDay(endDate)),
+    finalPrice: amount,
+    status: 'issued',
+    issuedAt: now,
+    updatedAt: now,
+    priceSnapshot: {
+      productId: 'manual_28d_academy_only',
+      season: 'regular',
+      studentType: 'academy_only',
+      basePrice: amount,
+    },
+    discountsSnapshot: [],
+    title: '28일 정기 트랙 국어 이용료',
+    trackCategory: 'academy',
+    isManualInvoice: true,
+    studentSource: 'manualAcademy',
+    ...(phoneNumber ? { manualStudentPhone: phoneNumber } : {}),
+    ...(memo ? { memo } : {}),
+  });
+
+  return { ok: true, invoiceId: invoiceRef.id, studentId };
 }
 
 export async function createBusinessLedgerEntry(

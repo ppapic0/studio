@@ -129,6 +129,11 @@ export interface Invoice {
   paymentKey?: string; // Toss Payments
   orderId?: string;    // Toss Payments
   trackCategory?: 'studyRoom' | 'academy';
+  title?: string;
+  isManualInvoice?: boolean;
+  studentSource?: 'centerStudent' | 'manualAcademy';
+  manualStudentPhone?: string | null;
+  memo?: string | null;
   isActionRequired?: boolean;
   dueLabel?: string;
   paymentMethodSummary?: string;
