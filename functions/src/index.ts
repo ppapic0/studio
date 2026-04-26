@@ -6223,6 +6223,7 @@ export const updateSmsRecipientPreference = functions.region(region).https.onCal
   const requestedParentUid = asTrimmedString(data?.parentUid);
   const isManualRecipientRequest = data?.isManualRecipient === true || requestedParentUid === MANUAL_PARENT_SMS_UID;
   const isFallbackRecipientRequest = data?.isFallbackRecipient === true || requestedParentUid === STUDENT_SMS_FALLBACK_UID;
+  const shouldDeleteManualRecipient = data?.deleteManualRecipient === true;
   if (isFallbackRecipientRequest) {
     throw new functions.https.HttpsError("invalid-argument", "학생 본인 번호는 문자 수신 대상으로 사용할 수 없습니다.");
   }
@@ -6251,11 +6252,18 @@ export const updateSmsRecipientPreference = functions.region(region).https.onCal
   const parentNameOverride = asTrimmedString(data?.parentNameOverride);
 
   if (isManualRecipientRequest) {
+    const prefRef = db.doc(`centers/${centerId}/smsRecipientPreferences/${buildSmsRecipientPreferenceId(studentId, parentUid)}`);
+
+    if (shouldDeleteManualRecipient) {
+      await prefRef.delete();
+      return { ok: true, deleted: true };
+    }
+
     if (!phoneNumberOverride) {
       throw new functions.https.HttpsError("invalid-argument", "보호자 휴대폰 번호가 필요합니다.");
     }
 
-    await db.doc(`centers/${centerId}/smsRecipientPreferences/${buildSmsRecipientPreferenceId(studentId, parentUid)}`).set({
+    await prefRef.set({
       studentId,
       studentName,
       parentUid,

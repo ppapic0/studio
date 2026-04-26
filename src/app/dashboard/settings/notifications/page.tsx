@@ -14,6 +14,7 @@ import {
   Save,
   Search,
   ShieldCheck,
+  Trash2,
   TrendingUp,
   XCircle,
 } from 'lucide-react';
@@ -1089,6 +1090,9 @@ export default function NotificationSettingsPage() {
     () => selectedBoardStudent?.recipients.find((row) => row.isManualRecipient) || null,
     [selectedBoardStudent]
   );
+  const selectedManualParentActionKey = selectedBoardStudent
+    ? `${selectedBoardStudent.studentId}:${MANUAL_PARENT_SMS_UID}`
+    : '';
 
   useEffect(() => {
     if (!selectedBoardStudent) return;
@@ -1375,6 +1379,43 @@ export default function NotificationSettingsPage() {
       existingManualRow?.eventToggles ?? getDefaultEventToggles(),
       nextPhone
     );
+  };
+
+  const handleDeleteManualParentPhone = async (student: StudentSmsBoardRow) => {
+    if (!functions || !centerId) return;
+    const existingManualRow = student.recipients.find((row) => row.isManualRecipient);
+    if (!existingManualRow) return;
+    if (!window.confirm(`${student.studentName} 학생의 직접 추가 보호자 번호를 삭제할까요?`)) return;
+
+    const actionKey = `${student.studentId}:${MANUAL_PARENT_SMS_UID}`;
+    setPreferenceActionKey(actionKey);
+    try {
+      const updateSmsRecipientPreference = httpsCallable(functions, 'updateSmsRecipientPreference');
+      await updateSmsRecipientPreference({
+        centerId,
+        studentId: student.studentId,
+        parentUid: MANUAL_PARENT_SMS_UID,
+        isManualRecipient: true,
+        deleteManualRecipient: true,
+      });
+      setRecipientPhoneDrafts((prev) => {
+        const next = { ...prev };
+        next[actionKey] = '';
+        return next;
+      });
+      toast({
+        title: '보호자 번호 삭제 완료',
+        description: `${student.studentName} 학생의 직접 추가 보호자 번호를 삭제했습니다.`,
+      });
+    } catch (error: any) {
+      toast({
+        variant: 'destructive',
+        title: '보호자 번호 삭제 실패',
+        description: error?.message || '직접 추가 보호자 번호 삭제 중 오류가 발생했습니다.',
+      });
+    } finally {
+      setPreferenceActionKey(null);
+    }
   };
 
   const handleResendStudentEvent = async (studentId: string, eventType: TodayBoardEventType) => {
@@ -1834,9 +1875,13 @@ export default function NotificationSettingsPage() {
                     <div className="rounded-2xl border border-orange-200 bg-orange-50/70 p-4">
                       <div className="flex flex-wrap items-start justify-between gap-3">
                         <div>
-                          <p className="text-sm font-black text-slate-900">보호자 번호 추가</p>
+                          <p className="text-sm font-black text-slate-900">
+                            {selectedManualParentRow?.phoneNumber ? '보호자 번호 수정' : '보호자 번호 추가'}
+                          </p>
                           <p className="mt-1 text-xs font-bold text-slate-500">
-                            학부모 계정 연결 전에도 이 번호를 보호자 문자 수신 대상으로 사용합니다.
+                            {selectedManualParentRow?.phoneNumber
+                              ? '직접 추가한 보호자 번호를 수정하거나 삭제할 수 있습니다.'
+                              : '학부모 계정 연결 전에도 이 번호를 보호자 문자 수신 대상으로 사용합니다.'}
                           </p>
                         </div>
                         {selectedManualParentRow?.phoneNumber ? (
@@ -1847,8 +1892,8 @@ export default function NotificationSettingsPage() {
                       </div>
                       <div className="mt-3 flex flex-col gap-2 sm:flex-row">
                         <Input
-                          value={recipientPhoneDrafts[`${selectedBoardStudent.studentId}:${MANUAL_PARENT_SMS_UID}`] ?? selectedManualParentRow?.phoneNumber ?? ''}
-                          onChange={(e) => setRecipientPhoneDrafts((prev) => ({ ...prev, [`${selectedBoardStudent.studentId}:${MANUAL_PARENT_SMS_UID}`]: e.target.value.replace(/\D/g, '').slice(0, 11) }))}
+                          value={recipientPhoneDrafts[selectedManualParentActionKey] ?? selectedManualParentRow?.phoneNumber ?? ''}
+                          onChange={(e) => setRecipientPhoneDrafts((prev) => ({ ...prev, [selectedManualParentActionKey]: e.target.value.replace(/\D/g, '').slice(0, 11) }))}
                           inputMode="tel"
                           maxLength={11}
                           placeholder="보호자 번호 입력"
@@ -1858,12 +1903,28 @@ export default function NotificationSettingsPage() {
                           type="button"
                           variant="outline"
                           className="h-10 rounded-xl border-orange-200 bg-white px-4 text-xs font-black text-orange-700 hover:bg-orange-100"
-                          disabled={preferenceActionKey === `${selectedBoardStudent.studentId}:${MANUAL_PARENT_SMS_UID}`}
+                          disabled={preferenceActionKey === selectedManualParentActionKey}
                           onClick={() => void handleSaveManualParentPhone(selectedBoardStudent)}
                         >
-                          {preferenceActionKey === `${selectedBoardStudent.studentId}:${MANUAL_PARENT_SMS_UID}` ? <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" /> : null}
-                          {selectedManualParentRow?.phoneNumber ? '보호자 번호 저장' : '보호자 번호 추가'}
+                          {preferenceActionKey === selectedManualParentActionKey ? <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" /> : null}
+                          {selectedManualParentRow?.phoneNumber ? '보호자 번호 수정' : '보호자 번호 추가'}
                         </Button>
+                        {selectedManualParentRow?.phoneNumber ? (
+                          <Button
+                            type="button"
+                            variant="outline"
+                            className="h-10 rounded-xl border-rose-200 bg-white px-4 text-xs font-black text-rose-600 hover:bg-rose-50 hover:text-rose-700"
+                            disabled={preferenceActionKey === selectedManualParentActionKey}
+                            onClick={() => void handleDeleteManualParentPhone(selectedBoardStudent)}
+                          >
+                            {preferenceActionKey === selectedManualParentActionKey ? (
+                              <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" />
+                            ) : (
+                              <Trash2 className="mr-1 h-3.5 w-3.5" />
+                            )}
+                            삭제
+                          </Button>
+                        ) : null}
                       </div>
                     </div>
                   </div>
