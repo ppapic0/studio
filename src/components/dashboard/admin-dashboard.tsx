@@ -88,7 +88,7 @@ import { useAppContext } from '@/contexts/app-context';
 import { useMemoFirebase } from '@/hooks/use-memo-firebase';
 import { addDoc, collection, query, where, Timestamp, doc, limit, getDoc, getDocs, orderBy, serverTimestamp, documentId, writeBatch, deleteField, increment } from 'firebase/firestore';
 import { httpsCallable } from 'firebase/functions';
-import { AttendanceCurrent, AttendanceRequest, CounselingReservation, DailyStudentStat, DailyReport, CenterMembership, InviteCode, GrowthProgress, ParentActivityEvent, CounselingLog, LayoutRoomConfig, StudentProfile, StudyLogDay, OpenClawIntegrationDoc, OpenClawSnapshotRecordCounts, PointBoostEvent } from '@/lib/types';
+import { AttendanceCurrent, AttendanceRequest, CounselingReservation, DailyStudentStat, DailyReport, CenterMembership, InviteCode, GrowthProgress, ParentActivityEvent, CounselingLog, LayoutRoomConfig, StudentProfile, StudyLogDay, OpenClawIntegrationDoc, OpenClawSnapshotRecordCounts, PointBoostEvent, StudyPlanItem } from '@/lib/types';
 import { format, subDays } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { logHandledClientIssue } from '@/lib/handled-client-log';
@@ -231,6 +231,42 @@ const toTimestampDateSafe = (value: unknown): Date | null => {
     return Number.isNaN(date.getTime()) ? null : date;
   }
   return null;
+};
+
+const getFocusPlanCategoryLabel = (category?: StudyPlanItem['category']): string => {
+  if (category === 'schedule') return '일정';
+  if (category === 'personal') return '개인';
+  return '학습';
+};
+
+const getFocusPlanTaskMetaLabel = (task: StudyPlanItem): string => {
+  const metaParts: string[] = [];
+  const subject = (task.subjectLabel || task.subject || '').trim();
+  if (subject) metaParts.push(subject);
+
+  if (task.startTime || task.endTime) {
+    metaParts.push(`${task.startTime || '?'}~${task.endTime || '?'}`);
+  }
+
+  if (task.studyPlanMode === 'time' && Number(task.targetMinutes || 0) > 0) {
+    metaParts.push(`${Math.round(Number(task.targetMinutes))}분`);
+  } else if (task.studyPlanMode === 'volume' && Number(task.targetAmount || 0) > 0) {
+    const unit = task.amountUnitLabel || task.amountUnit || '';
+    metaParts.push(`${Number(task.targetAmount)}${unit}`);
+  }
+
+  return metaParts.join(' · ');
+};
+
+const sortFocusPlanItems = (left: StudyPlanItem, right: StudyPlanItem): number => {
+  if (Boolean(left.done) !== Boolean(right.done)) return left.done ? 1 : -1;
+  const leftStart = left.startTime || '99:99';
+  const rightStart = right.startTime || '99:99';
+  if (leftStart !== rightStart) return leftStart.localeCompare(rightStart);
+  const leftWeight = Number(left.weight || 0);
+  const rightWeight = Number(right.weight || 0);
+  if (leftWeight !== rightWeight) return rightWeight - leftWeight;
+  return (left.title || '').localeCompare(right.title || '', 'ko');
 };
 
 const getAdminSmsDeliveryDate = (log: AdminSmsDeliveryLog): Date | null =>
@@ -773,6 +809,51 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
   const centerId = activeMembership?.id;
   const todayKey = today ? format(today, 'yyyy-MM-dd') : '';
   const yesterdayKey = today ? format(subDays(today, 1), 'yyyy-MM-dd') : '';
+  const selectedFocusPlanWeekKeys = useMemo(() => {
+    if (!today) return { current: '', previous: '' };
+    const current = format(today, "yyyy-'W'II");
+    const previous = format(subDays(today, 6), "yyyy-'W'II");
+    return {
+      current,
+      previous: previous === current ? '' : previous,
+    };
+  }, [today]);
+
+  const selectedFocusCurrentWeekPlansQuery = useMemoFirebase(() => {
+    if (!firestore || !centerId || !selectedFocusStudentId || !selectedFocusPlanWeekKeys.current) return null;
+    return collection(
+      firestore,
+      'centers',
+      centerId,
+      'plans',
+      selectedFocusStudentId,
+      'weeks',
+      selectedFocusPlanWeekKeys.current,
+      'items'
+    );
+  }, [firestore, centerId, selectedFocusStudentId, selectedFocusPlanWeekKeys.current]);
+  const { data: selectedFocusCurrentWeekPlans, isLoading: selectedFocusCurrentWeekPlansLoading } =
+    useCollection<StudyPlanItem>(selectedFocusCurrentWeekPlansQuery, {
+      enabled: isActive && Boolean(selectedFocusStudentId),
+    });
+
+  const selectedFocusPreviousWeekPlansQuery = useMemoFirebase(() => {
+    if (!firestore || !centerId || !selectedFocusStudentId || !selectedFocusPlanWeekKeys.previous) return null;
+    return collection(
+      firestore,
+      'centers',
+      centerId,
+      'plans',
+      selectedFocusStudentId,
+      'weeks',
+      selectedFocusPlanWeekKeys.previous,
+      'items'
+    );
+  }, [firestore, centerId, selectedFocusStudentId, selectedFocusPlanWeekKeys.previous]);
+  const { data: selectedFocusPreviousWeekPlans, isLoading: selectedFocusPreviousWeekPlansLoading } =
+    useCollection<StudyPlanItem>(selectedFocusPreviousWeekPlansQuery, {
+      enabled: isActive && Boolean(selectedFocusStudentId && selectedFocusPlanWeekKeys.previous),
+    });
 
   useEffect(() => {
     hasHydratedRoomDraftsRef.current = false;
@@ -2608,6 +2689,76 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
       || null
     );
   }, [metrics, selectedFocusStudentId, studentMembersById, studentsById, todayStats, progressList, weeklyStudyMinutesByStudent, selectedFocusAttendanceSeat, attendanceSeatSignalsByStudentId]);
+
+  const selectedFocusPlanSummary = useMemo(() => {
+    if (!today || !todayKey) {
+      return {
+        todayPlans: [] as StudyPlanItem[],
+        todayDone: 0,
+        todayTotal: 0,
+        todayRate: 0,
+        daySummaries: [] as Array<{
+          dateKey: string;
+          dateLabel: string;
+          done: number;
+          total: number;
+          rate: number | null;
+          previewPlans: StudyPlanItem[];
+        }>,
+      };
+    }
+
+    const recentDateKeys = Array.from({ length: 7 }, (_, index) =>
+      format(subDays(today, 6 - index), 'yyyy-MM-dd')
+    );
+    const recentDateKeySet = new Set(recentDateKeys);
+    const dedupedPlans = new Map<string, StudyPlanItem>();
+
+    [...(selectedFocusCurrentWeekPlans || []), ...(selectedFocusPreviousWeekPlans || [])].forEach((plan) => {
+      if (!plan.dateKey || !recentDateKeySet.has(plan.dateKey)) return;
+      const key = plan.id || `${plan.dateKey}:${plan.category || 'study'}:${plan.title}`;
+      dedupedPlans.set(key, plan);
+    });
+
+    const plansByDateKey = new Map<string, StudyPlanItem[]>();
+    Array.from(dedupedPlans.values()).forEach((plan) => {
+      const bucket = plansByDateKey.get(plan.dateKey) || [];
+      bucket.push(plan);
+      plansByDateKey.set(plan.dateKey, bucket);
+    });
+
+    const todayPlans = (plansByDateKey.get(todayKey) || [])
+      .slice()
+      .sort(sortFocusPlanItems);
+    const todayDone = todayPlans.filter((plan) => plan.done).length;
+    const todayTotal = todayPlans.length;
+
+    return {
+      todayPlans,
+      todayDone,
+      todayTotal,
+      todayRate: todayTotal > 0 ? Math.round((todayDone / todayTotal) * 100) : 0,
+      daySummaries: recentDateKeys
+        .slice()
+        .reverse()
+        .map((dateKey) => {
+          const plans = (plansByDateKey.get(dateKey) || []).slice().sort(sortFocusPlanItems);
+          const done = plans.filter((plan) => plan.done).length;
+          const total = plans.length;
+          return {
+            dateKey,
+            dateLabel: dateKey === todayKey ? '오늘' : format(new Date(`${dateKey}T00:00:00`), 'MM.dd'),
+            done,
+            total,
+            rate: total > 0 ? Math.round((done / total) * 100) : null,
+            previewPlans: (plans.some((plan) => !plan.done) ? plans.filter((plan) => !plan.done) : plans).slice(0, 2),
+          };
+        }),
+    };
+  }, [selectedFocusCurrentWeekPlans, selectedFocusPreviousWeekPlans, today, todayKey]);
+
+  const selectedFocusPlanLoading =
+    selectedFocusCurrentWeekPlansLoading || selectedFocusPreviousWeekPlansLoading;
 
   const selectedFocusOperationsSummary = useMemo(() => {
     if (!selectedFocusStudentId) return null;
@@ -7597,6 +7748,130 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
                       </div>
                       <p className="mt-2 truncate text-base font-black text-[#14295F]">{selectedFocusOperationsSummary.parentPhone}</p>
                       <p className="mt-1 truncate text-[11px] font-bold text-[#6E7EA3]">{selectedFocusOperationsSummary.parentName}</p>
+                    </div>
+                  </div>
+
+                  <div className="mt-4 grid gap-3 lg:grid-cols-[minmax(0,1.05fr)_minmax(0,0.95fr)]">
+                    <div className="min-w-0 rounded-2xl border border-[#DCE7FF] bg-[#FBFCFF] p-3">
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <div className="min-w-0">
+                          <div className="flex items-center gap-1.5 text-[#2554D7]">
+                            <ClipboardCheck className="h-3.5 w-3.5" />
+                            <p className="text-[11px] font-black text-[#14295F]">오늘 계획</p>
+                          </div>
+                          <p className="mt-1 text-[10px] font-bold text-[#6E7EA3]">
+                            {selectedFocusPlanLoading
+                              ? '계획 확인 중'
+                              : selectedFocusPlanSummary.todayTotal > 0
+                                ? `${selectedFocusPlanSummary.todayDone}/${selectedFocusPlanSummary.todayTotal} 완료`
+                                : '등록된 계획 없음'}
+                          </p>
+                        </div>
+                        <Badge className="h-7 rounded-full border-none bg-[#EEF4FF] px-3 text-[10px] font-black text-[#2554D7]">
+                          {selectedFocusPlanSummary.todayRate}%
+                        </Badge>
+                      </div>
+                      {selectedFocusPlanSummary.todayPlans.length > 0 ? (
+                        <div className="mt-3 space-y-2">
+                          {selectedFocusPlanSummary.todayPlans.slice(0, 5).map((plan) => {
+                            const metaLabel = getFocusPlanTaskMetaLabel(plan);
+                            return (
+                              <div key={plan.id || `${plan.dateKey}-${plan.title}`} className="rounded-[1.1rem] border border-[#E4ECFA] bg-white px-3 py-2.5">
+                                <div className="flex items-start gap-2">
+                                  <span
+                                    className={cn(
+                                      'mt-0.5 inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full border text-[10px] font-black',
+                                      plan.done
+                                        ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
+                                        : 'border-[#FFD7BA] bg-[#FFF8F2] text-[#C95A08]'
+                                    )}
+                                  >
+                                    {plan.done ? '✓' : '·'}
+                                  </span>
+                                  <div className="min-w-0 flex-1">
+                                    <div className="flex flex-wrap items-center gap-1.5">
+                                      <Badge className="h-5 rounded-full border-none bg-[#EEF4FF] px-2 text-[9px] font-black text-[#2554D7]">
+                                        {getFocusPlanCategoryLabel(plan.category)}
+                                      </Badge>
+                                      {plan.priority === 'high' ? (
+                                        <Badge className="h-5 rounded-full border-none bg-[#FFF2E8] px-2 text-[9px] font-black text-[#C95A08]">
+                                          중요
+                                        </Badge>
+                                      ) : null}
+                                    </div>
+                                    <p className={cn('mt-1 truncate text-xs font-black text-[#14295F]', plan.done && 'text-[#6E7EA3] line-through')}>
+                                      {plan.title || '제목 없는 계획'}
+                                    </p>
+                                    {metaLabel ? (
+                                      <p className="mt-0.5 truncate text-[10px] font-bold text-[#6E7EA3]">{metaLabel}</p>
+                                    ) : null}
+                                  </div>
+                                </div>
+                              </div>
+                            );
+                          })}
+                          {selectedFocusPlanSummary.todayPlans.length > 5 ? (
+                            <p className="px-1 text-[10px] font-bold text-[#6E7EA3]">
+                              외 {selectedFocusPlanSummary.todayPlans.length - 5}개 계획
+                            </p>
+                          ) : null}
+                        </div>
+                      ) : (
+                        <div className="mt-3 rounded-[1.1rem] border border-dashed border-[#DCE7FF] bg-white px-3 py-5 text-center text-xs font-bold text-[#5C6E97]">
+                          오늘 등록된 계획이 없습니다.
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="min-w-0 rounded-2xl border border-[#DCE7FF] bg-[#FBFCFF] p-3">
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <div className="min-w-0">
+                          <div className="flex items-center gap-1.5 text-[#2554D7]">
+                            <History className="h-3.5 w-3.5" />
+                            <p className="text-[11px] font-black text-[#14295F]">최근 7일 계획</p>
+                          </div>
+                          <p className="mt-1 text-[10px] font-bold text-[#6E7EA3]">
+                            일자별 계획 완료 흐름
+                          </p>
+                        </div>
+                      </div>
+                      <div className="mt-3 space-y-2">
+                        {selectedFocusPlanSummary.daySummaries.map((day) => (
+                          <div key={day.dateKey} className="rounded-[1.1rem] border border-[#E4ECFA] bg-white px-3 py-2.5">
+                            <div className="flex items-center justify-between gap-3">
+                              <div className="min-w-0">
+                                <p className="text-[11px] font-black text-[#14295F]">{day.dateLabel}</p>
+                                <p className="mt-0.5 text-[10px] font-bold text-[#6E7EA3]">
+                                  {day.total > 0 ? `${day.done}/${day.total} 완료` : '계획 없음'}
+                                </p>
+                              </div>
+                              <Badge
+                                className={cn(
+                                  'h-6 shrink-0 rounded-full border-none px-2.5 text-[10px] font-black',
+                                  day.rate === null
+                                    ? 'bg-[#F3F6FC] text-[#7B89A8]'
+                                    : day.rate >= 80
+                                      ? 'bg-emerald-50 text-emerald-700'
+                                      : day.rate >= 40
+                                        ? 'bg-[#FFF8F2] text-[#C95A08]'
+                                        : 'bg-rose-50 text-rose-600'
+                                )}
+                              >
+                                {day.rate === null ? '-' : `${day.rate}%`}
+                              </Badge>
+                            </div>
+                            {day.previewPlans.length > 0 ? (
+                              <div className="mt-2 space-y-1">
+                                {day.previewPlans.map((plan) => (
+                                  <p key={plan.id || `${day.dateKey}-${plan.title}`} className="truncate text-[10px] font-bold text-[#5C6E97]">
+                                    {plan.done ? '완료' : '미완료'} · {plan.title || '제목 없는 계획'}
+                                  </p>
+                                ))}
+                              </div>
+                            ) : null}
+                          </div>
+                        ))}
+                      </div>
                     </div>
                   </div>
 
