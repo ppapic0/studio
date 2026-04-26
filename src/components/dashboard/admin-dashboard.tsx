@@ -142,6 +142,21 @@ type AdminSmsRecipientPreference = {
 
 const buildSmsRecipientPreferenceId = (studentId: string, parentUid: string) => `${studentId}_${parentUid}`;
 
+const buildAdminCheckInTimeLabel = (
+  signal: Pick<CenterAdminAttendanceSeatSignal, 'checkedAtLabel' | 'firstCheckInLabel'>,
+  fallback = '입실 시간 확인 필요'
+) => {
+  const firstCheckInLabel = signal.firstCheckInLabel?.trim();
+  const checkedAtLabel = signal.checkedAtLabel?.trim();
+
+  if (firstCheckInLabel && checkedAtLabel && firstCheckInLabel !== checkedAtLabel) {
+    return `최초입실 ${firstCheckInLabel} · 최근입실 ${checkedAtLabel}`;
+  }
+  if (firstCheckInLabel) return `최초입실 ${firstCheckInLabel}`;
+  if (checkedAtLabel) return `입실 ${checkedAtLabel}`;
+  return fallback;
+};
+
 const isLikelyUid = (value: string): boolean => {
   const normalized = value.trim();
   if (!normalized) return false;
@@ -865,6 +880,7 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
       studentMember,
       seatLabel,
       plannedArrival: signal.routineExpectedArrivalTime || student?.expectedArrivalTime || '-',
+      firstCheckInLabel: signal.firstCheckInLabel || '-',
       plannedDeparture: signal.plannedDepartureTime || '-',
       outingLabel,
       scheduleLabel: scheduleLabel || classScheduleLabel || '등록된 일정 없음',
@@ -2856,12 +2872,11 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
                 ? '루틴누락'
                 : signal.attendanceRiskLabel;
 
+        const checkInLabel = buildAdminCheckInTimeLabel(signal, '');
         const detailLabel =
           signal.routineExpectedArrivalTime
-            ? `${signal.routineExpectedArrivalTime} 기준`
-            : signal.checkedAtLabel
-              ? `${signal.checkedAtLabel} 확인`
-              : signal.note;
+            ? `${signal.routineExpectedArrivalTime} 기준${checkInLabel ? ` · ${checkInLabel}` : ''}`
+            : checkInLabel || signal.note;
 
         return {
           studentId: signal.studentId,
@@ -3479,7 +3494,7 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
               label: '지각',
               title: `지각 학생 ${adminLateSignals.length}명`,
               detail: `${adminLateSignals[0].studentName} 학생부터 오늘 지각 흐름을 확인하고 교실 진입 이후 상태를 살펴보세요.`,
-              meta: adminLateSignals[0].checkedAtLabel ? `입실 ${adminLateSignals[0].checkedAtLabel}` : '입실 시간 확인 필요',
+              meta: buildAdminCheckInTimeLabel(adminLateSignals[0]),
               tone: 'orange' as const,
               onClick: () => openAdminAttendanceSignal(adminLateSignals[0]),
             }
@@ -3558,7 +3573,7 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
             key: `late-${signal.seatId}`,
             title: signal.studentName,
             detail: signal.note || '지각 입실 이후 수업 흐름을 다시 확인할 필요가 있습니다.',
-            meta: signal.checkedAtLabel ? `입실 ${signal.checkedAtLabel}` : '입실 시간 확인 필요',
+            meta: buildAdminCheckInTimeLabel(signal),
             badge: roomLabel,
             tone: 'orange' as const,
             onClick: () => openAdminAttendanceSignal(signal),
@@ -5549,10 +5564,14 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
                   </div>
 
                   <div className="space-y-3 bg-[#F7FAFF] p-5">
-                    <div className="grid gap-3 sm:grid-cols-2">
+                    <div className="grid gap-3 sm:grid-cols-3">
                       <div className="rounded-2xl border border-[#DCE7FF] bg-white p-4">
                         <p className="text-[10px] font-black uppercase tracking-[0.16em] text-[#5C6E97]">오늘 등원 예정</p>
                         <p className="mt-2 text-lg font-black text-[#14295F]">{selectedAttendanceDetail.plannedArrival}</p>
+                      </div>
+                      <div className="rounded-2xl border border-[#DCE7FF] bg-white p-4">
+                        <p className="text-[10px] font-black uppercase tracking-[0.16em] text-[#5C6E97]">오늘 최초입실</p>
+                        <p className="mt-2 text-lg font-black text-[#14295F]">{selectedAttendanceDetail.firstCheckInLabel}</p>
                       </div>
                       <div className="rounded-2xl border border-[#DCE7FF] bg-white p-4">
                         <p className="text-[10px] font-black uppercase tracking-[0.16em] text-[#5C6E97]">오늘 하원 예정</p>
@@ -5703,9 +5722,9 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
                         </div>
                       </div>
                       <div className="shrink-0 text-right">
-                        {student.checkedAtLabel ? (
+                        {student.firstCheckInLabel || student.checkedAtLabel ? (
                           <p className="text-[11px] font-bold text-[#5c6e97]">
-                            입실 {student.checkedAtLabel}
+                            {buildAdminCheckInTimeLabel(student)}
                           </p>
                         ) : null}
                         <p className="mt-2 text-[11px] font-black text-[#2554D7]">학생 KPI 보기</p>
