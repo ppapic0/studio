@@ -1284,7 +1284,7 @@ export function MarketingConsultingCRM({
                           {canManageLeadData ? (
                             <Button
                               type="button"
-                              className="h-9 rounded-lg bg-[#14295F] px-3 text-xs font-black hover:bg-[#0f214d]"
+                              className="h-9 rounded-lg bg-[#14295F] px-3 text-xs font-black text-white hover:bg-[#0f214d] hover:text-white disabled:text-white/80"
                               onClick={() => void handleMoveWebsiteRequestToDb(request)}
                               disabled={isMoving}
                             >
@@ -2298,7 +2298,7 @@ export function MarketingConsultingCRM({
                     {canManageLeadData && !selectedWebsiteRequest.linkedLeadId ? (
                       <Button
                         type="button"
-                        className="h-10 rounded-xl bg-[#14295F] font-black hover:bg-[#0f214d]"
+                        className="h-10 rounded-xl bg-[#14295F] font-black text-white hover:bg-[#0f214d] hover:text-white disabled:text-white/80"
                         onClick={() => void handleMoveWebsiteRequestToDb(selectedWebsiteRequest)}
                         disabled={movingWebsiteRequestId === selectedWebsiteRequest.id}
                       >
