@@ -704,7 +704,7 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
     if (!firestore || !centerId) return null;
     return doc(firestore, 'centers', centerId);
   }, [firestore, centerId]);
-  const { data: centerData } = useDoc<any>(centerRef);
+  const { data: centerData, isLoading: centerDataLoading } = useDoc<any>(centerRef);
 
   const openClawIntegrationRef = useMemoFirebase(() => {
     if (!firestore || !centerId) return null;
@@ -723,11 +723,14 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
   const { data: pointBoostEvents } = useCollection<PointBoostEvent>(pointBoostEventsQuery, { enabled: isActive });
 
   const persistedRooms = useMemo(
-    () => normalizeLayoutRooms(centerData?.layoutSettings),
-    [centerData?.layoutSettings]
+    () => (centerData ? normalizeLayoutRooms(centerData.layoutSettings) : []),
+    [centerData]
   );
 
   useEffect(() => {
+    if (centerDataLoading) return;
+    if (!centerData) return;
+
     setRoomDrafts((prev) => {
       if (!hasHydratedRoomDraftsRef.current) {
         hasHydratedRoomDraftsRef.current = true;
@@ -745,7 +748,7 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
       });
       return next;
     });
-  }, [persistedRooms]);
+  }, [centerData, centerDataLoading, persistedRooms]);
 
   const roomConfigs = useMemo(
     () =>
@@ -798,12 +801,13 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
   );
 
   useEffect(() => {
+    if (centerDataLoading) return;
     if (hasInitializedRoomViewRef.current || roomConfigs.length === 0) return;
     hasInitializedRoomViewRef.current = true;
     if (selectedRoomView === 'all') {
       setSelectedRoomView(roomConfigs[0].id);
     }
-  }, [roomConfigs, selectedRoomView]);
+  }, [centerDataLoading, roomConfigs, selectedRoomView]);
 
   useEffect(() => {
     if (roomConfigs.length === 0) {
@@ -1112,6 +1116,89 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
   const getLegacySeatDocId = (seat?: ResolvedAttendanceSeat | null) => {
     const legacySeatDocId = typeof seat?.seatDocId === 'string' ? seat.seatDocId.trim() : '';
     return legacySeatDocId && legacySeatDocId !== seat?.id ? legacySeatDocId : '';
+  };
+
+  const syncAdminRoomLayoutBatch = (
+    batch: ReturnType<typeof writeBatch>,
+    roomId: string,
+    nextRooms: LayoutRoomConfig[],
+    nextAisleSeatIds: string[]
+  ) => {
+    if (!firestore || !centerId) return;
+
+    const safeFirestore = firestore;
+    const safeCenterId = centerId;
+    const roomConfig = nextRooms.find((room) => room.id === roomId);
+    if (!roomConfig) return;
+
+    const nextAisleSeatIdSet = new Set(nextAisleSeatIds);
+    const roomSeatsToNormalize = resolvedAttendanceList.filter(
+      (seat) => seat.roomId === roomId && seat.roomSeatNo > 0 && seat.roomSeatNo <= roomConfig.rows * roomConfig.cols
+    );
+
+    roomSeatsToNormalize.forEach((seat) => {
+      const canonicalSeatId = buildSeatId(roomId, seat.roomSeatNo);
+      if (!canonicalSeatId) return;
+
+      const normalizedType = nextAisleSeatIdSet.has(canonicalSeatId) ? 'aisle' : 'seat';
+      const studentId = typeof seat.studentId === 'string' ? seat.studentId.trim() : '';
+      const manualOccupantName =
+        typeof seat.manualOccupantName === 'string' ? seat.manualOccupantName.trim() : '';
+
+      batch.set(
+        doc(safeFirestore, 'centers', safeCenterId, 'attendanceCurrent', canonicalSeatId),
+        {
+          seatNo: getGlobalSeatNo(roomId, seat.roomSeatNo),
+          roomId,
+          roomSeatNo: seat.roomSeatNo,
+          seatLabel: seat.seatLabel ?? deleteField(),
+          seatGenderPolicy:
+            normalizedType === 'aisle' || !seat.seatGenderPolicy || seat.seatGenderPolicy === 'all'
+              ? deleteField()
+              : seat.seatGenderPolicy,
+          type: normalizedType,
+          studentId: normalizedType === 'aisle' ? null : studentId || null,
+          manualOccupantName:
+            normalizedType === 'aisle' || !manualOccupantName ? deleteField() : manualOccupantName,
+          seatZone: normalizedType === 'aisle' ? deleteField() : seat.seatZone || null,
+          status: normalizedType === 'aisle' ? 'absent' : seat.status || 'absent',
+          lastCheckInAt:
+            normalizedType === 'aisle' || !seat.lastCheckInAt ? deleteField() : seat.lastCheckInAt,
+          updatedAt: serverTimestamp(),
+        },
+        { merge: true }
+      );
+
+      const legacySeatDocId = getLegacySeatDocId(seat);
+      if (legacySeatDocId) {
+        batch.delete(doc(safeFirestore, 'centers', safeCenterId, 'attendanceCurrent', legacySeatDocId));
+      }
+
+      if (!studentId || !studentsById.has(studentId)) return;
+
+      if (normalizedType === 'aisle') {
+        batch.update(doc(safeFirestore, 'centers', safeCenterId, 'students', studentId), {
+          seatNo: 0,
+          seatId: deleteField(),
+          roomId: deleteField(),
+          roomSeatNo: deleteField(),
+          seatLabel: deleteField(),
+          seatZone: deleteField(),
+          updatedAt: serverTimestamp(),
+        });
+        return;
+      }
+
+      batch.update(doc(safeFirestore, 'centers', safeCenterId, 'students', studentId), {
+        seatNo: getGlobalSeatNo(roomId, seat.roomSeatNo),
+        seatId: canonicalSeatId,
+        roomId,
+        roomSeatNo: seat.roomSeatNo,
+        seatLabel: seat.seatLabel ?? deleteField(),
+        seatZone: seat.seatZone || null,
+        updatedAt: serverTimestamp(),
+      });
+    });
   };
 
   const {
@@ -3334,8 +3421,8 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
                         </Button>
                         <Button
                           type="button"
-                          onClick={() => void handleSaveAdminRoomSettings(activeRoom.id)}
-                          disabled={isClassroomLayoutSaving || (!hasActiveRoomDraftChanges && activeRoomConflicts.length === 0)}
+                          onClick={() => handleAdminEditModeSaveClick(activeRoom.id)}
+                          disabled={isClassroomLayoutSaving}
                           className="h-10 rounded-xl bg-[#FF7A16] px-4 font-black text-white hover:bg-[#EB6E12]"
                         >
                           {isClassroomLayoutSaving ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> : <Save className="mr-1.5 h-4 w-4" />}
@@ -3816,6 +3903,7 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
         },
         { merge: true }
       );
+      syncAdminRoomLayoutBatch(batch, roomId, nextRooms, nextAisleSeatIds);
 
       setOptimisticAisleSeatIds(nextAisleSeatIds);
       await batch.commit();
@@ -3832,11 +3920,81 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
       });
     } catch (error) {
       setOptimisticAisleSeatIds(null);
+      logHandledClientIssue('[admin-dashboard] save classroom room settings failed', error);
       toast({ variant: 'destructive', title: '배치 저장 실패' });
     } finally {
       setIsClassroomLayoutSaving(false);
     }
   };
+
+  const handlePersistAdminCurrentRoomLayout = async (roomId: string) => {
+    if (!firestore || !centerId) return;
+
+    const roomConfig = roomConfigs.find((room) => room.id === roomId);
+    if (!roomConfig) return;
+
+    const nextRooms = roomConfigs.map((room) => ({ ...room }));
+    const nextMaxCells = roomConfig.rows * roomConfig.cols;
+    const nextAisleSeatIds = effectiveAisleSeatIds.filter((seatId) => {
+      const parsed = parseSeatId(seatId);
+      if (!parsed) return false;
+      if (parsed.roomId !== roomId) return true;
+      return parsed.roomSeatNo <= nextMaxCells;
+    });
+    const nextSeatLabelsBySeatId = filterSeatLabelsByRooms(nextRooms);
+    const nextSeatGenderBySeatId = filterSeatGenderByRooms(nextRooms);
+
+    setIsClassroomLayoutSaving(true);
+    try {
+      const batch = writeBatch(firestore);
+      batch.set(
+        doc(firestore, 'centers', centerId),
+        {
+          layoutSettings: {
+            aisleSeatIds: nextAisleSeatIds,
+            seatLabelsBySeatId: nextSeatLabelsBySeatId,
+            seatGenderBySeatId: nextSeatGenderBySeatId,
+            rows: nextRooms[0]?.rows ?? roomConfig.rows,
+            cols: nextRooms[0]?.cols ?? roomConfig.cols,
+            rooms: nextRooms,
+            updatedAt: serverTimestamp(),
+          },
+        },
+        { merge: true }
+      );
+      syncAdminRoomLayoutBatch(batch, roomId, nextRooms, nextAisleSeatIds);
+      setOptimisticAisleSeatIds(nextAisleSeatIds);
+      await batch.commit();
+
+      toast({
+        title: `${roomConfig.name} 배치를 저장했습니다.`,
+        description: '현재 보이는 좌석판과 통로 설정을 운영실 기준값으로 다시 맞췄습니다.',
+      });
+    } catch (error) {
+      setOptimisticAisleSeatIds(null);
+      logHandledClientIssue('[admin-dashboard] persist classroom layout failed', error);
+      toast({ variant: 'destructive', title: '배치 저장 실패' });
+    } finally {
+      setIsClassroomLayoutSaving(false);
+    }
+  };
+
+  const handleAdminEditModeSaveClick = (roomId: string) => {
+    const roomDraft = roomDrafts[roomId];
+    const persistedRoom = persistedRoomMap.get(roomId);
+    const hasDraftChanges =
+      Boolean(roomDraft && persistedRoom) &&
+      (roomDraft?.rows !== persistedRoom?.rows || roomDraft?.cols !== persistedRoom?.cols);
+    const hasResizeConflicts = (roomResizeConflicts.get(roomId) || []).length > 0;
+
+    if (hasDraftChanges || hasResizeConflicts) {
+      void handleSaveAdminRoomSettings(roomId);
+      return;
+    }
+
+    void handlePersistAdminCurrentRoomLayout(roomId);
+  };
+
   const handleToggleAdminCellType = async () => {
     if (!firestore || !centerId || !selectedLayoutSeat) return;
 
