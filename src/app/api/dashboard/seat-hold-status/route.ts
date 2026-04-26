@@ -36,7 +36,7 @@ class ApiError extends Error {
 const seatHoldStatusSchema = z.object({
   centerId: z.string().trim().min(1, '센터 정보를 확인해 주세요.'),
   seatHoldId: z.string().trim().min(1, '좌석예약 요청 정보를 확인해 주세요.'),
-  nextStatus: z.enum(['held', 'canceled']),
+  nextStatus: z.enum(['held', 'pending_transfer', 'canceled']),
   seatAssignment: z
     .object({
       seatId: z.string().trim().min(1, '좌석 정보를 확인해 주세요.'),
@@ -130,8 +130,60 @@ export async function POST(request: NextRequest) {
 
       const seatHold = { ...(seatHoldSnap.data() as WebsiteSeatHoldRequest), id: seatHoldSnap.id };
       const nowIso = new Date().toISOString();
+      const releaseReservedAttendanceSeat = () => {
+        const expectedManualName = `예약 ${seatHold.studentName}`;
+        let releasedSeatCount = 0;
+
+        attendanceSnap.docs.forEach((doc) => {
+          const attendance = doc.data() as AttendanceCurrent;
+          const manualName = typeof attendance.manualOccupantName === 'string' ? attendance.manualOccupantName.trim() : '';
+          const requestId = (attendance as unknown as { seatHoldRequestId?: unknown }).seatHoldRequestId;
+          const linkedToSeatHold =
+            requestId === seatHold.id ||
+            manualName === expectedManualName ||
+            (doc.id === seatHold.seatId && manualName === seatHold.studentName);
+
+          if (!linkedToSeatHold || attendance.studentId) return;
+
+          transaction.delete(doc.ref);
+          releasedSeatCount += 1;
+        });
+
+        return releasedSeatCount;
+      };
+
+      if (nextStatus === 'pending_transfer') {
+        if (seatHold.status === 'canceled') {
+          throw new ApiError(409, '취소된 좌석예약 요청은 다시 대기로 되돌릴 수 없습니다.');
+        }
+
+        if (seatHold.status !== 'held') {
+          return {
+            nextStatus,
+            releasedSeatCount: 0,
+            alreadyReleased: true,
+            canceledCompetingCount: 0,
+          };
+        }
+
+        const releasedSeatCount = releaseReservedAttendanceSeat();
+        transaction.update(seatHoldRef, {
+          status: 'pending_transfer',
+          updatedAt: nowIso,
+          confirmedAt: null,
+          canceledAt: null,
+          updatedByUid: session.uid,
+        });
+
+        return {
+          nextStatus,
+          releasedSeatCount,
+          canceledCompetingCount: 0,
+        };
+      }
 
       if (nextStatus === 'canceled') {
+        const releasedSeatCount = seatHold.status === 'held' ? releaseReservedAttendanceSeat() : 0;
         transaction.update(seatHoldRef, {
           status: 'canceled',
           updatedAt: nowIso,
@@ -142,6 +194,7 @@ export async function POST(request: NextRequest) {
 
         return {
           nextStatus,
+          releasedSeatCount,
           canceledCompetingCount: 0,
         };
       }

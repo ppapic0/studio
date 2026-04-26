@@ -404,9 +404,17 @@ type ResolvedAttendanceSeat = AttendanceCurrent & {
   roomId: string;
   roomSeatNo: number;
   seatDocId?: string;
+  seatHoldRequestId?: string | null;
 };
 
-type LayoutSeatActionMode = 'menu' | 'student' | 'reservation';
+type LayoutSeatActionMode = 'menu' | 'student' | 'reservation' | 'releaseReservation';
+
+const getSeatHoldRequestId = (seat?: Partial<ResolvedAttendanceSeat> | null) => {
+  const value = (seat as { seatHoldRequestId?: unknown } | null | undefined)?.seatHoldRequestId;
+  return typeof value === 'string' ? value.trim() : '';
+};
+
+const getSeatHoldOccupantName = (seatHold: WebsiteSeatHoldRequest) => `예약 ${seatHold.studentName}`;
 
 const EMPTY_ADMIN_METRICS = {
   totalTodayMins: 0,
@@ -1289,6 +1297,36 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
       .slice(0, 60);
   }, [normalizedLayoutSeatActionSearch, websiteSeatHoldRequests]);
 
+  const layoutSeatHeldReservationLookup = useMemo(() => {
+    const byId = new Map<string, WebsiteSeatHoldRequest>();
+    const bySeatId = new Map<string, WebsiteSeatHoldRequest>();
+
+    (websiteSeatHoldRequests || []).forEach((seatHold) => {
+      if (seatHold.status !== 'held') return;
+
+      byId.set(seatHold.id, seatHold);
+      const seatId = seatHold.seatId || buildSeatId(seatHold.roomId, Number(seatHold.roomSeatNo || 0));
+      if (seatId) {
+        bySeatId.set(seatId, seatHold);
+      }
+    });
+
+    return { byId, bySeatId };
+  }, [websiteSeatHoldRequests]);
+
+  const selectedLayoutSeatReservationHold = useMemo(() => {
+    if (!selectedLayoutSeat) return null;
+
+    const seatHoldRequestId = getSeatHoldRequestId(selectedLayoutSeat);
+    if (seatHoldRequestId) {
+      const byRequestId = layoutSeatHeldReservationLookup.byId.get(seatHoldRequestId);
+      if (byRequestId) return byRequestId;
+    }
+
+    const seatId = buildSeatId(selectedLayoutSeat.roomId, selectedLayoutSeat.roomSeatNo) || selectedLayoutSeat.id;
+    return layoutSeatHeldReservationLookup.bySeatId.get(seatId) || null;
+  }, [layoutSeatHeldReservationLookup, selectedLayoutSeat]);
+
   const smsRecipientPreferencesByKey = useMemo(
     () => new Map((smsRecipientPreferences || []).map((preference) => [preference.id, preference])),
     [smsRecipientPreferences]
@@ -1379,9 +1417,14 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
   const getSeatForRoom = (room: LayoutRoomConfig, roomSeatNo: number): ResolvedAttendanceSeat => {
     const seatId = buildSeatId(room.id, roomSeatNo);
     const existingSeat = seatById.get(seatId);
+    const heldReservation = layoutSeatHeldReservationLookup.bySeatId.get(seatId);
     if (existingSeat) {
+      const manualOccupantName =
+        typeof existingSeat.manualOccupantName === 'string' ? existingSeat.manualOccupantName.trim() : '';
       return {
         ...existingSeat,
+        manualOccupantName: manualOccupantName || (heldReservation ? getSeatHoldOccupantName(heldReservation) : existingSeat.manualOccupantName),
+        seatHoldRequestId: getSeatHoldRequestId(existingSeat) || heldReservation?.id || null,
         seatLabel: existingSeat.seatLabel || persistedSeatLabelsBySeatId[seatId],
         seatGenderPolicy: existingSeat.seatGenderPolicy || persistedSeatGenderBySeatId[seatId],
         type: effectiveAisleSeatIdSet.has(seatId) ? 'aisle' : existingSeat.type || 'seat',
@@ -1394,6 +1437,8 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
       roomSeatNo,
       seatNo: getGlobalSeatNo(room.id, roomSeatNo),
       status: 'absent',
+      manualOccupantName: heldReservation ? getSeatHoldOccupantName(heldReservation) : null,
+      seatHoldRequestId: heldReservation?.id || null,
       seatLabel: persistedSeatLabelsBySeatId[seatId],
       seatGenderPolicy: persistedSeatGenderBySeatId[seatId],
       type: effectiveAisleSeatIdSet.has(seatId) ? 'aisle' : 'seat',
@@ -3925,6 +3970,12 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
   function renderLayoutSeatActionDialog() {
     const selectedSeatLabel = selectedLayoutSeatLabel || '선택 좌석';
     const isSavingSeatAction = Boolean(layoutSeatActionSavingId) || isClassroomLayoutSaving;
+    const releaseSeatHold = selectedLayoutSeatReservationHold;
+    const isReleaseReservationMode = layoutSeatActionMode === 'releaseReservation';
+    const actionDialogTitle = isReleaseReservationMode ? '예약 배정을 해제할까요?' : '빈 좌석을 어떻게 사용할까요?';
+    const actionDialogDescription = isReleaseReservationMode
+      ? '좌석 표시를 비우고 예약 요청은 입금 확인 대기 상태로 되돌립니다.'
+      : '통로로 비워두거나, 미배정 학생 또는 좌석예약 요청을 바로 이 좌석에 연결합니다.';
 
     return (
       <Dialog
@@ -3942,17 +3993,66 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
                   {selectedSeatLabel}
                 </Badge>
               </div>
-              <DialogTitle className="text-2xl font-black tracking-tight">
-                빈 좌석을 어떻게 사용할까요?
-              </DialogTitle>
+              <DialogTitle className="text-2xl font-black tracking-tight">{actionDialogTitle}</DialogTitle>
               <DialogDescription className="text-sm font-medium text-white/76">
-                통로로 비워두거나, 미배정 학생 또는 좌석예약 요청을 바로 이 좌석에 연결합니다.
+                {actionDialogDescription}
               </DialogDescription>
             </DialogHeader>
           </div>
 
           <div className="max-h-[68vh] overflow-y-auto bg-[linear-gradient(180deg,#F7FAFF_0%,#EEF4FF_100%)] px-5 py-5">
-            {layoutSeatActionMode === 'menu' ? (
+            {isReleaseReservationMode ? (
+              releaseSeatHold ? (
+                <div className="space-y-4">
+                  <div className="rounded-[1.6rem] border border-emerald-200 bg-white p-5 shadow-[0_18px_34px_-30px_rgba(20,41,95,0.18)]">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <Badge className="border-none bg-emerald-50 text-[10px] font-black text-emerald-700">예약 배정</Badge>
+                      <Badge className="border-none bg-[#EEF4FF] text-[10px] font-black text-[#2554D7]">{selectedSeatLabel}</Badge>
+                    </div>
+                    <p className="mt-4 text-lg font-black text-[#14295F]">{releaseSeatHold.studentName}</p>
+                    <p className="mt-2 text-xs font-bold leading-5 text-[#5c6e97]">
+                      {releaseSeatHold.consultPhone || '연락처 없음'} · {releaseSeatHold.school || '학교 미등록'}
+                      {releaseSeatHold.grade ? ` · ${releaseSeatHold.grade}` : ''}
+                    </p>
+                    <div className="mt-4 rounded-[1.2rem] border border-[#FFE0C2] bg-[#FFF8F1] px-4 py-3">
+                      <p className="text-xs font-black text-[#C95A08]">해제 후에는 빈 좌석으로 표시됩니다.</p>
+                      <p className="mt-1 text-xs font-bold leading-5 text-[#8A5A2B]">
+                        예약 요청은 취소하지 않고 입금 확인 대기 목록으로 돌려 다시 배정할 수 있게 둡니다.
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex flex-wrap justify-end gap-2">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={closeLayoutSeatActionDialog}
+                      disabled={isSavingSeatAction}
+                      className="h-11 rounded-xl border-[#DCE7FF] bg-white px-4 font-black text-[#14295F]"
+                    >
+                      닫기
+                    </Button>
+                    <Button
+                      type="button"
+                      onClick={() => void handleReleaseReservationFromLayoutSeat(releaseSeatHold)}
+                      disabled={isSavingSeatAction}
+                      className="h-11 rounded-xl bg-rose-600 px-4 font-black text-white hover:bg-rose-700"
+                    >
+                      {layoutSeatActionSavingId === `release:${releaseSeatHold.id}` ? (
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      ) : (
+                        <Trash2 className="mr-2 h-4 w-4" />
+                      )}
+                      예약 해제
+                    </Button>
+                  </div>
+                </div>
+              ) : (
+                <div className="rounded-[1.6rem] border border-dashed border-[#DCE7FF] bg-white px-5 py-8 text-center">
+                  <p className="text-base font-black text-[#14295F]">연결된 예약 요청을 찾지 못했습니다.</p>
+                  <p className="mt-2 text-xs font-bold text-[#5c6e97]">목록을 새로 불러온 뒤 다시 눌러 주세요.</p>
+                </div>
+              )
+            ) : layoutSeatActionMode === 'menu' ? (
               <div className="grid gap-3 sm:grid-cols-3">
                 <button
                   type="button"
@@ -4703,6 +4803,18 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
       }
       const manualOccupantName =
         typeof normalizedSeat.manualOccupantName === 'string' ? normalizedSeat.manualOccupantName.trim() : '';
+      const seatHoldRequestId = getSeatHoldRequestId(normalizedSeat);
+      const selectedSeatId = buildSeatId(normalizedSeat.roomId, normalizedSeat.roomSeatNo) || normalizedSeat.id;
+      const reservationHold =
+        (seatHoldRequestId && layoutSeatHeldReservationLookup.byId.get(seatHoldRequestId)) ||
+        layoutSeatHeldReservationLookup.bySeatId.get(selectedSeatId) ||
+        null;
+      if (normalizedSeat.type !== 'aisle' && !normalizedSeat.studentId && reservationHold) {
+        setLayoutSeatActionMode('releaseReservation');
+        setLayoutSeatActionSearch('');
+        setIsLayoutSeatActionDialogOpen(true);
+        return;
+      }
       if (normalizedSeat.type !== 'aisle' && !normalizedSeat.studentId && !manualOccupantName) {
         setLayoutSeatActionMode('menu');
         setLayoutSeatActionSearch('');
@@ -5365,6 +5477,56 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
       });
     } catch (error: any) {
       toast({ variant: 'destructive', title: '예약 배정 실패', description: error?.message });
+    } finally {
+      setIsClassroomLayoutSaving(false);
+      setLayoutSeatActionSavingId(null);
+    }
+  };
+
+  const handleReleaseReservationFromLayoutSeat = async (seatHold: WebsiteSeatHoldRequest) => {
+    if (!centerId || !selectedLayoutSeat) return;
+
+    const seatId = buildSeatId(selectedLayoutSeat.roomId, selectedLayoutSeat.roomSeatNo) || selectedLayoutSeat.id;
+
+    setLayoutSeatActionSavingId(`release:${seatHold.id}`);
+    setIsClassroomLayoutSaving(true);
+    try {
+      const response = await fetch('/api/dashboard/seat-hold-status', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          centerId,
+          seatHoldId: seatHold.id,
+          nextStatus: 'pending_transfer',
+        }),
+      });
+      const result = await response.json();
+      if (!response.ok || !result?.ok) {
+        throw new Error(result?.message || '예약 배정 해제 중 오류가 발생했습니다.');
+      }
+
+      setSelectedLayoutSeat((current) =>
+        current
+          ? {
+              ...current,
+              id: seatId,
+              manualOccupantName: null,
+              seatHoldRequestId: null,
+              studentId: undefined,
+              type: 'seat',
+              status: 'absent',
+            }
+          : current
+      );
+      closeLayoutSeatActionDialog();
+      toast({
+        title: `${seatHold.studentName} 좌석예약 배정을 해제했습니다.`,
+        description: `${formatSeatLabel(selectedLayoutSeat, roomConfigs, '선택 셀', persistedSeatLabelsBySeatId)}을 빈 좌석으로 되돌렸습니다.`,
+      });
+    } catch (error: any) {
+      toast({ variant: 'destructive', title: '예약 해제 실패', description: error?.message });
     } finally {
       setIsClassroomLayoutSaving(false);
       setLayoutSeatActionSavingId(null);
