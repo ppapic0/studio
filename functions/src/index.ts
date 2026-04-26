@@ -36,6 +36,7 @@ type InviteDoc = {
 type AttendanceSmsEventType =
   | "study_start"
   | "away_start"
+  | "away_end"
   | "study_end"
   | "late_alert"
   | "check_in"
@@ -1967,10 +1968,128 @@ function applyTemplate(template: string, values: Record<string, string>): string
   }, template);
 }
 
+function buildParentSmsTemplateMessage(
+  template: string,
+  values: Record<string, string>
+): string {
+  return trimSmsToByteLimit(
+    normalizeTrackManagedSmsMessage(applyTemplate(template, values), { ensurePrefix: true })
+  );
+}
+
+function shouldEnsureTrackManagedSmsPrefix(eventType: SmsQueueEventType): boolean {
+  return (
+    eventType === "study_start" ||
+    eventType === "away_start" ||
+    eventType === "away_end" ||
+    eventType === "study_end" ||
+    eventType === "late_alert" ||
+    eventType === "daily_report" ||
+    eventType === "payment_reminder" ||
+    eventType === "weekly_report"
+  );
+}
+
+function isAttendanceSmsEventType(value: unknown): value is AttendanceSmsEventType {
+  const normalized = String(value || "").trim();
+  return (
+    normalized === "study_start" ||
+    normalized === "away_start" ||
+    normalized === "away_end" ||
+    normalized === "study_end" ||
+    normalized === "late_alert" ||
+    normalized === "check_in" ||
+    normalized === "check_out"
+  );
+}
+
 function normalizeSmsEventType(eventType: AttendanceSmsEventType): "study_start" | "away_start" | "away_end" | "study_end" | "late_alert" {
   if (eventType === "check_in") return "study_start";
   if (eventType === "check_out") return "study_end";
   return eventType;
+}
+
+function toKstDateFromUnknownTimestamp(value: unknown): Date | null {
+  const millis = toMillisSafe(value);
+  if (!millis) return null;
+  return toKstDate(new Date(millis));
+}
+
+function pickSmsEventDate(candidates: Date[], mode: "earliest" | "latest"): Date | null {
+  if (candidates.length === 0) return null;
+  return candidates
+    .slice()
+    .sort((a, b) => mode === "earliest" ? a.getTime() - b.getTime() : b.getTime() - a.getTime())[0] || null;
+}
+
+async function resolveAttendanceSmsEventAt(
+  db: admin.firestore.Firestore,
+  params: {
+    centerId: string;
+    studentId: string;
+    eventType: AttendanceSmsEventType;
+    fallbackEventAt: Date;
+    dateKeyOverride?: string | null;
+  }
+): Promise<Date> {
+  const eventType = normalizeSmsEventType(params.eventType);
+  if (eventType === "late_alert") return params.fallbackEventAt;
+
+  const dateKey = asTrimmedString(params.dateKeyOverride) || toDateKey(params.fallbackEventAt);
+  const candidates: Date[] = [];
+  const addCandidate = (value: unknown) => {
+    const candidate = toKstDateFromUnknownTimestamp(value);
+    if (!candidate) return;
+    if (toDateKey(candidate) !== dateKey) return;
+    candidates.push(candidate);
+  };
+
+  const [dailyStatSnap, attendanceRecordSnap, attendanceEventsSnap, liveAttendanceSnap] = await Promise.all([
+    db.doc(`centers/${params.centerId}/attendanceDailyStats/${dateKey}/students/${params.studentId}`).get(),
+    db.doc(`centers/${params.centerId}/attendanceRecords/${dateKey}/students/${params.studentId}`).get(),
+    db.collection(`centers/${params.centerId}/attendanceEvents`).where("dateKey", "==", dateKey).get(),
+    db.collection(`centers/${params.centerId}/attendanceCurrent`).where("studentId", "==", params.studentId).limit(5).get(),
+  ]);
+
+  const dailyStatData = dailyStatSnap.exists ? dailyStatSnap.data() || {} : {};
+  const attendanceRecordData = attendanceRecordSnap.exists ? attendanceRecordSnap.data() || {} : {};
+
+  if (eventType === "study_start") {
+    addCandidate(dailyStatData.checkInAt);
+    addCandidate(attendanceRecordData.checkInAt);
+    liveAttendanceSnap.docs.forEach((docSnap) => {
+      const data = docSnap.data() || {};
+      const status = asTrimmedString(data.status);
+      if (ACTIVE_STUDY_ATTENDANCE_STATUSES.has(status)) {
+        addCandidate(data.lastCheckInAt);
+      }
+    });
+  }
+
+  if (eventType === "study_end") {
+    addCandidate(dailyStatData.checkOutAt);
+    addCandidate(attendanceRecordData.checkOutAt);
+  }
+
+  const matchingAttendanceEventTypes: Record<
+    "study_start" | "away_start" | "away_end" | "study_end",
+    string[]
+  > = {
+    study_start: ["check_in"],
+    away_start: ["away_start"],
+    away_end: ["away_end"],
+    study_end: ["check_out"],
+  };
+  const targetEventTypes = matchingAttendanceEventTypes[eventType];
+  attendanceEventsSnap.docs.forEach((docSnap) => {
+    const data = docSnap.data() || {};
+    if (asTrimmedString(data.studentId) !== params.studentId) return;
+    if (!targetEventTypes.includes(asTrimmedString(data.eventType))) return;
+    addCandidate(data.occurredAt || data.createdAt);
+  });
+
+  const picked = pickSmsEventDate(candidates, eventType === "study_start" ? "earliest" : "latest");
+  return picked || params.fallbackEventAt;
 }
 
 function getDefaultSmsEventToggles(): Record<ParentSmsEventType, boolean> {
@@ -2132,6 +2251,24 @@ function sanitizeSmsTemplate(template: string): string {
     .replace(/[^\u0020-\u007E\u00A0-\u00FF\u1100-\u11FF\u3130-\u318F\uAC00-\uD7A3]/g, "")
     .replace(/\s+/g, " ")
     .trim();
+}
+
+function normalizeTrackManagedSmsMessage(
+  message: string,
+  options: { ensurePrefix?: boolean } = {}
+): string {
+  const normalized = String(message || "").replace(/\s+/g, " ").trim();
+  if (!normalized) return "";
+
+  const requiredPrefix = `[${TRACK_MANAGED_STUDY_CENTER_NAME}]`;
+  if (normalized.startsWith(requiredPrefix)) return normalized;
+
+  const bracketPrefixPattern = /^\[[^\]]+\]\s*/;
+  if (bracketPrefixPattern.test(normalized)) {
+    return normalized.replace(bracketPrefixPattern, `${requiredPrefix} `).trim();
+  }
+
+  return options.ensurePrefix ? `${requiredPrefix} ${normalized}` : normalized;
 }
 
 async function loadCenterName(
@@ -2463,21 +2600,27 @@ async function queueParentSmsNotification(
   }
   const centerName = await loadCenterName(db, centerId);
   const template = resolveTemplateByEvent(settings, eventType);
+  const smsEventAt = await resolveAttendanceSmsEventAt(db, {
+    centerId,
+    studentId,
+    eventType,
+    fallbackEventAt: eventAt,
+  });
 
-  const eventTimeLabel = toTimeLabel(eventAt);
+  const eventTimeLabel = toTimeLabel(smsEventAt);
   const expectedTimeLabel = expectedTime || "학생이 정한 시간";
-  const message = trimSmsToByteLimit(applyTemplate(template, {
+  const message = buildParentSmsTemplateMessage(template, {
     studentName,
     time: eventTimeLabel,
     expectedTime: expectedTimeLabel,
     centerName,
-  }));
+  });
   const messageBytes = calculateSmsBytes(message);
   const dedupeKey = buildSmsDedupeKey({
     centerId,
     studentId,
     eventType,
-    eventAt,
+    eventAt: smsEventAt,
   });
   const dedupeRef = db.doc(`centers/${centerId}/smsDedupes/${dedupeKey}`);
   const dedupeSnap = await dedupeRef.get();
@@ -2526,7 +2669,7 @@ async function queueParentSmsNotification(
       messageBytes,
       dedupeKey,
       eventType,
-      dateKey: toDateKey(eventAt),
+      dateKey: toDateKey(smsEventAt),
       status: initialStatus.status,
       providerStatus: initialStatus.providerStatus,
       attemptCount: 0,
@@ -2541,6 +2684,7 @@ async function queueParentSmsNotification(
       metadata: {
         studentName,
         centerName,
+        eventTime: eventTimeLabel,
         expectedTime: expectedTime || null,
       },
     });
@@ -2647,7 +2791,9 @@ async function queueCustomParentSmsNotification(
 
   const provider = settings.smsProvider || "none";
   const ts = admin.firestore.Timestamp.now();
-  const message = trimSmsToByteLimit(params.message);
+  const message = trimSmsToByteLimit(
+    normalizeTrackManagedSmsMessage(params.message, { ensurePrefix: false })
+  );
   const messageBytes = calculateSmsBytes(message);
   const initialStatus = buildSmsQueueInitialStatus(settings);
   const batch = db.batch();
@@ -2969,13 +3115,19 @@ async function dispatchSmsQueueItem(
   const provider = (settings.smsProvider || queueData.provider || "none") as SmsProviderType;
   const sender = asTrimmedString(settings.smsSender || queueData.sender || "");
   const receiver = normalizePhoneNumber(queueData.phoneNumber || queueData.to || "");
-  const message = asTrimmedString(queueData.renderedMessage || queueData.message || "");
   const queueId = queueRef.id;
   const studentId = asTrimmedString(queueData.studentId);
   const studentName = asTrimmedString(queueData.studentName || queueData?.metadata?.studentName, "학생");
   const parentUid = asTrimmedString(queueData.parentUid);
   const parentName = asTrimmedString(queueData.parentName);
   const eventType = String(queueData.eventType || "study_start") as SmsQueueEventType;
+  const rawMessage = asTrimmedString(queueData.renderedMessage || queueData.message || "");
+  const message = trimSmsToByteLimit(
+    normalizeTrackManagedSmsMessage(rawMessage, {
+      ensurePrefix: shouldEnsureTrackManagedSmsPrefix(eventType),
+    })
+  );
+  const messageBytes = calculateSmsBytes(message);
 
   if (parentUid === STUDENT_SMS_FALLBACK_UID) {
     await queueRef.set({
@@ -2998,7 +3150,7 @@ async function dispatchSmsQueueItem(
       phoneNumber: receiver || queueData.phoneNumber || queueData.to || null,
       eventType,
       renderedMessage: message || "",
-      messageBytes: Number(queueData.messageBytes || calculateSmsBytes(message || "")),
+      messageBytes,
       provider,
       attemptNo: attemptCount,
       status: "suppressed_opt_out",
@@ -3029,7 +3181,7 @@ async function dispatchSmsQueueItem(
       phoneNumber: receiver || queueData.phoneNumber || queueData.to || null,
       eventType,
       renderedMessage: message || "",
-      messageBytes: Number(queueData.messageBytes || calculateSmsBytes(message || "")),
+      messageBytes,
       provider,
       attemptNo: attemptCount,
       status: "failed",
@@ -3043,6 +3195,9 @@ async function dispatchSmsQueueItem(
 
   if (settings.smsEnabled === false || provider === "none") {
     await queueRef.set({
+      message,
+      renderedMessage: message,
+      messageBytes,
       status: "pending_provider",
       providerStatus: "pending_provider",
       updatedAt: nowTs,
@@ -3061,6 +3216,9 @@ async function dispatchSmsQueueItem(
     const userId = asTrimmedString(settings.smsUserId);
     if (!apiKey || !userId || !sender) {
       await queueRef.set({
+        message,
+        renderedMessage: message,
+        messageBytes,
         status: "pending_provider",
         providerStatus: "pending_provider",
         updatedAt: nowTs,
@@ -3085,6 +3243,9 @@ async function dispatchSmsQueueItem(
     const apiKey = asTrimmedString(settings.smsApiKey);
     if (!endpointUrl || !apiKey) {
       await queueRef.set({
+        message,
+        renderedMessage: message,
+        messageBytes,
         status: "pending_provider",
         providerStatus: "pending_provider",
         updatedAt: nowTs,
@@ -3109,12 +3270,13 @@ async function dispatchSmsQueueItem(
     });
   }
 
-  const messageBytes = Number(queueData.messageBytes || calculateSmsBytes(message));
-
   if (dispatchResult.ok) {
     await queueRef.set({
       provider,
       sender: sender || null,
+      message,
+      renderedMessage: message,
+      messageBytes,
       status: "sent",
       providerStatus: "sent",
       sentAt: nowTs,
@@ -3157,6 +3319,9 @@ async function dispatchSmsQueueItem(
     await queueRef.set({
       provider,
       sender: sender || null,
+      message,
+      renderedMessage: message,
+      messageBytes,
       status: "queued",
       providerStatus: "retry_scheduled",
       updatedAt: nowTs,
@@ -3171,6 +3336,9 @@ async function dispatchSmsQueueItem(
     await queueRef.set({
       provider,
       sender: sender || null,
+      message,
+      renderedMessage: message,
+      messageBytes,
       status: "failed",
       providerStatus: "failed",
       failedAt: nowTs,
@@ -6151,8 +6319,7 @@ export const retrySmsQueueItem = functions.region(region).https.onCall(async (da
   const initialStatus = buildSmsQueueInitialStatus(settings);
   const manualRetryCount = Math.max(0, Number(queueData.manualRetryCount || 0)) + 1;
   const nowTs = admin.firestore.Timestamp.now();
-
-  await queueRef.set({
+  const retryPayload: Record<string, unknown> = {
     status: initialStatus.status,
     providerStatus: initialStatus.providerStatus,
     manualRetryCount,
@@ -6164,7 +6331,58 @@ export const retrySmsQueueItem = functions.region(region).https.onCall(async (da
     processingStartedAt: admin.firestore.FieldValue.delete(),
     processingLeaseUntil: admin.firestore.FieldValue.delete(),
     updatedAt: nowTs,
-  }, { merge: true });
+  };
+
+  const queueEventTypeRaw = String(queueData.eventType || "").trim();
+  const queueMetadata = asRecord(queueData.metadata);
+  if (isAttendanceSmsEventType(queueEventTypeRaw)) {
+    const retryStudentId = asTrimmedString(queueData.studentId);
+    if (retryStudentId) {
+      const centerName = await loadCenterName(db, centerId);
+      const smsEventType = normalizeSmsEventType(queueEventTypeRaw);
+      const fallbackEventAt = toKstDateFromUnknownTimestamp(queueData.createdAt) || toKstDate();
+      const smsEventAt = await resolveAttendanceSmsEventAt(db, {
+        centerId,
+        studentId: retryStudentId,
+        eventType: smsEventType,
+        fallbackEventAt,
+        dateKeyOverride: asTrimmedString(queueData.dateKey),
+      });
+      const eventTimeLabel = toTimeLabel(smsEventAt);
+      const expectedTime = asTrimmedString(queueMetadata?.expectedTime);
+      const studentName = asTrimmedString(queueData.studentName || queueMetadata?.studentName, "학생");
+      const message = buildParentSmsTemplateMessage(resolveTemplateByEvent(settings, smsEventType), {
+        studentName,
+        time: eventTimeLabel,
+        expectedTime: expectedTime || "학생이 정한 시간",
+        centerName,
+      });
+      retryPayload.message = message;
+      retryPayload.renderedMessage = message;
+      retryPayload.messageBytes = calculateSmsBytes(message);
+      retryPayload.dateKey = toDateKey(smsEventAt);
+      retryPayload.metadata = {
+        studentName,
+        centerName,
+        eventTime: eventTimeLabel,
+        expectedTime: expectedTime || null,
+      };
+    }
+  } else {
+    const queueEventType = String(queueData.eventType || "manual_note") as SmsQueueEventType;
+    const message = trimSmsToByteLimit(
+      normalizeTrackManagedSmsMessage(asTrimmedString(queueData.renderedMessage || queueData.message), {
+        ensurePrefix: shouldEnsureTrackManagedSmsPrefix(queueEventType),
+      })
+    );
+    if (message) {
+      retryPayload.message = message;
+      retryPayload.renderedMessage = message;
+      retryPayload.messageBytes = calculateSmsBytes(message);
+    }
+  }
+
+  await queueRef.set(retryPayload, { merge: true });
 
   return { ok: true, status: initialStatus.status };
 });
