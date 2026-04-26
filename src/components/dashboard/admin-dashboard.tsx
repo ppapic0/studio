@@ -150,6 +150,30 @@ type AdminSmsRecipientPreference = {
   isFallbackRecipient?: boolean;
 };
 
+type AdminSmsDeliveryLog = {
+  id: string;
+  queueId?: string | null;
+  studentId?: string | null;
+  studentName?: string | null;
+  parentUid?: string | null;
+  parentName?: string | null;
+  phoneNumber?: string | null;
+  eventType?: string | null;
+  renderedMessage?: string | null;
+  messageBytes?: number;
+  provider?: string | null;
+  attemptNo?: number | null;
+  status?: string | null;
+  dateKey?: string | null;
+  createdAt?: Timestamp | Date | null;
+  sentAt?: Timestamp | Date | null;
+  failedAt?: Timestamp | Date | null;
+  updatedAt?: Timestamp | Date | null;
+  errorCode?: string | null;
+  errorMessage?: string | null;
+  suppressedReason?: string | null;
+};
+
 const buildSmsRecipientPreferenceId = (studentId: string, parentUid: string) => `${studentId}_${parentUid}`;
 
 const buildAdminCheckInTimeLabel = (
@@ -204,6 +228,79 @@ const toTimestampDateSafe = (value: unknown): Date | null => {
     return Number.isNaN(date.getTime()) ? null : date;
   }
   return null;
+};
+
+const getAdminSmsDeliveryDate = (log: AdminSmsDeliveryLog): Date | null =>
+  toTimestampDateSafe(log.sentAt)
+  || toTimestampDateSafe(log.failedAt)
+  || toTimestampDateSafe(log.createdAt)
+  || toTimestampDateSafe(log.updatedAt);
+
+const getAdminSmsEventLabel = (eventType?: string | null): string => {
+  switch (eventType) {
+    case 'study_start':
+    case 'check_in':
+      return '공부시작';
+    case 'away_start':
+      return '외출';
+    case 'away_end':
+      return '복귀';
+    case 'study_end':
+    case 'check_out':
+      return '공부종료';
+    case 'late_alert':
+      return '지각 알림';
+    case 'weekly_report':
+      return '주간리포트';
+    case 'daily_report':
+      return '일일리포트';
+    case 'payment_reminder':
+      return '수납 알림';
+    case 'manual_note':
+      return '직접 문자';
+    case 'risk_alert':
+      return '위험 알림';
+    default:
+      return '문자';
+  }
+};
+
+const getAdminSmsDeliveryStatusMeta = (status?: string | null) => {
+  switch (status) {
+    case 'sent':
+      return {
+        label: '발송완료',
+        className: 'bg-emerald-50 text-emerald-700 border-emerald-100',
+      };
+    case 'failed':
+      return {
+        label: '발송실패',
+        className: 'bg-rose-50 text-rose-700 border-rose-100',
+      };
+    case 'suppressed_opt_out':
+      return {
+        label: '수신제외',
+        className: 'bg-slate-100 text-slate-600 border-slate-200',
+      };
+    default:
+      return {
+        label: '확인중',
+        className: 'bg-[#EEF4FF] text-[#2554D7] border-[#DCE7FF]',
+      };
+  }
+};
+
+const buildAdminSmsStatusSummaryLabel = (logs: AdminSmsDeliveryLog[]): string => {
+  if (logs.length === 0) return '오늘 발송 기록 없음';
+  const sentCount = logs.filter((log) => log.status === 'sent').length;
+  const failedCount = logs.filter((log) => log.status === 'failed').length;
+  const suppressedCount = logs.filter((log) => log.status === 'suppressed_opt_out').length;
+  const parts = [
+    sentCount > 0 ? `완료 ${sentCount}건` : '',
+    failedCount > 0 ? `실패 ${failedCount}건` : '',
+    suppressedCount > 0 ? `제외 ${suppressedCount}건` : '',
+  ].filter(Boolean);
+  return parts.length > 0 ? parts.join(' · ') : `총 ${logs.length}건`;
 };
 
 const calculateRhythmScoreFromMinutes = (minutes: number[]): number => {
@@ -852,6 +949,16 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
     return query(collection(firestore, 'centers', centerId, 'smsRecipientPreferences'), limit(800));
   }, [firestore, centerId]);
   const { data: smsRecipientPreferences } = useCollection<AdminSmsRecipientPreference>(smsRecipientPreferencesQuery, { enabled: isActive });
+
+  const smsDeliveryLogsQuery = useMemoFirebase(() => {
+    if (!firestore || !centerId || !todayKey) return null;
+    return query(
+      collection(firestore, 'centers', centerId, 'smsDeliveryLogs'),
+      where('dateKey', '==', todayKey),
+      limit(300)
+    );
+  }, [firestore, centerId, todayKey]);
+  const { data: smsDeliveryLogs } = useCollection<AdminSmsDeliveryLog>(smsDeliveryLogsQuery, { enabled: isActive && Boolean(todayKey) });
 
   // 2. 벌점 데이터 소스
   const progressQuery = useMemoFirebase(() => {
@@ -2465,6 +2572,88 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
       || null
     );
   }, [metrics, selectedFocusStudentId, studentMembersById, studentsById, todayStats, progressList, weeklyStudyMinutesByStudent, attendanceList, attendanceSeatSignalsByStudentId]);
+
+  const selectedFocusOperationsSummary = useMemo(() => {
+    if (!selectedFocusStudentId) return null;
+
+    const signal = attendanceSeatSignalsByStudentId.get(selectedFocusStudentId) || null;
+    const student = studentsById.get(selectedFocusStudentId) || null;
+    const studentMember = studentMembersById.get(selectedFocusStudentId) || null;
+    const parentUidSet = new Set(student?.parentUids || []);
+    const parentMember =
+      (parentMembers || []).find((member) => {
+        if (parentUidSet.has(member.id)) return true;
+        return (member.linkedStudentIds || []).includes(selectedFocusStudentId);
+      }) || null;
+    const parentPreference = parentMember
+      ? smsRecipientPreferencesByKey.get(buildSmsRecipientPreferenceId(selectedFocusStudentId, parentMember.id))
+      : null;
+    const manualParentPreference = smsRecipientPreferencesByKey.get(
+      buildSmsRecipientPreferenceId(selectedFocusStudentId, MANUAL_PARENT_SMS_UID)
+    );
+    const manualParentPhone = normalizePhoneNumber(manualParentPreference?.phoneNumber);
+    const parentPhone =
+      manualParentPhone
+      || normalizePhoneNumber(parentPreference?.phoneNumber)
+      || normalizePhoneNumber(parentMember?.phoneNumber)
+      || '-';
+    const studentPhone =
+      normalizePhoneNumber(student?.phoneNumber)
+      || normalizePhoneNumber(studentMember?.phoneNumber)
+      || '-';
+    const classScheduleLabel = signal?.classScheduleName?.trim()
+      ? toStudyRoomTrackScheduleName(signal.classScheduleName)
+      : '';
+    const outingLabel =
+      signal?.scheduleMovementSummary
+      || (
+        signal?.excursionStartAt && signal?.excursionEndAt
+          ? `학원/외출 ${signal.excursionStartAt} ~ ${signal.excursionEndAt}${signal.excursionReason ? ` · ${signal.excursionReason}` : ''}`
+          : '오늘 등록된 외출/학원 시간이 없습니다.'
+      );
+    const todaysSmsLogs = (smsDeliveryLogs || [])
+      .filter((log) => {
+        if (log.studentId !== selectedFocusStudentId) return false;
+        if (!todayKey) return true;
+        if (log.dateKey === todayKey) return true;
+        const logDate = getAdminSmsDeliveryDate(log);
+        return logDate ? format(logDate, 'yyyy-MM-dd') === todayKey : false;
+      })
+      .sort((left, right) => {
+        const leftTime = getAdminSmsDeliveryDate(left)?.getTime() || 0;
+        const rightTime = getAdminSmsDeliveryDate(right)?.getTime() || 0;
+        return rightTime - leftTime;
+      });
+
+    return {
+      signal,
+      student,
+      studentMember,
+      plannedArrival: signal?.routineExpectedArrivalTime || student?.expectedArrivalTime || '-',
+      firstCheckInLabel: signal?.firstCheckInLabel || signal?.checkedAtLabel || '-',
+      plannedDeparture: signal?.plannedDepartureTime || '-',
+      outingLabel,
+      scheduleLabel: [classScheduleLabel, signal?.scheduleMovementSummary].filter(Boolean).join(' · ') || classScheduleLabel || '등록된 일정 없음',
+      parentName:
+        manualParentPhone
+          ? manualParentPreference?.parentName || '어머님'
+          : parentPreference?.parentName || parentMember?.displayName || '어머님',
+      parentPhone,
+      studentPhone,
+      smsLogs: todaysSmsLogs,
+      recentSmsLogs: todaysSmsLogs.slice(0, 4),
+      smsStatusSummary: buildAdminSmsStatusSummaryLabel(todaysSmsLogs),
+    };
+  }, [
+    attendanceSeatSignalsByStudentId,
+    parentMembers,
+    selectedFocusStudentId,
+    smsDeliveryLogs,
+    smsRecipientPreferencesByKey,
+    studentMembersById,
+    studentsById,
+    todayKey,
+  ]);
 
   const selectedFocusStat = useMemo(
     () => (selectedFocusStudentId ? (todayStats || []).find((row) => row.studentId === selectedFocusStudentId) || null : null),
@@ -6998,6 +7187,113 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
           {/* ── SCROLLABLE BODY ── */}
           <div className="flex-1 overflow-y-auto bg-[linear-gradient(180deg,#F7FAFF_0%,#EEF4FF_100%)]">
             <div className="bg-transparent p-5 space-y-5">
+
+              {selectedFocusOperationsSummary ? (
+                <div className="rounded-[1.8rem] border border-[#DCE7FF] bg-white p-4 shadow-[0_20px_38px_-30px_rgba(20,41,95,0.2)]">
+                  <div className="flex flex-wrap items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-2">
+                        <span className="inline-flex h-9 w-9 items-center justify-center rounded-[1rem] bg-[#EEF4FF] text-[#2554D7]">
+                          <CalendarClock className="h-4 w-4" />
+                        </span>
+                        <div>
+                          <p className={studioSectionEyebrowClassName}>오늘 운영 정보</p>
+                          <p className="mt-1 text-base font-black tracking-tight text-[#14295F]">
+                            등하원 일정과 연락·문자 현황
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                    <Badge className="h-8 rounded-full border-none bg-[#14295F] px-3 text-[11px] font-black text-white">
+                      문자 {selectedFocusOperationsSummary.smsLogs.length}건
+                    </Badge>
+                  </div>
+
+                  <div className="mt-4 grid gap-3 sm:grid-cols-3">
+                    <div className="min-w-0 rounded-2xl border border-[#DCE7FF] bg-[#F7FAFF] p-3">
+                      <p className="text-[10px] font-black uppercase tracking-[0.14em] text-[#5C6E97]">오늘 등원 일정</p>
+                      <p className="mt-2 truncate text-base font-black text-[#14295F]">{selectedFocusOperationsSummary.plannedArrival}</p>
+                    </div>
+                    <div className="min-w-0 rounded-2xl border border-[#DCE7FF] bg-[#F7FAFF] p-3">
+                      <p className="text-[10px] font-black uppercase tracking-[0.14em] text-[#5C6E97]">오늘 최초입실</p>
+                      <p className="mt-2 truncate text-base font-black text-[#14295F]">{selectedFocusOperationsSummary.firstCheckInLabel}</p>
+                    </div>
+                    <div className="min-w-0 rounded-2xl border border-[#DCE7FF] bg-[#F7FAFF] p-3">
+                      <p className="text-[10px] font-black uppercase tracking-[0.14em] text-[#5C6E97]">오늘 하원 일정</p>
+                      <p className="mt-2 truncate text-base font-black text-[#14295F]">{selectedFocusOperationsSummary.plannedDeparture}</p>
+                    </div>
+                    <div className="min-w-0 rounded-2xl border border-[#FFD7BA] bg-[#FFF8F2] p-3 sm:col-span-2">
+                      <p className="text-[10px] font-black uppercase tracking-[0.14em] text-[#C95A08]">오늘 외출 일정</p>
+                      <p className="mt-2 line-clamp-2 text-sm font-black leading-5 text-[#14295F]">{selectedFocusOperationsSummary.outingLabel}</p>
+                      <p className="mt-1 truncate text-[11px] font-bold text-[#6E7EA3]">{selectedFocusOperationsSummary.scheduleLabel}</p>
+                    </div>
+                    <div className="min-w-0 rounded-2xl border border-[#DCE7FF] bg-[#F7FAFF] p-3">
+                      <p className="text-[10px] font-black uppercase tracking-[0.14em] text-[#5C6E97]">문자 발송 현황</p>
+                      <p className="mt-2 truncate text-sm font-black text-[#14295F]">{selectedFocusOperationsSummary.smsStatusSummary}</p>
+                    </div>
+                    <div className="min-w-0 rounded-2xl border border-[#DCE7FF] bg-white p-3">
+                      <div className="flex items-center gap-1.5 text-[#5C6E97]">
+                        <Phone className="h-3.5 w-3.5" />
+                        <p className="text-[10px] font-black uppercase tracking-[0.14em]">학생 번호</p>
+                      </div>
+                      <p className="mt-2 truncate text-base font-black text-[#14295F]">{selectedFocusOperationsSummary.studentPhone}</p>
+                    </div>
+                    <div className="min-w-0 rounded-2xl border border-[#DCE7FF] bg-white p-3 sm:col-span-2">
+                      <div className="flex items-center gap-1.5 text-[#5C6E97]">
+                        <Phone className="h-3.5 w-3.5" />
+                        <p className="text-[10px] font-black uppercase tracking-[0.14em]">어머님 번호</p>
+                      </div>
+                      <p className="mt-2 truncate text-base font-black text-[#14295F]">{selectedFocusOperationsSummary.parentPhone}</p>
+                      <p className="mt-1 truncate text-[11px] font-bold text-[#6E7EA3]">{selectedFocusOperationsSummary.parentName}</p>
+                    </div>
+                  </div>
+
+                  <div className="mt-4 rounded-2xl border border-[#E4ECFA] bg-[#FBFCFF] p-3">
+                    <div className="flex items-center justify-between gap-3">
+                      <p className="text-[11px] font-black text-[#14295F]">오늘 문자 상세</p>
+                      <p className="text-[10px] font-bold text-[#6E7EA3]">최근 4건</p>
+                    </div>
+                    {selectedFocusOperationsSummary.recentSmsLogs.length > 0 ? (
+                      <div className="mt-3 space-y-2">
+                        {selectedFocusOperationsSummary.recentSmsLogs.map((log) => {
+                          const statusMeta = getAdminSmsDeliveryStatusMeta(log.status);
+                          const logDate = getAdminSmsDeliveryDate(log);
+                          const detail =
+                            log.renderedMessage
+                            || log.errorMessage
+                            || log.suppressedReason
+                            || '문자 상세 내용 없음';
+                          return (
+                            <div key={log.id} className="rounded-[1.1rem] border border-[#E4ECFA] bg-white px-3 py-2.5">
+                              <div className="flex flex-wrap items-center justify-between gap-2">
+                                <div className="min-w-0 flex items-center gap-2">
+                                  <Badge className="h-6 rounded-full border-none bg-[#EEF4FF] px-2.5 text-[10px] font-black text-[#2554D7]">
+                                    {getAdminSmsEventLabel(log.eventType)}
+                                  </Badge>
+                                  <Badge className={cn('h-6 rounded-full border px-2.5 text-[10px] font-black', statusMeta.className)}>
+                                    {statusMeta.label}
+                                  </Badge>
+                                </div>
+                                <p className="shrink-0 text-[10px] font-black text-[#5C6E97]">
+                                  {logDate ? format(logDate, 'HH:mm') : '시간 확인 필요'}
+                                </p>
+                              </div>
+                              <p className="mt-2 line-clamp-2 text-[11px] font-bold leading-5 text-[#5C6E97]">{detail}</p>
+                              <p className="mt-1 truncate text-[10px] font-black text-[#9AA9C7]">
+                                수신 {normalizePhoneNumber(log.phoneNumber) || '-'}
+                              </p>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    ) : (
+                      <div className="mt-3 rounded-[1.1rem] border border-dashed border-[#DCE7FF] bg-white px-3 py-5 text-center text-xs font-bold text-[#5C6E97]">
+                        오늘 이 학생에게 발송된 문자 기록이 없습니다.
+                      </div>
+                    )}
+                  </div>
+                </div>
+              ) : null}
 
               {selectedFocusKpi && selectedFocusKpi.riskAlerts.length > 0 && (
                 <div className="rounded-[1.7rem] border border-rose-200 bg-white p-4 shadow-[0_18px_34px_-30px_rgba(20,41,95,0.18)]">
