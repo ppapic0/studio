@@ -1526,7 +1526,7 @@ export default function StudentListPage() {
                           <div>
                             <p className="text-[11px] font-black uppercase tracking-[0.2em] text-[#5c6e97]">문자 보내기</p>
                             <p className="mt-1 text-sm font-bold text-[#5c6e97]">
-                              보호자 번호가 있으면 보호자에게, 없으면 학생 본인 fallback 번호로 접수됩니다.
+                              보호자 번호가 등록된 수신 대상에게만 문자 발송이 접수됩니다.
                             </p>
                           </div>
                           <div className="space-y-2">
@@ -1638,7 +1638,7 @@ export default function StudentListPage() {
                             ) : null}
                             {activeQuickAction === 'sms' ? (
                               <>
-                                <li>직접 문자를 보내도 수신 우선순위는 보호자 → 학생 fallback으로 유지됩니다.</li>
+                                <li>직접 문자를 보내도 보호자와 직접 추가한 보호자 번호에만 접수됩니다.</li>
                                 <li>실제 수신은 통신사와 단말 정책에 따라 다를 수 있습니다.</li>
                               </>
                             ) : null}

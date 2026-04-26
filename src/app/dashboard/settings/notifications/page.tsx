@@ -50,8 +50,8 @@ import {
 } from '@/components/ui/dialog';
 
 const SMS_BYTE_LIMIT = 90;
-const STUDENT_SMS_FALLBACK_UID = '__student__';
 const MANUAL_PARENT_SMS_UID = '__manual_parent__';
+const TRACK_MANAGED_STUDY_CENTER_NAME = '트랙 관리형 스터디센터';
 
 type ParentSmsEventType =
   | 'study_start'
@@ -169,7 +169,6 @@ type SmsRecipientPreferenceDoc = {
   phoneNumber?: string;
   enabled?: boolean;
   isManualRecipient?: boolean;
-  isFallbackRecipient?: boolean;
   eventToggles?: Partial<Record<ParentSmsEventType, boolean>>;
   updatedAt?: { toDate?: () => Date };
 };
@@ -183,7 +182,6 @@ type RecipientPreferenceRow = {
   phoneNumber: string;
   enabled: boolean;
   eventToggles: Record<ParentSmsEventType, boolean>;
-  isFallbackRecipient?: boolean;
   isManualRecipient?: boolean;
   isPhoneMissing?: boolean;
 };
@@ -633,7 +631,7 @@ export default function NotificationSettingsPage() {
     studentName: '김재윤',
     time: '18:40',
     expectedTime: '17:00',
-    centerName: '트랙센터',
+    centerName: TRACK_MANAGED_STUDY_CENTER_NAME,
   }), []);
 
   const templatePreviews = useMemo(() => {
@@ -813,7 +811,6 @@ export default function NotificationSettingsPage() {
           } satisfies RecipientPreferenceRow);
           return rows;
         }, []);
-        const parentRowsWithPhone = parentRows.filter((row) => !row.isPhoneMissing);
         const manualParentPref = preferencesByKey.get(buildSmsRecipientPreferenceId(student.id, MANUAL_PARENT_SMS_UID));
         const manualParentPhoneNumber = resolveFirstValidPhoneNumber(manualParentPref?.phoneNumber);
         const manualParentRow: RecipientPreferenceRow | null = manualParentPhoneNumber
@@ -830,27 +827,7 @@ export default function NotificationSettingsPage() {
               isPhoneMissing: false,
             }
           : null;
-        const fallbackPref = preferencesByKey.get(buildSmsRecipientPreferenceId(student.id, STUDENT_SMS_FALLBACK_UID));
-        const studentMember = membersById.get(student.id);
-        const fallbackPhoneNumber = resolveFirstValidPhoneNumber(
-          fallbackPref?.phoneNumber,
-          student.phoneNumber,
-          studentMember?.phoneNumber
-        );
-        const fallbackRow: RecipientPreferenceRow = {
-          studentId: student.id,
-          studentName,
-          className,
-          parentUid: STUDENT_SMS_FALLBACK_UID,
-          parentName: '학생 본인',
-          phoneNumber: fallbackPhoneNumber,
-          enabled: fallbackPref?.enabled !== false,
-          eventToggles: mergeEventToggles(fallbackPref?.eventToggles),
-          isFallbackRecipient: true,
-          isPhoneMissing: !fallbackPhoneNumber,
-        };
-        const parentRowsForSms = manualParentRow ? [...parentRowsWithPhone, manualParentRow] : parentRowsWithPhone;
-        const effectiveRows: RecipientPreferenceRow[] = parentRowsForSms.length > 0 ? parentRowsForSms : [fallbackRow];
+        const effectiveRows: RecipientPreferenceRow[] = manualParentRow ? [...parentRows, manualParentRow] : parentRows;
         return {
           studentId: student.id,
           studentName,
@@ -1016,10 +993,8 @@ export default function NotificationSettingsPage() {
                   ? 200
                   : 100 - todaySentCount;
         const recipientLabel = hasMissingPhone
-          ? '번호 미등록'
-          : student.parentRows[0]?.isFallbackRecipient
-            ? '학생 본인'
-            : `보호자 ${student.parentRows.length}명`;
+          ? '보호자 번호 미등록'
+          : `보호자 ${student.parentRows.filter((row) => !row.isPhoneMissing).length}명`;
 
         return {
           studentId: student.studentId,
@@ -1302,7 +1277,6 @@ export default function NotificationSettingsPage() {
         phoneNumberOverride: phoneNumberOverride || undefined,
         parentNameOverride: row.parentName,
         isManualRecipient: row.isManualRecipient === true || row.parentUid === MANUAL_PARENT_SMS_UID,
-        isFallbackRecipient: row.isFallbackRecipient === true || row.parentUid === STUDENT_SMS_FALLBACK_UID,
       });
       toast({
         title: '수신 설정 저장 완료',
@@ -1325,8 +1299,8 @@ export default function NotificationSettingsPage() {
     if (!nextPhone) {
       toast({
         variant: 'destructive',
-        title: '번호 확인',
-        description: '휴대폰 번호를 01012345678 형식으로 입력해 주세요.',
+        title: '보호자 번호 확인',
+        description: '보호자 휴대폰 번호를 01012345678 형식으로 입력해 주세요.',
       });
       return;
     }
@@ -1686,7 +1660,7 @@ export default function NotificationSettingsPage() {
                       <div className="flex flex-wrap items-center gap-2">
                         <p className="text-base font-black text-slate-900">{student.studentName}</p>
                         <Badge className="border-none bg-slate-100 text-slate-700 font-black">{student.className}</Badge>
-                        <Badge className={cn('border-none font-black', student.hasMissingPhone ? 'bg-slate-200 text-slate-700' : student.recipients[0]?.isFallbackRecipient ? 'bg-blue-100 text-blue-700' : 'bg-emerald-100 text-emerald-700')}>
+                        <Badge className={cn('border-none font-black', student.hasMissingPhone ? 'bg-slate-200 text-slate-700' : 'bg-emerald-100 text-emerald-700')}>
                           {student.recipientLabel}
                         </Badge>
                       </div>
@@ -1721,15 +1695,15 @@ export default function NotificationSettingsPage() {
         <DialogContent
           motionPreset="dashboard-premium"
           className={cn(
-            'overflow-hidden border-none p-0 shadow-2xl',
+            'flex min-h-0 flex-col overflow-hidden border-none p-0 shadow-2xl',
             isMobile
-              ? 'fixed left-1/2 top-1/2 max-h-[88svh] w-[95vw] max-w-[95vw] -translate-x-1/2 -translate-y-1/2 rounded-[2rem]'
+              ? 'fixed left-1/2 top-1/2 h-[min(88svh,46rem)] w-[95vw] max-w-[95vw] -translate-x-1/2 -translate-y-1/2 rounded-[2rem]'
               : 'h-[min(920px,calc(100dvh-2rem))] w-[min(1120px,calc(100vw-2rem))] max-w-[1120px] rounded-[2.5rem]'
           )}
         >
           {selectedBoardStudent ? (
-            <div className="flex max-h-full flex-col bg-white">
-              <div className="bg-gradient-to-br from-[#17306f] via-[#2046ab] to-[#2f66ff] px-6 py-6 text-white sm:px-8">
+            <div className="flex h-full min-h-0 flex-col bg-white">
+              <div className="shrink-0 bg-gradient-to-br from-[#17306f] via-[#2046ab] to-[#2f66ff] px-6 py-6 text-white sm:px-8">
                 <DialogHeader className="space-y-2 text-left">
                   <DialogTitle className="text-2xl font-black tracking-tight text-white">
                     {selectedBoardStudent.studentName}
@@ -1752,7 +1726,7 @@ export default function NotificationSettingsPage() {
                 <section className="min-w-0 space-y-3">
                   <div>
                     <h3 className="text-sm font-black text-slate-900">수신 번호</h3>
-                    <p className="mt-1 text-xs font-bold text-slate-500">보호자 번호가 없으면 학생 본인 번호로 fallback 됩니다.</p>
+                    <p className="mt-1 text-xs font-bold text-slate-500">보호자 번호가 없으면 문자 발송 대상에서 제외됩니다.</p>
                   </div>
                   <div className="grid gap-3">
                     {selectedBoardStudent.recipients.map((row) => {
@@ -1764,16 +1738,15 @@ export default function NotificationSettingsPage() {
                               <div className="flex flex-wrap items-center gap-2">
                                 <p className="text-sm font-black text-slate-900">{row.parentName}</p>
                                 {row.isManualRecipient ? <Badge className="border-none bg-orange-100 text-orange-700 font-black">보호자 직접 추가</Badge> : null}
-                                {row.isFallbackRecipient ? <Badge className="border-none bg-blue-100 text-blue-700 font-black">학생 fallback</Badge> : null}
                                 {row.isPhoneMissing ? <Badge className="border-none bg-slate-200 text-slate-700 font-black">번호 미등록</Badge> : null}
                               </div>
                               <p className="mt-1 text-xs font-bold text-slate-500">{row.phoneNumber ? maskPhone(row.phoneNumber) : '번호 미등록'}</p>
-                              {(row.isFallbackRecipient || row.isPhoneMissing) ? (
+                              {row.isPhoneMissing ? (
                                 <div className="mt-3 flex flex-col gap-2 sm:flex-row">
                                   <Input
                                     value={recipientPhoneDrafts[actionKey] ?? row.phoneNumber}
                                     onChange={(e) => setRecipientPhoneDrafts((prev) => ({ ...prev, [actionKey]: e.target.value.replace(/\D/g, '').slice(0, 11) }))}
-                                    placeholder="학생 번호 입력"
+                                    placeholder="보호자 번호 입력"
                                     className="h-9 rounded-xl border-2 text-sm font-bold"
                                   />
                                   <Button
@@ -2032,7 +2005,7 @@ export default function NotificationSettingsPage() {
       <Card className="rounded-[2rem] border-none shadow-xl ring-1 ring-black/[0.04]">
         <CardHeader className="border-b bg-muted/10">
           <CardTitle className="text-xl font-black tracking-tight">수신 관리</CardTitle>
-          <CardDescription className="font-bold text-sm">보호자 번호가 없으면 학생 본인 fallback 번호까지 함께 보고 이벤트별 수신을 제어합니다.</CardDescription>
+          <CardDescription className="font-bold text-sm">보호자 번호가 있는 수신 대상만 문자 발송에 사용하고 이벤트별 수신을 제어합니다.</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4 p-6">
           <div className="relative">
@@ -2063,7 +2036,6 @@ export default function NotificationSettingsPage() {
                           <div>
                             <div className="flex flex-wrap items-center gap-2">
                               <p className="text-sm font-black text-slate-900">{row.parentName}</p>
-                              {row.isFallbackRecipient ? <Badge className="border-none bg-blue-100 text-blue-700 font-black">학생 fallback</Badge> : null}
                               {row.isPhoneMissing ? <Badge className="border-none bg-slate-200 text-slate-700 font-black">번호 미등록</Badge> : null}
                             </div>
                             <p className="text-xs font-bold text-slate-500">{row.phoneNumber ? maskPhone(row.phoneNumber) : '번호 미등록'}</p>

@@ -161,6 +161,7 @@ const PARENT_LINK_FAILED_ATTEMPT_LIMIT = 5;
 const PARENT_LINK_FAILED_ATTEMPT_WINDOW_MS = 30 * 60 * 1000;
 const PARENT_LINK_FAILED_ATTEMPT_LOCK_MS = 30 * 60 * 1000;
 const PARENT_LINK_LOOKUP_COLLECTION = "parentLinkCodeLookup";
+const TRACK_MANAGED_STUDY_CENTER_NAME = "트랙 관리형 스터디센터";
 const ATTENDANCE_REQUEST_PENALTY_POINTS: Record<"late" | "absence" | "schedule_change", number> = {
   late: 1,
   absence: 2,
@@ -206,7 +207,7 @@ const DEFAULT_SMS_TEMPLATES: Record<"study_start" | "away_start" | "away_end" | 
   away_start: "[{centerName}] {studentName} 학생 {time} 외출. 복귀 후 다시 공부를 이어갑니다.",
   away_end: "[{centerName}] {studentName} 학생 {time} 복귀. 다시 공부를 시작했습니다.",
   study_end: "[{centerName}] {studentName} 학생 {time} 공부종료. 오늘 학습 마무리했습니다.",
-  late_alert: "{studentName}학생이 {expectedTime}까지 등원하지 않았습니다.",
+  late_alert: "[{centerName}] {studentName} 학생 {expectedTime} 미등원. 확인 부탁드립니다.",
 };
 
 type StudyBoxRarity = "common" | "rare" | "epic";
@@ -2134,16 +2135,10 @@ function sanitizeSmsTemplate(template: string): string {
 }
 
 async function loadCenterName(
-  db: admin.firestore.Firestore,
-  centerId: string
+  _db: admin.firestore.Firestore,
+  _centerId: string
 ): Promise<string> {
-  try {
-    const centerSnap = await db.doc(`centers/${centerId}`).get();
-    const name = centerSnap.data()?.name;
-    return typeof name === "string" && name.trim().length > 0 ? name.trim() : "센터";
-  } catch {
-    return "센터";
-  }
+  return TRACK_MANAGED_STUDY_CENTER_NAME;
 }
 
 function resolveTemplateByEvent(
@@ -2357,29 +2352,6 @@ async function collectParentRecipients(
       phoneNumber,
     });
     usedPhones.add(phoneNumber);
-  }
-
-  if (recipients.length === 0) {
-    const [fallbackPrefSnap, studentMemberSnap] = await Promise.all([
-      db.doc(`centers/${centerId}/smsRecipientPreferences/${buildSmsRecipientPreferenceId(studentId, STUDENT_SMS_FALLBACK_UID)}`).get(),
-      db.doc(`centers/${centerId}/members/${studentId}`).get(),
-    ]);
-    const fallbackPref = fallbackPrefSnap.exists ? (fallbackPrefSnap.data() as SmsRecipientPreferenceDoc) : null;
-    const studentMemberData = studentMemberSnap.exists ? studentMemberSnap.data() : null;
-    const fallbackPhoneNumber = resolveFirstValidPhoneNumber(
-      fallbackPref?.phoneNumber,
-      studentData.phoneNumber,
-      studentMemberData?.phoneNumber
-    );
-
-    if (fallbackPhoneNumber && !usedPhones.has(fallbackPhoneNumber)) {
-      recipients.push({
-        parentUid: STUDENT_SMS_FALLBACK_UID,
-        parentName: asTrimmedString(fallbackPref?.parentName, "학생 본인"),
-        phoneNumber: fallbackPhoneNumber,
-      });
-      usedPhones.add(fallbackPhoneNumber);
-    }
   }
 
   return recipients;
@@ -3004,6 +2976,37 @@ async function dispatchSmsQueueItem(
   const parentUid = asTrimmedString(queueData.parentUid);
   const parentName = asTrimmedString(queueData.parentName);
   const eventType = String(queueData.eventType || "study_start") as SmsQueueEventType;
+
+  if (parentUid === STUDENT_SMS_FALLBACK_UID) {
+    await queueRef.set({
+      status: "suppressed_opt_out",
+      providerStatus: "suppressed_parent_only",
+      updatedAt: nowTs,
+      nextAttemptAt: admin.firestore.FieldValue.delete(),
+      processingStartedAt: admin.firestore.FieldValue.delete(),
+      processingLeaseUntil: admin.firestore.FieldValue.delete(),
+      lastErrorCode: admin.firestore.FieldValue.delete(),
+      lastErrorMessage: admin.firestore.FieldValue.delete(),
+    }, { merge: true });
+    await appendSmsDeliveryLog(db, {
+      centerId,
+      queueId,
+      studentId,
+      studentName,
+      parentUid,
+      parentName: parentName || "학생 본인",
+      phoneNumber: receiver || queueData.phoneNumber || queueData.to || null,
+      eventType,
+      renderedMessage: message || "",
+      messageBytes: Number(queueData.messageBytes || calculateSmsBytes(message || "")),
+      provider,
+      attemptNo: attemptCount,
+      status: "suppressed_opt_out",
+      createdAt: nowTs,
+      suppressedReason: "student_fallback_blocked",
+    });
+    return;
+  }
 
   if (!message || !receiver) {
     await queueRef.set({
@@ -6220,11 +6223,11 @@ export const updateSmsRecipientPreference = functions.region(region).https.onCal
   const requestedParentUid = asTrimmedString(data?.parentUid);
   const isManualRecipientRequest = data?.isManualRecipient === true || requestedParentUid === MANUAL_PARENT_SMS_UID;
   const isFallbackRecipientRequest = data?.isFallbackRecipient === true || requestedParentUid === STUDENT_SMS_FALLBACK_UID;
-  const parentUid = isManualRecipientRequest
-    ? MANUAL_PARENT_SMS_UID
-    : isFallbackRecipientRequest
-      ? STUDENT_SMS_FALLBACK_UID
-      : requestedParentUid;
+  if (isFallbackRecipientRequest) {
+    throw new functions.https.HttpsError("invalid-argument", "학생 본인 번호는 문자 수신 대상으로 사용할 수 없습니다.");
+  }
+
+  const parentUid = isManualRecipientRequest ? MANUAL_PARENT_SMS_UID : requestedParentUid;
   if (!centerId || !studentId || !parentUid) {
     throw new functions.https.HttpsError("invalid-argument", "centerId, studentId, parentUid가 필요합니다.");
   }
@@ -6261,33 +6264,6 @@ export const updateSmsRecipientPreference = functions.region(region).https.onCal
       enabled,
       eventToggles,
       isManualRecipient: true,
-      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-      updatedBy: context.auth.uid,
-    }, { merge: true });
-
-    return { ok: true };
-  }
-
-  if (isFallbackRecipientRequest) {
-    const studentMemberSnap = await db.doc(`centers/${centerId}/members/${studentId}`).get();
-    const fallbackPhoneNumber = resolveFirstValidPhoneNumber(
-      phoneNumberOverride,
-      studentData.phoneNumber,
-      studentMemberSnap.data()?.phoneNumber
-    );
-    if (!fallbackPhoneNumber) {
-      throw new functions.https.HttpsError("invalid-argument", "학생 휴대폰 번호가 필요합니다.");
-    }
-
-    await db.doc(`centers/${centerId}/smsRecipientPreferences/${buildSmsRecipientPreferenceId(studentId, parentUid)}`).set({
-      studentId,
-      studentName,
-      parentUid,
-      parentName: parentNameOverride || "학생 본인",
-      phoneNumber: fallbackPhoneNumber,
-      enabled,
-      eventToggles,
-      isFallbackRecipient: true,
       updatedAt: admin.firestore.FieldValue.serverTimestamp(),
       updatedBy: context.auth.uid,
     }, { merge: true });
@@ -6602,7 +6578,7 @@ export const notifyDailyReportReady = functions.region(region).https.onCall(asyn
     studentId,
     studentName,
     eventType: "daily_report",
-    message: `[트랙학습센터] ${studentName} 학생의 오늘자 학습 리포트가 도착했습니다. 앱에서 확인해 주세요.`,
+    message: `[${TRACK_MANAGED_STUDY_CENTER_NAME}] ${studentName} 학생의 오늘자 학습 리포트가 도착했습니다. 앱에서 확인해 주세요.`,
     date: nowKst,
     settings,
     dedupeKey: `${centerId}_${studentId}_daily_report_${dateKey}`,
@@ -6684,7 +6660,7 @@ export const sendPaymentReminderBatch = functions.region(region).https.onCall(as
       studentId,
       studentName,
       eventType: "payment_reminder",
-      message: `[트랙학습센터] 안녕하세요 학부모님, ${studentName} 학생의 이번 달 수강료 결제일이 3일 남았습니다. (기한: ${dueDateLabel})`,
+      message: `[${TRACK_MANAGED_STUDY_CENTER_NAME}] 안녕하세요 학부모님, ${studentName} 학생의 이번 달 수강료 결제일이 3일 남았습니다. (기한: ${dueDateLabel})`,
       date: nowKst,
       settings,
       dedupeKey: `${centerId}_${invoiceDoc.id}_payment_reminder_${todayKey}`,
