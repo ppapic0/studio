@@ -33,7 +33,8 @@ var __importStar = (this && this.__importStar) || (function () {
     };
 })();
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.generateStudyPlan = exports.syncGiftishowCatalogSecure = exports.scheduledGiftishowCatalogSync = exports.saveGiftishowSettingsSecure = exports.resendGiftishowOrderSecure = exports.rejectGiftishowOrderSecure = exports.reconcilePendingGiftishowOrders = exports.getGiftishowBizmoneySecure = exports.createGiftishowOrderRequestSecure = exports.cancelGiftishowOrderSecure = exports.cancelGiftishowSendFailSecure = exports.approveGiftishowOrderSecure = exports.scheduledRankingRewardSettlement = exports.ensureCurrentUserMemberships = exports.scheduledOpenClawSnapshotExport = exports.generateOpenClawSnapshot = exports.refreshClassroomSignals = exports.stopStudentStudySessionSecure = exports.scheduledStudyBoxCarryoverExpiry = exports.openStudyRewardBoxSecure = exports.claimPlannerCompletionRewardSecure = exports.submitAttendanceRequestSecure = exports.applyPenaltyEventSecure = exports.cancelPointBoostEventSecure = exports.createPointBoostEventSecure = exports.scheduledClassroomSignalsRefresh = exports.scheduledDailyRiskAlert = exports.onSessionWritten = exports.onSessionCreated = exports.scheduledWeeklyReport = exports.cleanupOldDocuments = exports.scheduledAttendanceCheck = exports.runLateArrivalCheck = exports.sendPaymentReminderBatch = exports.notifyDailyReportReady = exports.notifyAttendanceSms = exports.scheduledSmsQueueDispatcher = exports.sendManualStudentSms = exports.updateSmsRecipientPreference = exports.cancelSmsQueueItem = exports.retrySmsQueueItem = exports.saveNotificationSettingsSecure = exports.confirmInvoicePayment = exports.completeSignupWithInvite = exports.redeemInviteCode = exports.createCounselingDemoBundle = exports.registerStudent = exports.updateStudentAccount = exports.deleteTeacherAccount = exports.deleteStudentAccount = void 0;
+exports.scheduledGiftishowCatalogSync = exports.saveGiftishowSettingsSecure = exports.resendGiftishowOrderSecure = exports.rejectGiftishowOrderSecure = exports.reconcilePendingGiftishowOrders = exports.getGiftishowBizmoneySecure = exports.createGiftishowOrderRequestSecure = exports.cancelGiftishowOrderSecure = exports.cancelGiftishowSendFailSecure = exports.approveGiftishowOrderSecure = exports.scheduledRankingRewardSettlement = exports.ensureCurrentUserMemberships = exports.scheduledOpenClawSnapshotExport = exports.generateOpenClawSnapshot = exports.refreshClassroomSignals = exports.stopStudentStudySessionSecure = exports.scheduledStudyBoxCarryoverExpiry = exports.openStudyRewardBoxSecure = exports.claimPlannerCompletionRewardSecure = exports.submitAttendanceRequestSecure = exports.applyPenaltyEventSecure = exports.cancelPointBoostEventSecure = exports.createPointBoostEventSecure = exports.scheduledClassroomSignalsRefresh = exports.scheduledDailyRiskAlert = exports.onSessionWritten = exports.onSessionCreated = exports.scheduledWeeklyReport = exports.cleanupOldDocuments = exports.scheduledAttendanceCheck = exports.runLateArrivalCheck = exports.sendPaymentReminderBatch = exports.notifyDailyReportReady = exports.notifyAttendanceSms = exports.scheduledSmsQueueDispatcher = exports.sendManualStudentSms = exports.updateSmsRecipientPreference = exports.cancelSmsQueueItem = exports.retrySmsQueueItem = exports.saveNotificationSettingsSecure = exports.confirmInvoicePayment = exports.completeSignupWithInvite = exports.redeemInviteCode = exports.createCounselingDemoBundle = exports.registerStudent = exports.updateStudentAccount = exports.deleteTeacherAccount = exports.deleteStudentAccount = exports.repairTodayAttendanceSmsQueue = exports.onAttendanceEventCreated = void 0;
+exports.generateStudyPlan = exports.syncGiftishowCatalogSecure = void 0;
 const params_1 = require("firebase-functions/params");
 const functions = __importStar(require("firebase-functions"));
 const admin = __importStar(require("firebase-admin"));
@@ -56,6 +57,7 @@ const PARENT_LINK_FAILED_ATTEMPT_LIMIT = 5;
 const PARENT_LINK_FAILED_ATTEMPT_WINDOW_MS = 30 * 60 * 1000;
 const PARENT_LINK_FAILED_ATTEMPT_LOCK_MS = 30 * 60 * 1000;
 const PARENT_LINK_LOOKUP_COLLECTION = "parentLinkCodeLookup";
+const TRACK_MANAGED_STUDY_CENTER_NAME = "트랙 관리형 스터디센터";
 const ATTENDANCE_REQUEST_PENALTY_POINTS = {
     late: 1,
     absence: 2,
@@ -93,12 +95,21 @@ const SENSITIVE_USER_MESSAGE_PATTERNS = [
     /firebaseerror:/i,
 ];
 const DEFAULT_SMS_TEMPLATES = {
-    study_start: "[{centerName}] {studentName} 학생 {time} 공부시작. 오늘 학습 흐름 확인 부탁드립니다.",
-    away_start: "[{centerName}] {studentName} 학생 {time} 외출. 복귀 후 다시 공부를 이어갑니다.",
-    away_end: "[{centerName}] {studentName} 학생 {time} 복귀. 다시 공부를 시작했습니다.",
-    study_end: "[{centerName}] {studentName} 학생 {time} 공부종료. 오늘 학습 마무리했습니다.",
-    late_alert: "{studentName}학생이 {expectedTime}까지 등원하지 않았습니다.",
+    study_start: `[${TRACK_MANAGED_STUDY_CENTER_NAME}] {studentName} 학생 {time} 공부시작. 오늘 학습 흐름 확인 부탁드립니다.`,
+    away_start: `[${TRACK_MANAGED_STUDY_CENTER_NAME}] {studentName} 학생 {time} 외출. 복귀 후 다시 공부를 이어갑니다.`,
+    away_end: `[${TRACK_MANAGED_STUDY_CENTER_NAME}] {studentName} 학생 {time} 복귀. 다시 공부를 시작했습니다.`,
+    study_end: `[${TRACK_MANAGED_STUDY_CENTER_NAME}] {studentName} 학생 {time} 공부종료. 오늘 학습 마무리했습니다.`,
+    late_alert: `[${TRACK_MANAGED_STUDY_CENTER_NAME}] {studentName} 학생 {expectedTime} 미등원. 확인 부탁드립니다.`,
 };
+const SMS_TEMPLATE_SETTING_KEYS = [
+    "smsTemplateStudyStart",
+    "smsTemplateAwayStart",
+    "smsTemplateAwayEnd",
+    "smsTemplateStudyEnd",
+    "smsTemplateLateAlert",
+    "smsTemplateCheckIn",
+    "smsTemplateCheckOut",
+];
 const STUDY_BOX_REWARD_RANGE_BY_RARITY = {
     common: [1, 10],
     rare: [10, 20],
@@ -456,7 +467,7 @@ function resolveStudyBoxMilestoneEarnedAtMs(params) {
     return null;
 }
 async function finalizeStudySession(params) {
-    const { db, centerId, studentId, closeSeatRef, shouldCloseSeat, progressExtra, sessionMetadata } = params;
+    const { db, centerId, studentId, closeSeatRef, shouldCloseSeat, closeAttendanceEvent, progressExtra, sessionMetadata } = params;
     const startMs = Math.max(0, Math.floor(params.startMs));
     const rawEndMs = Math.max(startMs, Math.floor(params.endMs));
     const effectiveEndMs = Math.min(rawEndMs, startMs + MAX_STUDY_SESSION_MINUTES * MINUTE_MS);
@@ -554,9 +565,30 @@ async function finalizeStudySession(params) {
                 dailyPointStatusUpdates[entry.dateKey] = currentDayStatus;
             }
         });
+        const createdSessionCount = sessionEntries.reduce((count, entry, index) => {
+            const sessionSnap = sessionSnapshots[index];
+            return count + (!sessionSnap.exists && entry.durationMinutes > 0 ? 1 : 0);
+        }, 0);
         if (shouldCloseSeat && closeSeatRef) {
             transaction.set(closeSeatRef, {
                 status: "absent",
+                lastCheckInAt: admin.firestore.FieldValue.delete(),
+                updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+            }, { merge: true });
+        }
+        if (shouldCloseSeat && closeAttendanceEvent && createdSessionCount > 0) {
+            const closeEventAt = admin.firestore.Timestamp.fromMillis(Math.max(startMs, Math.floor(closeAttendanceEvent.eventAtMs || effectiveEndMs)));
+            const closeEventRef = db.collection(`centers/${centerId}/attendanceEvents`).doc();
+            transaction.set(closeEventRef, Object.assign(Object.assign(Object.assign({ studentId, dateKey: closeAttendanceEvent.dateKey, eventType: "check_out", occurredAt: closeEventAt, createdAt: admin.firestore.FieldValue.serverTimestamp(), source: closeAttendanceEvent.source }, (closeAttendanceEvent.seatId ? { seatId: closeAttendanceEvent.seatId } : {})), (closeAttendanceEvent.statusBefore ? { statusBefore: closeAttendanceEvent.statusBefore } : {})), { statusAfter: closeAttendanceEvent.statusAfter || "absent" }));
+            const attendanceStatRef = db.doc(`centers/${centerId}/attendanceDailyStats/${closeAttendanceEvent.dateKey}/students/${studentId}`);
+            transaction.set(attendanceStatRef, {
+                centerId,
+                studentId,
+                dateKey: closeAttendanceEvent.dateKey,
+                attendanceStatus: closeAttendanceEvent.statusAfter || "absent",
+                checkOutAt: closeEventAt,
+                hasCheckOutRecord: true,
+                source: closeAttendanceEvent.source,
                 updatedAt: admin.firestore.FieldValue.serverTimestamp(),
             }, { merge: true });
         }
@@ -1402,12 +1434,104 @@ function applyTemplate(template, values) {
         return acc.replace(new RegExp(`\\{${key}\\}`, "g"), value);
     }, template);
 }
+function buildParentSmsTemplateMessage(template, values) {
+    return trimSmsToByteLimit(normalizeTrackManagedSmsMessage(applyTemplate(template, values), { ensurePrefix: true }));
+}
+function shouldEnsureTrackManagedSmsPrefix(eventType) {
+    return (eventType === "study_start" ||
+        eventType === "away_start" ||
+        eventType === "away_end" ||
+        eventType === "study_end" ||
+        eventType === "late_alert" ||
+        eventType === "daily_report" ||
+        eventType === "payment_reminder" ||
+        eventType === "weekly_report");
+}
+function isAttendanceSmsEventType(value) {
+    const normalized = String(value || "").trim();
+    return (normalized === "study_start" ||
+        normalized === "away_start" ||
+        normalized === "away_end" ||
+        normalized === "study_end" ||
+        normalized === "late_alert" ||
+        normalized === "check_in" ||
+        normalized === "check_out");
+}
 function normalizeSmsEventType(eventType) {
     if (eventType === "check_in")
         return "study_start";
     if (eventType === "check_out")
         return "study_end";
     return eventType;
+}
+function toKstDateFromUnknownTimestamp(value) {
+    const millis = toMillisSafe(value);
+    if (!millis)
+        return null;
+    return toKstDate(new Date(millis));
+}
+function pickSmsEventDate(candidates, mode) {
+    if (candidates.length === 0)
+        return null;
+    return candidates
+        .slice()
+        .sort((a, b) => mode === "earliest" ? a.getTime() - b.getTime() : b.getTime() - a.getTime())[0] || null;
+}
+async function resolveAttendanceSmsEventAt(db, params) {
+    const eventType = normalizeSmsEventType(params.eventType);
+    if (eventType === "late_alert")
+        return params.fallbackEventAt;
+    const dateKey = asTrimmedString(params.dateKeyOverride) || toDateKey(params.fallbackEventAt);
+    const candidates = [];
+    const addCandidate = (value) => {
+        const candidate = toKstDateFromUnknownTimestamp(value);
+        if (!candidate)
+            return;
+        if (toDateKey(candidate) !== dateKey)
+            return;
+        candidates.push(candidate);
+    };
+    addCandidate(params.fallbackEventAt);
+    const [dailyStatSnap, attendanceRecordSnap, attendanceEventsSnap, liveAttendanceSnap] = await Promise.all([
+        db.doc(`centers/${params.centerId}/attendanceDailyStats/${dateKey}/students/${params.studentId}`).get(),
+        db.doc(`centers/${params.centerId}/attendanceRecords/${dateKey}/students/${params.studentId}`).get(),
+        db.collection(`centers/${params.centerId}/attendanceEvents`).where("dateKey", "==", dateKey).get(),
+        db.collection(`centers/${params.centerId}/attendanceCurrent`).where("studentId", "==", params.studentId).limit(5).get(),
+    ]);
+    const dailyStatData = dailyStatSnap.exists ? dailyStatSnap.data() || {} : {};
+    const attendanceRecordData = attendanceRecordSnap.exists ? attendanceRecordSnap.data() || {} : {};
+    if (eventType === "study_start") {
+        addCandidate(dailyStatData.checkInAt);
+        addCandidate(attendanceRecordData.checkInAt);
+        liveAttendanceSnap.docs.forEach((docSnap) => {
+            const data = docSnap.data() || {};
+            const status = asTrimmedString(data.status);
+            if (ACTIVE_STUDY_ATTENDANCE_STATUSES.has(status)) {
+                addCandidate(data.lastCheckInAt);
+            }
+        });
+    }
+    if (eventType === "study_end") {
+        addCandidate(dailyStatData.checkOutAt);
+        addCandidate(attendanceRecordData.checkOutAt);
+    }
+    const matchingAttendanceEventTypes = {
+        study_start: ["check_in"],
+        away_start: ["away_start"],
+        away_end: ["away_end"],
+        study_end: ["check_out"],
+    };
+    const targetEventTypes = matchingAttendanceEventTypes[eventType];
+    attendanceEventsSnap.docs.forEach((docSnap) => {
+        const data = docSnap.data() || {};
+        if (asTrimmedString(data.studentId) !== params.studentId)
+            return;
+        if (!targetEventTypes.includes(asTrimmedString(data.eventType)))
+            return;
+        addCandidate(data.occurredAt || data.createdAt);
+    });
+    const picked = pickSmsEventDate(candidates, eventType === "study_start" ? "earliest" : "latest");
+    return picked || params.fallbackEventAt;
 }
 function getDefaultSmsEventToggles() {
     return {
@@ -1541,21 +1665,33 @@ function trimSmsToByteLimit(message, limit = SMS_BYTE_LIMIT) {
     return result.trim();
 }
 function sanitizeSmsTemplate(template) {
-    return String(template || "")
+    return enforceTrackManagedSmsCenterName(String(template || ""))
         .replace(/[^\u0020-\u007E\u00A0-\u00FF\u1100-\u11FF\u3130-\u318F\uAC00-\uD7A3]/g, "")
         .replace(/\s+/g, " ")
         .trim();
 }
-async function loadCenterName(db, centerId) {
-    var _a;
-    try {
-        const centerSnap = await db.doc(`centers/${centerId}`).get();
-        const name = (_a = centerSnap.data()) === null || _a === void 0 ? void 0 : _a.name;
-        return typeof name === "string" && name.trim().length > 0 ? name.trim() : "센터";
+function enforceTrackManagedSmsCenterName(value) {
+    return String(value || "")
+        .replace(/\{centerName\}/g, TRACK_MANAGED_STUDY_CENTER_NAME)
+        .replace(/공부\s*트랙\s*동백\s*센터/g, TRACK_MANAGED_STUDY_CENTER_NAME)
+        .replace(/트랙\s*학습\s*센터/g, TRACK_MANAGED_STUDY_CENTER_NAME)
+        .replace(/트랙학습센터/g, TRACK_MANAGED_STUDY_CENTER_NAME);
+}
+function normalizeTrackManagedSmsMessage(message, options = {}) {
+    const normalized = enforceTrackManagedSmsCenterName(message).replace(/\s+/g, " ").trim();
+    if (!normalized)
+        return "";
+    const requiredPrefix = `[${TRACK_MANAGED_STUDY_CENTER_NAME}]`;
+    if (normalized.startsWith(requiredPrefix))
+        return normalized;
+    const bracketPrefixPattern = /^\[[^\]]+\]\s*/;
+    if (bracketPrefixPattern.test(normalized)) {
+        return normalized.replace(bracketPrefixPattern, `${requiredPrefix} `).trim();
     }
-    catch (_b) {
-        return "센터";
-    }
+    return options.ensurePrefix ? `${requiredPrefix} ${normalized}` : normalized;
+}
+async function loadCenterName(_db, _centerId) {
+    return TRACK_MANAGED_STUDY_CENTER_NAME;
 }
 function resolveTemplateByEvent(settings, eventType) {
     if (eventType === "study_start") {
@@ -1641,6 +1777,20 @@ async function loadNotificationSettings(db, centerId) {
             }, { merge: true }),
         ]);
     }
+    const normalizedTemplateUpdates = {};
+    for (const key of SMS_TEMPLATE_SETTING_KEYS) {
+        const currentValue = publicData[key];
+        if (typeof currentValue !== "string" || !currentValue.trim())
+            continue;
+        const normalizedValue = sanitizeSmsTemplate(currentValue);
+        if (normalizedValue && normalizedValue !== currentValue) {
+            normalizedTemplateUpdates[key] = normalizedValue;
+            publicData[key] = normalizedValue;
+        }
+    }
+    if (Object.keys(normalizedTemplateUpdates).length > 0) {
+        await publicRef.set(Object.assign(Object.assign({}, normalizedTemplateUpdates), { smsTemplatesNormalizedAt: admin.firestore.FieldValue.serverTimestamp() }), { merge: true });
+    }
     return Object.assign(Object.assign({}, publicData), { smsApiKey: privateApiKey || legacyPublicApiKey || undefined });
 }
 function validateSmsTemplateLength(template, fieldLabel) {
@@ -1703,23 +1853,6 @@ async function collectParentRecipients(db, centerId, studentId) {
         });
         usedPhones.add(phoneNumber);
     }
-    if (recipients.length === 0) {
-        const [fallbackPrefSnap, studentMemberSnap] = await Promise.all([
-            db.doc(`centers/${centerId}/smsRecipientPreferences/${buildSmsRecipientPreferenceId(studentId, STUDENT_SMS_FALLBACK_UID)}`).get(),
-            db.doc(`centers/${centerId}/members/${studentId}`).get(),
-        ]);
-        const fallbackPref = fallbackPrefSnap.exists ? fallbackPrefSnap.data() : null;
-        const studentMemberData = studentMemberSnap.exists ? studentMemberSnap.data() : null;
-        const fallbackPhoneNumber = resolveFirstValidPhoneNumber(fallbackPref === null || fallbackPref === void 0 ? void 0 : fallbackPref.phoneNumber, studentData.phoneNumber, studentMemberData === null || studentMemberData === void 0 ? void 0 : studentMemberData.phoneNumber);
-        if (fallbackPhoneNumber && !usedPhones.has(fallbackPhoneNumber)) {
-            recipients.push({
-                parentUid: STUDENT_SMS_FALLBACK_UID,
-                parentName: asTrimmedString(fallbackPref === null || fallbackPref === void 0 ? void 0 : fallbackPref.parentName, "학생 본인"),
-                phoneNumber: fallbackPhoneNumber,
-            });
-            usedPhones.add(fallbackPhoneNumber);
-        }
-    }
     return recipients;
 }
 async function splitRecipientsBySmsPreference(db, centerId, studentId, studentName, eventType, recipients) {
@@ -1776,36 +1909,35 @@ async function queueParentSmsNotification(db, params) {
     const settings = params.settings || await loadNotificationSettings(db, centerId);
     const recipients = await collectParentRecipients(db, centerId, studentId);
     if (recipients.length === 0) {
-        return { queuedCount: 0, recipientCount: 0, message: "" };
+        return { queuedCount: 0, recipientCount: 0, suppressedCount: 0, message: "" };
     }
     const centerName = await loadCenterName(db, centerId);
     const template = resolveTemplateByEvent(settings, eventType);
-    const eventTimeLabel = toTimeLabel(eventAt);
+    const smsEventAt = await resolveAttendanceSmsEventAt(db, {
+        centerId,
+        studentId,
+        eventType,
+        fallbackEventAt: eventAt,
+        dateKeyOverride: params.dateKeyOverride,
+    });
+    const eventTimeLabel = toTimeLabel(smsEventAt);
     const expectedTimeLabel = expectedTime || "학생이 정한 시간";
-    const message = trimSmsToByteLimit(applyTemplate(template, {
+    const message = buildParentSmsTemplateMessage(template, {
         studentName,
         time: eventTimeLabel,
         expectedTime: expectedTimeLabel,
         centerName,
-    }));
+    });
     const messageBytes = calculateSmsBytes(message);
     const dedupeKey = buildSmsDedupeKey({
         centerId,
         studentId,
         eventType,
-        eventAt,
+        eventAt: smsEventAt,
     });
     const dedupeRef = db.doc(`centers/${centerId}/smsDedupes/${dedupeKey}`);
-    const dedupeSnap = await dedupeRef.get();
-    if (dedupeSnap.exists) {
-        return { queuedCount: 0, recipientCount: recipients.length, message };
-    }
-    const { allowedRecipients, suppressedRecipients } = await splitRecipientsBySmsPreference(db, centerId, studentId, studentName, eventType, recipients);
-    const provider = settings.smsProvider || "none";
     const ts = admin.firestore.Timestamp.now();
-    const batch = db.batch();
-    const initialStatus = buildSmsQueueInitialStatus(settings);
-    batch.set(dedupeRef, {
+    const dedupePayload = {
         centerId,
         studentId,
         eventType,
@@ -1813,7 +1945,26 @@ async function queueParentSmsNotification(db, params) {
         createdAt: ts,
         renderedMessage: message,
         messageBytes,
-    }, { merge: true });
+    };
+    if (!params.force) {
+        const shouldQueue = await db.runTransaction(async (tx) => {
+            const dedupeSnap = await tx.get(dedupeRef);
+            if (dedupeSnap.exists)
+                return false;
+            tx.set(dedupeRef, dedupePayload, { merge: true });
+            return true;
+        });
+        if (!shouldQueue) {
+            return { queuedCount: 0, recipientCount: recipients.length, suppressedCount: 0, message, deduped: true };
+        }
+    }
+    const { allowedRecipients, suppressedRecipients } = await splitRecipientsBySmsPreference(db, centerId, studentId, studentName, eventType, recipients);
+    const provider = settings.smsProvider || "none";
+    const batch = db.batch();
+    const initialStatus = buildSmsQueueInitialStatus(settings);
+    if (params.force) {
+        batch.set(dedupeRef, Object.assign(Object.assign({}, dedupePayload), { forcedAt: ts }), { merge: true });
+    }
     allowedRecipients.forEach((recipient) => {
         const queueRef = db.collection(`centers/${centerId}/smsQueue`).doc();
         batch.set(queueRef, {
@@ -1832,7 +1983,7 @@ async function queueParentSmsNotification(db, params) {
             messageBytes,
             dedupeKey,
             eventType,
-            dateKey: toDateKey(eventAt),
+            dateKey: toDateKey(smsEventAt),
             status: initialStatus.status,
             providerStatus: initialStatus.providerStatus,
             attemptCount: 0,
@@ -1847,6 +1998,7 @@ async function queueParentSmsNotification(db, params) {
             metadata: {
                 studentName,
                 centerName,
+                eventTime: eventTimeLabel,
                 expectedTime: expectedTime || null,
             },
         });
@@ -1856,13 +2008,7 @@ async function queueParentSmsNotification(db, params) {
             studentId,
             parentUid: recipient.parentUid,
             type: eventType,
-            title: eventType === "study_start"
-                ? "공부 시작 알림"
-                : eventType === "study_end"
-                    ? "공부 종료 알림"
-                    : eventType === "away_start"
-                        ? "외출 알림"
-                        : "지각 알림",
+            title: buildParentNotificationTitle(eventType),
             body: message,
             isRead: false,
             isImportant: eventType !== "study_start",
@@ -1887,7 +2033,12 @@ async function queueParentSmsNotification(db, params) {
         createdAt: ts,
         suppressedReason: recipient.suppressedReason,
     })));
-    return { queuedCount: allowedRecipients.length, recipientCount: recipients.length, message };
+    return {
+        queuedCount: allowedRecipients.length,
+        recipientCount: recipients.length,
+        suppressedCount: suppressedRecipients.length,
+        message,
+    };
 }
 function buildParentNotificationTitle(eventType) {
     if (eventType === "study_start")
@@ -1912,7 +2063,7 @@ async function queueCustomParentSmsNotification(db, params) {
     const settings = params.settings || await loadNotificationSettings(db, params.centerId);
     const recipients = await collectParentRecipients(db, params.centerId, params.studentId);
     if (recipients.length === 0) {
-        return { queuedCount: 0, recipientCount: 0, message: params.message };
+        return { queuedCount: 0, recipientCount: 0, suppressedCount: 0, message: params.message };
     }
     const dedupeRef = params.dedupeKey
         ? db.doc(`centers/${params.centerId}/smsDedupes/${params.dedupeKey}`)
@@ -1920,13 +2071,13 @@ async function queueCustomParentSmsNotification(db, params) {
     if (dedupeRef) {
         const dedupeSnap = await dedupeRef.get();
         if (dedupeSnap.exists) {
-            return { queuedCount: 0, recipientCount: recipients.length, message: params.message };
+            return { queuedCount: 0, recipientCount: recipients.length, suppressedCount: 0, message: params.message };
         }
     }
     const { allowedRecipients, suppressedRecipients } = await splitRecipientsBySmsPreference(db, params.centerId, params.studentId, params.studentName, params.eventType, recipients);
     const provider = settings.smsProvider || "none";
     const ts = admin.firestore.Timestamp.now();
-    const message = trimSmsToByteLimit(params.message);
+    const message = trimSmsToByteLimit(normalizeTrackManagedSmsMessage(params.message, { ensurePrefix: false }));
     const messageBytes = calculateSmsBytes(message);
     const initialStatus = buildSmsQueueInitialStatus(settings);
     const batch = db.batch();
@@ -2004,8 +2155,173 @@ async function queueCustomParentSmsNotification(db, params) {
         createdAt: ts,
         suppressedReason: recipient.suppressedReason,
     })));
-    return { queuedCount: allowedRecipients.length, recipientCount: recipients.length, message };
+    return {
+        queuedCount: allowedRecipients.length,
+        recipientCount: recipients.length,
+        suppressedCount: suppressedRecipients.length,
+        message,
+    };
 }
+function normalizeAttendanceEventForParentSms(value) {
+    const normalized = asTrimmedString(value);
+    if (normalized === "check_in")
+        return "study_start";
+    if (normalized === "check_out")
+        return "study_end";
+    if (normalized === "away_start" || normalized === "away_end")
+        return normalized;
+    if (normalized === "study_start" || normalized === "study_end")
+        return normalized;
+    return null;
+}
+exports.onAttendanceEventCreated = functions
+    .region(region)
+    .firestore.document("centers/{centerId}/attendanceEvents/{eventId}")
+    .onCreate(async (snap, context) => {
+    var _a;
+    const db = admin.firestore();
+    const centerId = asTrimmedString(context.params.centerId);
+    const eventId = asTrimmedString(context.params.eventId);
+    const data = (snap.data() || {});
+    const studentId = asTrimmedString(data.studentId);
+    const eventType = normalizeAttendanceEventForParentSms(data.eventType);
+    if (!centerId || !studentId || !eventType) {
+        return null;
+    }
+    try {
+        const eventAt = toKstDateFromUnknownTimestamp(data.occurredAt)
+            || toKstDateFromUnknownTimestamp(data.createdAt)
+            || toKstDate();
+        const [settings, studentSnap] = await Promise.all([
+            loadNotificationSettings(db, centerId),
+            db.doc(`centers/${centerId}/students/${studentId}`).get(),
+        ]);
+        const studentData = studentSnap.exists ? studentSnap.data() || {} : {};
+        const studentName = asTrimmedString(studentData.name || ((_a = asRecord(data.meta)) === null || _a === void 0 ? void 0 : _a.studentName) || data.studentName, "학생");
+        const queueResult = await queueParentSmsNotification(db, {
+            centerId,
+            studentId,
+            studentName,
+            eventType,
+            eventAt,
+            settings,
+        });
+        await snap.ref.set({
+            smsAutoQueuedAt: admin.firestore.FieldValue.serverTimestamp(),
+            smsAutoQueuedCount: queueResult.queuedCount,
+            smsAutoRecipientCount: queueResult.recipientCount,
+            smsAutoEventType: eventType,
+            smsAutoMessage: queueResult.message || null,
+        }, { merge: true });
+    }
+    catch (error) {
+        console.error("[attendance-sms-auto] failed", {
+            centerId,
+            eventId,
+            studentId,
+            eventType,
+            message: (error === null || error === void 0 ? void 0 : error.message) || String(error),
+        });
+        await snap.ref.set({
+            smsAutoQueuedAt: admin.firestore.FieldValue.serverTimestamp(),
+            smsAutoError: (error === null || error === void 0 ? void 0 : error.message) || String(error),
+            smsAutoEventType: eventType,
+        }, { merge: true });
+    }
+    return null;
+});
+exports.repairTodayAttendanceSmsQueue = functions.region(region).https.onCall(async (data, context) => {
+    var _a;
+    const db = admin.firestore();
+    if (!context.auth) {
+        throw new functions.https.HttpsError("unauthenticated", "로그인이 필요합니다.");
+    }
+    const centerId = asTrimmedString(data === null || data === void 0 ? void 0 : data.centerId);
+    if (!centerId) {
+        throw new functions.https.HttpsError("invalid-argument", "centerId가 필요합니다.");
+    }
+    const callerMemberSnap = await db.doc(`centers/${centerId}/members/${context.auth.uid}`).get();
+    const callerRole = callerMemberSnap.exists ? (_a = callerMemberSnap.data()) === null || _a === void 0 ? void 0 : _a.role : null;
+    if (!isAdminRole(callerRole)) {
+        throw new functions.https.HttpsError("permission-denied", "센터 관리자만 문자 접수 복구를 실행할 수 있습니다.");
+    }
+    const todayKey = toDateKey(toKstDate());
+    const requestedDateKey = asTrimmedString(data === null || data === void 0 ? void 0 : data.dateKey, todayKey);
+    if (requestedDateKey !== todayKey) {
+        throw new functions.https.HttpsError("invalid-argument", "오늘 날짜의 문자 접수만 복구할 수 있습니다.");
+    }
+    const eventsSnap = await db
+        .collection(`centers/${centerId}/attendanceEvents`)
+        .where("dateKey", "==", todayKey)
+        .limit(1500)
+        .get();
+    const targetEvents = eventsSnap.docs
+        .map((eventDoc) => {
+        const eventData = eventDoc.data() || {};
+        const eventType = normalizeAttendanceEventForParentSms(eventData.eventType);
+        const studentId = asTrimmedString(eventData.studentId);
+        if (!eventType || !studentId)
+            return null;
+        return {
+            eventId: eventDoc.id,
+            data: eventData,
+            studentId,
+            eventType,
+            eventAt: toKstDateFromUnknownTimestamp(eventData.occurredAt)
+                || toKstDateFromUnknownTimestamp(eventData.createdAt)
+                || toKstDate(),
+        };
+    })
+        .filter((event) => Boolean(event))
+        .sort((left, right) => left.eventAt.getTime() - right.eventAt.getTime());
+    const studentIds = Array.from(new Set(targetEvents.map((event) => event.studentId)));
+    const studentRefs = studentIds.map((studentId) => db.doc(`centers/${centerId}/students/${studentId}`));
+    const [settings, studentSnaps] = await Promise.all([
+        loadNotificationSettings(db, centerId),
+        studentRefs.length > 0 ? db.getAll(...studentRefs) : Promise.resolve([]),
+    ]);
+    const studentNameById = new Map();
+    studentSnaps.forEach((studentSnap) => {
+        const studentData = studentSnap.exists ? studentSnap.data() || {} : {};
+        studentNameById.set(studentSnap.id, asTrimmedString(studentData.name, "학생"));
+    });
+    let queuedCount = 0;
+    let suppressedCount = 0;
+    let skippedCount = 0;
+    let noRecipientCount = 0;
+    for (const event of targetEvents) {
+        const studentName = studentNameById.get(event.studentId) || asTrimmedString(event.data.studentName, "학생");
+        const queueResult = await queueParentSmsNotification(db, {
+            centerId,
+            studentId: event.studentId,
+            studentName,
+            eventType: event.eventType,
+            eventAt: event.eventAt,
+            settings,
+        });
+        if (queueResult.deduped) {
+            skippedCount += 1;
+            continue;
+        }
+        if (queueResult.recipientCount === 0) {
+            noRecipientCount += 1;
+            continue;
+        }
+        queuedCount += queueResult.queuedCount;
+        suppressedCount += queueResult.suppressedCount;
+    }
+    return {
+        ok: true,
+        centerId,
+        dateKey: todayKey,
+        scannedCount: eventsSnap.size,
+        targetCount: targetEvents.length,
+        queuedCount,
+        suppressedCount,
+        skippedCount,
+        noRecipientCount,
+    };
+});
 async function runLateArrivalCheckForCenter(db, centerId, nowKst, attendanceSnap) {
     const settings = await loadNotificationSettings(db, centerId);
     if (settings.lateAlertEnabled === false)
@@ -2197,13 +2513,47 @@ async function dispatchSmsQueueItem(db, centerId, queueRef, queueData, attemptCo
     const provider = (settings.smsProvider || queueData.provider || "none");
     const sender = asTrimmedString(settings.smsSender || queueData.sender || "");
     const receiver = normalizePhoneNumber(queueData.phoneNumber || queueData.to || "");
-    const message = asTrimmedString(queueData.renderedMessage || queueData.message || "");
     const queueId = queueRef.id;
     const studentId = asTrimmedString(queueData.studentId);
     const studentName = asTrimmedString(queueData.studentName || ((_a = queueData === null || queueData === void 0 ? void 0 : queueData.metadata) === null || _a === void 0 ? void 0 : _a.studentName), "학생");
     const parentUid = asTrimmedString(queueData.parentUid);
     const parentName = asTrimmedString(queueData.parentName);
     const eventType = String(queueData.eventType || "study_start");
+    const rawMessage = asTrimmedString(queueData.renderedMessage || queueData.message || "");
+    const message = trimSmsToByteLimit(normalizeTrackManagedSmsMessage(rawMessage, {
+        ensurePrefix: shouldEnsureTrackManagedSmsPrefix(eventType),
+    }));
+    const messageBytes = calculateSmsBytes(message);
+    if (parentUid === STUDENT_SMS_FALLBACK_UID) {
+        await queueRef.set({
+            status: "suppressed_opt_out",
+            providerStatus: "suppressed_parent_only",
+            updatedAt: nowTs,
+            nextAttemptAt: admin.firestore.FieldValue.delete(),
+            processingStartedAt: admin.firestore.FieldValue.delete(),
+            processingLeaseUntil: admin.firestore.FieldValue.delete(),
+            lastErrorCode: admin.firestore.FieldValue.delete(),
+            lastErrorMessage: admin.firestore.FieldValue.delete(),
+        }, { merge: true });
+        await appendSmsDeliveryLog(db, {
+            centerId,
+            queueId,
+            studentId,
+            studentName,
+            parentUid,
+            parentName: parentName || "학생 본인",
+            phoneNumber: receiver || queueData.phoneNumber || queueData.to || null,
+            eventType,
+            renderedMessage: message || "",
+            messageBytes,
+            provider,
+            attemptNo: attemptCount,
+            status: "suppressed_opt_out",
+            createdAt: nowTs,
+            suppressedReason: "student_fallback_blocked",
+        });
+        return;
+    }
     if (!message || !receiver) {
         await queueRef.set({
             status: "failed",
@@ -2225,7 +2575,7 @@ async function dispatchSmsQueueItem(db, centerId, queueRef, queueData, attemptCo
             phoneNumber: receiver || queueData.phoneNumber || queueData.to || null,
             eventType,
             renderedMessage: message || "",
-            messageBytes: Number(queueData.messageBytes || calculateSmsBytes(message || "")),
+            messageBytes,
             provider,
             attemptNo: attemptCount,
             status: "failed",
@@ -2238,6 +2588,9 @@ async function dispatchSmsQueueItem(db, centerId, queueRef, queueData, attemptCo
     }
     if (settings.smsEnabled === false || provider === "none") {
         await queueRef.set({
+            message,
+            renderedMessage: message,
+            messageBytes,
             status: "pending_provider",
             providerStatus: "pending_provider",
             updatedAt: nowTs,
@@ -2255,6 +2608,9 @@ async function dispatchSmsQueueItem(db, centerId, queueRef, queueData, attemptCo
         const userId = asTrimmedString(settings.smsUserId);
         if (!apiKey || !userId || !sender) {
             await queueRef.set({
+                message,
+                renderedMessage: message,
+                messageBytes,
                 status: "pending_provider",
                 providerStatus: "pending_provider",
                 updatedAt: nowTs,
@@ -2279,6 +2635,9 @@ async function dispatchSmsQueueItem(db, centerId, queueRef, queueData, attemptCo
         const apiKey = asTrimmedString(settings.smsApiKey);
         if (!endpointUrl || !apiKey) {
             await queueRef.set({
+                message,
+                renderedMessage: message,
+                messageBytes,
                 status: "pending_provider",
                 providerStatus: "pending_provider",
                 updatedAt: nowTs,
@@ -2301,11 +2660,13 @@ async function dispatchSmsQueueItem(db, centerId, queueRef, queueData, attemptCo
             eventType,
         });
     }
-    const messageBytes = Number(queueData.messageBytes || calculateSmsBytes(message));
     if (dispatchResult.ok) {
         await queueRef.set({
             provider,
             sender: sender || null,
+            message,
+            renderedMessage: message,
+            messageBytes,
             status: "sent",
             providerStatus: "sent",
             sentAt: nowTs,
@@ -2345,6 +2706,9 @@ async function dispatchSmsQueueItem(db, centerId, queueRef, queueData, attemptCo
         await queueRef.set({
             provider,
             sender: sender || null,
+            message,
+            renderedMessage: message,
+            messageBytes,
             status: "queued",
             providerStatus: "retry_scheduled",
             updatedAt: nowTs,
@@ -2360,6 +2724,9 @@ async function dispatchSmsQueueItem(db, centerId, queueRef, queueData, attemptCo
         await queueRef.set({
             provider,
             sender: sender || null,
+            message,
+            renderedMessage: message,
+            messageBytes,
             status: "failed",
             providerStatus: "failed",
             failedAt: nowTs,
@@ -4907,7 +5274,7 @@ exports.retrySmsQueueItem = functions.region(region).https.onCall(async (data, c
     const initialStatus = buildSmsQueueInitialStatus(settings);
     const manualRetryCount = Math.max(0, Number(queueData.manualRetryCount || 0)) + 1;
     const nowTs = admin.firestore.Timestamp.now();
-    await queueRef.set({
+    const retryPayload = {
         status: initialStatus.status,
         providerStatus: initialStatus.providerStatus,
         manualRetryCount,
@@ -4919,7 +5286,55 @@ exports.retrySmsQueueItem = functions.region(region).https.onCall(async (data, c
         processingStartedAt: admin.firestore.FieldValue.delete(),
         processingLeaseUntil: admin.firestore.FieldValue.delete(),
         updatedAt: nowTs,
-    }, { merge: true });
+    };
+    const queueEventTypeRaw = String(queueData.eventType || "").trim();
+    const queueMetadata = asRecord(queueData.metadata);
+    if (isAttendanceSmsEventType(queueEventTypeRaw)) {
+        const retryStudentId = asTrimmedString(queueData.studentId);
+        if (retryStudentId) {
+            const centerName = await loadCenterName(db, centerId);
+            const smsEventType = normalizeSmsEventType(queueEventTypeRaw);
+            const fallbackEventAt = toKstDateFromUnknownTimestamp(queueData.createdAt) || toKstDate();
+            const smsEventAt = await resolveAttendanceSmsEventAt(db, {
+                centerId,
+                studentId: retryStudentId,
+                eventType: smsEventType,
+                fallbackEventAt,
+                dateKeyOverride: asTrimmedString(queueData.dateKey),
+            });
+            const eventTimeLabel = toTimeLabel(smsEventAt);
+            const expectedTime = asTrimmedString(queueMetadata === null || queueMetadata === void 0 ? void 0 : queueMetadata.expectedTime);
+            const studentName = asTrimmedString(queueData.studentName || (queueMetadata === null || queueMetadata === void 0 ? void 0 : queueMetadata.studentName), "학생");
+            const message = buildParentSmsTemplateMessage(resolveTemplateByEvent(settings, smsEventType), {
+                studentName,
+                time: eventTimeLabel,
+                expectedTime: expectedTime || "학생이 정한 시간",
+                centerName,
+            });
+            retryPayload.message = message;
+            retryPayload.renderedMessage = message;
+            retryPayload.messageBytes = calculateSmsBytes(message);
+            retryPayload.dateKey = toDateKey(smsEventAt);
+            retryPayload.metadata = {
+                studentName,
+                centerName,
+                eventTime: eventTimeLabel,
+                expectedTime: expectedTime || null,
+            };
+        }
+    }
+    else {
+        const queueEventType = String(queueData.eventType || "manual_note");
+        const message = trimSmsToByteLimit(normalizeTrackManagedSmsMessage(asTrimmedString(queueData.renderedMessage || queueData.message), {
+            ensurePrefix: shouldEnsureTrackManagedSmsPrefix(queueEventType),
+        }));
+        if (message) {
+            retryPayload.message = message;
+            retryPayload.renderedMessage = message;
+            retryPayload.messageBytes = calculateSmsBytes(message);
+        }
+    }
+    await queueRef.set(retryPayload, { merge: true });
     return { ok: true, status: initialStatus.status };
 });
 exports.cancelSmsQueueItem = functions.region(region).https.onCall(async (data, context) => {
@@ -4958,7 +5373,7 @@ exports.cancelSmsQueueItem = functions.region(region).https.onCall(async (data, 
     return { ok: true };
 });
 exports.updateSmsRecipientPreference = functions.region(region).https.onCall(async (data, context) => {
-    var _a, _b, _c, _d, _e, _f;
+    var _a, _b, _c, _d, _e;
     const db = admin.firestore();
     if (!context.auth) {
         throw new functions.https.HttpsError("unauthenticated", "로그인이 필요합니다.");
@@ -4968,11 +5383,11 @@ exports.updateSmsRecipientPreference = functions.region(region).https.onCall(asy
     const requestedParentUid = asTrimmedString(data === null || data === void 0 ? void 0 : data.parentUid);
     const isManualRecipientRequest = (data === null || data === void 0 ? void 0 : data.isManualRecipient) === true || requestedParentUid === MANUAL_PARENT_SMS_UID;
     const isFallbackRecipientRequest = (data === null || data === void 0 ? void 0 : data.isFallbackRecipient) === true || requestedParentUid === STUDENT_SMS_FALLBACK_UID;
-    const parentUid = isManualRecipientRequest
-        ? MANUAL_PARENT_SMS_UID
-        : isFallbackRecipientRequest
-            ? STUDENT_SMS_FALLBACK_UID
-            : requestedParentUid;
+    const shouldDeleteManualRecipient = (data === null || data === void 0 ? void 0 : data.deleteManualRecipient) === true;
+    if (isFallbackRecipientRequest) {
+        throw new functions.https.HttpsError("invalid-argument", "학생 본인 번호는 문자 수신 대상으로 사용할 수 없습니다.");
+    }
+    const parentUid = isManualRecipientRequest ? MANUAL_PARENT_SMS_UID : requestedParentUid;
     if (!centerId || !studentId || !parentUid) {
         throw new functions.https.HttpsError("invalid-argument", "centerId, studentId, parentUid가 필요합니다.");
     }
@@ -4992,38 +5407,26 @@ exports.updateSmsRecipientPreference = functions.region(region).https.onCall(asy
     const eventToggles = normalizeSmsEventToggles(data === null || data === void 0 ? void 0 : data.eventToggles);
     const parentNameOverride = asTrimmedString(data === null || data === void 0 ? void 0 : data.parentNameOverride);
     if (isManualRecipientRequest) {
-        if (!phoneNumberOverride) {
+        const prefRef = db.doc(`centers/${centerId}/smsRecipientPreferences/${buildSmsRecipientPreferenceId(studentId, parentUid)}`);
+        if (shouldDeleteManualRecipient) {
+            await prefRef.delete();
+            return { ok: true, deleted: true };
+        }
+        const existingPrefSnap = await prefRef.get();
+        const existingPrefData = existingPrefSnap.exists ? (existingPrefSnap.data() || {}) : null;
+        const manualPhoneNumber = phoneNumberOverride || normalizePhoneNumber((existingPrefData === null || existingPrefData === void 0 ? void 0 : existingPrefData.phoneNumber) || "");
+        if (!manualPhoneNumber) {
             throw new functions.https.HttpsError("invalid-argument", "보호자 휴대폰 번호가 필요합니다.");
         }
-        await db.doc(`centers/${centerId}/smsRecipientPreferences/${buildSmsRecipientPreferenceId(studentId, parentUid)}`).set({
+        await prefRef.set({
             studentId,
             studentName,
             parentUid,
-            parentName: parentNameOverride || "보호자",
-            phoneNumber: phoneNumberOverride,
+            parentName: parentNameOverride || (existingPrefData === null || existingPrefData === void 0 ? void 0 : existingPrefData.parentName) || "보호자",
+            phoneNumber: manualPhoneNumber,
             enabled,
             eventToggles,
             isManualRecipient: true,
-            updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-            updatedBy: context.auth.uid,
-        }, { merge: true });
-        return { ok: true };
-    }
-    if (isFallbackRecipientRequest) {
-        const studentMemberSnap = await db.doc(`centers/${centerId}/members/${studentId}`).get();
-        const fallbackPhoneNumber = resolveFirstValidPhoneNumber(phoneNumberOverride, studentData.phoneNumber, (_b = studentMemberSnap.data()) === null || _b === void 0 ? void 0 : _b.phoneNumber);
-        if (!fallbackPhoneNumber) {
-            throw new functions.https.HttpsError("invalid-argument", "학생 휴대폰 번호가 필요합니다.");
-        }
-        await db.doc(`centers/${centerId}/smsRecipientPreferences/${buildSmsRecipientPreferenceId(studentId, parentUid)}`).set({
-            studentId,
-            studentName,
-            parentUid,
-            parentName: parentNameOverride || "학생 본인",
-            phoneNumber: fallbackPhoneNumber,
-            enabled,
-            eventToggles,
-            isFallbackRecipient: true,
             updatedAt: admin.firestore.FieldValue.serverTimestamp(),
             updatedBy: context.auth.uid,
         }, { merge: true });
@@ -5037,8 +5440,8 @@ exports.updateSmsRecipientPreference = functions.region(region).https.onCall(asy
         db.doc(`users/${parentUid}`).get(),
         db.doc(`centers/${centerId}/members/${parentUid}`).get(),
     ]);
-    const parentName = asTrimmedString(((_c = memberSnap.data()) === null || _c === void 0 ? void 0 : _c.displayName) || ((_d = userSnap.data()) === null || _d === void 0 ? void 0 : _d.displayName) || "학부모");
-    const phoneNumber = normalizePhoneNumber(((_e = userSnap.data()) === null || _e === void 0 ? void 0 : _e.phoneNumber) || ((_f = memberSnap.data()) === null || _f === void 0 ? void 0 : _f.phoneNumber) || phoneNumberOverride);
+    const parentName = asTrimmedString(((_b = memberSnap.data()) === null || _b === void 0 ? void 0 : _b.displayName) || ((_c = userSnap.data()) === null || _c === void 0 ? void 0 : _c.displayName) || "학부모");
+    const phoneNumber = normalizePhoneNumber(((_d = userSnap.data()) === null || _d === void 0 ? void 0 : _d.phoneNumber) || ((_e = memberSnap.data()) === null || _e === void 0 ? void 0 : _e.phoneNumber) || phoneNumberOverride);
     await db.doc(`centers/${centerId}/smsRecipientPreferences/${buildSmsRecipientPreferenceId(studentId, parentUid)}`).set({
         studentId,
         studentName,
@@ -5199,6 +5602,9 @@ exports.notifyAttendanceSms = functions.region(region).https.onCall(async (data,
     const callerMemberSnap = await db.doc(`centers/${centerId}/members/${context.auth.uid}`).get();
     const callerRole = callerMemberSnap.exists ? (_a = callerMemberSnap.data()) === null || _a === void 0 ? void 0 : _a.role : null;
     const isTeacherOrAdminCaller = callerRole === "teacher" || isAdminRole(callerRole);
+    const forceResend = (data === null || data === void 0 ? void 0 : data.force) === true && isTeacherOrAdminCaller;
+    const requestedEventAt = isTeacherOrAdminCaller ? toKstDateFromUnknownTimestamp(data === null || data === void 0 ? void 0 : data.eventAt) : null;
+    const requestedDateKey = isTeacherOrAdminCaller ? asTrimmedString(data === null || data === void 0 ? void 0 : data.dateKey) : "";
     const callerIdentity = callerRole === "student"
         ? await resolveCenterStudentIdentity(db, centerId, context.auth.uid)
         : null;
@@ -5244,8 +5650,10 @@ exports.notifyAttendanceSms = functions.region(region).https.onCall(async (data,
         studentId: effectiveStudentId,
         studentName,
         eventType,
-        eventAt: nowKst,
+        eventAt: requestedEventAt || nowKst,
         settings,
+        force: forceResend,
+        dateKeyOverride: requestedDateKey || null,
     });
     return {
         ok: true,
@@ -5292,7 +5700,7 @@ exports.notifyDailyReportReady = functions.region(region).https.onCall(async (da
         studentId,
         studentName,
         eventType: "daily_report",
-        message: `[트랙학습센터] ${studentName} 학생의 오늘자 학습 리포트가 도착했습니다. 앱에서 확인해 주세요.`,
+        message: `[${TRACK_MANAGED_STUDY_CENTER_NAME}] ${studentName} 학생의 오늘자 학습 리포트가 도착했습니다. 앱에서 확인해 주세요.`,
         date: nowKst,
         settings,
         dedupeKey: `${centerId}_${studentId}_daily_report_${dateKey}`,
@@ -5363,7 +5771,7 @@ exports.sendPaymentReminderBatch = functions.region(region).https.onCall(async (
             studentId,
             studentName,
             eventType: "payment_reminder",
-            message: `[트랙학습센터] 안녕하세요 학부모님, ${studentName} 학생의 이번 달 수강료 결제일이 3일 남았습니다. (기한: ${dueDateLabel})`,
+            message: `[${TRACK_MANAGED_STUDY_CENTER_NAME}] 안녕하세요 학부모님, ${studentName} 학생의 이번 달 수강료 결제일이 3일 남았습니다. (기한: ${dueDateLabel})`,
             date: nowKst,
             settings,
             dedupeKey: `${centerId}_${invoiceDoc.id}_payment_reminder_${todayKey}`,
@@ -5681,7 +6089,7 @@ async function syncStudyLogDayTotalMinutes(db, centerId, studentId, dateKey) {
     const dayRef = db.doc(`centers/${centerId}/studyLogs/${studentId}/days/${dateKey}`);
     const statRef = db.doc(`centers/${centerId}/dailyStudentStats/${dateKey}/students/${studentId}`);
     await db.runTransaction(async (transaction) => {
-        var _a, _b, _c, _d;
+        var _a, _b;
         const [daySnap, statSnap] = await Promise.all([
             transaction.get(dayRef),
             transaction.get(statRef),
@@ -5690,18 +6098,10 @@ async function syncStudyLogDayTotalMinutes(db, centerId, studentId, dateKey) {
         const statData = (statSnap.data() || {});
         const dayManualAdjustment = Math.round((_a = parseFiniteNumber(dayData.manualAdjustmentMinutes)) !== null && _a !== void 0 ? _a : 0);
         const statManualAdjustment = Math.round((_b = parseFiniteNumber(statData.manualAdjustmentMinutes)) !== null && _b !== void 0 ? _b : 0);
-        const existingDayDisplayMinutes = Math.max(0, Math.round((_c = parseFiniteNumber(dayData.totalMinutes)) !== null && _c !== void 0 ? _c : 0)) +
-            dayManualAdjustment;
-        const existingStatDisplayMinutes = Math.max(0, Math.round((_d = parseFiniteNumber(statData.totalStudyMinutes)) !== null && _d !== void 0 ? _d : 0)) +
-            statManualAdjustment;
-        const hasManualAdjustment = dayManualAdjustment !== 0 || statManualAdjustment !== 0;
-        const existingDisplayMinutes = hasManualAdjustment
-            ? Math.max(0, existingDayDisplayMinutes, existingStatDisplayMinutes)
-            : Math.max(0, existingDayDisplayMinutes);
-        const displayTotalMinutes = hasManualAdjustment
-            ? existingDisplayMinutes
-            : Math.max(sessionTotalMinutes, existingDisplayMinutes);
-        const manualAdjustmentMinutes = displayTotalMinutes - sessionTotalMinutes;
+        const hasManualCorrection = Boolean(dayData.correctedAt || dayData.correctedByUserId);
+        const manualAdjustmentMinutes = hasManualCorrection
+            ? (dayManualAdjustment !== 0 ? dayManualAdjustment : statManualAdjustment)
+            : 0;
         transaction.set(dayRef, Object.assign(Object.assign(Object.assign({ studentId,
             centerId,
             dateKey, totalMinutes: sessionTotalMinutes, manualAdjustmentMinutes }, (firstSessionStartAt ? { firstSessionStartAt } : {})), (lastSessionEndAt ? { lastSessionEndAt } : {})), { updatedAt: admin.firestore.FieldValue.serverTimestamp() }), { merge: true });
@@ -6921,6 +7321,16 @@ exports.stopStudentStudySessionSecure = functions.region(region).https.onCall(as
         endMs: nowMs,
         closeSeatRef: (_c = preferredSeatDoc === null || preferredSeatDoc === void 0 ? void 0 : preferredSeatDoc.ref) !== null && _c !== void 0 ? _c : null,
         shouldCloseSeat: hasActiveSeatSession,
+        closeAttendanceEvent: hasActiveSeatSession
+            ? {
+                dateKey: toDateKey(toKstDate(new Date(nowMs))),
+                eventAtMs: nowMs,
+                source: "student_dashboard_secure",
+                seatId: (preferredSeatDoc === null || preferredSeatDoc === void 0 ? void 0 : preferredSeatDoc.id) || null,
+                statusBefore: seatStatus || null,
+                statusAfter: "absent",
+            }
+            : undefined,
     });
     return {
         ok: true,
