@@ -577,7 +577,6 @@ export default function StudentListPage() {
         statusAfter: nextStatus,
       });
 
-      let smsEventType: 'study_start' | 'away_start' | 'away_end' | 'study_end' | null = null;
       if (prevStatus === 'absent' && nextStatus === 'studying') {
         appendAttendanceEventToBatch(batch, firestore, centerId, {
           studentId,
@@ -594,7 +593,6 @@ export default function StudentListPage() {
           checkInAt: nowDate,
           source: 'student_index',
         });
-        smsEventType = 'study_start';
       } else if ((prevStatus === 'away' || prevStatus === 'break') && nextStatus === 'studying') {
         appendAttendanceEventToBatch(batch, firestore, centerId, {
           studentId,
@@ -610,7 +608,6 @@ export default function StudentListPage() {
           attendanceStatus: nextStatus,
           source: 'student_index',
         });
-        smsEventType = 'away_end';
       } else if ((nextStatus === 'away' || nextStatus === 'break') && prevStatus === 'studying') {
         appendAttendanceEventToBatch(batch, firestore, centerId, {
           studentId,
@@ -626,7 +623,6 @@ export default function StudentListPage() {
           attendanceStatus: nextStatus,
           source: 'student_index',
         });
-        smsEventType = 'away_start';
       } else if (nextStatus === 'absent' && prevStatus !== 'absent') {
         appendAttendanceEventToBatch(batch, firestore, centerId, {
           studentId,
@@ -644,7 +640,6 @@ export default function StudentListPage() {
           hasCheckOutRecord: true,
           source: 'student_index',
         });
-        smsEventType = 'study_end';
       } else {
         mergeAttendanceDailyStatToBatch(batch, firestore, centerId, studentId, todayDateKey, {
           attendanceStatus: nextStatus,
@@ -670,26 +665,9 @@ export default function StudentListPage() {
         console.warn('[student-index] auto attendance sync skipped', syncError?.message || syncError);
       });
 
-      let successTitle = '출결 처리를 저장했습니다.';
-      let successDescription = `${studentName} 학생 상태를 ${nextStatusLabel}으로 반영했습니다.`;
-
-      if (smsEventType && functions) {
-        try {
-          const notifyAttendanceSms = httpsCallable(functions, 'notifyAttendanceSms');
-          await notifyAttendanceSms({ centerId, studentId, eventType: smsEventType });
-        } catch (notifyError: any) {
-          console.warn('[student-index] attendance sms notify skipped', notifyError?.message || notifyError);
-          successTitle = '출결은 저장되었습니다.';
-          successDescription = `${studentName} 학생 상태는 ${nextStatusLabel}으로 반영했고, 보호자 문자 접수는 확인이 필요합니다.`;
-        }
-      } else if (smsEventType && !functions) {
-        successTitle = '출결은 저장되었습니다.';
-        successDescription = `${studentName} 학생 상태는 ${nextStatusLabel}으로 반영했고, 문자 기능은 아직 준비되지 않았습니다.`;
-      }
-
       toast({
-        title: successTitle,
-        description: successDescription,
+        title: '출결 처리를 저장했습니다.',
+        description: `${studentName} 학생 상태를 ${nextStatusLabel}으로 반영했습니다.`,
       });
     } catch (error) {
       console.error('[student-index] inline attendance update failed', error);

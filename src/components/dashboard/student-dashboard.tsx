@@ -2057,16 +2057,6 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
           });
         }
 
-        if (!stopRequestDeduped) {
-          void sendKakaoNotification(firestore, centerId, {
-            studentId: studentUid,
-            studentName: user.displayName || '\uD559\uC0DD',
-            type: 'exit',
-          }).catch((notifyError: any) => {
-          logHandledClientIssue('[student-track] exit notification skipped', notifyError);
-          });
-        }
-
         setIsTimerActive(false);
         setStartTime(null);
         if (stopCommitError) {

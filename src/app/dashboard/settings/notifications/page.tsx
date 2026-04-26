@@ -547,6 +547,7 @@ export default function NotificationSettingsPage() {
   const [recipientPhoneDrafts, setRecipientPhoneDrafts] = useState<Record<string, string>>({});
   const [manualSmsMessage, setManualSmsMessage] = useState('');
   const [manualSmsActionKey, setManualSmsActionKey] = useState<string | null>(null);
+  const [isRepairingTodaySms, setIsRepairingTodaySms] = useState(false);
 
   const settingsRef = useMemoFirebase(() => {
     if (!firestore || !centerId || !isAdmin) return null;
@@ -1321,6 +1322,34 @@ export default function NotificationSettingsPage() {
     }
   };
 
+  const handleRepairTodayAttendanceSms = async () => {
+    if (!functions || !centerId || !isAdmin) return;
+    setIsRepairingTodaySms(true);
+    try {
+      const repairTodayAttendanceSmsQueue = httpsCallable(functions, 'repairTodayAttendanceSmsQueue');
+      const result = await repairTodayAttendanceSmsQueue({ centerId, dateKey: todayDateKey });
+      const data = (result.data || {}) as {
+        queuedCount?: number;
+        suppressedCount?: number;
+        skippedCount?: number;
+        noRecipientCount?: number;
+        targetCount?: number;
+      };
+      toast({
+        title: '오늘 누락 문자 복구 완료',
+        description: `큐 ${data.queuedCount || 0}건 · 수신제외 ${data.suppressedCount || 0}건 · 기존접수 ${data.skippedCount || 0}건 · 번호없음 ${data.noRecipientCount || 0}건`,
+      });
+    } catch (error: any) {
+      toast({
+        variant: 'destructive',
+        title: '누락 문자 복구 실패',
+        description: error?.message || '오늘 출결 문자 접수 복구 중 오류가 발생했습니다.',
+      });
+    } finally {
+      setIsRepairingTodaySms(false);
+    }
+  };
+
   const handleUpdateRecipientPreference = async (
     row: RecipientPreferenceRow,
     nextEnabled: boolean,
@@ -1717,10 +1746,24 @@ export default function NotificationSettingsPage() {
       </Card>
       <Card className="rounded-[2rem] border-none shadow-xl ring-1 ring-black/[0.04]">
         <CardHeader className="border-b bg-muted/10">
-          <CardTitle className="text-xl font-black tracking-tight">발송 현황</CardTitle>
-          <CardDescription className="font-bold text-sm">
-            학생별로 오늘 등원·외출·복귀·하원 문자 시각만 먼저 보고, 상세는 팝업에서 확인합니다.
-          </CardDescription>
+          <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+            <div className="min-w-0">
+              <CardTitle className="text-xl font-black tracking-tight">발송 현황</CardTitle>
+              <CardDescription className="font-bold text-sm">
+                학생별로 오늘 등원·외출·복귀·하원 문자 시각만 먼저 보고, 상세는 팝업에서 확인합니다.
+              </CardDescription>
+            </div>
+            <Button
+              type="button"
+              variant="outline"
+              className="h-10 shrink-0 rounded-xl border-orange-200 bg-white font-black text-orange-700 hover:bg-orange-50"
+              onClick={() => void handleRepairTodayAttendanceSms()}
+              disabled={isRepairingTodaySms || isLoading}
+            >
+              {isRepairingTodaySms ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCcw className="h-4 w-4" />}
+              오늘 누락 문자 복구
+            </Button>
+          </div>
         </CardHeader>
         <CardContent className="space-y-5 p-6">
           <div className="grid gap-3 sm:grid-cols-3 xl:grid-cols-6">

@@ -99,7 +99,6 @@ import { Textarea } from '@/components/ui/textarea';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, Tooltip, CartesianGrid } from 'recharts';
 import { motion, useReducedMotion } from 'framer-motion';
-import { sendKakaoNotification } from '@/lib/kakao-service';
 import { AdminWorkbenchCommandBar } from '@/components/dashboard/admin-workbench-command-bar';
 import { CenterAdminAttendanceBoard } from '@/components/dashboard/center-admin-attendance-board';
 import {
@@ -3625,15 +3624,6 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
         console.warn('[teacher-dashboard] auto attendance sync skipped', syncError?.message || syncError);
       });
 
-      const kakaoType: any = nextStatus === 'studying' ? 'entry' : nextStatus === 'away' ? 'away' : 'exit';
-      void sendKakaoNotification(firestore, centerId, {
-        studentId,
-        studentName,
-        type: kakaoType
-      }).catch((notifyError: any) => {
-        console.warn('[teacher-dashboard] attendance notification skipped', notifyError?.message || notifyError);
-      });
-      
       toast({ title: "학생 상태가 업데이트되었습니다." });
       setIsManaging(false);
     } catch (e: any) {

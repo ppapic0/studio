@@ -283,6 +283,14 @@ type FinalizeStudySessionParams = {
   endMs: number;
   closeSeatRef?: FirebaseFirestore.DocumentReference | null;
   shouldCloseSeat?: boolean;
+  closeAttendanceEvent?: {
+    dateKey: string;
+    eventAtMs: number;
+    source: string;
+    seatId?: string | null;
+    statusBefore?: string | null;
+    statusAfter?: string | null;
+  };
   progressExtra?: Record<string, unknown>;
   sessionMetadata?: Record<string, unknown>;
 };
@@ -729,7 +737,7 @@ function resolveStudyBoxMilestoneEarnedAtMs(params: {
 }
 
 async function finalizeStudySession(params: FinalizeStudySessionParams): Promise<FinalizeStudySessionResult> {
-  const { db, centerId, studentId, closeSeatRef, shouldCloseSeat, progressExtra, sessionMetadata } = params;
+  const { db, centerId, studentId, closeSeatRef, shouldCloseSeat, closeAttendanceEvent, progressExtra, sessionMetadata } = params;
   const startMs = Math.max(0, Math.floor(params.startMs));
   const rawEndMs = Math.max(startMs, Math.floor(params.endMs));
   const effectiveEndMs = Math.min(rawEndMs, startMs + MAX_STUDY_SESSION_MINUTES * MINUTE_MS);
@@ -876,6 +884,11 @@ async function finalizeStudySession(params: FinalizeStudySessionParams): Promise
       }
     });
 
+    const createdSessionCount = sessionEntries.reduce((count, entry, index) => {
+      const sessionSnap = sessionSnapshots[index];
+      return count + (!sessionSnap.exists && entry.durationMinutes > 0 ? 1 : 0);
+    }, 0);
+
     if (shouldCloseSeat && closeSeatRef) {
       transaction.set(
         closeSeatRef,
@@ -885,6 +898,36 @@ async function finalizeStudySession(params: FinalizeStudySessionParams): Promise
         },
         { merge: true }
       );
+    }
+
+    if (shouldCloseSeat && closeAttendanceEvent && createdSessionCount > 0) {
+      const closeEventAt = admin.firestore.Timestamp.fromMillis(
+        Math.max(startMs, Math.floor(closeAttendanceEvent.eventAtMs || effectiveEndMs))
+      );
+      const closeEventRef = db.collection(`centers/${centerId}/attendanceEvents`).doc();
+      transaction.set(closeEventRef, {
+        studentId,
+        dateKey: closeAttendanceEvent.dateKey,
+        eventType: "check_out",
+        occurredAt: closeEventAt,
+        createdAt: admin.firestore.FieldValue.serverTimestamp(),
+        source: closeAttendanceEvent.source,
+        ...(closeAttendanceEvent.seatId ? { seatId: closeAttendanceEvent.seatId } : {}),
+        ...(closeAttendanceEvent.statusBefore ? { statusBefore: closeAttendanceEvent.statusBefore } : {}),
+        statusAfter: closeAttendanceEvent.statusAfter || "absent",
+      });
+
+      const attendanceStatRef = db.doc(`centers/${centerId}/attendanceDailyStats/${closeAttendanceEvent.dateKey}/students/${studentId}`);
+      transaction.set(attendanceStatRef, {
+        centerId,
+        studentId,
+        dateKey: closeAttendanceEvent.dateKey,
+        attendanceStatus: closeAttendanceEvent.statusAfter || "absent",
+        checkOutAt: closeEventAt,
+        hasCheckOutRecord: true,
+        source: closeAttendanceEvent.source,
+        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      }, { merge: true });
     }
 
     const hasDailyPointStatusUpdates = Object.keys(dailyPointStatusUpdates).length > 0;
@@ -2623,7 +2666,7 @@ async function queueParentSmsNotification(
     settings?: NotificationSettingsDoc;
     force?: boolean;
   }
-): Promise<{ queuedCount: number; recipientCount: number; message: string }> {
+): Promise<{ queuedCount: number; recipientCount: number; suppressedCount: number; message: string; deduped?: boolean }> {
   const {
     centerId,
     studentId,
@@ -2636,7 +2679,7 @@ async function queueParentSmsNotification(
   const settings = params.settings || await loadNotificationSettings(db, centerId);
   const recipients = await collectParentRecipients(db, centerId, studentId);
   if (recipients.length === 0) {
-    return { queuedCount: 0, recipientCount: 0, message: "" };
+    return { queuedCount: 0, recipientCount: 0, suppressedCount: 0, message: "" };
   }
   const centerName = await loadCenterName(db, centerId);
   const template = resolveTemplateByEvent(settings, eventType);
@@ -2681,7 +2724,7 @@ async function queueParentSmsNotification(
       return true;
     });
     if (!shouldQueue) {
-      return { queuedCount: 0, recipientCount: recipients.length, message };
+      return { queuedCount: 0, recipientCount: recipients.length, suppressedCount: 0, message, deduped: true };
     }
   }
 
@@ -2745,13 +2788,7 @@ async function queueParentSmsNotification(
       studentId,
       parentUid: recipient.parentUid,
       type: eventType,
-      title: eventType === "study_start"
-        ? "공부 시작 알림"
-        : eventType === "study_end"
-          ? "공부 종료 알림"
-          : eventType === "away_start"
-            ? "외출 알림"
-            : "지각 알림",
+      title: buildParentNotificationTitle(eventType),
       body: message,
       isRead: false,
       isImportant: eventType !== "study_start",
@@ -2783,7 +2820,12 @@ async function queueParentSmsNotification(
     )
   );
 
-  return { queuedCount: allowedRecipients.length, recipientCount: recipients.length, message };
+  return {
+    queuedCount: allowedRecipients.length,
+    recipientCount: recipients.length,
+    suppressedCount: suppressedRecipients.length,
+    message,
+  };
 }
 
 function buildParentNotificationTitle(eventType: RecipientPreferenceEventType) {
@@ -2813,11 +2855,11 @@ async function queueCustomParentSmsNotification(
     isImportant?: boolean;
     metadata?: Record<string, unknown>;
   }
-): Promise<{ queuedCount: number; recipientCount: number; message: string }> {
+): Promise<{ queuedCount: number; recipientCount: number; suppressedCount: number; message: string }> {
   const settings = params.settings || await loadNotificationSettings(db, params.centerId);
   const recipients = await collectParentRecipients(db, params.centerId, params.studentId);
   if (recipients.length === 0) {
-    return { queuedCount: 0, recipientCount: 0, message: params.message };
+    return { queuedCount: 0, recipientCount: 0, suppressedCount: 0, message: params.message };
   }
 
   const dedupeRef = params.dedupeKey
@@ -2826,7 +2868,7 @@ async function queueCustomParentSmsNotification(
   if (dedupeRef) {
     const dedupeSnap = await dedupeRef.get();
     if (dedupeSnap.exists) {
-      return { queuedCount: 0, recipientCount: recipients.length, message: params.message };
+      return { queuedCount: 0, recipientCount: recipients.length, suppressedCount: 0, message: params.message };
     }
   }
 
@@ -2935,7 +2977,12 @@ async function queueCustomParentSmsNotification(
     )
   );
 
-  return { queuedCount: allowedRecipients.length, recipientCount: recipients.length, message };
+  return {
+    queuedCount: allowedRecipients.length,
+    recipientCount: recipients.length,
+    suppressedCount: suppressedRecipients.length,
+    message,
+  };
 }
 
 function normalizeAttendanceEventForParentSms(value: unknown): AttendanceSmsEventType | null {
@@ -3009,6 +3056,115 @@ export const onAttendanceEventCreated = functions
 
     return null;
   });
+
+export const repairTodayAttendanceSmsQueue = functions.region(region).https.onCall(async (data, context) => {
+  const db = admin.firestore();
+
+  if (!context.auth) {
+    throw new functions.https.HttpsError("unauthenticated", "로그인이 필요합니다.");
+  }
+
+  const centerId = asTrimmedString(data?.centerId);
+  if (!centerId) {
+    throw new functions.https.HttpsError("invalid-argument", "centerId가 필요합니다.");
+  }
+
+  const callerMemberSnap = await db.doc(`centers/${centerId}/members/${context.auth.uid}`).get();
+  const callerRole = callerMemberSnap.exists ? callerMemberSnap.data()?.role : null;
+  if (!isAdminRole(callerRole)) {
+    throw new functions.https.HttpsError("permission-denied", "센터 관리자만 문자 접수 복구를 실행할 수 있습니다.");
+  }
+
+  const todayKey = toDateKey(toKstDate());
+  const requestedDateKey = asTrimmedString(data?.dateKey, todayKey);
+  if (requestedDateKey !== todayKey) {
+    throw new functions.https.HttpsError("invalid-argument", "오늘 날짜의 문자 접수만 복구할 수 있습니다.");
+  }
+
+  const eventsSnap = await db
+    .collection(`centers/${centerId}/attendanceEvents`)
+    .where("dateKey", "==", todayKey)
+    .limit(1500)
+    .get();
+  const targetEvents = eventsSnap.docs
+    .map((eventDoc) => {
+      const eventData = eventDoc.data() || {};
+      const eventType = normalizeAttendanceEventForParentSms(eventData.eventType);
+      const studentId = asTrimmedString(eventData.studentId);
+      if (!eventType || !studentId) return null;
+      return {
+        eventId: eventDoc.id,
+        data: eventData,
+        studentId,
+        eventType,
+        eventAt:
+          toKstDateFromUnknownTimestamp(eventData.occurredAt)
+          || toKstDateFromUnknownTimestamp(eventData.createdAt)
+          || toKstDate(),
+      };
+    })
+    .filter((event): event is {
+      eventId: string;
+      data: FirebaseFirestore.DocumentData;
+      studentId: string;
+      eventType: AttendanceSmsEventType;
+      eventAt: Date;
+    } => Boolean(event))
+    .sort((left, right) => left.eventAt.getTime() - right.eventAt.getTime());
+
+  const studentIds = Array.from(new Set(targetEvents.map((event) => event.studentId)));
+  const studentRefs = studentIds.map((studentId) => db.doc(`centers/${centerId}/students/${studentId}`));
+  const [settings, studentSnaps] = await Promise.all([
+    loadNotificationSettings(db, centerId),
+    studentRefs.length > 0 ? db.getAll(...studentRefs) : Promise.resolve([]),
+  ]);
+  const studentNameById = new Map<string, string>();
+  studentSnaps.forEach((studentSnap) => {
+    const studentData = studentSnap.exists ? studentSnap.data() || {} : {};
+    studentNameById.set(studentSnap.id, asTrimmedString(studentData.name, "학생"));
+  });
+
+  let queuedCount = 0;
+  let suppressedCount = 0;
+  let skippedCount = 0;
+  let noRecipientCount = 0;
+
+  for (const event of targetEvents) {
+    const studentName = studentNameById.get(event.studentId) || asTrimmedString(event.data.studentName, "학생");
+    const queueResult = await queueParentSmsNotification(db, {
+      centerId,
+      studentId: event.studentId,
+      studentName,
+      eventType: event.eventType,
+      eventAt: event.eventAt,
+      settings,
+    });
+
+    if (queueResult.deduped) {
+      skippedCount += 1;
+      continue;
+    }
+    if (queueResult.recipientCount === 0) {
+      noRecipientCount += 1;
+      continue;
+    }
+
+    queuedCount += queueResult.queuedCount;
+    suppressedCount += queueResult.suppressedCount;
+  }
+
+  return {
+    ok: true,
+    centerId,
+    dateKey: todayKey,
+    scannedCount: eventsSnap.size,
+    targetCount: targetEvents.length,
+    queuedCount,
+    suppressedCount,
+    skippedCount,
+    noRecipientCount,
+  };
+});
 
 async function runLateArrivalCheckForCenter(
   db: admin.firestore.Firestore,
@@ -8861,6 +9017,16 @@ export const stopStudentStudySessionSecure = functions.region(region).https.onCa
     endMs: nowMs,
     closeSeatRef: preferredSeatDoc?.ref ?? null,
     shouldCloseSeat: hasActiveSeatSession,
+    closeAttendanceEvent: hasActiveSeatSession
+      ? {
+          dateKey: toDateKey(toKstDate(new Date(nowMs))),
+          eventAtMs: nowMs,
+          source: "student_dashboard_secure",
+          seatId: preferredSeatDoc?.id || null,
+          statusBefore: seatStatus || null,
+          statusAfter: "absent",
+        }
+      : undefined,
   });
 
   return {

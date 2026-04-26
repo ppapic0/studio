@@ -38,7 +38,6 @@ import {
 import { useToast } from '@/hooks/use-toast';
 import { useRouter } from 'next/navigation';
 import { format } from 'date-fns';
-import { sendKakaoNotification } from '@/lib/kakao-service';
 import { syncAutoAttendanceRecord } from '@/lib/attendance-auto';
 import { appendAttendanceEventToBatch, mergeAttendanceDailyStatToBatch } from '@/lib/attendance-events';
 import { resolveSeatIdentity } from '@/lib/seat-layout';
@@ -301,16 +300,6 @@ export default function KioskPage() {
         checkInAt: autoCheckInAt,
       }).catch((syncError: any) => {
         console.warn('[kiosk] auto attendance sync skipped', syncError?.message || syncError);
-      });
-
-      // 카카오톡 알림 발송
-      const kakaoType: any = nextStatus === 'studying' ? 'entry' : nextStatus === 'away' ? 'away' : 'exit';
-      void sendKakaoNotification(firestore, centerId, {
-        studentId: student.id,
-        studentName: student.name,
-        type: kakaoType
-      }).catch((notifyError: any) => {
-        console.warn('[kiosk] attendance notification skipped', notifyError?.message || notifyError);
       });
 
       const statusLabels: Record<AttendanceCurrent['status'], string> = {
