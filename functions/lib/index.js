@@ -174,6 +174,37 @@ function getStoredStudyTotalMinutes(data, keys) {
 function getLegacyStudyCarryoverMinutes(storedTotalMinutes, sessionTotalMinutes) {
     return Math.max(0, Math.round(storedTotalMinutes) - Math.max(0, Math.round(sessionTotalMinutes)));
 }
+function getStudySessionProtectionArchiveRef(params) {
+    const safeSessionId = asTrimmedString(params.sessionId).replace(/[^A-Za-z0-9_-]/g, "_").slice(0, 140);
+    const archiveId = `${params.dateKey}_${params.studentId}_${safeSessionId}_${Date.now()}`;
+    return params.db.doc(`centers/${params.centerId}/studySessionProtectionLogs/${archiveId}`);
+}
+async function hasStudySessionDeletionAllowance(params) {
+    const allowanceSnap = await params.db
+        .doc(`centers/${params.centerId}/studySessionDeletionAllowances/${params.studentId}`)
+        .get();
+    if (!allowanceSnap.exists)
+        return false;
+    const allowanceData = (allowanceSnap.data() || {});
+    const expiresAtMs = toMillisSafe(allowanceData.expiresAt);
+    return expiresAtMs <= 0 || expiresAtMs > Date.now();
+}
+async function archiveProtectedStudySessionMutation(params) {
+    const beforeMinutes = getStudySessionDurationMinutesFromData(params.beforeData);
+    const afterMinutes = params.afterData ? getStudySessionDurationMinutesFromData(params.afterData) : null;
+    await getStudySessionProtectionArchiveRef(params).set({
+        centerId: params.centerId,
+        studentId: params.studentId,
+        dateKey: params.dateKey,
+        sessionId: params.sessionId,
+        reason: params.reason,
+        beforeData: params.beforeData,
+        afterData: params.afterData || null,
+        beforeMinutes,
+        afterMinutes,
+        createdAt: admin.firestore.FieldValue.serverTimestamp(),
+    });
+}
 const STUDY_BOX_REWARD_RANGE_BY_RARITY = {
     common: [1, 10],
     rare: [10, 20],
@@ -3653,6 +3684,14 @@ exports.deleteStudentAccount = functions.region(region).runWith({
     const targetParentLinkCode = normalizeParentLinkCodeValue((_c = targetStudentSnap.data()) === null || _c === void 0 ? void 0 : _c.parentLinkCode);
     try {
         const errors = [];
+        await db.doc(`centers/${centerId}/studySessionDeletionAllowances/${studentId}`).set({
+            studentId,
+            centerId,
+            reason: "deleteStudentAccount",
+            createdByUid: context.auth.uid,
+            createdAt: admin.firestore.FieldValue.serverTimestamp(),
+            expiresAt: admin.firestore.Timestamp.fromMillis(Date.now() + 60 * MINUTE_MS),
+        }, { merge: true });
         const paths = [
             `users/${studentId}`,
             `userCenters/${studentId}`,
@@ -6574,9 +6613,58 @@ exports.onSessionCreated = functions
 exports.onSessionWritten = functions
     .region(region)
     .firestore.document("centers/{centerId}/studyLogs/{studentId}/days/{dateKey}/sessions/{sessionId}")
-    .onWrite(async (_change, context) => {
-    const { centerId, studentId, dateKey } = context.params;
+    .onWrite(async (change, context) => {
+    var _a, _b, _c, _d;
+    const { centerId, studentId, dateKey, sessionId } = context.params;
     const db = admin.firestore();
+    if (change.before.exists && !change.after.exists) {
+        const beforeData = (change.before.data() || {});
+        const beforeMinutes = getStudySessionDurationMinutesFromData(beforeData);
+        const deletionAllowed = await hasStudySessionDeletionAllowance({ db, centerId, studentId });
+        if (beforeMinutes > 0 && !deletionAllowed) {
+            await archiveProtectedStudySessionMutation({
+                db,
+                centerId,
+                studentId,
+                dateKey,
+                sessionId,
+                reason: "deleted_session_restored",
+                beforeData,
+            });
+            await change.after.ref.set(Object.assign(Object.assign({}, beforeData), { restoredFromAccidentalDelete: true, restoredAt: admin.firestore.FieldValue.serverTimestamp(), restoreReason: "prevent_study_time_loss", updatedAt: admin.firestore.FieldValue.serverTimestamp() }), { merge: true });
+            return null;
+        }
+    }
+    if (change.before.exists && change.after.exists) {
+        const beforeData = (change.before.data() || {});
+        const afterData = (change.after.data() || {});
+        const beforeMinutes = getStudySessionDurationMinutesFromData(beforeData);
+        const afterMinutes = getStudySessionDurationMinutesFromData(afterData);
+        const shrinkAllowed = afterData.allowSessionShrink === true || afterData.manualSessionCorrection === true;
+        if (beforeMinutes > 0 && afterMinutes + 1 < beforeMinutes && !shrinkAllowed) {
+            await archiveProtectedStudySessionMutation({
+                db,
+                centerId,
+                studentId,
+                dateKey,
+                sessionId,
+                reason: "shrunk_session_restored",
+                beforeData,
+                afterData,
+            });
+            await change.after.ref.set({
+                startTime: (_a = beforeData.startTime) !== null && _a !== void 0 ? _a : admin.firestore.FieldValue.delete(),
+                endTime: (_b = beforeData.endTime) !== null && _b !== void 0 ? _b : admin.firestore.FieldValue.delete(),
+                durationMinutes: (_c = beforeData.durationMinutes) !== null && _c !== void 0 ? _c : admin.firestore.FieldValue.delete(),
+                durationSeconds: (_d = beforeData.durationSeconds) !== null && _d !== void 0 ? _d : admin.firestore.FieldValue.delete(),
+                sessionRestoredFromShrink: true,
+                sessionRestoredAt: admin.firestore.FieldValue.serverTimestamp(),
+                restoreReason: "prevent_study_time_loss",
+                updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+            }, { merge: true });
+            return null;
+        }
+    }
     await syncStudyLogDayTotalMinutes(db, centerId, studentId, dateKey);
     return null;
 });
