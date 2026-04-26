@@ -3972,9 +3972,9 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
     const isSavingSeatAction = Boolean(layoutSeatActionSavingId) || isClassroomLayoutSaving;
     const releaseSeatHold = selectedLayoutSeatReservationHold;
     const isReleaseReservationMode = layoutSeatActionMode === 'releaseReservation';
-    const actionDialogTitle = isReleaseReservationMode ? '예약 배정을 해제할까요?' : '빈 좌석을 어떻게 사용할까요?';
+    const actionDialogTitle = isReleaseReservationMode ? '예약 좌석을 어떻게 처리할까요?' : '빈 좌석을 어떻게 사용할까요?';
     const actionDialogDescription = isReleaseReservationMode
-      ? '좌석 표시를 비우고 예약 요청은 입금 확인 대기 상태로 되돌립니다.'
+      ? '기존 예약을 해제하거나, 이 좌석에 학생 또는 다른 좌석예약을 바로 다시 연결합니다.'
       : '통로로 비워두거나, 미배정 학생 또는 좌석예약 요청을 바로 이 좌석에 연결합니다.';
 
     return (
@@ -4015,35 +4015,59 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
                       {releaseSeatHold.grade ? ` · ${releaseSeatHold.grade}` : ''}
                     </p>
                     <div className="mt-4 rounded-[1.2rem] border border-[#FFE0C2] bg-[#FFF8F1] px-4 py-3">
-                      <p className="text-xs font-black text-[#C95A08]">해제 후에는 빈 좌석으로 표시됩니다.</p>
+                      <p className="text-xs font-black text-[#C95A08]">다른 배정을 선택하면 기존 예약은 대기 상태로 되돌립니다.</p>
                       <p className="mt-1 text-xs font-bold leading-5 text-[#8A5A2B]">
-                        예약 요청은 취소하지 않고 입금 확인 대기 목록으로 돌려 다시 배정할 수 있게 둡니다.
+                        예약 자체를 취소하지 않으므로, 필요하면 다른 좌석에 다시 배정할 수 있습니다.
                       </p>
                     </div>
                   </div>
-                  <div className="flex flex-wrap justify-end gap-2">
-                    <Button
+                  <div className="grid gap-3 sm:grid-cols-3">
+                    <button
                       type="button"
-                      variant="outline"
-                      onClick={closeLayoutSeatActionDialog}
                       disabled={isSavingSeatAction}
-                      className="h-11 rounded-xl border-[#DCE7FF] bg-white px-4 font-black text-[#14295F]"
+                      onClick={() => {
+                        setLayoutSeatActionMode('student');
+                        setLayoutSeatActionSearch('');
+                      }}
+                      className="rounded-[1.45rem] border border-[#DCE7FF] bg-white p-4 text-left transition-all hover:-translate-y-0.5 hover:border-[#9CB6F6] disabled:cursor-not-allowed disabled:opacity-60"
                     >
-                      닫기
-                    </Button>
-                    <Button
+                      <span className="inline-flex h-10 w-10 items-center justify-center rounded-[1rem] bg-[#EEF4FF] text-[#2554D7] shadow-sm">
+                        <UserPlus className="h-4 w-4" />
+                      </span>
+                      <p className="mt-4 text-sm font-black text-[#14295F]">학생 배정</p>
+                      <p className="mt-2 text-xs font-bold leading-5 text-[#5c6e97]">기존 예약을 대기로 돌리고 학생을 연결합니다.</p>
+                    </button>
+                    <button
+                      type="button"
+                      disabled={isSavingSeatAction}
+                      onClick={() => {
+                        setLayoutSeatActionMode('reservation');
+                        setLayoutSeatActionSearch('');
+                      }}
+                      className="rounded-[1.45rem] border border-emerald-200 bg-emerald-50 p-4 text-left transition-all hover:-translate-y-0.5 hover:border-emerald-300 disabled:cursor-not-allowed disabled:opacity-60"
+                    >
+                      <span className="inline-flex h-10 w-10 items-center justify-center rounded-[1rem] bg-white text-emerald-700 shadow-sm">
+                        <CalendarClock className="h-4 w-4" />
+                      </span>
+                      <p className="mt-4 text-sm font-black text-[#14295F]">예약 다시 배정</p>
+                      <p className="mt-2 text-xs font-bold leading-5 text-emerald-800">다른 예약 대기를 이 좌석으로 바꿉니다.</p>
+                    </button>
+                    <button
                       type="button"
                       onClick={() => void handleReleaseReservationFromLayoutSeat(releaseSeatHold)}
                       disabled={isSavingSeatAction}
-                      className="h-11 rounded-xl bg-rose-600 px-4 font-black text-white hover:bg-rose-700"
+                      className="rounded-[1.45rem] border border-rose-200 bg-white p-4 text-left transition-all hover:-translate-y-0.5 hover:border-rose-300 disabled:cursor-not-allowed disabled:opacity-60"
                     >
-                      {layoutSeatActionSavingId === `release:${releaseSeatHold.id}` ? (
-                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      ) : (
-                        <Trash2 className="mr-2 h-4 w-4" />
-                      )}
-                      예약 해제
-                    </Button>
+                      <span className="inline-flex h-10 w-10 items-center justify-center rounded-[1rem] bg-rose-50 text-rose-600 shadow-sm">
+                        {layoutSeatActionSavingId === `release:${releaseSeatHold.id}` ? (
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                        ) : (
+                          <Trash2 className="h-4 w-4" />
+                        )}
+                      </span>
+                      <p className="mt-4 text-sm font-black text-[#14295F]">예약 해제</p>
+                      <p className="mt-2 text-xs font-bold leading-5 text-rose-700">좌석만 비우고 예약은 대기 목록으로 돌립니다.</p>
+                    </button>
                   </div>
                 </div>
               ) : (
@@ -4111,7 +4135,7 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
                     variant="outline"
                     className="h-10 rounded-xl border-[#DCE7FF] bg-white px-3 text-xs font-black text-[#14295F]"
                     onClick={() => {
-                      setLayoutSeatActionMode('menu');
+                      setLayoutSeatActionMode(releaseSeatHold ? 'releaseReservation' : 'menu');
                       setLayoutSeatActionSearch('');
                     }}
                   >
@@ -4170,6 +4194,8 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
                     ) : (
                       layoutSeatReservationCandidates.map((seatHold) => {
                         const saving = layoutSeatActionSavingId === `reservation:${seatHold.id}`;
+                        const previousSeatLabel =
+                          seatHold.seatLabel || (Number(seatHold.roomSeatNo) > 0 ? `${seatHold.roomSeatNo}번` : '좌석 미지정');
                         return (
                           <button
                             key={seatHold.id}
@@ -4186,7 +4212,7 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
                                 </Badge>
                               </div>
                               <p className="mt-1 truncate text-xs font-bold text-[#5c6e97]">
-                                {seatHold.consultPhone || '연락처 없음'} · 기존 선택 {seatHold.seatLabel || `${seatHold.roomSeatNo}번`}
+                                {seatHold.consultPhone || '연락처 없음'} · 기존 선택 {previousSeatLabel}
                               </p>
                             </div>
                             <span className="inline-flex h-9 shrink-0 items-center rounded-full bg-emerald-600 px-3 text-[10px] font-black text-white">
@@ -5347,15 +5373,39 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
     setLayoutSeatActionSavingId(null);
   };
 
+  const releaseReservationSeatHold = async (seatHold: WebsiteSeatHoldRequest) => {
+    const response = await fetch('/api/dashboard/seat-hold-status', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        centerId,
+        seatHoldId: seatHold.id,
+        nextStatus: 'pending_transfer',
+      }),
+    });
+    const result = await response.json();
+    if (!response.ok || !result?.ok) {
+      throw new Error(result?.message || '예약 배정 해제 중 오류가 발생했습니다.');
+    }
+    return result;
+  };
+
   const handleAssignStudentToLayoutSeat = async (student: StudentProfile) => {
     if (!firestore || !centerId || !selectedLayoutSeat) return;
 
     const seatId = buildSeatId(selectedLayoutSeat.roomId, selectedLayoutSeat.roomSeatNo);
     if (!seatId) return;
 
+    const reservationHoldToRelease = selectedLayoutSeatReservationHold;
     setLayoutSeatActionSavingId(`student:${student.id}`);
     setIsClassroomLayoutSaving(true);
     try {
+      if (reservationHoldToRelease) {
+        await releaseReservationSeatHold(reservationHoldToRelease);
+      }
+
       const batch = writeBatch(firestore);
       const seatNo = getGlobalSeatNo(selectedLayoutSeat.roomId, selectedLayoutSeat.roomSeatNo);
       const seatLabel = selectedLayoutSeat.seatLabel || persistedSeatLabelsBySeatId[seatId] || '';
@@ -5376,6 +5426,7 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
         {
           studentId: student.id,
           manualOccupantName: deleteField(),
+          seatHoldRequestId: deleteField(),
           type: 'seat',
           status: 'absent',
           seatNo,
@@ -5401,6 +5452,7 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
               id: seatId,
               studentId: student.id,
               manualOccupantName: null,
+              seatHoldRequestId: null,
               type: 'seat',
               status: 'absent',
             }
@@ -5426,9 +5478,17 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
     const seatId = buildSeatId(selectedLayoutSeat.roomId, selectedLayoutSeat.roomSeatNo);
     if (!seatId) return;
 
+    const reservationHoldToRelease =
+      selectedLayoutSeatReservationHold && selectedLayoutSeatReservationHold.id !== seatHold.id
+        ? selectedLayoutSeatReservationHold
+        : null;
     setLayoutSeatActionSavingId(`reservation:${seatHold.id}`);
     setIsClassroomLayoutSaving(true);
     try {
+      if (reservationHoldToRelease) {
+        await releaseReservationSeatHold(reservationHoldToRelease);
+      }
+
       const seatNo = getGlobalSeatNo(selectedLayoutSeat.roomId, selectedLayoutSeat.roomSeatNo);
       const seatLabel = selectedLayoutSeat.seatLabel || persistedSeatLabelsBySeatId[seatId] || String(selectedLayoutSeat.roomSeatNo);
       const response = await fetch('/api/dashboard/seat-hold-status', {
@@ -5461,6 +5521,7 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
               ...current,
               id: seatId,
               manualOccupantName: `예약 ${seatHold.studentName}`,
+              seatHoldRequestId: seatHold.id,
               studentId: undefined,
               type: 'seat',
               status: 'absent',
@@ -5491,21 +5552,7 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
     setLayoutSeatActionSavingId(`release:${seatHold.id}`);
     setIsClassroomLayoutSaving(true);
     try {
-      const response = await fetch('/api/dashboard/seat-hold-status', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          centerId,
-          seatHoldId: seatHold.id,
-          nextStatus: 'pending_transfer',
-        }),
-      });
-      const result = await response.json();
-      if (!response.ok || !result?.ok) {
-        throw new Error(result?.message || '예약 배정 해제 중 오류가 발생했습니다.');
-      }
+      await releaseReservationSeatHold(seatHold);
 
       setSelectedLayoutSeat((current) =>
         current

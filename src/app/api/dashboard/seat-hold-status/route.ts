@@ -169,6 +169,13 @@ export async function POST(request: NextRequest) {
         const releasedSeatCount = releaseReservedAttendanceSeat();
         transaction.update(seatHoldRef, {
           status: 'pending_transfer',
+          seatId: admin.firestore.FieldValue.delete(),
+          roomId: admin.firestore.FieldValue.delete(),
+          roomSeatNo: admin.firestore.FieldValue.delete(),
+          seatNo: admin.firestore.FieldValue.delete(),
+          seatLabel: admin.firestore.FieldValue.delete(),
+          seatGenderPolicy: admin.firestore.FieldValue.delete(),
+          seatGenderLabel: admin.firestore.FieldValue.delete(),
           updatedAt: nowIso,
           confirmedAt: null,
           canceledAt: null,
