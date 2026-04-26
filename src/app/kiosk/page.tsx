@@ -43,6 +43,8 @@ import { syncAutoAttendanceRecord } from '@/lib/attendance-auto';
 import { appendAttendanceEventToBatch, mergeAttendanceDailyStatToBatch } from '@/lib/attendance-events';
 import { resolveSeatIdentity } from '@/lib/seat-layout';
 
+const MAX_STUDY_SESSION_MINUTES = 360;
+
 export default function KioskPage() {
   const firestore = useFirestore();
   const { activeMembership } = useAppContext();
@@ -162,7 +164,10 @@ export default function KioskPage() {
       // away/break 상태에서 퇴실해도 lastCheckInAt 기준으로 시간을 기록한다 (T-2 버그 수정)
       if (nextStatus === 'absent' && (prevStatus === 'studying' || prevStatus === 'away' || prevStatus === 'break') && seat.lastCheckInAt) {
         const startTime = seat.lastCheckInAt.toMillis();
-        const durationMinutes = Math.max(1, Math.floor((nowMs - startTime) / 60000));
+        const durationMinutes = Math.min(
+          MAX_STUDY_SESSION_MINUTES,
+          Math.max(1, Math.floor((nowMs - startTime) / 60000))
+        );
 
         if (durationMinutes > 0) {
           const logRef = doc(firestore, 'centers', centerId, 'studyLogs', student.id, 'days', todayKey);

@@ -179,6 +179,7 @@ const REQUEST_PENALTY_POINTS: Record<'late' | 'absence', number> = {
   late: 1,
   absence: 2,
 };
+const MAX_STUDY_SESSION_MINUTES = 360;
 
 const ATTENDANCE_STATUS_LABEL: Record<string, string> = {
   studying: '입실',
@@ -196,6 +197,18 @@ function formatAttendanceStatus(status?: string): string {
 function formatDurationMinutes(totalMinutes: number): string {
   const safeMinutes = Math.max(0, Number(totalMinutes || 0));
   return `${Math.floor(safeMinutes / 60)}시간 ${safeMinutes % 60}분`;
+}
+
+function getStudySessionDisplayMinutes(session: Partial<StudySession>) {
+  const directMinutes = Number(session.durationMinutes ?? 0);
+  if (Number.isFinite(directMinutes) && directMinutes > 0) {
+    return Math.max(0, Math.round(directMinutes));
+  }
+
+  const startMs = session.startTime?.toMillis?.() ?? 0;
+  const endMs = session.endTime?.toMillis?.() ?? 0;
+  if (!Number.isFinite(startMs) || !Number.isFinite(endMs) || endMs <= startMs) return 0;
+  return Math.max(1, Math.ceil((endMs - startMs) / 60000));
 }
 
 function parsePositivePointValue(value: unknown): number {
@@ -1229,8 +1242,21 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
     if (!mounted) return { session: '00:00', total: '0h 0m', isStudying: false, totalMins: 0, sessionSecs: 0 };
     
     const studentStat = todayStats?.find(s => s.studentId === studentId);
-    const cumulativeMinutes = studentStat?.totalStudyMinutes || 0;
+    const statBaseMinutes = Number(studentStat?.totalStudyMinutes || 0);
+    const statAdjustmentMinutes = Number(studentStat?.manualAdjustmentMinutes || 0);
+    const cumulativeMinutes = Math.max(
+      0,
+      Math.round(
+        (Number.isFinite(statBaseMinutes) ? statBaseMinutes : 0) +
+        (Number.isFinite(statAdjustmentMinutes) ? statAdjustmentMinutes : 0)
+      )
+    );
     const signalMinutes = Math.max(0, Math.round(Number(attendanceSeatSignalsByStudentId.get(studentId)?.todayStudyMinutes || 0)));
+    const selectedSessionMinutes =
+      selectedSeat?.studentId === studentId
+        ? selectedStudentSessions.reduce((sum, session) => sum + getStudySessionDisplayMinutes(session), 0)
+        : 0;
+    const adjustedSelectedSessionMinutes = Math.max(0, selectedSessionMinutes + (Number.isFinite(statAdjustmentMinutes) ? statAdjustmentMinutes : 0));
     
     let sessionSeconds = 0;
     if (status === 'studying' && lastCheckInAt) {
@@ -1239,7 +1265,7 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
     }
 
     const sessionMinutes = Math.ceil(sessionSeconds / 60);
-    const totalMinutes = Math.max(cumulativeMinutes + Math.max(0, sessionMinutes), signalMinutes);
+    const totalMinutes = Math.max(cumulativeMinutes + Math.max(0, sessionMinutes), signalMinutes, adjustedSelectedSessionMinutes);
 
     const formatSession = (secs: number) => {
       const m = Math.floor(secs / 60);
@@ -3453,7 +3479,7 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
         const startTime = selectedSeat.lastCheckInAt.toMillis();
         const sessionDateKey = format(selectedSeat.lastCheckInAt.toDate(), 'yyyy-MM-dd');
         const sessionSeconds = Math.max(0, Math.floor((nowTs - startTime) / 1000));
-        const sessionMinutes = Math.max(1, Math.ceil(sessionSeconds / 60));
+        const sessionMinutes = Math.min(MAX_STUDY_SESSION_MINUTES, Math.max(1, Math.ceil(sessionSeconds / 60)));
 
         if (sessionSeconds > 0) {
           const logRef = doc(firestore, 'centers', centerId, 'studyLogs', studentId, 'days', sessionDateKey);
