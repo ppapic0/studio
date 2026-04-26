@@ -2621,6 +2621,7 @@ async function queueParentSmsNotification(
     eventAt: Date;
     expectedTime?: string;
     settings?: NotificationSettingsDoc;
+    force?: boolean;
   }
 ): Promise<{ queuedCount: number; recipientCount: number; message: string }> {
   const {
@@ -2662,9 +2663,11 @@ async function queueParentSmsNotification(
     eventAt: smsEventAt,
   });
   const dedupeRef = db.doc(`centers/${centerId}/smsDedupes/${dedupeKey}`);
-  const dedupeSnap = await dedupeRef.get();
-  if (dedupeSnap.exists) {
-    return { queuedCount: 0, recipientCount: recipients.length, message };
+  if (!params.force) {
+    const dedupeSnap = await dedupeRef.get();
+    if (dedupeSnap.exists) {
+      return { queuedCount: 0, recipientCount: recipients.length, message };
+    }
   }
 
   const { allowedRecipients, suppressedRecipients } = await splitRecipientsBySmsPreference(
@@ -6743,6 +6746,7 @@ export const notifyAttendanceSms = functions.region(region).https.onCall(async (
   const callerMemberSnap = await db.doc(`centers/${centerId}/members/${context.auth.uid}`).get();
   const callerRole = callerMemberSnap.exists ? callerMemberSnap.data()?.role : null;
   const isTeacherOrAdminCaller = callerRole === "teacher" || isAdminRole(callerRole);
+  const forceResend = data?.force === true && isTeacherOrAdminCaller;
   const callerIdentity = callerRole === "student"
     ? await resolveCenterStudentIdentity(db, centerId, context.auth.uid)
     : null;
@@ -6794,6 +6798,7 @@ export const notifyAttendanceSms = functions.region(region).https.onCall(async (
     eventType,
     eventAt: nowKst,
     settings,
+    force: forceResend,
   });
 
   return {

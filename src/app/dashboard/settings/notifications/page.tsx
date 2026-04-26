@@ -1446,7 +1446,7 @@ export default function NotificationSettingsPage() {
     setManualSmsActionKey(actionKey);
     try {
       const notifyAttendanceSms = httpsCallable(functions, 'notifyAttendanceSms');
-      await notifyAttendanceSms({ centerId, studentId, eventType });
+      await notifyAttendanceSms({ centerId, studentId, eventType, force: true });
       toast({
         title: '문자 재발송 요청 완료',
         description: `${getEventLabel(eventType)} 문자를 다시 발송 대기열에 넣었습니다.`,
