@@ -204,12 +204,22 @@ const SENSITIVE_USER_MESSAGE_PATTERNS = [
 ];
 
 const DEFAULT_SMS_TEMPLATES: Record<"study_start" | "away_start" | "away_end" | "study_end" | "late_alert", string> = {
-  study_start: "[{centerName}] {studentName} 학생 {time} 공부시작. 오늘 학습 흐름 확인 부탁드립니다.",
-  away_start: "[{centerName}] {studentName} 학생 {time} 외출. 복귀 후 다시 공부를 이어갑니다.",
-  away_end: "[{centerName}] {studentName} 학생 {time} 복귀. 다시 공부를 시작했습니다.",
-  study_end: "[{centerName}] {studentName} 학생 {time} 공부종료. 오늘 학습 마무리했습니다.",
-  late_alert: "[{centerName}] {studentName} 학생 {expectedTime} 미등원. 확인 부탁드립니다.",
+  study_start: `[${TRACK_MANAGED_STUDY_CENTER_NAME}] {studentName} 학생 {time} 공부시작. 오늘 학습 흐름 확인 부탁드립니다.`,
+  away_start: `[${TRACK_MANAGED_STUDY_CENTER_NAME}] {studentName} 학생 {time} 외출. 복귀 후 다시 공부를 이어갑니다.`,
+  away_end: `[${TRACK_MANAGED_STUDY_CENTER_NAME}] {studentName} 학생 {time} 복귀. 다시 공부를 시작했습니다.`,
+  study_end: `[${TRACK_MANAGED_STUDY_CENTER_NAME}] {studentName} 학생 {time} 공부종료. 오늘 학습 마무리했습니다.`,
+  late_alert: `[${TRACK_MANAGED_STUDY_CENTER_NAME}] {studentName} 학생 {expectedTime} 미등원. 확인 부탁드립니다.`,
 };
+
+const SMS_TEMPLATE_SETTING_KEYS = [
+  "smsTemplateStudyStart",
+  "smsTemplateAwayStart",
+  "smsTemplateAwayEnd",
+  "smsTemplateStudyEnd",
+  "smsTemplateLateAlert",
+  "smsTemplateCheckIn",
+  "smsTemplateCheckOut",
+] as const;
 
 type StudyBoxRarity = "common" | "rare" | "epic";
 type SecureStudyBoxReward = {
@@ -2247,17 +2257,25 @@ function trimSmsToByteLimit(message: string, limit = SMS_BYTE_LIMIT): string {
 }
 
 function sanitizeSmsTemplate(template: string): string {
-  return String(template || "")
+  return enforceTrackManagedSmsCenterName(String(template || ""))
     .replace(/[^\u0020-\u007E\u00A0-\u00FF\u1100-\u11FF\u3130-\u318F\uAC00-\uD7A3]/g, "")
     .replace(/\s+/g, " ")
     .trim();
+}
+
+function enforceTrackManagedSmsCenterName(value: string): string {
+  return String(value || "")
+    .replace(/\{centerName\}/g, TRACK_MANAGED_STUDY_CENTER_NAME)
+    .replace(/공부\s*트랙\s*동백\s*센터/g, TRACK_MANAGED_STUDY_CENTER_NAME)
+    .replace(/트랙\s*학습\s*센터/g, TRACK_MANAGED_STUDY_CENTER_NAME)
+    .replace(/트랙학습센터/g, TRACK_MANAGED_STUDY_CENTER_NAME);
 }
 
 function normalizeTrackManagedSmsMessage(
   message: string,
   options: { ensurePrefix?: boolean } = {}
 ): string {
-  const normalized = String(message || "").replace(/\s+/g, " ").trim();
+  const normalized = enforceTrackManagedSmsCenterName(message).replace(/\s+/g, " ").trim();
   if (!normalized) return "";
 
   const requiredPrefix = `[${TRACK_MANAGED_STUDY_CENTER_NAME}]`;
@@ -2411,6 +2429,27 @@ async function loadNotificationSettings(
         { merge: true },
       ),
     ]);
+  }
+
+  const normalizedTemplateUpdates: Record<string, string> = {};
+  for (const key of SMS_TEMPLATE_SETTING_KEYS) {
+    const currentValue = publicData[key];
+    if (typeof currentValue !== "string" || !currentValue.trim()) continue;
+    const normalizedValue = sanitizeSmsTemplate(currentValue);
+    if (normalizedValue && normalizedValue !== currentValue) {
+      normalizedTemplateUpdates[key] = normalizedValue;
+      publicData[key] = normalizedValue;
+    }
+  }
+
+  if (Object.keys(normalizedTemplateUpdates).length > 0) {
+    await publicRef.set(
+      {
+        ...normalizedTemplateUpdates,
+        smsTemplatesNormalizedAt: admin.firestore.FieldValue.serverTimestamp(),
+      },
+      { merge: true }
+    );
   }
 
   return {

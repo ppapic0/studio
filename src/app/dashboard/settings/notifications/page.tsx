@@ -279,11 +279,11 @@ const DEFAULT_FORM: Required<Pick<NotificationSettings,
   smsSender: '',
   smsUserId: '',
   smsEndpointUrl: '',
-  smsTemplateStudyStart: '[{centerName}] {studentName} 학생 {time} 공부시작. 오늘 학습 흐름 확인 부탁드립니다.',
-  smsTemplateAwayStart: '[{centerName}] {studentName} 학생 {time} 외출. 복귀 후 다시 공부를 이어갑니다.',
-  smsTemplateAwayEnd: '[{centerName}] {studentName} 학생 {time} 복귀. 다시 공부를 시작했습니다.',
-  smsTemplateStudyEnd: '[{centerName}] {studentName} 학생 {time} 공부종료. 오늘 학습 마무리했습니다.',
-  smsTemplateLateAlert: '[{centerName}] {studentName} 학생 {expectedTime} 미등원. 확인 부탁드립니다.',
+  smsTemplateStudyStart: `[${TRACK_MANAGED_STUDY_CENTER_NAME}] {studentName} 학생 {time} 공부시작. 오늘 학습 흐름 확인 부탁드립니다.`,
+  smsTemplateAwayStart: `[${TRACK_MANAGED_STUDY_CENTER_NAME}] {studentName} 학생 {time} 외출. 복귀 후 다시 공부를 이어갑니다.`,
+  smsTemplateAwayEnd: `[${TRACK_MANAGED_STUDY_CENTER_NAME}] {studentName} 학생 {time} 복귀. 다시 공부를 시작했습니다.`,
+  smsTemplateStudyEnd: `[${TRACK_MANAGED_STUDY_CENTER_NAME}] {studentName} 학생 {time} 공부종료. 오늘 학습 마무리했습니다.`,
+  smsTemplateLateAlert: `[${TRACK_MANAGED_STUDY_CENTER_NAME}] {studentName} 학생 {expectedTime} 미등원. 확인 부탁드립니다.`,
   lateAlertEnabled: true,
   lateAlertGraceMinutes: 20,
 };
@@ -345,11 +345,23 @@ function trimSmsToByteLimit(message: string, limit = SMS_BYTE_LIMIT) {
   return result.trim();
 }
 
+function enforceTrackManagedSmsCenterName(value: string) {
+  return String(value || '')
+    .replace(/\{centerName\}/g, TRACK_MANAGED_STUDY_CENTER_NAME)
+    .replace(/공부\s*트랙\s*동백\s*센터/g, TRACK_MANAGED_STUDY_CENTER_NAME)
+    .replace(/트랙\s*학습\s*센터/g, TRACK_MANAGED_STUDY_CENTER_NAME)
+    .replace(/트랙학습센터/g, TRACK_MANAGED_STUDY_CENTER_NAME);
+}
+
+function normalizeSmsTemplateForForm(template: string) {
+  return enforceTrackManagedSmsCenterName(template).replace(/\s+/g, ' ').trim();
+}
+
 function renderTemplatePreview(template: string, sampleValues: Record<string, string>) {
   const rendered = Object.entries(sampleValues).reduce((acc, [key, value]) => {
     return acc.replace(new RegExp(`\\{${key}\\}`, 'g'), value);
   }, template || '');
-  return trimSmsToByteLimit(rendered.replace(/\s+/g, ' ').trim());
+  return trimSmsToByteLimit(normalizeSmsTemplateForForm(rendered));
 }
 
 function getByteTone(bytes: number) {
@@ -617,11 +629,11 @@ export default function NotificationSettingsPage() {
       smsSender: settingsDoc.smsSender || prev.smsSender,
       smsUserId: settingsDoc.smsUserId || prev.smsUserId,
       smsEndpointUrl: settingsDoc.smsEndpointUrl || prev.smsEndpointUrl,
-      smsTemplateStudyStart: settingsDoc.smsTemplateStudyStart || settingsDoc.smsTemplateCheckIn || prev.smsTemplateStudyStart,
-      smsTemplateAwayStart: settingsDoc.smsTemplateAwayStart || prev.smsTemplateAwayStart,
-      smsTemplateAwayEnd: settingsDoc.smsTemplateAwayEnd || prev.smsTemplateAwayEnd,
-      smsTemplateStudyEnd: settingsDoc.smsTemplateStudyEnd || settingsDoc.smsTemplateCheckOut || prev.smsTemplateStudyEnd,
-      smsTemplateLateAlert: settingsDoc.smsTemplateLateAlert || prev.smsTemplateLateAlert,
+      smsTemplateStudyStart: normalizeSmsTemplateForForm(settingsDoc.smsTemplateStudyStart || settingsDoc.smsTemplateCheckIn || prev.smsTemplateStudyStart),
+      smsTemplateAwayStart: normalizeSmsTemplateForForm(settingsDoc.smsTemplateAwayStart || prev.smsTemplateAwayStart),
+      smsTemplateAwayEnd: normalizeSmsTemplateForForm(settingsDoc.smsTemplateAwayEnd || prev.smsTemplateAwayEnd),
+      smsTemplateStudyEnd: normalizeSmsTemplateForForm(settingsDoc.smsTemplateStudyEnd || settingsDoc.smsTemplateCheckOut || prev.smsTemplateStudyEnd),
+      smsTemplateLateAlert: normalizeSmsTemplateForForm(settingsDoc.smsTemplateLateAlert || prev.smsTemplateLateAlert),
       lateAlertEnabled: settingsDoc.lateAlertEnabled ?? prev.lateAlertEnabled,
       lateAlertGraceMinutes: Number(settingsDoc.lateAlertGraceMinutes ?? prev.lateAlertGraceMinutes),
     }));
@@ -1216,8 +1228,17 @@ export default function NotificationSettingsPage() {
 
     setIsSaving(true);
     try {
+      const normalizedForm = {
+        ...form,
+        smsTemplateStudyStart: normalizeSmsTemplateForForm(form.smsTemplateStudyStart),
+        smsTemplateAwayStart: normalizeSmsTemplateForForm(form.smsTemplateAwayStart),
+        smsTemplateAwayEnd: normalizeSmsTemplateForForm(form.smsTemplateAwayEnd),
+        smsTemplateStudyEnd: normalizeSmsTemplateForForm(form.smsTemplateStudyEnd),
+        smsTemplateLateAlert: normalizeSmsTemplateForForm(form.smsTemplateLateAlert),
+      };
       const saveNotificationSettings = httpsCallable(functions, 'saveNotificationSettingsSecure');
-      await saveNotificationSettings({ centerId, ...form, smsApiKey: smsApiKeyInput.trim() });
+      await saveNotificationSettings({ centerId, ...normalizedForm, smsApiKey: smsApiKeyInput.trim() });
+      setForm(normalizedForm);
       setSmsApiKeyInput('');
       setShowApiKeyEditor(false);
       toast({
@@ -2174,7 +2195,7 @@ export default function NotificationSettingsPage() {
                 <MessageSquare className="h-5 w-5" /> 문자 템플릿
               </CardTitle>
               <CardDescription className="font-bold text-sm">
-                사용 가능 변수: {'{centerName}'}, {'{studentName}'}, {'{time}'}, {'{expectedTime}'}
+                센터명은 [{TRACK_MANAGED_STUDY_CENTER_NAME}]로 고정됩니다. 사용 가능 변수: {'{studentName}'}, {'{time}'}, {'{expectedTime}'}
               </CardDescription>
             </div>
             <div className="flex flex-wrap items-center gap-2">
