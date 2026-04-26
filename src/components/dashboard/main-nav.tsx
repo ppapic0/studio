@@ -34,7 +34,6 @@ type NavGroup = { title: string; items: NavItem[] };
 
 const adminNavItems = [
   { href: '/dashboard', label: '운영실', icon: LayoutDashboard },
-  { href: '/dashboard/teacher', label: '실시간 교실', icon: Monitor },
   { href: '/kiosk', label: '키오스크', icon: MonitorSmartphone },
   { href: '/dashboard/attendance', label: '출결/요청 확인', icon: ClipboardCheck },
   { href: '/dashboard/teacher/students', label: '학생 관리', icon: GraduationCap },
@@ -53,7 +52,6 @@ const adminNavGroups: NavGroup[] = [
     title: '오늘 운영',
     items: [
       { href: '/dashboard', label: '운영실', icon: LayoutDashboard },
-      { href: '/dashboard/teacher', label: '실시간 교실', icon: Monitor },
       { href: '/dashboard/attendance', label: '출결/요청 확인', icon: ClipboardCheck },
       { href: '/kiosk', label: '키오스크', icon: MonitorSmartphone },
     ],

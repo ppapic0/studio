@@ -32,6 +32,8 @@ type CenterAdminAttendanceBoardProps = {
   variant?: 'default' | 'teacherEditorial';
   shellMode?: 'standalone' | 'embedded';
   showHeader?: boolean;
+  isLayoutEditMode?: boolean;
+  selectedSeatId?: string | null;
   isLoading: boolean;
   summary: CenterAdminAttendanceBoardSummary;
   seatSignalsBySeatId: Map<string, CenterAdminAttendanceSeatSignal>;
@@ -114,6 +116,8 @@ export function CenterAdminAttendanceBoard({
   variant = 'default',
   shellMode = 'standalone',
   showHeader = true,
+  isLayoutEditMode = false,
+  selectedSeatId = null,
   isLoading,
   summary,
   seatSignalsBySeatId,
@@ -272,6 +276,7 @@ export function CenterAdminAttendanceBoard({
                   const signal = studentId ? seatSignalsBySeatId.get(seat.id) || null : null;
                   const presentation = signal ? getAttendanceBoardPresentation(signal) : DEFAULT_PRESENTATION;
                   const isAisle = seat.type === 'aisle';
+                  const isSelectedSeat = Boolean(selectedSeatId && selectedSeatId === seat.id);
                   const isFilteredOut = selectedClass !== 'all' && member?.className !== selectedClass;
                   const displayName = signal?.studentName || student?.name || member?.displayName || '학생';
                   const scheduleMovementLabel = signal?.scheduleMovementSummary || null;
@@ -340,10 +345,54 @@ export function CenterAdminAttendanceBoard({
                   const shouldShowSeatMeta = !isNameOnly || isNoAttendanceDay || Boolean(scheduleMovementLabel) || checkoutMetaChips.length > 0;
 
                   if (isAisle) {
+                    if (isLayoutEditMode) {
+                      return (
+                        <button
+                          key={`${room.id}_${roomSeatNo}`}
+                          type="button"
+                          onClick={() => onSeatClick(seat)}
+                          className={cn(
+                            'relative aspect-square rounded-[1.45rem] border-2 border-dashed border-[#FFD0A6] bg-[#FFF8F1] p-2.5 text-left text-[#C95A08] transition-all duration-200 hover:-translate-y-0.5 hover:border-[#FF7A16] hover:bg-[#FFF2E6] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#FF7A16]/35',
+                            isSelectedSeat && 'ring-4 ring-[#FFB273]/40 ring-offset-2 ring-offset-white'
+                          )}
+                        >
+                          <span className="absolute left-2.5 top-2 text-[9px] font-black tracking-tight text-[#C95A08]/65">
+                            {seatDisplayLabel}
+                          </span>
+                          <div className="flex h-full items-end">
+                            <span className={cn('inline-flex max-w-full items-center rounded-full border border-[#FFD0A6] bg-white px-2.5 py-1 font-black text-[#C95A08]', isMobile ? 'text-[9px]' : 'text-[10px]')}>
+                              통로
+                            </span>
+                          </div>
+                        </button>
+                      );
+                    }
                     return <div key={`${room.id}_${roomSeatNo}`} className="aspect-square rounded-[1.35rem] bg-transparent" />;
                   }
 
                   if (!seat.studentId) {
+                    if (isLayoutEditMode) {
+                      return (
+                        <button
+                          key={`${room.id}_${roomSeatNo}`}
+                          type="button"
+                          onClick={() => onSeatClick(seat)}
+                          className={cn(
+                            'relative aspect-square rounded-[1.45rem] border border-dashed border-[#DCE7FF] bg-white/78 p-2.5 text-left transition-all duration-200 hover:-translate-y-0.5 hover:border-[#BFD1F8] hover:bg-[#F7FAFF] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#2554D7]/35',
+                            isSelectedSeat && 'ring-4 ring-[#FFB273]/40 ring-offset-2 ring-offset-white'
+                          )}
+                        >
+                          <span className="absolute left-2.5 top-2 text-[9px] font-black tracking-tight text-[#94A8D0]">
+                            {seatDisplayLabel}
+                          </span>
+                          <div className="flex h-full items-end">
+                            <span className={cn('inline-flex max-w-full items-center rounded-full border border-[#DCE7FF] bg-white px-2.5 py-1 font-black text-[#5c6e97]', isMobile ? 'text-[9px]' : 'text-[10px]')}>
+                              빈좌석
+                            </span>
+                          </div>
+                        </button>
+                      );
+                    }
                     return (
                       <div
                         key={`${room.id}_${roomSeatNo}`}
@@ -361,12 +410,14 @@ export function CenterAdminAttendanceBoard({
                       key={`${room.id}_${roomSeatNo}`}
                       type="button"
                       onClick={() => onSeatClick(seat)}
-                      disabled={isFilteredOut}
+                      disabled={!isLayoutEditMode && isFilteredOut}
                       className={cn(
                         'relative aspect-square rounded-[1.45rem] border-2 p-2.5 text-left shadow-[0_18px_30px_-26px_rgba(20,41,95,0.34)] transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#2554D7]/35 hover:-translate-y-0.5 hover:shadow-[0_22px_34px_-24px_rgba(20,41,95,0.38)]',
                         presentation.surfaceClass,
                         isCheckedOutLate && 'border-[#FF9A42] bg-[#FFF2E6]',
-                        isFilteredOut && 'opacity-20 grayscale hover:translate-y-0 hover:shadow-none'
+                        isSelectedSeat && 'ring-4 ring-[#FFB273]/40 ring-offset-2 ring-offset-white',
+                        isFilteredOut && !isLayoutEditMode && 'opacity-20 grayscale hover:translate-y-0 hover:shadow-none',
+                        isFilteredOut && isLayoutEditMode && 'opacity-45 grayscale'
                       )}
                     >
                       <span className="absolute left-2.5 top-2 text-[9px] font-black tracking-tight text-[#14295F]/46">

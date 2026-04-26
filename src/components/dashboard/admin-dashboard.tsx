@@ -78,11 +78,15 @@ import {
   ClipboardCheck,
   Link2,
   Wifi,
+  Save,
+  Settings2,
+  Trash2,
+  ArrowRightLeft,
 } from 'lucide-react';
 import { useFirestore, useCollection, useFunctions, useDoc, useUser } from '@/firebase';
 import { useAppContext } from '@/contexts/app-context';
 import { useMemoFirebase } from '@/hooks/use-memo-firebase';
-import { addDoc, collection, query, where, Timestamp, doc, limit, getDoc, getDocs, orderBy, serverTimestamp, documentId } from 'firebase/firestore';
+import { addDoc, collection, query, where, Timestamp, doc, limit, getDoc, getDocs, orderBy, serverTimestamp, documentId, writeBatch, deleteField } from 'firebase/firestore';
 import { httpsCallable } from 'firebase/functions';
 import { AttendanceCurrent, AttendanceRequest, CounselingReservation, DailyStudentStat, DailyReport, CenterMembership, InviteCode, GrowthProgress, ParentActivityEvent, CounselingLog, LayoutRoomConfig, StudentProfile, StudyLogDay, OpenClawIntegrationDoc, OpenClawSnapshotRecordCounts, PointBoostEvent } from '@/lib/types';
 import { format, subDays } from 'date-fns';
@@ -117,8 +121,14 @@ import {
 } from '@/lib/dashboard-communications';
 import {
   buildSeatId,
+  formatSeatLabel,
   getGlobalSeatNo,
   normalizeLayoutRooms,
+  normalizeAisleSeatIds,
+  normalizeSeatGenderBySeatId,
+  normalizeSeatLabelsBySeatId,
+  parseSeatId,
+  PRIMARY_ROOM_ID,
   resolveSeatIdentity,
 } from '@/lib/seat-layout';
 import { toStudyRoomTrackScheduleName } from '@/lib/study-room-class-schedule';
@@ -208,6 +218,7 @@ const calculateRhythmScoreFromMinutes = (minutes: number[]): number => {
 type ResolvedAttendanceSeat = AttendanceCurrent & {
   roomId: string;
   roomSeatNo: number;
+  seatDocId?: string;
 };
 
 const EMPTY_ADMIN_METRICS = {
@@ -567,6 +578,13 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
   const [selectedHomeAxisId, setSelectedHomeAxisId] = useState<string | null>(null);
   const [selectedRoomView, setSelectedRoomView] = useState<'all' | string>('all');
   const hasInitializedRoomViewRef = useRef(false);
+  const hasHydratedRoomDraftsRef = useRef(false);
+  const liveClassroomSectionRef = useRef<HTMLDivElement | null>(null);
+  const [isClassroomEditMode, setIsClassroomEditMode] = useState(false);
+  const [isClassroomLayoutSaving, setIsClassroomLayoutSaving] = useState(false);
+  const [roomDrafts, setRoomDrafts] = useState<Record<string, { rows: number; cols: number }>>({});
+  const [optimisticAisleSeatIds, setOptimisticAisleSeatIds] = useState<string[] | null>(null);
+  const [selectedLayoutSeat, setSelectedLayoutSeat] = useState<ResolvedAttendanceSeat | null>(null);
   const [focusDayData, setFocusDayData] = useState<Record<string, { awayMinutes: number; startHour: number | null; endHour: number | null }>>({});
   const [dayDataLoading, setDayDataLoading] = useState(false);
   const [dailyGrowthWindowIndex, setDailyGrowthWindowIndex] = useState(0);
@@ -627,10 +645,30 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
     return () => window.clearInterval(refreshTimer);
   }, [isActive]);
 
+  useEffect(() => {
+    if (!isMounted) return;
+    if (typeof window === 'undefined') return;
+    if (window.location.hash !== '#live-classroom') return;
+
+    window.setTimeout(() => {
+      liveClassroomSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }, 80);
+  }, [isMounted]);
+
   const isMobile = viewMode === 'mobile';
   const centerId = activeMembership?.id;
   const todayKey = today ? format(today, 'yyyy-MM-dd') : '';
   const yesterdayKey = today ? format(subDays(today, 1), 'yyyy-MM-dd') : '';
+
+  useEffect(() => {
+    hasHydratedRoomDraftsRef.current = false;
+    hasInitializedRoomViewRef.current = false;
+    setRoomDrafts({});
+    setSelectedRoomView('all');
+    setSelectedLayoutSeat(null);
+    setIsClassroomEditMode(false);
+    setOptimisticAisleSeatIds(null);
+  }, [centerId]);
 
   useEffect(() => {
     if (!today) return;
@@ -684,10 +722,66 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
   }, [firestore, centerId]);
   const { data: pointBoostEvents } = useCollection<PointBoostEvent>(pointBoostEventsQuery, { enabled: isActive });
 
-  const roomConfigs = useMemo(
+  const persistedRooms = useMemo(
     () => normalizeLayoutRooms(centerData?.layoutSettings),
     [centerData?.layoutSettings]
   );
+
+  useEffect(() => {
+    setRoomDrafts((prev) => {
+      if (!hasHydratedRoomDraftsRef.current) {
+        hasHydratedRoomDraftsRef.current = true;
+        return Object.fromEntries(
+          persistedRooms.map((room) => [room.id, { rows: room.rows, cols: room.cols }])
+        );
+      }
+
+      const next: Record<string, { rows: number; cols: number }> = {};
+      persistedRooms.forEach((room) => {
+        next[room.id] = {
+          rows: prev[room.id]?.rows ?? room.rows,
+          cols: prev[room.id]?.cols ?? room.cols,
+        };
+      });
+      return next;
+    });
+  }, [persistedRooms]);
+
+  const roomConfigs = useMemo(
+    () =>
+      persistedRooms.map((room) => ({
+        ...room,
+        rows: roomDrafts[room.id]?.rows ?? room.rows,
+        cols: roomDrafts[room.id]?.cols ?? room.cols,
+      })),
+    [persistedRooms, roomDrafts]
+  );
+  const persistedRoomMap = useMemo(
+    () => new Map(persistedRooms.map((room) => [room.id, room])),
+    [persistedRooms]
+  );
+  const persistedAisleSeatIds = useMemo(
+    () => normalizeAisleSeatIds(centerData?.layoutSettings),
+    [centerData?.layoutSettings]
+  );
+  const persistedSeatLabelsBySeatId = useMemo(
+    () => normalizeSeatLabelsBySeatId(centerData?.layoutSettings),
+    [centerData?.layoutSettings]
+  );
+  const persistedSeatGenderBySeatId = useMemo(
+    () => normalizeSeatGenderBySeatId(centerData?.layoutSettings),
+    [centerData?.layoutSettings]
+  );
+  const effectiveAisleSeatIds = optimisticAisleSeatIds || persistedAisleSeatIds;
+  const effectiveAisleSeatIdSet = useMemo(
+    () => new Set(effectiveAisleSeatIds),
+    [effectiveAisleSeatIds]
+  );
+  useEffect(() => {
+    if (!optimisticAisleSeatIds) return;
+    if (optimisticAisleSeatIds.join('|') !== persistedAisleSeatIds.join('|')) return;
+    setOptimisticAisleSeatIds(null);
+  }, [optimisticAisleSeatIds, persistedAisleSeatIds]);
   const roomNameById = useMemo(
     () =>
       new Map(
@@ -803,15 +897,20 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
     () =>
       (attendanceList || []).map((seat) => {
         const identity = resolveSeatIdentity(seat);
+        const canonicalSeatId = buildSeatId(identity.roomId, identity.roomSeatNo) || identity.seatId;
         return {
           ...seat,
+          id: canonicalSeatId || seat.id,
+          seatDocId: seat.id,
           roomId: identity.roomId,
           roomSeatNo: identity.roomSeatNo,
           seatNo: identity.seatNo,
-          type: seat.type || 'seat',
+          seatLabel: seat.seatLabel || persistedSeatLabelsBySeatId[canonicalSeatId],
+          seatGenderPolicy: seat.seatGenderPolicy || persistedSeatGenderBySeatId[canonicalSeatId],
+          type: effectiveAisleSeatIdSet.has(canonicalSeatId) ? 'aisle' : seat.type || 'seat',
         };
       }),
-    [attendanceList]
+    [attendanceList, effectiveAisleSeatIdSet, persistedSeatGenderBySeatId, persistedSeatLabelsBySeatId]
   );
 
   const studentsById = useMemo(
@@ -914,7 +1013,14 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
   const getSeatForRoom = (room: LayoutRoomConfig, roomSeatNo: number): ResolvedAttendanceSeat => {
     const seatId = buildSeatId(room.id, roomSeatNo);
     const existingSeat = seatById.get(seatId);
-    if (existingSeat) return existingSeat;
+    if (existingSeat) {
+      return {
+        ...existingSeat,
+        seatLabel: existingSeat.seatLabel || persistedSeatLabelsBySeatId[seatId],
+        seatGenderPolicy: existingSeat.seatGenderPolicy || persistedSeatGenderBySeatId[seatId],
+        type: effectiveAisleSeatIdSet.has(seatId) ? 'aisle' : existingSeat.type || 'seat',
+      };
+    }
 
     return {
       id: seatId,
@@ -922,9 +1028,90 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
       roomSeatNo,
       seatNo: getGlobalSeatNo(room.id, roomSeatNo),
       status: 'absent',
-      type: 'seat',
+      seatLabel: persistedSeatLabelsBySeatId[seatId],
+      seatGenderPolicy: persistedSeatGenderBySeatId[seatId],
+      type: effectiveAisleSeatIdSet.has(seatId) ? 'aisle' : 'seat',
       updatedAt: Timestamp.now(),
     };
+  };
+
+  const selectedRoomConfig =
+    selectedRoomView === 'all'
+      ? null
+      : roomConfigs.find((room) => room.id === selectedRoomView) || roomConfigs[0] || null;
+
+  const selectedLayoutSeatLabel = selectedLayoutSeat
+    ? formatSeatLabel(selectedLayoutSeat, roomConfigs, '좌석 미지정', persistedSeatLabelsBySeatId)
+    : '';
+
+  const roomResizeConflicts = useMemo(() => {
+    const next = new Map<string, ResolvedAttendanceSeat[]>();
+
+    roomConfigs.forEach((room) => {
+      const persistedRoom = persistedRoomMap.get(room.id);
+      if (!persistedRoom) return;
+
+      const currentMaxCells = persistedRoom.rows * persistedRoom.cols;
+      const nextMaxCells = room.rows * room.cols;
+      if (nextMaxCells >= currentMaxCells) return;
+
+      const conflicts = resolvedAttendanceList.filter(
+        (seat) =>
+          seat.roomId === room.id &&
+          seat.roomSeatNo > nextMaxCells &&
+          (Boolean(seat.studentId) || seat.type === 'aisle')
+      );
+      if (conflicts.length > 0) {
+        next.set(room.id, conflicts);
+      }
+    });
+
+    return next;
+  }, [persistedRoomMap, resolvedAttendanceList, roomConfigs]);
+
+  const activeRoomConflicts = selectedRoomConfig
+    ? roomResizeConflicts.get(selectedRoomConfig.id) || []
+    : [];
+
+  const filterSeatLabelsByRooms = (
+    rooms: LayoutRoomConfig[],
+    source: Record<string, string> = persistedSeatLabelsBySeatId
+  ) => {
+    const roomCellLimitById = new Map(rooms.map((room) => [room.id, room.rows * room.cols]));
+
+    return Object.fromEntries(
+      Object.entries(source)
+        .filter(([seatId]) => {
+          const parsed = parseSeatId(seatId);
+          if (!parsed) return false;
+          const maxCells = roomCellLimitById.get(parsed.roomId);
+          return Boolean(maxCells) && parsed.roomSeatNo <= Number(maxCells);
+        })
+        .sort(([left], [right]) => left.localeCompare(right))
+    );
+  };
+
+  const filterSeatGenderByRooms = (
+    rooms: LayoutRoomConfig[],
+    source = persistedSeatGenderBySeatId
+  ) => {
+    const roomCellLimitById = new Map(rooms.map((room) => [room.id, room.rows * room.cols]));
+
+    return Object.fromEntries(
+      Object.entries(source)
+        .filter(([seatId, policy]) => {
+          const parsed = parseSeatId(seatId);
+          if (!parsed) return false;
+          const maxCells = roomCellLimitById.get(parsed.roomId);
+          return Boolean(maxCells) && parsed.roomSeatNo <= Number(maxCells) && policy !== 'all';
+        })
+        .sort(([left], [right]) => left.localeCompare(right))
+    );
+  };
+
+  const getLegacySeatDocId = (seat?: ResolvedAttendanceSeat | null) => {
+    const legacySeatDocId = typeof seat?.seatDocId === 'string' ? seat.seatDocId.trim() : '';
+    return legacySeatDocId && legacySeatDocId !== seat?.id ? legacySeatDocId : '';
   };
 
   const {
@@ -2608,9 +2795,9 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
   const quickActionLinks = useMemo(
     () => [
       {
-        href: '/dashboard/teacher',
+        href: '/dashboard#live-classroom',
         label: '실시간 교실',
-        description: '도면과 좌석 상태를 바로 열어 조치합니다.',
+        description: '운영실 안에서 좌석 상태와 배치를 바로 봅니다.',
         icon: LayoutGrid,
       },
       {
@@ -2785,7 +2972,7 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
           title: `장기 외출 ${attendanceBoardSummary.longAwayCount}명`,
           detail: '실시간 교실 도면에서 장기 외출 학생의 복귀 여부를 바로 점검하세요.',
           actionLabel: '실시간 교실',
-          href: '/dashboard/teacher',
+          href: '/dashboard#live-classroom',
           icon: LayoutGrid,
           toneClass: 'bg-amber-100 text-amber-700',
         },
@@ -3029,6 +3216,236 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
     );
   }
 
+  function renderIntegratedClassroomSection() {
+    const activeRoom = selectedRoomConfig || roomConfigs[0] || null;
+    const activeRoomDraft = activeRoom ? roomDrafts[activeRoom.id] : null;
+    const activePersistedRoom = activeRoom ? persistedRoomMap.get(activeRoom.id) : null;
+    const hasActiveRoomDraftChanges =
+      Boolean(activeRoom && activeRoomDraft && activePersistedRoom) &&
+      (activeRoomDraft?.rows !== activePersistedRoom?.rows || activeRoomDraft?.cols !== activePersistedRoom?.cols);
+    const selectedLayoutSeatIsAisle =
+      Boolean(selectedLayoutSeat && (selectedLayoutSeat.type === 'aisle' || effectiveAisleSeatIdSet.has(selectedLayoutSeat.id)));
+
+    return (
+      <motion.section
+        id="live-classroom"
+        ref={liveClassroomSectionRef}
+        className="scroll-mt-28 space-y-4 px-1"
+        {...getStudioMotionProps(0.24, 14)}
+      >
+        <div className="overflow-hidden rounded-[2.4rem] border border-[#DCE7FF] bg-[linear-gradient(180deg,#FFFFFF_0%,#F6FAFF_100%)] shadow-[0_28px_70px_-54px_rgba(20,41,95,0.34)]">
+          <div className={cn('border-b border-[#E4ECFF] px-5 py-5 sm:px-6', isClassroomEditMode ? 'bg-[#FFF8F2]' : 'bg-white')}>
+            <div className={cn('flex gap-4', isMobile ? 'flex-col' : 'items-start justify-between')}>
+              <div className="min-w-0 space-y-2">
+                <div className="flex flex-wrap items-center gap-2">
+                  <Badge className="h-6 rounded-full border-none bg-[#14295F] px-2.5 text-[10px] font-black uppercase tracking-[0.16em] text-white">
+                    실시간 교실
+                  </Badge>
+                  <Badge className="h-6 rounded-full border border-[#DCE7FF] bg-white px-2.5 text-[10px] font-black text-[#14295F]">
+                    운영실 통합
+                  </Badge>
+                  {isClassroomEditMode ? (
+                    <Badge className="h-6 rounded-full border-none bg-[#FF7A16] px-2.5 text-[10px] font-black text-white">
+                      배치 수정 중
+                    </Badge>
+                  ) : null}
+                </div>
+                <h2 className="text-[1.7rem] font-black tracking-tight text-[#14295F] sm:text-[2rem]">
+                  좌석 관제와 배치 수정을 운영실에서 같이 봅니다
+                </h2>
+                <p className="max-w-[52rem] text-xs font-bold leading-5 text-[#5c6e97] sm:text-sm">
+                  별도 실시간 교실 메뉴로 이동하지 않고, 오늘 착석 흐름과 호실 배치를 같은 운영실 화면에서 바로 확인합니다.
+                </p>
+              </div>
+              <div className="flex flex-wrap items-center gap-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => handleOpenAttendanceOverview(selectedRoomView)}
+                  className="h-10 rounded-xl border-2 border-[#DCE7FF] bg-white px-3 text-xs font-black text-[#14295F]"
+                >
+                  <LayoutGrid className="mr-1.5 h-4 w-4" />
+                  전체보기
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={handleToggleClassroomEditMode}
+                  className={cn(
+                    'h-10 rounded-xl border-2 px-3 text-xs font-black',
+                    isClassroomEditMode
+                      ? 'border-[#FFB36D] bg-[#FFF2E8] text-[#C95A08]'
+                      : 'border-[#DCE7FF] bg-white text-[#14295F]'
+                  )}
+                >
+                  <Settings2 className="mr-1.5 h-4 w-4" />
+                  {isClassroomEditMode ? '편집 닫기' : '배치 수정'}
+                </Button>
+              </div>
+            </div>
+          </div>
+
+          {isClassroomEditMode ? (
+            <div className="border-b border-[#FFE0C2] bg-[#FFF8F1] px-4 py-4 sm:px-5">
+              <div className={cn('grid gap-3', isMobile ? 'grid-cols-1' : 'lg:grid-cols-[minmax(0,1fr)_minmax(280px,0.75fr)]')}>
+                <div className="rounded-[1.65rem] border border-[#FFD7B0] bg-white p-4 shadow-[0_18px_34px_-30px_rgba(255,122,22,0.22)]">
+                  <div className={cn('flex gap-3', isMobile ? 'flex-col' : 'items-end justify-between')}>
+                    <div className="min-w-0">
+                      <p className="text-[10px] font-black uppercase tracking-[0.2em] text-[#C95A08]">호실 구조</p>
+                      <p className="mt-1 text-base font-black text-[#14295F]">
+                        {activeRoom ? `${activeRoom.name} 가로·세로 설정` : '호실을 선택해 주세요'}
+                      </p>
+                      <p className="mt-1 text-xs font-bold leading-5 text-[#8A5A2B]">
+                        통로/좌석 전환은 아래 좌석판에서 셀을 누른 뒤 오른쪽 버튼으로 저장합니다.
+                      </p>
+                    </div>
+                    {activeRoom && activeRoomDraft ? (
+                      <div className="flex flex-wrap items-center gap-2">
+                        <div className="flex items-center gap-2 rounded-2xl border border-[#FFE3C4] bg-[#FFF8F1] px-3 py-2 shadow-sm">
+                          <Label className="text-[10px] font-black uppercase tracking-widest text-[#C95A08]">가로</Label>
+                          <Input
+                            type="number"
+                            min={1}
+                            max={24}
+                            value={activeRoomDraft.cols}
+                            onChange={(event) => handleAdminRoomDraftChange(activeRoom.id, 'cols', event.target.value)}
+                            className="h-9 w-20 rounded-xl border-2 border-[#FFD7B0] text-center font-black"
+                          />
+                        </div>
+                        <div className="flex items-center gap-2 rounded-2xl border border-[#FFE3C4] bg-[#FFF8F1] px-3 py-2 shadow-sm">
+                          <Label className="text-[10px] font-black uppercase tracking-widest text-[#C95A08]">세로</Label>
+                          <Input
+                            type="number"
+                            min={1}
+                            max={24}
+                            value={activeRoomDraft.rows}
+                            onChange={(event) => handleAdminRoomDraftChange(activeRoom.id, 'rows', event.target.value)}
+                            className="h-9 w-20 rounded-xl border-2 border-[#FFD7B0] text-center font-black"
+                          />
+                        </div>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          onClick={() => handleCancelAdminRoomDraft(activeRoom.id)}
+                          disabled={isClassroomLayoutSaving || !hasActiveRoomDraftChanges}
+                          className="h-10 rounded-xl border-2 bg-white font-black text-[#14295F]"
+                        >
+                          취소
+                        </Button>
+                        <Button
+                          type="button"
+                          onClick={() => void handleSaveAdminRoomSettings(activeRoom.id)}
+                          disabled={isClassroomLayoutSaving || (!hasActiveRoomDraftChanges && activeRoomConflicts.length === 0)}
+                          className="h-10 rounded-xl bg-[#FF7A16] px-4 font-black text-white hover:bg-[#EB6E12]"
+                        >
+                          {isClassroomLayoutSaving ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> : <Save className="mr-1.5 h-4 w-4" />}
+                          저장
+                        </Button>
+                        {activeRoom.id !== PRIMARY_ROOM_ID && roomConfigs.length > 1 ? (
+                          <Button
+                            type="button"
+                            variant="outline"
+                            onClick={() => void handleDeleteAdminRoom(activeRoom.id)}
+                            disabled={isClassroomLayoutSaving}
+                            className="h-10 rounded-xl border-rose-200 bg-white px-3 font-black text-rose-600 hover:bg-rose-50"
+                          >
+                            <Trash2 className="mr-1.5 h-4 w-4" />
+                            삭제
+                          </Button>
+                        ) : null}
+                      </div>
+                    ) : null}
+                  </div>
+                  {activeRoomConflicts.length > 0 ? (
+                    <div className="mt-3 rounded-[1.25rem] border border-rose-200 bg-rose-50 px-4 py-3">
+                      <p className="text-sm font-black text-rose-700">축소 저장 시 {activeRoomConflicts.length}개 셀이 정리됩니다.</p>
+                      <p className="mt-1 text-xs font-bold leading-5 text-rose-700/90">
+                        {activeRoomConflicts
+                          .slice(0, 5)
+                          .map((seat) => formatSeatLabel(seat, roomConfigs, '좌석 미지정', persistedSeatLabelsBySeatId))
+                          .join(', ')}
+                        {activeRoomConflicts.length > 5 ? ` 외 ${activeRoomConflicts.length - 5}개` : ''}
+                      </p>
+                    </div>
+                  ) : null}
+                </div>
+
+                <div className="rounded-[1.65rem] border border-[#DCE7FF] bg-white p-4 shadow-[0_18px_34px_-30px_rgba(20,41,95,0.18)]">
+                  <p className="text-[10px] font-black uppercase tracking-[0.2em] text-[#5c6e97]">선택한 셀</p>
+                  {selectedLayoutSeat ? (
+                    <div className="mt-3 space-y-3">
+                      <div className="rounded-[1.25rem] border border-[#E4ECFA] bg-[#F8FBFF] px-4 py-3">
+                        <p className="text-sm font-black text-[#14295F]">{selectedLayoutSeatLabel}</p>
+                        <p className="mt-1 text-xs font-bold text-[#5c6e97]">
+                          {selectedLayoutSeatIsAisle ? '통로' : selectedLayoutSeat.studentId ? '학생 배정 좌석' : '빈좌석'}
+                        </p>
+                      </div>
+                      <Button
+                        type="button"
+                        onClick={() => void handleToggleAdminCellType()}
+                        disabled={isClassroomLayoutSaving}
+                        className={cn(
+                          'h-11 w-full rounded-xl font-black',
+                          selectedLayoutSeatIsAisle
+                            ? 'bg-[#14295F] text-white hover:bg-[#10224C]'
+                            : 'bg-[#FF7A16] text-white hover:bg-[#EB6E12]'
+                        )}
+                      >
+                        {isClassroomLayoutSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <ArrowRightLeft className="mr-2 h-4 w-4" />}
+                        {selectedLayoutSeatIsAisle ? '좌석으로 다시 사용' : '통로로 전환'}
+                      </Button>
+                      {selectedLayoutSeat.studentId ? (
+                        <Button
+                          type="button"
+                          variant="outline"
+                          onClick={() => setSelectedFocusStudentId(selectedLayoutSeat.studentId || null)}
+                          className="h-10 w-full rounded-xl border-2 bg-white font-black text-[#14295F]"
+                        >
+                          학생 상세 열기
+                        </Button>
+                      ) : null}
+                    </div>
+                  ) : (
+                    <div className="mt-3 rounded-[1.25rem] border border-dashed border-[#DCE7FF] bg-[#F8FBFF] px-4 py-5">
+                      <p className="text-sm font-black text-[#14295F]">좌석판에서 셀을 선택해 주세요.</p>
+                      <p className="mt-1 text-xs font-bold leading-5 text-[#5c6e97]">
+                        빈좌석, 학생 좌석, 통로 셀 모두 편집 중에는 클릭할 수 있습니다.
+                      </p>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          ) : null}
+
+          <div className="px-2 py-4 sm:px-3">
+            <CenterAdminAttendanceBoard
+              roomConfigs={roomConfigs}
+              selectedRoomView={selectedRoomView}
+              onRoomViewChange={(roomId) => {
+                setSelectedRoomView(roomId);
+                setSelectedLayoutSeat(null);
+              }}
+              selectedClass={selectedClass}
+              isMobile={isMobile}
+              shellMode="embedded"
+              showHeader={true}
+              isLayoutEditMode={isClassroomEditMode}
+              selectedSeatId={selectedLayoutSeat?.id || null}
+              isLoading={attendanceBoardLoading}
+              summary={attendanceBoardSummary}
+              seatSignalsBySeatId={attendanceSeatSignalsBySeatId}
+              studentsById={studentsById}
+              studentMembersById={studentMembersById}
+              getSeatForRoom={getSeatForRoom}
+              onSeatClick={handleClassroomSeatClick}
+            />
+          </div>
+        </div>
+      </motion.section>
+    );
+  }
+
   useEffect(() => {
     if (adminHeatmapRows.length === 0) {
       if (selectedHomeAxisId !== null) {
@@ -3053,7 +3470,7 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
   }, [adminHeatmapRows, selectedHomeAxisId]);
 
   const workbenchQuickActions = [
-    { label: '실시간 교실', icon: <LayoutGrid className="h-4 w-4" />, href: '/dashboard/teacher' },
+    { label: '실시간 교실', icon: <LayoutGrid className="h-4 w-4" />, onClick: handleScrollToLiveClassroom },
     { label: '학생 360', icon: <Users className="h-4 w-4" />, href: '/dashboard/teacher/students' },
     { label: '출결 KPI', icon: <ClipboardCheck className="h-4 w-4" />, href: '/dashboard/attendance' },
     { label: '리드 / 상담', icon: <Megaphone className="h-4 w-4" />, href: '/dashboard/leads' },
@@ -3228,8 +3645,8 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
       interventionSignals={heatmapInterventionSignals}
       scopeLabel={selectedClass === 'all' ? '센터 전체' : selectedClass}
       isLoading={adminHeatmapLoading}
-      actionHref="/dashboard/teacher"
-      actionLabel="실시간 교실 이동"
+      actionHref="/dashboard#live-classroom"
+      actionLabel="실시간 교실 보기"
       className="border-0 bg-white shadow-none"
       activeRowId={selectedHomeAxisId}
       onActiveRowChange={setSelectedHomeAxisId}
@@ -3266,6 +3683,346 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
   const handleOpenAttendanceOverview = (roomId: 'all' | string = 'all') => {
     setSelectedRoomView(roomId);
     setIsAttendanceFullscreenOpen(true);
+  };
+  function handleScrollToLiveClassroom() {
+    if (typeof window !== 'undefined') {
+      window.history.replaceState(null, '', '#live-classroom');
+    }
+    liveClassroomSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+  const handleClassroomSeatClick = (seat: AttendanceCurrent) => {
+    const identity = resolveSeatIdentity(seat);
+    const normalizedSeat: ResolvedAttendanceSeat = {
+      ...seat,
+      id: buildSeatId(identity.roomId, identity.roomSeatNo) || seat.id,
+      roomId: identity.roomId,
+      roomSeatNo: identity.roomSeatNo,
+      seatNo: identity.seatNo,
+      type: effectiveAisleSeatIdSet.has(buildSeatId(identity.roomId, identity.roomSeatNo)) ? 'aisle' : seat.type || 'seat',
+    };
+
+    if (isClassroomEditMode) {
+      setSelectedLayoutSeat(normalizedSeat);
+      if (normalizedSeat.roomId) {
+        setSelectedRoomView(normalizedSeat.roomId);
+      }
+      return;
+    }
+
+    if (normalizedSeat.studentId) {
+      setSelectedFocusStudentId(normalizedSeat.studentId);
+    }
+  };
+  const handleToggleClassroomEditMode = () => {
+    if (!isClassroomEditMode && selectedRoomView === 'all' && roomConfigs[0]) {
+      setSelectedRoomView(roomConfigs[0].id);
+      toast({
+        title: `${roomConfigs[0].name} 배치 수정으로 전환했습니다.`,
+        description: '가로·세로와 통로 셀을 운영실에서 바로 수정할 수 있습니다.',
+      });
+    }
+    setIsClassroomEditMode((prev) => !prev);
+    setSelectedLayoutSeat(null);
+  };
+  const handleAdminRoomDraftChange = (roomId: string, key: 'rows' | 'cols', value: string) => {
+    const fallbackRoom = persistedRoomMap.get(roomId);
+    const fallbackValue = key === 'rows' ? fallbackRoom?.rows ?? 7 : fallbackRoom?.cols ?? 10;
+    const parsed = Number.parseInt(value, 10);
+    const safeValue = Number.isFinite(parsed) ? Math.min(24, Math.max(1, parsed)) : fallbackValue;
+
+    setRoomDrafts((prev) => ({
+      ...prev,
+      [roomId]: {
+        rows: key === 'rows' ? safeValue : prev[roomId]?.rows ?? fallbackRoom?.rows ?? 7,
+        cols: key === 'cols' ? safeValue : prev[roomId]?.cols ?? fallbackRoom?.cols ?? 10,
+      },
+    }));
+  };
+  const handleCancelAdminRoomDraft = (roomId: string) => {
+    const persistedRoom = persistedRoomMap.get(roomId);
+    if (!persistedRoom) return;
+    setRoomDrafts((prev) => ({
+      ...prev,
+      [roomId]: {
+        rows: persistedRoom.rows,
+        cols: persistedRoom.cols,
+      },
+    }));
+  };
+  const handleSaveAdminRoomSettings = async (roomId: string) => {
+    if (!firestore || !centerId) return;
+
+    const roomDraft = roomDrafts[roomId];
+    const persistedRoom = persistedRoomMap.get(roomId);
+    if (!roomDraft || !persistedRoom) return;
+
+    const nextMaxCells = roomDraft.rows * roomDraft.cols;
+    const conflicts = roomResizeConflicts.get(roomId) || [];
+    const nextRooms = persistedRooms.map((room) =>
+      room.id === roomId
+        ? {
+            ...room,
+            rows: roomDraft.rows,
+            cols: roomDraft.cols,
+          }
+        : room
+    );
+    const nextAisleSeatIds = effectiveAisleSeatIds.filter((seatId) => {
+      const parsed = parseSeatId(seatId);
+      if (!parsed) return false;
+      if (parsed.roomId !== roomId) return true;
+      return parsed.roomSeatNo <= nextMaxCells;
+    });
+    const nextSeatLabelsBySeatId = filterSeatLabelsByRooms(nextRooms);
+    const nextSeatGenderBySeatId = filterSeatGenderByRooms(nextRooms);
+
+    setIsClassroomLayoutSaving(true);
+    try {
+      const batch = writeBatch(firestore);
+
+      conflicts.forEach((seat) => {
+        const assignedStudentId = typeof seat.studentId === 'string' ? seat.studentId.trim() : '';
+        if (assignedStudentId && studentsById.has(assignedStudentId)) {
+          batch.update(doc(firestore, 'centers', centerId, 'students', assignedStudentId), {
+            seatNo: 0,
+            seatId: deleteField(),
+            roomId: deleteField(),
+            roomSeatNo: deleteField(),
+            seatLabel: deleteField(),
+            seatZone: deleteField(),
+            updatedAt: serverTimestamp(),
+          });
+        }
+
+        batch.delete(doc(firestore, 'centers', centerId, 'attendanceCurrent', seat.id));
+        const legacySeatDocId = getLegacySeatDocId(seat);
+        if (legacySeatDocId) {
+          batch.delete(doc(firestore, 'centers', centerId, 'attendanceCurrent', legacySeatDocId));
+        }
+      });
+
+      batch.set(
+        doc(firestore, 'centers', centerId),
+        {
+          layoutSettings: {
+            aisleSeatIds: nextAisleSeatIds,
+            seatLabelsBySeatId: nextSeatLabelsBySeatId,
+            seatGenderBySeatId: nextSeatGenderBySeatId,
+            rows: nextRooms[0]?.rows ?? roomDraft.rows,
+            cols: nextRooms[0]?.cols ?? roomDraft.cols,
+            rooms: nextRooms,
+            updatedAt: serverTimestamp(),
+          },
+        },
+        { merge: true }
+      );
+
+      setOptimisticAisleSeatIds(nextAisleSeatIds);
+      await batch.commit();
+      setSelectedLayoutSeat((current) =>
+        current?.roomId === roomId && current.roomSeatNo > nextMaxCells ? null : current
+      );
+
+      toast({
+        title: `${persistedRoom.name} 배치를 저장했습니다.`,
+        description:
+          conflicts.length > 0
+            ? `${roomDraft.cols} x ${roomDraft.rows} 구조로 반영하고 범위를 벗어난 ${conflicts.length}개 셀을 정리했습니다.`
+            : `${roomDraft.cols} x ${roomDraft.rows} 구조로 반영했습니다.`,
+      });
+    } catch (error) {
+      setOptimisticAisleSeatIds(null);
+      toast({ variant: 'destructive', title: '배치 저장 실패' });
+    } finally {
+      setIsClassroomLayoutSaving(false);
+    }
+  };
+  const handleToggleAdminCellType = async () => {
+    if (!firestore || !centerId || !selectedLayoutSeat) return;
+
+    const seatId = buildSeatId(selectedLayoutSeat.roomId, selectedLayoutSeat.roomSeatNo);
+    if (!seatId) return;
+
+    const isCurrentlyAisle = effectiveAisleSeatIdSet.has(seatId) || selectedLayoutSeat.type === 'aisle';
+    const nextAisleSeatIds = isCurrentlyAisle
+      ? effectiveAisleSeatIds.filter((item) => item !== seatId)
+      : Array.from(new Set([...effectiveAisleSeatIds, seatId])).sort();
+
+    setIsClassroomLayoutSaving(true);
+    try {
+      const batch = writeBatch(firestore);
+      batch.set(
+        doc(firestore, 'centers', centerId),
+        {
+          layoutSettings: {
+            aisleSeatIds: nextAisleSeatIds,
+            seatLabelsBySeatId: filterSeatLabelsByRooms(persistedRooms),
+            seatGenderBySeatId: filterSeatGenderByRooms(persistedRooms),
+            rows: persistedRooms[0]?.rows ?? selectedLayoutSeat.roomSeatNo,
+            cols: persistedRooms[0]?.cols ?? 1,
+            rooms: persistedRooms,
+            updatedAt: serverTimestamp(),
+          },
+        },
+        { merge: true }
+      );
+
+      const assignedStudentId =
+        typeof selectedLayoutSeat.studentId === 'string' ? selectedLayoutSeat.studentId.trim() : '';
+      if (!isCurrentlyAisle && assignedStudentId && studentsById.has(assignedStudentId)) {
+        batch.update(doc(firestore, 'centers', centerId, 'students', assignedStudentId), {
+          seatNo: 0,
+          seatId: deleteField(),
+          roomId: deleteField(),
+          roomSeatNo: deleteField(),
+          seatLabel: deleteField(),
+          seatZone: deleteField(),
+          updatedAt: serverTimestamp(),
+        });
+      }
+
+      batch.set(
+        doc(firestore, 'centers', centerId, 'attendanceCurrent', seatId),
+        {
+          seatNo: getGlobalSeatNo(selectedLayoutSeat.roomId, selectedLayoutSeat.roomSeatNo),
+          roomId: selectedLayoutSeat.roomId,
+          roomSeatNo: selectedLayoutSeat.roomSeatNo,
+          type: isCurrentlyAisle ? 'seat' : 'aisle',
+          studentId: isCurrentlyAisle ? selectedLayoutSeat.studentId || null : null,
+          status: isCurrentlyAisle ? selectedLayoutSeat.status || 'absent' : 'absent',
+          seatLabel: selectedLayoutSeat.seatLabel || deleteField(),
+          manualOccupantName: deleteField(),
+          seatZone: isCurrentlyAisle ? selectedLayoutSeat.seatZone || null : deleteField(),
+          lastCheckInAt: deleteField(),
+          updatedAt: serverTimestamp(),
+        },
+        { merge: true }
+      );
+
+      const legacySeatDocId = getLegacySeatDocId(selectedLayoutSeat);
+      if (legacySeatDocId) {
+        batch.delete(doc(firestore, 'centers', centerId, 'attendanceCurrent', legacySeatDocId));
+      }
+
+      setOptimisticAisleSeatIds(nextAisleSeatIds);
+      await batch.commit();
+      setSelectedLayoutSeat((current) =>
+        current
+          ? {
+              ...current,
+              type: isCurrentlyAisle ? 'seat' : 'aisle',
+              studentId: isCurrentlyAisle ? current.studentId : undefined,
+              status: isCurrentlyAisle ? current.status || 'absent' : 'absent',
+            }
+          : current
+      );
+      toast({
+        title: isCurrentlyAisle ? '좌석으로 전환했습니다.' : '통로로 전환했습니다.',
+        description: `${formatSeatLabel(selectedLayoutSeat, roomConfigs, '선택 셀', persistedSeatLabelsBySeatId)} 설정을 저장했습니다.`,
+      });
+    } catch (error) {
+      setOptimisticAisleSeatIds(null);
+      toast({ variant: 'destructive', title: '셀 설정 저장 실패' });
+    } finally {
+      setIsClassroomLayoutSaving(false);
+    }
+  };
+  const handleDeleteAdminRoom = async (roomId: string) => {
+    if (!firestore || !centerId) return;
+
+    const targetRoom = persistedRoomMap.get(roomId);
+    if (!targetRoom) return;
+    if (roomId === PRIMARY_ROOM_ID || persistedRooms.length <= 1) {
+      toast({
+        variant: 'destructive',
+        title: '기본 호실은 삭제할 수 없습니다.',
+        description: '운영실에는 최소 한 개 호실이 필요합니다.',
+      });
+      return;
+    }
+
+    const assignedStudents = (students || []).filter((student) => {
+      const identity = resolveSeatIdentity(student);
+      return identity.roomId === roomId && identity.roomSeatNo > 0;
+    });
+    const occupiedSeats = resolvedAttendanceList.filter(
+      (seat) =>
+        seat.roomId === roomId &&
+        (Boolean(seat.studentId) || Boolean(typeof seat.manualOccupantName === 'string' && seat.manualOccupantName.trim()))
+    );
+
+    if (assignedStudents.length > 0 || occupiedSeats.length > 0) {
+      toast({
+        variant: 'destructive',
+        title: `${targetRoom.name}에는 아직 사용 중 좌석이 있습니다.`,
+        description: '배정 또는 임시 사용중 좌석을 먼저 비운 뒤 다시 삭제해 주세요.',
+      });
+      return;
+    }
+
+    if (!window.confirm(`${targetRoom.name}을(를) 삭제할까요? 비어 있는 좌석 설정과 통로 설정도 함께 정리됩니다.`)) {
+      return;
+    }
+
+    setIsClassroomLayoutSaving(true);
+    try {
+      const batch = writeBatch(firestore);
+      resolvedAttendanceList
+        .filter((seat) => seat.roomId === roomId)
+        .forEach((seat) => {
+          batch.delete(doc(firestore, 'centers', centerId, 'attendanceCurrent', seat.id));
+          const legacySeatDocId = getLegacySeatDocId(seat);
+          if (legacySeatDocId) {
+            batch.delete(doc(firestore, 'centers', centerId, 'attendanceCurrent', legacySeatDocId));
+          }
+        });
+
+      const nextRooms = persistedRooms
+        .filter((room) => room.id !== roomId)
+        .map((room, index) => ({
+          ...room,
+          order: index + 1,
+        }));
+      const nextAisleSeatIds = effectiveAisleSeatIds.filter((seatId) => parseSeatId(seatId)?.roomId !== roomId);
+      const nextSeatLabelsBySeatId = filterSeatLabelsByRooms(nextRooms);
+      const nextSeatGenderBySeatId = filterSeatGenderByRooms(nextRooms);
+
+      batch.set(
+        doc(firestore, 'centers', centerId),
+        {
+          layoutSettings: {
+            aisleSeatIds: nextAisleSeatIds,
+            seatLabelsBySeatId: nextSeatLabelsBySeatId,
+            seatGenderBySeatId: nextSeatGenderBySeatId,
+            rows: nextRooms[0]?.rows ?? targetRoom.rows,
+            cols: nextRooms[0]?.cols ?? targetRoom.cols,
+            rooms: nextRooms,
+            updatedAt: serverTimestamp(),
+          },
+        },
+        { merge: true }
+      );
+
+      setOptimisticAisleSeatIds(nextAisleSeatIds);
+      await batch.commit();
+      setRoomDrafts((prev) => {
+        const next = { ...prev };
+        delete next[roomId];
+        return next;
+      });
+      setSelectedRoomView(nextRooms[0]?.id ?? 'all');
+      setSelectedLayoutSeat(null);
+
+      toast({
+        title: `${targetRoom.name}을 삭제했습니다.`,
+        description: '사용하지 않는 호실 배치를 정리했습니다.',
+      });
+    } catch (error) {
+      setOptimisticAisleSeatIds(null);
+      toast({ variant: 'destructive', title: '호실 삭제 실패' });
+    } finally {
+      setIsClassroomLayoutSaving(false);
+    }
   };
   const handleImmediateStudentSelect = (studentId: string) => {
     setIsImmediateInterventionSheetOpen(false);
@@ -4692,6 +5449,7 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
         <>
           {renderHomeHeroSection()}
           {renderAttendanceDashboardSection()}
+          {renderIntegratedClassroomSection()}
           {renderHomeInsightsSection()}
 
           <Dialog

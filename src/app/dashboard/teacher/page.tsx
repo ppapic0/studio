@@ -1,6 +1,8 @@
 'use client';
 
+import { useEffect } from 'react';
 import { Loader2 } from 'lucide-react';
+import { useRouter } from 'next/navigation';
 
 import { TeacherDashboard } from '@/components/dashboard/teacher-dashboard';
 import { useAppContext } from '@/contexts/app-context';
@@ -13,11 +15,19 @@ function hasClassroomAccess(role?: string, status?: string) {
 }
 
 export default function TeacherHomePage() {
+  const router = useRouter();
   const { activeMembership, memberships, membershipsLoading } = useAppContext();
   const fallbackMembership =
     (activeMembership && hasClassroomAccess(activeMembership.role, activeMembership.status) ? activeMembership : null) ||
     memberships.find((membership) => hasClassroomAccess(membership.role, membership.status)) ||
     null;
+  const shouldUseAdminOperationsRoom =
+    fallbackMembership?.role === 'centerAdmin' || fallbackMembership?.role === 'owner';
+
+  useEffect(() => {
+    if (!shouldUseAdminOperationsRoom) return;
+    router.replace('/dashboard#live-classroom');
+  }, [router, shouldUseAdminOperationsRoom]);
 
   if (membershipsLoading && !fallbackMembership) {
     return (
@@ -34,6 +44,17 @@ export default function TeacherHomePage() {
     return (
       <div className="flex h-[60vh] items-center justify-center">
         <p className="font-black text-muted-foreground opacity-20">실시간 교실에 접근할 수 있는 권한이 없습니다.</p>
+      </div>
+    );
+  }
+
+  if (shouldUseAdminOperationsRoom) {
+    return (
+      <div className="flex h-[60vh] items-center justify-center">
+        <div className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-white px-5 py-4 shadow-sm">
+          <Loader2 className="h-5 w-5 animate-spin text-primary" />
+          <p className="text-sm font-bold text-slate-600">센터관리자 운영실로 이동하는 중입니다.</p>
+        </div>
       </div>
     );
   }
