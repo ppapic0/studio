@@ -33,7 +33,7 @@ var __importStar = (this && this.__importStar) || (function () {
     };
 })();
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.generateStudyPlan = exports.syncGiftishowCatalogSecure = exports.scheduledGiftishowCatalogSync = exports.saveGiftishowSettingsSecure = exports.resendGiftishowOrderSecure = exports.rejectGiftishowOrderSecure = exports.reconcilePendingGiftishowOrders = exports.getGiftishowBizmoneySecure = exports.createGiftishowOrderRequestSecure = exports.cancelGiftishowOrderSecure = exports.cancelGiftishowSendFailSecure = exports.approveGiftishowOrderSecure = exports.scheduledRankingRewardSettlement = exports.ensureCurrentUserMemberships = exports.scheduledOpenClawSnapshotExport = exports.generateOpenClawSnapshot = exports.refreshClassroomSignals = exports.stopStudentStudySessionSecure = exports.scheduledStudyBoxCarryoverExpiry = exports.openStudyRewardBoxSecure = exports.submitAttendanceRequestSecure = exports.applyPenaltyEventSecure = exports.cancelPointBoostEventSecure = exports.createPointBoostEventSecure = exports.scheduledClassroomSignalsRefresh = exports.scheduledDailyRiskAlert = exports.onSessionWritten = exports.onSessionCreated = exports.scheduledWeeklyReport = exports.cleanupOldDocuments = exports.scheduledAttendanceCheck = exports.runLateArrivalCheck = exports.sendPaymentReminderBatch = exports.notifyDailyReportReady = exports.notifyAttendanceSms = exports.scheduledSmsQueueDispatcher = exports.updateSmsRecipientPreference = exports.cancelSmsQueueItem = exports.retrySmsQueueItem = exports.saveNotificationSettingsSecure = exports.confirmInvoicePayment = exports.completeSignupWithInvite = exports.redeemInviteCode = exports.createCounselingDemoBundle = exports.registerStudent = exports.updateStudentAccount = exports.deleteTeacherAccount = exports.deleteStudentAccount = void 0;
+exports.generateStudyPlan = exports.syncGiftishowCatalogSecure = exports.scheduledGiftishowCatalogSync = exports.saveGiftishowSettingsSecure = exports.resendGiftishowOrderSecure = exports.rejectGiftishowOrderSecure = exports.reconcilePendingGiftishowOrders = exports.getGiftishowBizmoneySecure = exports.createGiftishowOrderRequestSecure = exports.cancelGiftishowOrderSecure = exports.cancelGiftishowSendFailSecure = exports.approveGiftishowOrderSecure = exports.scheduledRankingRewardSettlement = exports.ensureCurrentUserMemberships = exports.scheduledOpenClawSnapshotExport = exports.generateOpenClawSnapshot = exports.refreshClassroomSignals = exports.stopStudentStudySessionSecure = exports.scheduledStudyBoxCarryoverExpiry = exports.openStudyRewardBoxSecure = exports.claimPlannerCompletionRewardSecure = exports.submitAttendanceRequestSecure = exports.applyPenaltyEventSecure = exports.cancelPointBoostEventSecure = exports.createPointBoostEventSecure = exports.scheduledClassroomSignalsRefresh = exports.scheduledDailyRiskAlert = exports.onSessionWritten = exports.onSessionCreated = exports.scheduledWeeklyReport = exports.cleanupOldDocuments = exports.scheduledAttendanceCheck = exports.runLateArrivalCheck = exports.sendPaymentReminderBatch = exports.notifyDailyReportReady = exports.notifyAttendanceSms = exports.scheduledSmsQueueDispatcher = exports.sendManualStudentSms = exports.updateSmsRecipientPreference = exports.cancelSmsQueueItem = exports.retrySmsQueueItem = exports.saveNotificationSettingsSecure = exports.confirmInvoicePayment = exports.completeSignupWithInvite = exports.redeemInviteCode = exports.createCounselingDemoBundle = exports.registerStudent = exports.updateStudentAccount = exports.deleteTeacherAccount = exports.deleteStudentAccount = void 0;
 const params_1 = require("firebase-functions/params");
 const functions = __importStar(require("firebase-functions"));
 const admin = __importStar(require("firebase-admin"));
@@ -47,6 +47,8 @@ if (admin.apps.length === 0) {
 }
 const region = "asia-northeast3";
 const geminiApiKey = (0, params_1.defineSecret)("GEMINI_API_KEY");
+const MANUAL_PARENT_SMS_UID = "__manual_parent__";
+const STUDENT_SMS_FALLBACK_UID = "__student__";
 const allowedRoles = ["student", "teacher", "parent", "centerAdmin"];
 const adminRoles = new Set(["centerAdmin", "owner", "admin", "centerManager"]);
 const SMS_BYTE_LIMIT = 90;
@@ -57,6 +59,23 @@ const PARENT_LINK_LOOKUP_COLLECTION = "parentLinkCodeLookup";
 const ATTENDANCE_REQUEST_PENALTY_POINTS = {
     late: 1,
     absence: 2,
+    schedule_change: 1,
+};
+const ATTENDANCE_REQUEST_PROOF_LIMIT = 2;
+const ATTENDANCE_REQUEST_PROOF_MAX_ATTACHMENT_BYTES = 700 * 1024;
+const ATTENDANCE_REQUEST_REASON_CATEGORIES = new Set([
+    "disaster",
+    "emergency",
+    "surgery",
+    "hospital",
+    "other",
+]);
+const ATTENDANCE_REQUEST_REASON_LABELS = {
+    disaster: "천재지변",
+    emergency: "긴급",
+    surgery: "수술",
+    hospital: "병원",
+    other: "기타",
 };
 const SECURE_PENALTY_SOURCE_POINTS = {
     manual: 1,
@@ -96,6 +115,8 @@ const LATE_STUDY_BOX_RARITY_WEIGHTS = [
     { rarity: "epic", weight: 10 },
 ];
 const DAILY_POINT_EARN_CAP = 1000;
+const PLANNER_COMPLETION_REWARD_POINTS = 5;
+const PLANNER_COMPLETION_DAILY_REWARD_LIMIT = 4;
 const ACTIVE_STUDY_ATTENDANCE_STATUS_VALUES = ["studying", "away", "break"];
 const ACTIVE_STUDY_ATTENDANCE_STATUSES = new Set(ACTIVE_STUDY_ATTENDANCE_STATUS_VALUES);
 const STUDY_DAY_RESET_HOUR = 1;
@@ -174,6 +195,13 @@ function upsertStudyBoxRewardEntries(existing, reward) {
     next.set(reward.milestone, reward);
     return Array.from(next.values()).sort((a, b) => a.milestone - b.milestone);
 }
+function normalizePlannerCompletionRewardTaskIds(value) {
+    if (!Array.isArray(value))
+        return [];
+    return Array.from(new Set(value
+        .map((entry) => asTrimmedString(entry))
+        .filter((entry) => entry.length > 0))).slice(-200);
+}
 function normalizeDailyPointEventEntry(value) {
     var _a, _b, _c;
     if (!isPlainObject(value))
@@ -185,7 +213,7 @@ function normalizeDailyPointEventEntry(value) {
     const createdAt = asTrimmedString(value.createdAt);
     if (!id || !source || !label || points <= 0 || !createdAt)
         return null;
-    if (!["study_box", "daily_rank", "weekly_rank", "monthly_rank", "manual_adjustment", "legacy"].includes(source)) {
+    if (!["study_box", "daily_rank", "weekly_rank", "monthly_rank", "plan_completion", "manual_adjustment", "legacy"].includes(source)) {
         return null;
     }
     const event = {
@@ -750,6 +778,12 @@ function parseHourMinute(value) {
     const [hour, minute] = normalized.split(":").map((part) => Number(part));
     return { hour, minute };
 }
+function parseTimeToMinutes(value) {
+    const parsed = parseHourMinute(value);
+    if (!parsed)
+        return Number.NaN;
+    return parsed.hour * 60 + parsed.minute;
+}
 function normalizeMembershipStatus(value) {
     if (typeof value !== "string")
         return "";
@@ -1165,8 +1199,119 @@ function toTimestampOrNow(value) {
 function asTrimmedString(value, fallback = "") {
     return typeof value === "string" && value.trim().length > 0 ? value.trim() : fallback;
 }
+function getFirebaseStorageBucketName() {
+    const appBucket = asTrimmedString(admin.app().options.storageBucket);
+    if (appBucket)
+        return appBucket;
+    if (typeof process.env.FIREBASE_CONFIG === "string" && process.env.FIREBASE_CONFIG.trim()) {
+        try {
+            const parsed = JSON.parse(process.env.FIREBASE_CONFIG);
+            const configuredBucket = asTrimmedString(parsed.storageBucket);
+            if (configuredBucket)
+                return configuredBucket;
+            const configuredProjectId = asTrimmedString(parsed.projectId);
+            if (configuredProjectId)
+                return `${configuredProjectId}.appspot.com`;
+        }
+        catch (error) {
+            console.warn("[counseling] failed to parse FIREBASE_CONFIG for storage bucket", { error });
+        }
+    }
+    const projectId = asTrimmedString(process.env.GCLOUD_PROJECT || process.env.GCP_PROJECT || admin.app().options.projectId);
+    if (projectId)
+        return `${projectId}.appspot.com`;
+    throw new functions.https.HttpsError("internal", "Storage bucket is not configured.", {
+        userMessage: "첨부 파일 저장소 설정을 확인해 주세요.",
+    });
+}
+function buildFirebaseStorageDownloadUrl(path, downloadToken) {
+    return `https://firebasestorage.googleapis.com/v0/b/${encodeURIComponent(getFirebaseStorageBucketName())}/o/${encodeURIComponent(path)}?alt=media&token=${encodeURIComponent(downloadToken)}`;
+}
+function normalizeAttendanceRequestProofAttachments(params) {
+    const expectedPathPrefix = `centers/${params.centerId}/attendance-request-proofs/${params.studentId}/`;
+    if (!Array.isArray(params.attachments) || params.attachments.length === 0)
+        return [];
+    if (params.attachments.length > ATTENDANCE_REQUEST_PROOF_LIMIT) {
+        throw new functions.https.HttpsError("invalid-argument", "Too many proof attachments.", {
+            userMessage: `병원 증빙 사진은 최대 ${ATTENDANCE_REQUEST_PROOF_LIMIT}장까지 첨부할 수 있습니다.`,
+        });
+    }
+    const uniquePaths = new Set();
+    return params.attachments.map((rawAttachment, index) => {
+        var _a, _b, _c;
+        const attachment = (rawAttachment || {});
+        const id = asTrimmedString(attachment.id, `proof-${index + 1}`);
+        const name = asTrimmedString(attachment.name, `proof-${index + 1}.jpg`);
+        const path = asTrimmedString(attachment.path);
+        const downloadToken = asTrimmedString(attachment.downloadToken);
+        const contentType = asTrimmedString(attachment.contentType, "image/jpeg");
+        const sizeBytes = Math.round((_a = parseFiniteNumber(attachment.sizeBytes)) !== null && _a !== void 0 ? _a : Number.NaN);
+        const width = Math.round((_b = parseFiniteNumber(attachment.width)) !== null && _b !== void 0 ? _b : Number.NaN);
+        const height = Math.round((_c = parseFiniteNumber(attachment.height)) !== null && _c !== void 0 ? _c : Number.NaN);
+        if (!path || !path.startsWith(expectedPathPrefix)) {
+            throw new functions.https.HttpsError("invalid-argument", "Proof attachment path is invalid.", {
+                userMessage: "병원 증빙 사진 경로가 올바르지 않습니다. 다시 업로드해 주세요.",
+            });
+        }
+        if (!downloadToken || downloadToken.length < 8) {
+            throw new functions.https.HttpsError("invalid-argument", "Proof attachment token is invalid.", {
+                userMessage: "병원 증빙 사진 정보를 다시 확인해 주세요.",
+            });
+        }
+        if (!Number.isFinite(sizeBytes) || sizeBytes <= 0 || sizeBytes > ATTENDANCE_REQUEST_PROOF_MAX_ATTACHMENT_BYTES) {
+            throw new functions.https.HttpsError("invalid-argument", "Proof attachment size is invalid.", {
+                userMessage: "병원 증빙 사진 용량이 너무 크거나 올바르지 않습니다. 다시 업로드해 주세요.",
+            });
+        }
+        if (uniquePaths.has(path)) {
+            throw new functions.https.HttpsError("invalid-argument", "Duplicate proof attachment path.", {
+                userMessage: "같은 병원 증빙 사진이 중복 첨부되었습니다. 다시 확인해 주세요.",
+            });
+        }
+        uniquePaths.add(path);
+        return {
+            id,
+            name,
+            path,
+            downloadUrl: buildFirebaseStorageDownloadUrl(path, downloadToken),
+            contentType,
+            sizeBytes,
+            width: Number.isFinite(width) && width > 0 ? width : null,
+            height: Number.isFinite(height) && height > 0 ? height : null,
+            uploadedAt: params.uploadedAt,
+            deletedAt: null,
+        };
+    });
+}
+function shouldWaiveSameDayScheduleChangePenalty(category, proofCount, parentContactConfirmed) {
+    if (category === "disaster" || category === "emergency" || category === "surgery")
+        return true;
+    if (category === "hospital")
+        return proofCount > 0 && parentContactConfirmed;
+    return false;
+}
 function isValidDateKey(value) {
     return /^\d{4}-\d{2}-\d{2}$/.test(value);
+}
+function getPlannerWeekKeyFromDateKey(dateKey) {
+    const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(dateKey);
+    if (!match)
+        return "";
+    const calendarYear = Number(match[1]);
+    const month = Number(match[2]);
+    const day = Number(match[3]);
+    const date = new Date(Date.UTC(calendarYear, month - 1, day));
+    if (date.getUTCFullYear() !== calendarYear ||
+        date.getUTCMonth() !== month - 1 ||
+        date.getUTCDate() !== day) {
+        return "";
+    }
+    const isoWeekAnchor = new Date(date.getTime());
+    const weekday = isoWeekAnchor.getUTCDay() || 7;
+    isoWeekAnchor.setUTCDate(isoWeekAnchor.getUTCDate() + 4 - weekday);
+    const yearStart = new Date(Date.UTC(isoWeekAnchor.getUTCFullYear(), 0, 1));
+    const isoWeek = Math.ceil((((isoWeekAnchor.getTime() - yearStart.getTime()) / 86400000) + 1) / 7);
+    return `${String(calendarYear).padStart(4, "0")}-W${String(isoWeek).padStart(2, "0")}`;
 }
 function toDateKeyFromUnknownTimestamp(value) {
     const millis = toMillisSafe(value);
@@ -1371,7 +1516,13 @@ async function clearParentLinkRateLimit(db, uid) {
     await buildParentLinkRateLimitRef(db, uid).delete();
 }
 function shouldCountParentLinkFailedAttempt(error) {
-    return error instanceof functions.https.HttpsError && error.code === "failed-precondition";
+    if (!(error instanceof functions.https.HttpsError) || error.code !== "failed-precondition")
+        return false;
+    const message = String(error.message || "").toLowerCase();
+    return (message.includes("student") ||
+        message.includes("parent link") ||
+        message.includes("linked student") ||
+        message.includes("invite center does not match linked student center"));
 }
 function calculateSmsBytes(message) {
     return Array.from(message || "").reduce((sum, char) => {
@@ -1503,31 +1654,46 @@ function validateSmsTemplateLength(template, fieldLabel) {
     return sanitized;
 }
 async function collectParentRecipients(db, centerId, studentId) {
-    var _a;
     const studentSnap = await db.doc(`centers/${centerId}/students/${studentId}`).get();
     if (!studentSnap.exists)
         return [];
-    if (shouldExcludeFromSmsQueries(studentSnap.data(), studentId))
+    const studentData = studentSnap.data() || {};
+    if (shouldExcludeFromSmsQueries(studentData, studentId))
         return [];
-    const parentUidsRaw = (_a = studentSnap.data()) === null || _a === void 0 ? void 0 : _a.parentUids;
+    const parentUidsRaw = studentData.parentUids;
     const parentUids = Array.isArray(parentUidsRaw)
         ? parentUidsRaw.filter((uid) => typeof uid === "string" && uid.trim().length > 0)
         : [];
-    if (parentUids.length === 0)
-        return [];
     const recipients = [];
     const usedPhones = new Set();
+    const manualParentPrefSnap = await db
+        .doc(`centers/${centerId}/smsRecipientPreferences/${buildSmsRecipientPreferenceId(studentId, MANUAL_PARENT_SMS_UID)}`)
+        .get();
+    if (manualParentPrefSnap.exists) {
+        const manualPref = manualParentPrefSnap.data();
+        const phoneNumber = normalizePhoneNumber(manualPref.phoneNumber);
+        if (phoneNumber) {
+            recipients.push({
+                parentUid: MANUAL_PARENT_SMS_UID,
+                parentName: asTrimmedString(manualPref.parentName, "보호자"),
+                phoneNumber,
+            });
+            usedPhones.add(phoneNumber);
+        }
+    }
     for (const parentUid of parentUids) {
-        const [userSnap, memberSnap] = await Promise.all([
+        const [userSnap, memberSnap, prefSnap] = await Promise.all([
             db.doc(`users/${parentUid}`).get(),
             db.doc(`centers/${centerId}/members/${parentUid}`).get(),
+            db.doc(`centers/${centerId}/smsRecipientPreferences/${buildSmsRecipientPreferenceId(studentId, parentUid)}`).get(),
         ]);
         const userData = userSnap.exists ? userSnap.data() : null;
         const memberData = memberSnap.exists ? memberSnap.data() : null;
+        const prefData = prefSnap.exists ? prefSnap.data() : null;
         if (shouldExcludeFromSmsQueries(userData, parentUid) || shouldExcludeFromSmsQueries(memberData, parentUid)) {
             continue;
         }
-        const phoneNumber = normalizePhoneNumber((userData === null || userData === void 0 ? void 0 : userData.phoneNumber) || (memberData === null || memberData === void 0 ? void 0 : memberData.phoneNumber));
+        const phoneNumber = normalizePhoneNumber((userData === null || userData === void 0 ? void 0 : userData.phoneNumber) || (memberData === null || memberData === void 0 ? void 0 : memberData.phoneNumber) || (prefData === null || prefData === void 0 ? void 0 : prefData.phoneNumber));
         if (!phoneNumber || usedPhones.has(phoneNumber))
             continue;
         recipients.push({
@@ -1536,6 +1702,23 @@ async function collectParentRecipients(db, centerId, studentId) {
             phoneNumber,
         });
         usedPhones.add(phoneNumber);
+    }
+    if (recipients.length === 0) {
+        const [fallbackPrefSnap, studentMemberSnap] = await Promise.all([
+            db.doc(`centers/${centerId}/smsRecipientPreferences/${buildSmsRecipientPreferenceId(studentId, STUDENT_SMS_FALLBACK_UID)}`).get(),
+            db.doc(`centers/${centerId}/members/${studentId}`).get(),
+        ]);
+        const fallbackPref = fallbackPrefSnap.exists ? fallbackPrefSnap.data() : null;
+        const studentMemberData = studentMemberSnap.exists ? studentMemberSnap.data() : null;
+        const fallbackPhoneNumber = resolveFirstValidPhoneNumber(fallbackPref === null || fallbackPref === void 0 ? void 0 : fallbackPref.phoneNumber, studentData.phoneNumber, studentMemberData === null || studentMemberData === void 0 ? void 0 : studentMemberData.phoneNumber);
+        if (fallbackPhoneNumber && !usedPhones.has(fallbackPhoneNumber)) {
+            recipients.push({
+                parentUid: STUDENT_SMS_FALLBACK_UID,
+                parentName: asTrimmedString(fallbackPref === null || fallbackPref === void 0 ? void 0 : fallbackPref.parentName, "학생 본인"),
+                phoneNumber: fallbackPhoneNumber,
+            });
+            usedPhones.add(fallbackPhoneNumber);
+        }
     }
     return recipients;
 }
@@ -1558,7 +1741,7 @@ async function splitRecipientsBySmsPreference(db, centerId, studentId, studentNa
         const pref = prefMap.get(prefId);
         const enabled = (pref === null || pref === void 0 ? void 0 : pref.enabled) !== false;
         const toggles = normalizeSmsEventToggles(pref === null || pref === void 0 ? void 0 : pref.eventToggles);
-        const eventEnabled = toggles[eventType] !== false;
+        const eventEnabled = eventType === "manual_note" || toggles[eventType] !== false;
         if (!enabled) {
             suppressedRecipients.push(Object.assign(Object.assign({}, recipient), { suppressedReason: "recipient_disabled" }));
             continue;
@@ -1721,6 +1904,8 @@ function buildParentNotificationTitle(eventType) {
         return "주간 리포트 알림";
     if (eventType === "daily_report")
         return "일일 리포트 알림";
+    if (eventType === "manual_note")
+        return "수동 문자";
     return "결제 예정 알림";
 }
 async function queueCustomParentSmsNotification(db, params) {
@@ -2651,20 +2836,127 @@ async function refreshClassroomSignalsForCenter(db, centerId, nowKst) {
 }
 function assertInviteUsable(inv, expectedRole) {
     if (!allowedRoles.includes(inv.intendedRole)) {
-        throw new functions.https.HttpsError("failed-precondition", "Invite has invalid role configuration.");
+        throw new functions.https.HttpsError("failed-precondition", "Invite has invalid role configuration.", {
+            userMessage: "초대 코드의 역할 설정이 올바르지 않습니다. 센터 관리자에게 문의해 주세요.",
+        });
     }
     if (expectedRole && inv.intendedRole !== expectedRole) {
-        throw new functions.https.HttpsError("failed-precondition", "Invite role does not match selected signup role.");
+        throw new functions.https.HttpsError("failed-precondition", "Invite role does not match selected signup role.", {
+            userMessage: "선택한 역할과 초대 코드 권한이 맞지 않습니다.",
+        });
     }
     if (inv.isActive === false) {
-        throw new functions.https.HttpsError("failed-precondition", "Invite code is inactive.");
+        throw new functions.https.HttpsError("failed-precondition", "Invite code is inactive.", {
+            userMessage: "비활성화된 초대 코드입니다.",
+        });
     }
     if (typeof inv.maxUses === "number" && typeof inv.usedCount === "number" && inv.usedCount >= inv.maxUses) {
-        throw new functions.https.HttpsError("failed-precondition", "Invite code usage limit exceeded.");
+        throw new functions.https.HttpsError("failed-precondition", "Invite code usage limit exceeded.", {
+            userMessage: "사용 가능 횟수가 모두 소진된 초대 코드입니다.",
+        });
     }
     if (inv.expiresAt && inv.expiresAt.toMillis && inv.expiresAt.toMillis() < Date.now()) {
-        throw new functions.https.HttpsError("failed-precondition", "Invite code has expired.");
+        throw new functions.https.HttpsError("failed-precondition", "Invite code has expired.", {
+            userMessage: "만료된 초대 코드입니다.",
+        });
     }
+}
+const sharedStudyRoomScheduleWeekdays = [1, 2, 3, 4, 5, 0];
+const saturdayStudyRoomScheduleWeekdays = [6];
+const nsuStudyRoomScheduleWeekdays = [1, 2, 3, 4, 5, 6, 0];
+const sharedStudyRoomArrivalTime = "18:00";
+const sharedStudyRoomDepartureTime = "23:30";
+const saturdayStudyRoomArrivalTime = "08:30";
+const saturdayStudyRoomDepartureTime = "16:40";
+const nsuStudyRoomArrivalTime = "17:00";
+const nsuStudyRoomDepartureTime = "01:00";
+const defaultStudyRoomScheduleTemplateId = "default-shared-study-room-schedule";
+const saturdayStudyRoomScheduleTemplateId = "default-saturday-mandatory-track-schedule";
+const nsuStudyRoomScheduleTemplateId = "default-nsu-study-room-schedule";
+const sharedStudyRoomClassScheduleId = "shared-study-room-schedule";
+const saturdayStudyRoomClassScheduleId = "saturday-mandatory-track-schedule";
+const nsuStudyRoomClassScheduleId = "nsu-study-room-schedule";
+function isNsuStudyRoomClassName(className) {
+    const normalized = String(className || "")
+        .trim()
+        .toLowerCase()
+        .replace(/\s+/g, "")
+        .replace(/[._-]/g, "");
+    return (normalized.includes("n수") ||
+        normalized.includes("엔수") ||
+        normalized.includes("재수") ||
+        normalized.includes("nstudent") ||
+        normalized.includes("n반"));
+}
+function buildDefaultStudyRoomScheduleTemplateData(params) {
+    const isNsu = isNsuStudyRoomClassName(params.className);
+    const templateConfigs = isNsu
+        ? [
+            {
+                id: nsuStudyRoomScheduleTemplateId,
+                classScheduleId: nsuStudyRoomClassScheduleId,
+                classScheduleName: "N수반 트랙제",
+                weekdays: nsuStudyRoomScheduleWeekdays,
+                arrivalPlannedAt: nsuStudyRoomArrivalTime,
+                departurePlannedAt: nsuStudyRoomDepartureTime,
+                note: "N수반은 센터 공통 트랙제와 별도 기준으로 운영합니다. 특이사항이 있는 학생만 학원 및 외출 일정을 별도로 등록합니다.",
+            },
+        ]
+        : [
+            {
+                id: defaultStudyRoomScheduleTemplateId,
+                classScheduleId: sharedStudyRoomClassScheduleId,
+                classScheduleName: "센터 공통 트랙제",
+                weekdays: sharedStudyRoomScheduleWeekdays,
+                arrivalPlannedAt: sharedStudyRoomArrivalTime,
+                departurePlannedAt: sharedStudyRoomDepartureTime,
+                note: "의무 등원은 18:00, 의무 하원은 23:30입니다. 특이사항이 없으면 이 트랙제를 그대로 따르고, 학원 및 외출 일정이 있는 학생만 별도로 등록합니다.",
+            },
+            {
+                id: saturdayStudyRoomScheduleTemplateId,
+                classScheduleId: saturdayStudyRoomClassScheduleId,
+                classScheduleName: "토요일 의무 트랙제",
+                weekdays: saturdayStudyRoomScheduleWeekdays,
+                arrivalPlannedAt: saturdayStudyRoomArrivalTime,
+                departurePlannedAt: saturdayStudyRoomDepartureTime,
+                note: "토요일은 의무 트랙제로 운영합니다. 08:30 입실 후 16:40 기록 마감까지 토요일 전용 트랙을 따릅니다.",
+            },
+        ];
+    return templateConfigs.map((config) => ({
+        id: config.id,
+        data: {
+            centerId: params.centerId,
+            name: `${config.classScheduleName} 기본 등하원`,
+            weekdays: config.weekdays,
+            arrivalPlannedAt: config.arrivalPlannedAt,
+            departurePlannedAt: config.departurePlannedAt,
+            academyNameDefault: null,
+            academyStartAtDefault: null,
+            academyEndAtDefault: null,
+            hasExcursionDefault: false,
+            defaultExcursionStartAt: null,
+            defaultExcursionEndAt: null,
+            defaultExcursionReason: null,
+            note: config.note,
+            classScheduleId: config.classScheduleId,
+            classScheduleName: config.classScheduleName,
+            active: true,
+            timezone: "Asia/Seoul",
+            source: "default-study-room-class-schedule",
+            createdAt: params.timestamp,
+            updatedAt: params.timestamp,
+        },
+    }));
+}
+function seedDefaultStudyRoomScheduleTemplateInTransaction(params) {
+    const templates = buildDefaultStudyRoomScheduleTemplateData({
+        centerId: params.centerId,
+        className: params.className,
+        timestamp: params.timestamp,
+    });
+    templates.forEach((template) => {
+        params.transaction.set(params.db.doc(`users/${params.uid}/scheduleTemplates/${template.id}`), template.data, { merge: true });
+    });
 }
 exports.deleteStudentAccount = functions.region(region).runWith({
     timeoutSeconds: 540,
@@ -3779,6 +4071,16 @@ exports.redeemInviteCode = functions.region(region).https.onCall(async (data, co
                 displayName: callerDisplayName,
                 className: inv.targetClassName || null,
             });
+            if (inv.intendedRole === "student") {
+                seedDefaultStudyRoomScheduleTemplateInTransaction({
+                    db,
+                    transaction: t,
+                    uid,
+                    centerId: inv.centerId,
+                    className: inv.targetClassName || null,
+                    timestamp: ts,
+                });
+            }
             t.update(inviteRef, { usedCount: admin.firestore.FieldValue.increment(1), updatedAt: ts });
             return { ok: true, message: "센터 가입이 완료되었습니다." };
         });
@@ -3855,7 +4157,7 @@ exports.completeSignupWithInvite = functions.region(region).https.onCall(async (
             userMessage: "선택 동의 정보를 다시 확인해 주세요.",
         });
     }
-    if (role !== "parent" && !code) {
+    if (!code) {
         throw new functions.https.HttpsError("invalid-argument", "초대 코드가 누락되었습니다.", {
             userMessage: "초대 코드를 입력해주세요.",
         });
@@ -3882,6 +4184,22 @@ exports.completeSignupWithInvite = functions.region(region).https.onCall(async (
             let linkedStudentRef = null;
             let linkedStudentData = null;
             let linkedStudentId = "";
+            inviteRef = db.doc(`inviteCodes/${code}`);
+            const inviteSnap = await t.get(inviteRef);
+            if (!inviteSnap.exists) {
+                throw new functions.https.HttpsError("failed-precondition", "Invalid invite code.", {
+                    userMessage: "유효하지 않은 초대 코드입니다.",
+                });
+            }
+            const inviteData = inviteSnap.data();
+            assertInviteUsable(inviteData, role);
+            centerId = asTrimmedString(inviteData.centerId);
+            targetClassName = inviteData.targetClassName || null;
+            if (!centerId) {
+                throw new functions.https.HttpsError("failed-precondition", "Invite code has no center information.", {
+                    userMessage: "초대 코드의 센터 정보가 올바르지 않습니다.",
+                });
+            }
             if (role === "parent") {
                 if (!/^\d{6}$/.test(studentLinkCode)) {
                     throw new functions.https.HttpsError("invalid-argument", "Student link code must be a 6-digit number.", {
@@ -3890,11 +4208,15 @@ exports.completeSignupWithInvite = functions.region(region).https.onCall(async (
                 }
                 const lookupCandidate = await resolveParentLinkCandidateFromLookupInTransaction(db, t, studentLinkCode);
                 if (lookupCandidate) {
-                    centerId = lookupCandidate.centerId;
+                    if (lookupCandidate.centerId !== centerId) {
+                        throw new functions.https.HttpsError("failed-precondition", "Invite center does not match linked student center.", {
+                            userMessage: "센터 초대 코드와 학생 코드의 센터가 일치하지 않습니다. 코드를 다시 확인해 주세요.",
+                        });
+                    }
                     linkedStudentRef = lookupCandidate.studentRef;
                     linkedStudentData = lookupCandidate.studentData;
                     linkedStudentId = lookupCandidate.studentId;
-                    targetClassName = lookupCandidate.className || (linkedStudentData === null || linkedStudentData === void 0 ? void 0 : linkedStudentData.className) || null;
+                    targetClassName = lookupCandidate.className || (linkedStudentData === null || linkedStudentData === void 0 ? void 0 : linkedStudentData.className) || targetClassName;
                 }
                 else {
                     const codeAsNumber = Number(studentLinkCode);
@@ -3943,7 +4265,7 @@ exports.completeSignupWithInvite = functions.region(region).https.onCall(async (
                     }
                     if (studentDocMap.size === 0) {
                         throw new functions.https.HttpsError("failed-precondition", "No student found for this link code.", {
-                            userMessage: "No student matched this code. Please check the 6-digit student code and try again.",
+                            userMessage: "해당 학생 코드를 찾을 수 없습니다. 6자리 학생 코드를 다시 확인해 주세요.",
                         });
                     }
                     let candidates = [];
@@ -3951,12 +4273,21 @@ exports.completeSignupWithInvite = functions.region(region).https.onCall(async (
                         const pathSegments = studentDoc.ref.path.split("/");
                         return pathSegments.length === 4 && pathSegments[0] === "centers" && pathSegments[2] === "students";
                     });
+                    const centerScopedStudentDocs = candidateStudentDocs.filter((studentDoc) => {
+                        const pathSegments = studentDoc.ref.path.split("/");
+                        return pathSegments[1] === centerId;
+                    });
+                    if (candidateStudentDocs.length > 0 && centerScopedStudentDocs.length === 0) {
+                        throw new functions.https.HttpsError("failed-precondition", "Invite center does not match linked student center.", {
+                            userMessage: "센터 초대 코드와 학생 코드의 센터가 일치하지 않습니다. 코드를 다시 확인해 주세요.",
+                        });
+                    }
                     console.info("[completeSignupWithInvite] parent code lookup", {
                         studentLinkCode,
                         rawMatchedDocCount: studentDocMap.size,
-                        centerStudentDocCount: candidateStudentDocs.length,
+                        centerStudentDocCount: centerScopedStudentDocs.length,
                     });
-                    for (const studentDoc of candidateStudentDocs) {
+                    for (const studentDoc of centerScopedStudentDocs) {
                         const pathSegments = studentDoc.ref.path.split("/");
                         const resolvedCenterId = pathSegments[1];
                         if (!resolvedCenterId)
@@ -4002,7 +4333,7 @@ exports.completeSignupWithInvite = functions.region(region).https.onCall(async (
                             centerStudentDocCount: candidateStudentDocs.length,
                         });
                         throw new functions.https.HttpsError("failed-precondition", "No student profile could be resolved for this link code.", {
-                            userMessage: "A student was found for this code, but profile linkage failed. Please ask the center admin to verify student data.",
+                            userMessage: "학생 코드는 확인됐지만 프로필 연결에 실패했습니다. 센터 관리자에게 학생 등록 상태를 확인해 주세요.",
                         });
                     }
                     const activeMemberCandidates = candidates.filter((candidate) => candidate.hasActiveMember);
@@ -4044,29 +4375,10 @@ exports.completeSignupWithInvite = functions.region(region).https.onCall(async (
                         });
                     }
                     const selected = candidates[0];
-                    centerId = selected.centerId;
                     linkedStudentRef = selected.studentDoc.ref;
                     linkedStudentData = selected.studentData;
                     linkedStudentId = selected.studentDoc.id;
-                    targetClassName = selected.className || (linkedStudentData === null || linkedStudentData === void 0 ? void 0 : linkedStudentData.className) || null;
-                }
-            }
-            else {
-                inviteRef = db.doc(`inviteCodes/${code}`);
-                const inviteSnap = await t.get(inviteRef);
-                if (!inviteSnap.exists) {
-                    throw new functions.https.HttpsError("failed-precondition", "Invalid invite code.", {
-                        userMessage: "유효하지 않은 초대 코드입니다.",
-                    });
-                }
-                const inviteData = inviteSnap.data();
-                assertInviteUsable(inviteData, role);
-                centerId = inviteData.centerId;
-                targetClassName = inviteData.targetClassName || null;
-                if (!centerId) {
-                    throw new functions.https.HttpsError("failed-precondition", "Invite code has no center information.", {
-                        userMessage: "초대 코드의 센터 정보가 올바르지 않습니다.",
-                    });
+                    targetClassName = selected.className || (linkedStudentData === null || linkedStudentData === void 0 ? void 0 : linkedStudentData.className) || targetClassName;
                 }
             }
             const userCenterRef = db.doc(`userCenters/${uid}/centers/${centerId}`);
@@ -4152,10 +4464,6 @@ exports.completeSignupWithInvite = functions.region(region).https.onCall(async (
                             (existingCenterMemberData === null || existingCenterMemberData === void 0 ? void 0 : existingCenterMemberData.displayName) ||
                             `${(linkedStudentData === null || linkedStudentData === void 0 ? void 0 : linkedStudentData.name) || "학생"} 학부모`;
                 }
-                t.set(linkedStudentRef, {
-                    parentUids: admin.firestore.FieldValue.arrayUnion(uid),
-                    updatedAt: ts,
-                }, { merge: true });
                 const linkedStudentParentCode = normalizeParentLinkCodeValue(linkedStudentData === null || linkedStudentData === void 0 ? void 0 : linkedStudentData.parentLinkCode);
                 if (linkedStudentParentCode === studentLinkCode) {
                     await reserveParentLinkCodeLookupInTransaction({
@@ -4168,6 +4476,21 @@ exports.completeSignupWithInvite = functions.region(region).https.onCall(async (
                         timestamp: ts,
                     });
                 }
+                t.set(linkedStudentRef, {
+                    parentUids: admin.firestore.FieldValue.arrayUnion(uid),
+                    updatedAt: ts,
+                }, { merge: true });
+            }
+            if (role === "student") {
+                await reserveParentLinkCodeLookupInTransaction({
+                    db,
+                    transaction: t,
+                    code: parentLinkCode,
+                    centerId,
+                    studentId: uid,
+                    studentName: resolvedDisplayName,
+                    timestamp: ts,
+                });
             }
             const userDocData = {
                 id: uid,
@@ -4224,15 +4547,6 @@ exports.completeSignupWithInvite = functions.region(region).https.onCall(async (
             t.set(memberRef, memberData, { merge: true });
             t.set(userCenterRef, userCenterData, { merge: true });
             if (role === "student") {
-                await reserveParentLinkCodeLookupInTransaction({
-                    db,
-                    transaction: t,
-                    code: parentLinkCode,
-                    centerId,
-                    studentId: uid,
-                    studentName: resolvedDisplayName,
-                    timestamp: ts,
-                });
                 t.set(db.doc(`centers/${centerId}/students/${uid}`), {
                     id: uid,
                     name: resolvedDisplayName,
@@ -4257,6 +4571,14 @@ exports.completeSignupWithInvite = functions.region(region).https.onCall(async (
                     skills: {},
                     updatedAt: ts,
                 }, { merge: true });
+                seedDefaultStudyRoomScheduleTemplateInTransaction({
+                    db,
+                    transaction: t,
+                    uid,
+                    centerId,
+                    className: memberData.className || targetClassName || null,
+                    timestamp: ts,
+                });
             }
             if (inviteRef) {
                 t.update(inviteRef, {
@@ -4636,14 +4958,21 @@ exports.cancelSmsQueueItem = functions.region(region).https.onCall(async (data, 
     return { ok: true };
 });
 exports.updateSmsRecipientPreference = functions.region(region).https.onCall(async (data, context) => {
-    var _a, _b, _c, _d, _e, _f, _g;
+    var _a, _b, _c, _d, _e, _f;
     const db = admin.firestore();
     if (!context.auth) {
         throw new functions.https.HttpsError("unauthenticated", "로그인이 필요합니다.");
     }
     const centerId = asTrimmedString(data === null || data === void 0 ? void 0 : data.centerId);
     const studentId = asTrimmedString(data === null || data === void 0 ? void 0 : data.studentId);
-    const parentUid = asTrimmedString(data === null || data === void 0 ? void 0 : data.parentUid);
+    const requestedParentUid = asTrimmedString(data === null || data === void 0 ? void 0 : data.parentUid);
+    const isManualRecipientRequest = (data === null || data === void 0 ? void 0 : data.isManualRecipient) === true || requestedParentUid === MANUAL_PARENT_SMS_UID;
+    const isFallbackRecipientRequest = (data === null || data === void 0 ? void 0 : data.isFallbackRecipient) === true || requestedParentUid === STUDENT_SMS_FALLBACK_UID;
+    const parentUid = isManualRecipientRequest
+        ? MANUAL_PARENT_SMS_UID
+        : isFallbackRecipientRequest
+            ? STUDENT_SMS_FALLBACK_UID
+            : requestedParentUid;
     if (!centerId || !studentId || !parentUid) {
         throw new functions.https.HttpsError("invalid-argument", "centerId, studentId, parentUid가 필요합니다.");
     }
@@ -4656,7 +4985,51 @@ exports.updateSmsRecipientPreference = functions.region(region).https.onCall(asy
     if (!studentSnap.exists) {
         throw new functions.https.HttpsError("not-found", "학생 정보를 찾을 수 없습니다.");
     }
-    const parentUids = normalizeStringArray((_b = studentSnap.data()) === null || _b === void 0 ? void 0 : _b.parentUids);
+    const studentData = studentSnap.data() || {};
+    const studentName = asTrimmedString(studentData.name, "학생");
+    const phoneNumberOverride = normalizePhoneNumber((data === null || data === void 0 ? void 0 : data.phoneNumberOverride) || "");
+    const enabled = (data === null || data === void 0 ? void 0 : data.enabled) !== false;
+    const eventToggles = normalizeSmsEventToggles(data === null || data === void 0 ? void 0 : data.eventToggles);
+    const parentNameOverride = asTrimmedString(data === null || data === void 0 ? void 0 : data.parentNameOverride);
+    if (isManualRecipientRequest) {
+        if (!phoneNumberOverride) {
+            throw new functions.https.HttpsError("invalid-argument", "보호자 휴대폰 번호가 필요합니다.");
+        }
+        await db.doc(`centers/${centerId}/smsRecipientPreferences/${buildSmsRecipientPreferenceId(studentId, parentUid)}`).set({
+            studentId,
+            studentName,
+            parentUid,
+            parentName: parentNameOverride || "보호자",
+            phoneNumber: phoneNumberOverride,
+            enabled,
+            eventToggles,
+            isManualRecipient: true,
+            updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+            updatedBy: context.auth.uid,
+        }, { merge: true });
+        return { ok: true };
+    }
+    if (isFallbackRecipientRequest) {
+        const studentMemberSnap = await db.doc(`centers/${centerId}/members/${studentId}`).get();
+        const fallbackPhoneNumber = resolveFirstValidPhoneNumber(phoneNumberOverride, studentData.phoneNumber, (_b = studentMemberSnap.data()) === null || _b === void 0 ? void 0 : _b.phoneNumber);
+        if (!fallbackPhoneNumber) {
+            throw new functions.https.HttpsError("invalid-argument", "학생 휴대폰 번호가 필요합니다.");
+        }
+        await db.doc(`centers/${centerId}/smsRecipientPreferences/${buildSmsRecipientPreferenceId(studentId, parentUid)}`).set({
+            studentId,
+            studentName,
+            parentUid,
+            parentName: parentNameOverride || "학생 본인",
+            phoneNumber: fallbackPhoneNumber,
+            enabled,
+            eventToggles,
+            isFallbackRecipient: true,
+            updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+            updatedBy: context.auth.uid,
+        }, { merge: true });
+        return { ok: true };
+    }
+    const parentUids = normalizeStringArray(studentData.parentUids);
     if (!parentUids.includes(parentUid)) {
         throw new functions.https.HttpsError("failed-precondition", "해당 학생에 연결된 학부모가 아닙니다.");
     }
@@ -4664,11 +5037,8 @@ exports.updateSmsRecipientPreference = functions.region(region).https.onCall(asy
         db.doc(`users/${parentUid}`).get(),
         db.doc(`centers/${centerId}/members/${parentUid}`).get(),
     ]);
-    const studentName = asTrimmedString((_c = studentSnap.data()) === null || _c === void 0 ? void 0 : _c.name, "학생");
-    const parentName = asTrimmedString(((_d = memberSnap.data()) === null || _d === void 0 ? void 0 : _d.displayName) || ((_e = userSnap.data()) === null || _e === void 0 ? void 0 : _e.displayName) || "학부모");
-    const phoneNumber = normalizePhoneNumber(((_f = userSnap.data()) === null || _f === void 0 ? void 0 : _f.phoneNumber) || ((_g = memberSnap.data()) === null || _g === void 0 ? void 0 : _g.phoneNumber));
-    const enabled = (data === null || data === void 0 ? void 0 : data.enabled) !== false;
-    const eventToggles = normalizeSmsEventToggles(data === null || data === void 0 ? void 0 : data.eventToggles);
+    const parentName = asTrimmedString(((_c = memberSnap.data()) === null || _c === void 0 ? void 0 : _c.displayName) || ((_d = userSnap.data()) === null || _d === void 0 ? void 0 : _d.displayName) || "학부모");
+    const phoneNumber = normalizePhoneNumber(((_e = userSnap.data()) === null || _e === void 0 ? void 0 : _e.phoneNumber) || ((_f = memberSnap.data()) === null || _f === void 0 ? void 0 : _f.phoneNumber) || phoneNumberOverride);
     await db.doc(`centers/${centerId}/smsRecipientPreferences/${buildSmsRecipientPreferenceId(studentId, parentUid)}`).set({
         studentId,
         studentName,
@@ -4681,6 +5051,61 @@ exports.updateSmsRecipientPreference = functions.region(region).https.onCall(asy
         updatedBy: context.auth.uid,
     }, { merge: true });
     return { ok: true };
+});
+exports.sendManualStudentSms = functions.region(region).https.onCall(async (data, context) => {
+    var _a, _b;
+    const db = admin.firestore();
+    if (!context.auth) {
+        throw new functions.https.HttpsError("unauthenticated", "로그인이 필요합니다.");
+    }
+    const centerId = asTrimmedString(data === null || data === void 0 ? void 0 : data.centerId);
+    const studentId = asTrimmedString(data === null || data === void 0 ? void 0 : data.studentId);
+    const message = sanitizeSmsTemplate(asTrimmedString(data === null || data === void 0 ? void 0 : data.message));
+    if (!centerId || !studentId) {
+        throw new functions.https.HttpsError("invalid-argument", "centerId와 studentId가 필요합니다.");
+    }
+    if (!message) {
+        throw new functions.https.HttpsError("invalid-argument", "보낼 문자 내용이 필요합니다.");
+    }
+    if (calculateSmsBytes(message) > SMS_BYTE_LIMIT) {
+        throw new functions.https.HttpsError("invalid-argument", "수동 문자 내용이 90byte를 넘었습니다.");
+    }
+    const callerMemberSnap = await db.doc(`centers/${centerId}/members/${context.auth.uid}`).get();
+    const callerRole = callerMemberSnap.exists ? (_a = callerMemberSnap.data()) === null || _a === void 0 ? void 0 : _a.role : null;
+    if (!isAdminRole(callerRole)) {
+        throw new functions.https.HttpsError("permission-denied", "센터 관리자만 수동 문자를 발송할 수 있습니다.");
+    }
+    const studentSnap = await db.doc(`centers/${centerId}/students/${studentId}`).get();
+    if (!studentSnap.exists) {
+        throw new functions.https.HttpsError("not-found", "학생 정보를 찾을 수 없습니다.");
+    }
+    const studentName = asTrimmedString((_b = studentSnap.data()) === null || _b === void 0 ? void 0 : _b.name, "학생");
+    const settings = await loadNotificationSettings(db, centerId);
+    const queueResult = await queueCustomParentSmsNotification(db, {
+        centerId,
+        studentId,
+        studentName,
+        eventType: "manual_note",
+        message,
+        date: toKstDate(),
+        settings,
+        notificationTitle: "수동 문자",
+        isImportant: true,
+        metadata: {
+            sentBy: context.auth.uid,
+            source: "manual_console",
+        },
+    });
+    if (queueResult.recipientCount === 0) {
+        throw new functions.https.HttpsError("failed-precondition", "등록된 수신 대상 번호가 없습니다.");
+    }
+    return {
+        ok: true,
+        queuedCount: queueResult.queuedCount,
+        recipientCount: queueResult.recipientCount,
+        provider: settings.smsProvider || "none",
+        message: queueResult.message,
+    };
 });
 exports.scheduledSmsQueueDispatcher = functions
     .region(region)
@@ -5238,19 +5663,57 @@ exports.scheduledWeeklyReport = functions
     return null;
 });
 async function syncStudyLogDayTotalMinutes(db, centerId, studentId, dateKey) {
+    var _a, _b;
     const sessionsSnap = await db.collection(`centers/${centerId}/studyLogs/${studentId}/days/${dateKey}/sessions`).get();
-    const totalMinutes = sessionsSnap.docs.reduce((sum, docSnap) => {
+    const sessionTotalMinutes = sessionsSnap.docs.reduce((sum, docSnap) => {
         var _a, _b;
         const raw = Number((_b = (_a = docSnap.data()) === null || _a === void 0 ? void 0 : _a.durationMinutes) !== null && _b !== void 0 ? _b : 0);
         return sum + (Number.isFinite(raw) ? Math.max(0, Math.round(raw)) : 0);
     }, 0);
-    await db.doc(`centers/${centerId}/studyLogs/${studentId}/days/${dateKey}`).set({
-        studentId,
-        centerId,
-        dateKey,
-        totalMinutes,
-        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-    }, { merge: true });
+    const firstSessionStartAt = (_a = sessionsSnap.docs
+        .map((docSnap) => { var _a; return toTimestampOrNow((_a = docSnap.data()) === null || _a === void 0 ? void 0 : _a.startTime); })
+        .filter((value) => Boolean(value))
+        .sort((left, right) => left.toMillis() - right.toMillis())[0]) !== null && _a !== void 0 ? _a : null;
+    const lastSessionEndAt = (_b = sessionsSnap.docs
+        .map((docSnap) => { var _a; return toTimestampOrNow((_a = docSnap.data()) === null || _a === void 0 ? void 0 : _a.endTime); })
+        .filter((value) => Boolean(value))
+        .sort((left, right) => right.toMillis() - left.toMillis())[0]) !== null && _b !== void 0 ? _b : null;
+    const dayRef = db.doc(`centers/${centerId}/studyLogs/${studentId}/days/${dateKey}`);
+    const statRef = db.doc(`centers/${centerId}/dailyStudentStats/${dateKey}/students/${studentId}`);
+    await db.runTransaction(async (transaction) => {
+        var _a, _b, _c, _d;
+        const [daySnap, statSnap] = await Promise.all([
+            transaction.get(dayRef),
+            transaction.get(statRef),
+        ]);
+        const dayData = (daySnap.data() || {});
+        const statData = (statSnap.data() || {});
+        const dayManualAdjustment = Math.round((_a = parseFiniteNumber(dayData.manualAdjustmentMinutes)) !== null && _a !== void 0 ? _a : 0);
+        const statManualAdjustment = Math.round((_b = parseFiniteNumber(statData.manualAdjustmentMinutes)) !== null && _b !== void 0 ? _b : 0);
+        const existingDayDisplayMinutes = Math.max(0, Math.round((_c = parseFiniteNumber(dayData.totalMinutes)) !== null && _c !== void 0 ? _c : 0)) +
+            dayManualAdjustment;
+        const existingStatDisplayMinutes = Math.max(0, Math.round((_d = parseFiniteNumber(statData.totalStudyMinutes)) !== null && _d !== void 0 ? _d : 0)) +
+            statManualAdjustment;
+        const hasManualAdjustment = dayManualAdjustment !== 0 || statManualAdjustment !== 0;
+        const existingDisplayMinutes = hasManualAdjustment
+            ? Math.max(0, existingDayDisplayMinutes, existingStatDisplayMinutes)
+            : Math.max(0, existingDayDisplayMinutes);
+        const displayTotalMinutes = hasManualAdjustment
+            ? existingDisplayMinutes
+            : Math.max(sessionTotalMinutes, existingDisplayMinutes);
+        const manualAdjustmentMinutes = displayTotalMinutes - sessionTotalMinutes;
+        transaction.set(dayRef, Object.assign(Object.assign(Object.assign({ studentId,
+            centerId,
+            dateKey, totalMinutes: sessionTotalMinutes, manualAdjustmentMinutes }, (firstSessionStartAt ? { firstSessionStartAt } : {})), (lastSessionEndAt ? { lastSessionEndAt } : {})), { updatedAt: admin.firestore.FieldValue.serverTimestamp() }), { merge: true });
+        transaction.set(statRef, {
+            studentId,
+            centerId,
+            dateKey,
+            totalStudyMinutes: sessionTotalMinutes,
+            manualAdjustmentMinutes,
+            updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        }, { merge: true });
+    });
 }
 /**
  * 세션 문서 생성 시 durationMinutes 유효성 검증 및 서버 집계 보정
@@ -5342,6 +5805,7 @@ exports.onSessionCreated = functions
             clamped: normalizedDuration,
         });
     }
+    await syncStudyLogDayTotalMinutes(db, centerId, studentId, dateKey);
     return null;
 });
 exports.onSessionWritten = functions
@@ -5780,22 +6244,88 @@ exports.submitAttendanceRequestSecure = functions.region(region).https.onCall(as
     const requestType = asTrimmedString(data === null || data === void 0 ? void 0 : data.requestType);
     const requestDate = asTrimmedString(data === null || data === void 0 ? void 0 : data.requestDate);
     const reason = asTrimmedString(data === null || data === void 0 ? void 0 : data.reason);
+    const reasonCategory = asTrimmedString(data === null || data === void 0 ? void 0 : data.reasonCategory);
+    const requestedArrivalTime = asTrimmedString(data === null || data === void 0 ? void 0 : data.requestedArrivalTime);
+    const requestedDepartureTime = asTrimmedString(data === null || data === void 0 ? void 0 : data.requestedDepartureTime);
+    const requestedAcademyName = asTrimmedString(data === null || data === void 0 ? void 0 : data.requestedAcademyName);
+    const requestedAcademyStartTime = asTrimmedString(data === null || data === void 0 ? void 0 : data.requestedAcademyStartTime);
+    const requestedAcademyEndTime = asTrimmedString(data === null || data === void 0 ? void 0 : data.requestedAcademyEndTime);
+    const scheduleChangeAction = asTrimmedString(data === null || data === void 0 ? void 0 : data.scheduleChangeAction);
+    const classScheduleId = asTrimmedString(data === null || data === void 0 ? void 0 : data.classScheduleId);
+    const classScheduleName = asTrimmedString(data === null || data === void 0 ? void 0 : data.classScheduleName);
+    const parentContactConfirmed = Boolean(data === null || data === void 0 ? void 0 : data.parentContactConfirmed);
     if (!centerId) {
         throw new functions.https.HttpsError("invalid-argument", "centerId is required.", {
             userMessage: "센터 정보가 누락되었습니다.",
         });
     }
-    if (requestType !== "late" && requestType !== "absence") {
+    if (requestType !== "late" && requestType !== "absence" && requestType !== "schedule_change") {
         throw new functions.https.HttpsError("invalid-argument", "requestType is invalid.", {
             userMessage: "출결 신청 유형이 올바르지 않습니다.",
         });
     }
-    if (!requestDate) {
+    if (!isValidDateKey(requestDate)) {
         throw new functions.https.HttpsError("invalid-argument", "requestDate is required.", {
             userMessage: "요청 날짜를 선택해 주세요.",
         });
     }
-    if (reason.length < 10) {
+    if (requestType === "schedule_change") {
+        if (!ATTENDANCE_REQUEST_REASON_CATEGORIES.has(reasonCategory)) {
+            throw new functions.https.HttpsError("invalid-argument", "reasonCategory is invalid.", {
+                userMessage: "당일 변경 사유 유형을 다시 선택해 주세요.",
+            });
+        }
+        if (scheduleChangeAction !== "save" && scheduleChangeAction !== "absent" && scheduleChangeAction !== "reset") {
+            throw new functions.https.HttpsError("invalid-argument", "scheduleChangeAction is invalid.", {
+                userMessage: "변경 유형을 다시 확인해 주세요.",
+            });
+        }
+        if (reason.length < 5) {
+            throw new functions.https.HttpsError("invalid-argument", "Reason is too short.", {
+                userMessage: "변경 사유는 5자 이상 입력해 주세요.",
+            });
+        }
+        const todayDateKey = toDateKey(toKstDate(new Date()));
+        if (requestDate !== todayDateKey) {
+            throw new functions.https.HttpsError("failed-precondition", "Schedule change requests are same-day only.", {
+                userMessage: "당일 등하원 변경만 이 신청서로 접수할 수 있습니다.",
+            });
+        }
+        if (scheduleChangeAction === "save") {
+            if (!requestedArrivalTime || !requestedDepartureTime) {
+                throw new functions.https.HttpsError("invalid-argument", "Requested arrival/departure time is required.", {
+                    userMessage: "등원 예정 시간과 하원 예정 시간을 모두 입력해 주세요.",
+                });
+            }
+            const arrivalMinutes = parseTimeToMinutes(requestedArrivalTime);
+            const departureMinutes = parseTimeToMinutes(requestedDepartureTime);
+            if (!Number.isFinite(arrivalMinutes) || !Number.isFinite(departureMinutes) || arrivalMinutes >= departureMinutes) {
+                throw new functions.https.HttpsError("invalid-argument", "Requested arrival/departure time is invalid.", {
+                    userMessage: "등원 예정 시간은 하원 예정 시간보다 빨라야 합니다.",
+                });
+            }
+            if (requestedAcademyStartTime || requestedAcademyEndTime) {
+                if (!requestedAcademyStartTime || !requestedAcademyEndTime) {
+                    throw new functions.https.HttpsError("invalid-argument", "Academy time is incomplete.", {
+                        userMessage: "학원 시작 시간과 종료 시간을 모두 입력해 주세요.",
+                    });
+                }
+                const academyStartMinutes = parseTimeToMinutes(requestedAcademyStartTime);
+                const academyEndMinutes = parseTimeToMinutes(requestedAcademyEndTime);
+                if (!Number.isFinite(academyStartMinutes) || !Number.isFinite(academyEndMinutes) || academyStartMinutes >= academyEndMinutes) {
+                    throw new functions.https.HttpsError("invalid-argument", "Academy time is invalid.", {
+                        userMessage: "학원 시작 시간은 종료 시간보다 빨라야 합니다.",
+                    });
+                }
+                if (academyStartMinutes < arrivalMinutes || academyEndMinutes > departureMinutes) {
+                    throw new functions.https.HttpsError("invalid-argument", "Academy time is outside attendance range.", {
+                        userMessage: "학원 시간은 등원부터 하원 사이에서만 등록할 수 있습니다.",
+                    });
+                }
+            }
+        }
+    }
+    else if (reason.length < 10) {
         throw new functions.https.HttpsError("invalid-argument", "Reason is too short.", {
             userMessage: "사유는 10자 이상 입력해 주세요.",
         });
@@ -5816,11 +6346,44 @@ exports.submitAttendanceRequestSecure = functions.region(region).https.onCall(as
     const studentMemberData = studentIdentity.memberData;
     const studentProfileData = studentIdentity.studentProfileData;
     const studentName = asTrimmedString((studentMemberData === null || studentMemberData === void 0 ? void 0 : studentMemberData.displayName) || (studentMemberData === null || studentMemberData === void 0 ? void 0 : studentMemberData.name) || (studentProfileData === null || studentProfileData === void 0 ? void 0 : studentProfileData.displayName) || (studentProfileData === null || studentProfileData === void 0 ? void 0 : studentProfileData.name) || context.auth.token.name, "학생");
+    const uploadedAt = admin.firestore.Timestamp.now();
+    const proofAttachments = requestType === "schedule_change"
+        ? normalizeAttendanceRequestProofAttachments({
+            attachments: data === null || data === void 0 ? void 0 : data.proofAttachments,
+            centerId,
+            studentId,
+            uploadedAt,
+        })
+        : [];
     const penaltyPointsDelta = ATTENDANCE_REQUEST_PENALTY_POINTS[requestType];
+    const penaltyShouldBeWaived = requestType === "schedule_change"
+        ? shouldWaiveSameDayScheduleChangePenalty(reasonCategory, proofAttachments.length, parentContactConfirmed)
+        : false;
+    const penaltyKey = requestType === "schedule_change" ? `same_day_routine:${requestDate}` : "";
+    const penaltyDateKey = requestType === "schedule_change" ? requestDate : "";
     const requestRef = db.collection(`centers/${centerId}/attendanceRequests`).doc();
-    const penaltyLogRef = db.doc(`centers/${centerId}/penaltyLogs/attendance_request_${requestRef.id}`);
+    const penaltyLogRef = requestType === "schedule_change"
+        ? db.doc(`centers/${centerId}/penaltyLogs/${buildPenaltyEventLogId(studentId, "attendance_request", `schedule_change:${requestDate}`)}`)
+        : db.doc(`centers/${centerId}/penaltyLogs/attendance_request_${requestRef.id}`);
     const progressRef = db.doc(`centers/${centerId}/growthProgress/${studentId}`);
+    const existingSameDayPenaltyLog = requestType === "schedule_change" && !penaltyShouldBeWaived
+        ? await findExistingPenaltyEventLog({
+            db,
+            centerId,
+            studentId,
+            source: "manual",
+            penaltyKey,
+            penaltyDateKey,
+        })
+        : null;
+    let penaltyApplied = false;
+    let duplicatePenalty = false;
     await db.runTransaction(async (transaction) => {
+        const existingPenaltySnap = requestType === "schedule_change" && !penaltyShouldBeWaived
+            ? await transaction.get(penaltyLogRef)
+            : null;
+        penaltyApplied = requestType !== "schedule_change" || (!penaltyShouldBeWaived && !existingSameDayPenaltyLog && !(existingPenaltySnap === null || existingPenaltySnap === void 0 ? void 0 : existingPenaltySnap.exists));
+        duplicatePenalty = requestType === "schedule_change" && !penaltyShouldBeWaived && (Boolean(existingSameDayPenaltyLog) || Boolean(existingPenaltySnap === null || existingPenaltySnap === void 0 ? void 0 : existingPenaltySnap.exists));
         transaction.set(requestRef, {
             studentId,
             studentName,
@@ -5828,36 +6391,210 @@ exports.submitAttendanceRequestSecure = functions.region(region).https.onCall(as
             type: requestType,
             date: requestDate,
             reason,
+            reasonCategory: reasonCategory || null,
             status: "requested",
-            penaltyApplied: true,
-            penaltyPointsDelta,
+            penaltyApplied: requestType === "schedule_change" ? !penaltyShouldBeWaived : true,
+            penaltyPointsDelta: penaltyApplied ? penaltyPointsDelta : 0,
+            penaltyWaived: requestType === "schedule_change" ? penaltyShouldBeWaived : false,
+            proofRequired: requestType === "schedule_change" ? reasonCategory === "hospital" && proofAttachments.length === 0 : false,
+            parentContactRequired: requestType === "schedule_change" ? reasonCategory === "hospital" && !parentContactConfirmed : false,
+            parentContactConfirmed: requestType === "schedule_change" ? parentContactConfirmed : false,
+            proofAttachments,
+            requestedArrivalTime: requestedArrivalTime || null,
+            requestedDepartureTime: requestedDepartureTime || null,
+            requestedAcademyName: requestedAcademyName || null,
+            requestedAcademyStartTime: requestedAcademyStartTime || null,
+            requestedAcademyEndTime: requestedAcademyEndTime || null,
+            scheduleChangeAction: scheduleChangeAction || null,
+            classScheduleId: classScheduleId || null,
+            classScheduleName: classScheduleName || null,
             createdAt: admin.firestore.FieldValue.serverTimestamp(),
             updatedAt: admin.firestore.FieldValue.serverTimestamp(),
         });
-        transaction.set(progressRef, {
-            penaltyPoints: admin.firestore.FieldValue.increment(penaltyPointsDelta),
-            updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-        }, { merge: true });
-        transaction.set(penaltyLogRef, {
-            centerId,
-            studentId,
-            studentName,
-            pointsDelta: penaltyPointsDelta,
-            reason: `${requestType === "absence" ? "결석" : "지각"} 신청 - ${reason}`,
-            source: "attendance_request",
-            requestId: requestRef.id,
-            requestType,
-            createdByUserId: authUid,
-            createdByName: studentName,
-            createdAt: admin.firestore.FieldValue.serverTimestamp(),
-        }, { merge: true });
+        if (penaltyApplied) {
+            transaction.set(progressRef, {
+                penaltyPoints: admin.firestore.FieldValue.increment(penaltyPointsDelta),
+                updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+            }, { merge: true });
+        }
+        if (penaltyApplied) {
+            const requestTypeLabel = requestType === "absence"
+                ? "결석"
+                : requestType === "late"
+                    ? "지각"
+                    : "당일 등하원 변경";
+            const reasonLabel = requestType === "schedule_change"
+                ? ATTENDANCE_REQUEST_REASON_LABELS[reasonCategory]
+                : requestTypeLabel;
+            transaction.set(penaltyLogRef, {
+                centerId,
+                studentId,
+                studentName,
+                pointsDelta: penaltyPointsDelta,
+                reason: requestType === "schedule_change"
+                    ? `${requestTypeLabel} - ${reasonLabel} - ${reason}`
+                    : `${requestTypeLabel} 신청 - ${reason}`,
+                source: "attendance_request",
+                requestId: requestRef.id,
+                requestType,
+                penaltyKey: penaltyKey || null,
+                penaltyDateKey: penaltyDateKey || null,
+                createdByUserId: authUid,
+                createdByName: studentName,
+                createdAt: admin.firestore.FieldValue.serverTimestamp(),
+            }, { merge: true });
+        }
     });
     return {
         ok: true,
         requestId: requestRef.id,
-        penaltyLogId: penaltyLogRef.id,
-        penaltyPointsDelta,
+        penaltyLogId: (existingSameDayPenaltyLog === null || existingSameDayPenaltyLog === void 0 ? void 0 : existingSameDayPenaltyLog.id) || (penaltyApplied ? penaltyLogRef.id : undefined),
+        penaltyPointsDelta: penaltyApplied ? penaltyPointsDelta : 0,
+        penaltyApplied,
+        penaltyWaived: requestType === "schedule_change" ? penaltyShouldBeWaived : false,
+        duplicatePenalty,
     };
+});
+exports.claimPlannerCompletionRewardSecure = functions.region(region).https.onCall(async (data, context) => {
+    var _a;
+    const db = admin.firestore();
+    if (!((_a = context.auth) === null || _a === void 0 ? void 0 : _a.uid)) {
+        throw new functions.https.HttpsError("unauthenticated", "로그인이 필요합니다.");
+    }
+    const authUid = context.auth.uid;
+    const centerId = asTrimmedString(data === null || data === void 0 ? void 0 : data.centerId);
+    const dateKey = asTrimmedString(data === null || data === void 0 ? void 0 : data.dateKey);
+    const taskId = asTrimmedString(data === null || data === void 0 ? void 0 : data.taskId);
+    if (!centerId) {
+        throw new functions.https.HttpsError("invalid-argument", "centerId is required.", {
+            userMessage: "센터 정보를 다시 확인해 주세요.",
+        });
+    }
+    if (!isValidDateKey(dateKey)) {
+        throw new functions.https.HttpsError("invalid-argument", "Invalid dateKey.", {
+            userMessage: "계획 날짜 정보가 올바르지 않습니다.",
+        });
+    }
+    if (!taskId) {
+        throw new functions.https.HttpsError("invalid-argument", "taskId is required.", {
+            userMessage: "완료한 계획 정보를 다시 확인해 주세요.",
+        });
+    }
+    const membership = await resolveCenterMembershipRole(db, centerId, authUid);
+    if (membership.role !== "student" || !isActiveMembershipStatus(membership.status)) {
+        throw new functions.https.HttpsError("permission-denied", "Only active students can claim planner rewards.", {
+            userMessage: "학생 본인만 계획 완료 포인트를 적립할 수 있습니다.",
+        });
+    }
+    const studentIdentity = await resolveCenterStudentIdentity(db, centerId, authUid);
+    if (!studentIdentity) {
+        throw new functions.https.HttpsError("failed-precondition", "Student profile not found.", {
+            userMessage: "학생 정보를 찾지 못했습니다.",
+        });
+    }
+    const studentId = studentIdentity.studentId;
+    const weekKey = getPlannerWeekKeyFromDateKey(dateKey);
+    if (!weekKey) {
+        throw new functions.https.HttpsError("invalid-argument", "Invalid planner week key.", {
+            userMessage: "계획 주차 정보가 올바르지 않습니다.",
+        });
+    }
+    const planItemRef = db.doc(`centers/${centerId}/plans/${studentId}/weeks/${weekKey}/items/${taskId}`);
+    const progressRef = db.doc(`centers/${centerId}/growthProgress/${studentId}`);
+    const eventCreatedAt = new Date().toISOString();
+    const result = await db.runTransaction(async (transaction) => {
+        var _a, _b, _c;
+        const [planItemSnap, progressSnap] = await Promise.all([
+            transaction.get(planItemRef),
+            transaction.get(progressRef),
+        ]);
+        const progressData = progressSnap.exists ? progressSnap.data() : {};
+        const dailyPointStatus = isPlainObject(progressData.dailyPointStatus)
+            ? progressData.dailyPointStatus
+            : {};
+        const currentDayStatus = isPlainObject(dailyPointStatus[dateKey])
+            ? dailyPointStatus[dateKey]
+            : {};
+        const rewardedTaskIds = normalizePlannerCompletionRewardTaskIds(currentDayStatus.planCompletionRewardTaskIds);
+        const currentRewardCount = Math.max(rewardedTaskIds.length, Math.max(0, Math.floor((_a = parseFiniteNumber(currentDayStatus.planCompletionRewardCount)) !== null && _a !== void 0 ? _a : 0)));
+        const currentPointsBalance = Math.max(0, Math.floor((_b = parseFiniteNumber(progressData.pointsBalance)) !== null && _b !== void 0 ? _b : 0));
+        const currentTotalPointsEarned = Math.max(0, Math.floor((_c = parseFiniteNumber(progressData.totalPointsEarned)) !== null && _c !== void 0 ? _c : 0));
+        const planItemData = planItemSnap.exists ? planItemSnap.data() : null;
+        const planItemDateKey = asTrimmedString(planItemData === null || planItemData === void 0 ? void 0 : planItemData.dateKey);
+        const planItemCategory = asTrimmedString(planItemData === null || planItemData === void 0 ? void 0 : planItemData.category);
+        const isEligibleStudyTask = Boolean(planItemData) &&
+            planItemDateKey === dateKey &&
+            (planItemCategory === "" || planItemCategory === "study") &&
+            (planItemData === null || planItemData === void 0 ? void 0 : planItemData.done) === true;
+        if (!isEligibleStudyTask) {
+            return {
+                awarded: false,
+                duplicate: false,
+                dailyLimitReached: false,
+                ineligible: true,
+                awardedPoints: 0,
+                rewardCount: currentRewardCount,
+                pointsBalance: currentPointsBalance,
+                totalPointsEarned: currentTotalPointsEarned,
+            };
+        }
+        if (rewardedTaskIds.includes(taskId)) {
+            return {
+                awarded: false,
+                duplicate: true,
+                dailyLimitReached: false,
+                ineligible: false,
+                awardedPoints: 0,
+                rewardCount: currentRewardCount,
+                pointsBalance: currentPointsBalance,
+                totalPointsEarned: currentTotalPointsEarned,
+            };
+        }
+        if (currentRewardCount >= PLANNER_COMPLETION_DAILY_REWARD_LIMIT) {
+            return {
+                awarded: false,
+                duplicate: false,
+                dailyLimitReached: true,
+                ineligible: false,
+                awardedPoints: 0,
+                rewardCount: currentRewardCount,
+                pointsBalance: currentPointsBalance,
+                totalPointsEarned: currentTotalPointsEarned,
+            };
+        }
+        const awardClamp = clampDailyPointAward(currentDayStatus, PLANNER_COMPLETION_REWARD_POINTS);
+        const awardedPoints = awardClamp.awardedPoints;
+        const nextRewardedTaskIds = normalizePlannerCompletionRewardTaskIds([...rewardedTaskIds, taskId]);
+        const nextRewardCount = nextRewardedTaskIds.length;
+        const nextPointEvents = awardedPoints > 0
+            ? upsertDailyPointEvent(currentDayStatus.pointEvents, {
+                id: `plan_completion:${dateKey}:${taskId}`,
+                source: "plan_completion",
+                label: "계획 완수",
+                points: awardedPoints,
+                createdAt: eventCreatedAt,
+            })
+            : normalizeDailyPointEvents(currentDayStatus.pointEvents);
+        transaction.set(progressRef, {
+            pointsBalance: admin.firestore.FieldValue.increment(awardedPoints),
+            totalPointsEarned: admin.firestore.FieldValue.increment(awardedPoints),
+            dailyPointStatus: {
+                [dateKey]: Object.assign(Object.assign({}, currentDayStatus), { planCompletionRewardTaskIds: nextRewardedTaskIds, planCompletionRewardCount: nextRewardCount, pointEvents: nextPointEvents, dailyPointAmount: admin.firestore.FieldValue.increment(awardedPoints), updatedAt: admin.firestore.FieldValue.serverTimestamp() }),
+            },
+            updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        }, { merge: true });
+        return {
+            awarded: awardedPoints > 0,
+            duplicate: false,
+            dailyLimitReached: false,
+            ineligible: false,
+            awardedPoints,
+            rewardCount: nextRewardCount,
+            pointsBalance: currentPointsBalance + awardedPoints,
+            totalPointsEarned: currentTotalPointsEarned + awardedPoints,
+        };
+    });
+    return Object.assign(Object.assign({ ok: true }, result), { rewardLimit: PLANNER_COMPLETION_DAILY_REWARD_LIMIT });
 });
 exports.openStudyRewardBoxSecure = functions.region(region).https.onCall(async (data, context) => {
     var _a, _b, _c, _d, _e, _f;

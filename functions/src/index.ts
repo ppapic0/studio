@@ -49,7 +49,8 @@ type ParentSmsEventType =
   | "weekly_report"
   | "daily_report"
   | "payment_reminder";
-type SmsQueueEventType = ParentSmsEventType | "risk_alert";
+type RecipientPreferenceEventType = ParentSmsEventType | "manual_note";
+type SmsQueueEventType = RecipientPreferenceEventType | "risk_alert";
 type SmsQueueStatus =
   | "queued"
   | "processing"
@@ -2389,7 +2390,7 @@ async function splitRecipientsBySmsPreference(
   centerId: string,
   studentId: string,
   studentName: string,
-  eventType: ParentSmsEventType,
+  eventType: RecipientPreferenceEventType,
   recipients: SmsRecipient[]
 ): Promise<{
   allowedRecipients: SmsRecipient[];
@@ -2418,7 +2419,7 @@ async function splitRecipientsBySmsPreference(
     const pref = prefMap.get(prefId);
     const enabled = pref?.enabled !== false;
     const toggles = normalizeSmsEventToggles(pref?.eventToggles);
-    const eventEnabled = toggles[eventType] !== false;
+    const eventEnabled = eventType === "manual_note" || toggles[eventType] !== false;
 
     if (!enabled) {
       suppressedRecipients.push({
@@ -2619,7 +2620,7 @@ async function queueParentSmsNotification(
   return { queuedCount: allowedRecipients.length, recipientCount: recipients.length, message };
 }
 
-function buildParentNotificationTitle(eventType: ParentSmsEventType) {
+function buildParentNotificationTitle(eventType: RecipientPreferenceEventType) {
   if (eventType === "study_start") return "공부 시작 알림";
   if (eventType === "study_end") return "공부 종료 알림";
   if (eventType === "away_start") return "외출 알림";
@@ -2627,6 +2628,7 @@ function buildParentNotificationTitle(eventType: ParentSmsEventType) {
   if (eventType === "late_alert") return "지각 알림";
   if (eventType === "weekly_report") return "주간 리포트 알림";
   if (eventType === "daily_report") return "일일 리포트 알림";
+  if (eventType === "manual_note") return "수동 문자";
   return "결제 예정 알림";
 }
 
@@ -2636,7 +2638,7 @@ async function queueCustomParentSmsNotification(
     centerId: string;
     studentId: string;
     studentName: string;
-    eventType: Extract<ParentSmsEventType, "daily_report" | "payment_reminder">;
+    eventType: Extract<RecipientPreferenceEventType, "daily_report" | "payment_reminder" | "manual_note">;
     message: string;
     date: Date;
     settings?: NotificationSettingsDoc;
@@ -6319,6 +6321,68 @@ export const updateSmsRecipientPreference = functions.region(region).https.onCal
   }, { merge: true });
 
   return { ok: true };
+});
+
+export const sendManualStudentSms = functions.region(region).https.onCall(async (data, context) => {
+  const db = admin.firestore();
+
+  if (!context.auth) {
+    throw new functions.https.HttpsError("unauthenticated", "로그인이 필요합니다.");
+  }
+
+  const centerId = asTrimmedString(data?.centerId);
+  const studentId = asTrimmedString(data?.studentId);
+  const message = sanitizeSmsTemplate(asTrimmedString(data?.message));
+  if (!centerId || !studentId) {
+    throw new functions.https.HttpsError("invalid-argument", "centerId와 studentId가 필요합니다.");
+  }
+  if (!message) {
+    throw new functions.https.HttpsError("invalid-argument", "보낼 문자 내용이 필요합니다.");
+  }
+  if (calculateSmsBytes(message) > SMS_BYTE_LIMIT) {
+    throw new functions.https.HttpsError("invalid-argument", "수동 문자 내용이 90byte를 넘었습니다.");
+  }
+
+  const callerMemberSnap = await db.doc(`centers/${centerId}/members/${context.auth.uid}`).get();
+  const callerRole = callerMemberSnap.exists ? callerMemberSnap.data()?.role : null;
+  if (!isAdminRole(callerRole)) {
+    throw new functions.https.HttpsError("permission-denied", "센터 관리자만 수동 문자를 발송할 수 있습니다.");
+  }
+
+  const studentSnap = await db.doc(`centers/${centerId}/students/${studentId}`).get();
+  if (!studentSnap.exists) {
+    throw new functions.https.HttpsError("not-found", "학생 정보를 찾을 수 없습니다.");
+  }
+
+  const studentName = asTrimmedString(studentSnap.data()?.name, "학생");
+  const settings = await loadNotificationSettings(db, centerId);
+  const queueResult = await queueCustomParentSmsNotification(db, {
+    centerId,
+    studentId,
+    studentName,
+    eventType: "manual_note",
+    message,
+    date: toKstDate(),
+    settings,
+    notificationTitle: "수동 문자",
+    isImportant: true,
+    metadata: {
+      sentBy: context.auth.uid,
+      source: "manual_console",
+    },
+  });
+
+  if (queueResult.recipientCount === 0) {
+    throw new functions.https.HttpsError("failed-precondition", "등록된 수신 대상 번호가 없습니다.");
+  }
+
+  return {
+    ok: true,
+    queuedCount: queueResult.queuedCount,
+    recipientCount: queueResult.recipientCount,
+    provider: settings.smsProvider || "none",
+    message: queueResult.message,
+  };
 });
 
 export const scheduledSmsQueueDispatcher = functions
