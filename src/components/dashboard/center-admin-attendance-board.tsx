@@ -270,20 +270,35 @@ export function CenterAdminAttendanceBoard({
                   const displayName = signal?.studentName || student?.name || member?.displayName || '학생';
                   const scheduleMovementLabel = signal?.scheduleMovementSummary || null;
                   const isNoAttendanceDay = Boolean(signal?.isNoAttendanceDay || signal?.boardStatus === 'excused_absent');
-                  const checkoutMetaLabel =
+                  const isCheckedOutLate = Boolean(signal?.boardStatus === 'checked_out' && signal.wasLateToday);
+                  const checkoutMetaChips =
                     signal?.boardStatus === 'checked_out'
                       ? [
-                          signal.wasLateToday ? '오늘 지각O' : '오늘 지각X',
-                          signal.firstCheckInLabel ? `최초 등원 ${signal.firstCheckInLabel}` : null,
-                          signal.lastCheckOutLabel ? `마지막 하원 ${signal.lastCheckOutLabel}` : null,
-                        ].filter(Boolean).join(' · ')
-                      : null;
+                          {
+                            key: 'late',
+                            label: signal.wasLateToday ? '오늘 지각O' : '오늘 지각X',
+                            className: signal.wasLateToday
+                              ? 'border-[#FFD0A6] bg-[#FFF1E2] text-[#C95A08]'
+                              : 'border-white/85 bg-white/92 text-slate-700',
+                          },
+                          {
+                            key: 'firstCheckIn',
+                            label: `최초 등원 ${signal.firstCheckInLabel || '-'}`,
+                            className: 'border-white/85 bg-white/92 text-[#14295F]',
+                          },
+                          {
+                            key: 'lastCheckOut',
+                            label: `하원 ${signal.lastCheckOutLabel || '-'}`,
+                            className: 'border-white/85 bg-white/92 text-[#14295F]',
+                          },
+                        ]
+                      : [];
                   const attendanceTimeLabel = signal
                     ? isNoAttendanceDay
                       ? '미등원'
                       : signal.boardStatus === 'checked_out'
-                      ? signal.lastCheckOutLabel
-                        ? `퇴실 ${signal.lastCheckOutLabel}`
+                      ? signal.wasLateToday
+                        ? '퇴실 · 지각'
                         : '퇴실'
                       : signal.attendanceDisplayStatus === 'confirmed_late' && signal.checkedAtLabel
                       ? `지각 ${signal.checkedAtLabel}`
@@ -293,7 +308,7 @@ export function CenterAdminAttendanceBoard({
                           ? `예정 ${signal.routineExpectedArrivalTime}`
                           : signal.boardLabel
                     : '확인중';
-                  const shouldShowSeatMeta = !isNameOnly || isNoAttendanceDay || Boolean(scheduleMovementLabel) || Boolean(checkoutMetaLabel);
+                  const shouldShowSeatMeta = !isNameOnly || isNoAttendanceDay || Boolean(scheduleMovementLabel) || checkoutMetaChips.length > 0;
 
                   if (isAisle) {
                     return <div key={`${room.id}_${roomSeatNo}`} className="aspect-square rounded-[1.35rem] bg-transparent" />;
@@ -321,6 +336,7 @@ export function CenterAdminAttendanceBoard({
                       className={cn(
                         'relative aspect-square rounded-[1.45rem] border-2 p-2.5 text-left shadow-[0_18px_30px_-26px_rgba(20,41,95,0.34)] transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#2554D7]/35 hover:-translate-y-0.5 hover:shadow-[0_22px_34px_-24px_rgba(20,41,95,0.38)]',
                         presentation.surfaceClass,
+                        isCheckedOutLate && 'border-[#FF9A42] bg-[#FFF2E6]',
                         isFilteredOut && 'opacity-20 grayscale hover:translate-y-0 hover:shadow-none'
                       )}
                     >
@@ -341,23 +357,32 @@ export function CenterAdminAttendanceBoard({
                             className={cn(
                               'inline-flex max-w-full items-center rounded-full border border-white/85 bg-white/88 px-2.5 py-1 font-black tracking-tight text-[#14295F] shadow-[0_10px_18px_-16px_rgba(20,41,95,0.35)]',
                               isNoAttendanceDay && 'bg-rose-50 text-rose-700',
-                              signal?.boardStatus === 'checked_out' && 'border-slate-600 bg-slate-800 text-white',
+                              signal?.boardStatus === 'checked_out' &&
+                                !isCheckedOutLate &&
+                                'border-slate-600 bg-slate-800 text-white',
+                              isCheckedOutLate &&
+                                'border-[#FF9A42] bg-[#FF7A16] text-white shadow-[0_10px_18px_-16px_rgba(255,122,22,0.55)]',
                               isMobile ? 'text-[9px]' : 'text-[10px]'
                             )}
                           >
                             <span className="truncate">{attendanceTimeLabel}</span>
                           </span>
                         )}
-                        {checkoutMetaLabel ? (
-                          <span
-                            className={cn(
-                              'inline-flex max-w-full items-center rounded-full border border-white/85 bg-white/90 px-2 py-0.5 font-black tracking-tight text-slate-700 shadow-[0_10px_18px_-16px_rgba(20,41,95,0.35)]',
-                              signal?.wasLateToday && 'border-[#FFD9B6] bg-[#FFF6EC] text-[#C95A08]',
-                              isMobile ? 'text-[7.5px]' : 'text-[8.5px]'
-                            )}
-                          >
-                            <span className="truncate">{checkoutMetaLabel}</span>
-                          </span>
+                        {checkoutMetaChips.length > 0 ? (
+                          <div className="flex max-w-full flex-wrap gap-1">
+                            {checkoutMetaChips.map((chip) => (
+                              <span
+                                key={chip.key}
+                                className={cn(
+                                  'inline-flex min-w-0 max-w-full items-center rounded-full border px-1.5 py-0.5 font-black tracking-tight shadow-[0_10px_18px_-16px_rgba(20,41,95,0.35)]',
+                                  chip.className,
+                                  isMobile ? 'text-[6.8px]' : 'text-[7.6px]'
+                                )}
+                              >
+                                <span className="truncate">{chip.label}</span>
+                              </span>
+                            ))}
+                          </div>
                         ) : null}
                         {scheduleMovementLabel && !isNoAttendanceDay ? (
                           <span

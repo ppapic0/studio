@@ -162,9 +162,9 @@ const PRESENTATION_BY_STATUS: Record<CenterAdminAttendanceBoardStatus, Attendanc
 };
 
 const CHECKED_OUT_LATE_PRESENTATION: AttendanceBoardPresentation = {
-  surfaceClass: 'border-[#FF9A42] bg-[#FFE5C8] text-[#14295F]',
-  chipClass: 'bg-slate-800 text-white',
-  chipLabel: '퇴실',
+  surfaceClass: 'border-[#FF9A42] bg-[#FFF2E6] text-[#14295F]',
+  chipClass: 'bg-[#FF7A16] text-white',
+  chipLabel: '지각 퇴실',
   flagClass: 'bg-white/95 text-[#C95A08]',
   isDark: false,
 };
