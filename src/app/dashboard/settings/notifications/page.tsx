@@ -23,7 +23,7 @@ import { useAppContext } from '@/contexts/app-context';
 import { useToast } from '@/hooks/use-toast';
 import { shouldExcludeFromSmsQueries } from '@/lib/counseling-demo';
 import { canManageSettings } from '@/lib/dashboard-access';
-import type { NotificationSettings } from '@/lib/types';
+import type { AttendanceCurrent, NotificationSettings } from '@/lib/types';
 import { cn } from '@/lib/utils';
 import { AdminWorkbenchCommandBar } from '@/components/dashboard/admin-workbench-command-bar';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -238,6 +238,8 @@ type AttendanceEventRow = {
   createdAt?: { toDate?: () => Date };
 };
 
+type AttendanceCurrentRow = AttendanceCurrent;
+
 type StudentSmsBoardRow = {
   studentId: string;
   studentName: string;
@@ -363,6 +365,10 @@ function getByteLabel(bytes: number) {
 
 function toDateInputValue(date: Date) {
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+}
+
+function getStudentIdFromDatedAttendanceRow(row: { id: string; studentId?: string }) {
+  return row.studentId || row.id;
 }
 
 function toDateKeyFromValue(value?: { toDate?: () => Date }) {
@@ -585,6 +591,12 @@ export default function NotificationSettingsPage() {
   }, [firestore, centerId, isAdmin, todayDateKey]);
   const { data: attendanceDailyStatsTodayRaw } = useCollection<AttendanceDailyStatRow>(attendanceDailyStatsTodayQuery, { enabled: isAdmin });
 
+  const attendanceCurrentQuery = useMemoFirebase(() => {
+    if (!firestore || !centerId || !isAdmin) return null;
+    return query(collection(firestore, 'centers', centerId, 'attendanceCurrent'), limit(1200));
+  }, [firestore, centerId, isAdmin]);
+  const { data: attendanceCurrentRaw } = useCollection<AttendanceCurrentRow>(attendanceCurrentQuery, { enabled: isAdmin });
+
   const attendanceEventsTodayQuery = useMemoFirebase(() => {
     if (!firestore || !centerId || !isAdmin) return null;
     return query(
@@ -656,13 +668,28 @@ export default function NotificationSettingsPage() {
     [preferencesRaw]
   );
   const attendanceRecordsByStudentId = useMemo<Map<string, AttendanceRecordRow>>(
-    () => new Map((attendanceRecordsTodayRaw || []).filter((row) => row.studentId).map((row) => [row.studentId!, row] as const)),
+    () => new Map((attendanceRecordsTodayRaw || []).map((row) => [getStudentIdFromDatedAttendanceRow(row), row] as const)),
     [attendanceRecordsTodayRaw]
   );
   const attendanceDailyStatsByStudentId = useMemo<Map<string, AttendanceDailyStatRow>>(
-    () => new Map((attendanceDailyStatsTodayRaw || []).filter((row) => row.studentId).map((row) => [row.studentId!, row] as const)),
+    () => new Map((attendanceDailyStatsTodayRaw || []).map((row) => [getStudentIdFromDatedAttendanceRow(row), row] as const)),
     [attendanceDailyStatsTodayRaw]
   );
+  const attendanceCurrentByStudentId = useMemo<Map<string, AttendanceCurrentRow>>(() => {
+    const next = new Map<string, AttendanceCurrentRow>();
+    (attendanceCurrentRaw || []).forEach((seat) => {
+      if (!seat.studentId) return;
+      const previous = next.get(seat.studentId);
+      const previousUpdatedAt = toDateSafe(previous?.updatedAt)?.getTime() || 0;
+      const nextUpdatedAt = toDateSafe(seat.updatedAt)?.getTime() || 0;
+      const previousIsActive = previous ? ['studying', 'away', 'break'].includes(previous.status) : false;
+      const nextIsActive = ['studying', 'away', 'break'].includes(seat.status);
+      if (!previous || (nextIsActive && !previousIsActive) || nextUpdatedAt >= previousUpdatedAt) {
+        next.set(seat.studentId, seat);
+      }
+    });
+    return next;
+  }, [attendanceCurrentRaw]);
   const attendanceEventsByStudentId = useMemo<Map<string, AttendanceEventRow[]>>(() => {
     const next = new Map<string, AttendanceEventRow[]>();
     (attendanceEventsTodayRaw || []).forEach((row) => {
@@ -848,14 +875,24 @@ export default function NotificationSettingsPage() {
       .map((student) => {
         const attendanceRecord = attendanceRecordsByStudentId.get(student.studentId);
         const attendanceDailyStat = attendanceDailyStatsByStudentId.get(student.studentId);
+        const liveAttendance = attendanceCurrentByStudentId.get(student.studentId);
         const attendanceEvents = attendanceEventsByStudentId.get(student.studentId) || [];
+        const liveCheckInAt = toDateSafe(liveAttendance?.lastCheckInAt);
+        const liveCheckInToday =
+          liveAttendance &&
+          ['studying', 'away', 'break'].includes(liveAttendance.status) &&
+          liveCheckInAt &&
+          toDateInputValue(liveCheckInAt) === todayKey
+            ? liveCheckInAt
+            : null;
         const resolveAttendanceTime = (eventType: TodayBoardEventType) => {
           if (eventType === 'study_start') {
             return (
               toDateSafe(attendanceDailyStat?.checkInAt) ||
               toDateSafe(attendanceRecord?.checkInAt) ||
               toDateSafe(attendanceEvents.find((row) => row.eventType === 'check_in')?.occurredAt) ||
-              toDateSafe(attendanceEvents.find((row) => row.eventType === 'check_in')?.createdAt)
+              toDateSafe(attendanceEvents.find((row) => row.eventType === 'check_in')?.createdAt) ||
+              liveCheckInToday
             );
           }
           if (eventType === 'study_end') {
@@ -1024,6 +1061,7 @@ export default function NotificationSettingsPage() {
         return a.studentName.localeCompare(b.studentName, 'ko-KR');
       });
   }, [
+    attendanceCurrentByStudentId,
     attendanceDailyStatsByStudentId,
     attendanceEventsByStudentId,
     attendanceRecordsByStudentId,
