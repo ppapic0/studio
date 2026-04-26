@@ -1235,7 +1235,9 @@ export default function StudentListPage() {
                           <Avatar className="h-14 w-14 border-4 border-white shadow-xl ring-1 ring-[#dbe7ff]"><AvatarFallback className="bg-[#eef4ff] text-[#14295F] font-black text-xl">{member.displayName?.charAt(0) || 'S'}</AvatarFallback></Avatar>
                           <div className="flex flex-col min-w-0 gap-2">
                             <div className="flex flex-wrap items-center gap-2">
-                              <h3 className="truncate text-lg font-black tracking-tighter text-[#14295F]">{member.displayName}</h3>
+                              <h3 className="max-w-full break-keep pb-0.5 pr-1 text-lg font-black leading-[1.35] text-[#14295F]">
+                                {member.displayName}
+                              </h3>
                               {member.className ? (
                                 <Badge className="h-5 rounded-full border border-[#dbe7ff] bg-[#f8fbff] px-2 text-[10px] font-black text-[#14295F]">{member.className}</Badge>
                               ) : null}
