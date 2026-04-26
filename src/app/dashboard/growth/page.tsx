@@ -76,8 +76,8 @@ import { openStudyRewardBoxSecure } from '@/lib/study-box-actions';
 import { GiftishowOrder, GiftishowProduct, GiftishowSettings, GrowthProgress, PointBoostEvent, StudyLogDay } from '@/lib/types';
 import { cn } from '@/lib/utils';
 
-const REWARD_BOX_BURST_DELAY_MS = 380;
-const REWARD_TEXT_REVEAL_DELAY_MS = 460;
+const REWARD_BOX_BURST_DELAY_MS = 120;
+const REWARD_TEXT_REVEAL_DELAY_MS = 220;
 const POINT_BREAKDOWN_CHIP_CLASS = {
   box: 'bg-[#FFF3E2] text-[#915A1E]',
   rank: 'bg-[#EAF1FF] text-[#3357A5]',
@@ -413,7 +413,7 @@ export default function GrowthPage() {
   const [selectedBoxHour, setSelectedBoxHour] = useState<number | null>(null);
   const [boxStage, setBoxStage] = useState<BoxStage>('idle');
   const [revealedReward, setRevealedReward] = useState<number | null>(null);
-  const [isClaimingBox, setIsClaimingBox] = useState(false);
+  const [openingBoxHours, setOpeningBoxHours] = useState<number[]>([]);
   const [floatingGain, setFloatingGain] = useState<FloatingGain | null>(null);
   const [arrivalEvent, setArrivalEvent] = useState<{ key: number; count: number } | null>(null);
   const [freshReadyHours, setFreshReadyHours] = useState<number[]>([]);
@@ -431,6 +431,8 @@ export default function GrowthPage() {
   const [isPointTrackManualOpen, setIsPointTrackManualOpen] = useState(false);
   const timeoutsRef = useRef<Array<ReturnType<typeof setTimeout>>>([]);
   const liveClaimKeyRef = useRef<string | null>(null);
+  const activeRevealTokenRef = useRef(0);
+  const openingBoxHoursRef = useRef<Set<number>>(new Set());
   const [hydratedClaimCacheKey, setHydratedClaimCacheKey] = useState<string | null>(null);
 
   const progressRef = useMemoFirebase(() => {
@@ -951,7 +953,9 @@ export default function GrowthPage() {
 
   const selectedBox = selectedBoxHour ? activeBoxes.find((box) => box.hour === selectedBoxHour) || null : null;
   const isRewardRevealed = boxStage === 'revealed' && revealedReward !== null;
-  const isOpeningReward = isClaimingBox && !isRewardRevealed;
+  const selectedBoxIsOpening = selectedBoxHour !== null && openingBoxHours.includes(selectedBoxHour);
+  const isOpeningReward = selectedBoxIsOpening && !isRewardRevealed;
+  const isSelectedBoxVisuallyReady = selectedBox?.state === 'ready' || selectedBoxIsOpening || isRewardRevealed;
 
   useEffect(() => {
     if (!isTimerActive || !progressRef || !activeMembership?.id || !studentUid) return;
@@ -1056,11 +1060,13 @@ export default function GrowthPage() {
   };
 
   const resetRevealState = () => {
+    activeRevealTokenRef.current += 1;
+    openingBoxHoursRef.current.clear();
     timeoutsRef.current.forEach((timeoutId) => clearTimeout(timeoutId));
     timeoutsRef.current = [];
     setBoxStage('idle');
     setRevealedReward(null);
-    setIsClaimingBox(false);
+    setOpeningBoxHours([]);
   };
 
   const handleVaultChange = (open: boolean) => {
@@ -1071,9 +1077,23 @@ export default function GrowthPage() {
     }
   };
 
-  const handleRevealBox = async () => {
-    if (!selectedBox || selectedBox.state !== 'ready' || isClaimingBox || !activeMembership?.id || !studentUid) return;
-    const targetHour = selectedBox.hour;
+  const handleRevealBox = (hourOverride?: number) => {
+    const targetBox =
+      typeof hourOverride === 'number'
+        ? activeBoxes.find((box) => box.hour === hourOverride) || null
+        : selectedBox;
+    if (!targetBox || targetBox.state !== 'ready' || !activeMembership?.id || !studentUid) return;
+    const targetHour = targetBox.hour;
+    if (openingBoxHoursRef.current.has(targetHour)) return;
+
+    const revealToken = activeRevealTokenRef.current + 1;
+    activeRevealTokenRef.current = revealToken;
+    openingBoxHoursRef.current.add(targetHour);
+    setOpeningBoxHours(Array.from(openingBoxHoursRef.current).sort((a, b) => a - b));
+    setSelectedBoxHour(targetHour);
+    setRevealedReward(null);
+    setBoxStage('shake');
+
     const currentDayStatus = {
       ...activeDayStatus,
       claimedStudyBoxes: activeClaimedBoxes,
@@ -1098,26 +1118,45 @@ export default function GrowthPage() {
       .then((result) => ({ ok: true as const, result }))
       .catch((error) => ({ ok: false as const, error }));
 
-    setIsClaimingBox(true);
-    setBoxStage('shake');
-
     const shakeTimeout = setTimeout(() => {
-      setBoxStage('burst');
+      if (activeRevealTokenRef.current === revealToken) {
+        setBoxStage('burst');
+      }
     }, REWARD_BOX_BURST_DELAY_MS);
     timeoutsRef.current.push(shakeTimeout);
 
-    const revealTimeout = setTimeout(async () => {
-      const optimisticReward = activeRewardByHour.get(targetHour)?.awardedPoints ?? selectedBox.reward ?? 0;
-      setRevealedReward(optimisticReward);
-      setBoxStage('revealed');
-      setFloatingGain({ key: Date.now(), amount: optimisticReward });
-      const clearFloating = setTimeout(() => {
-        setFloatingGain(null);
-      }, 1800);
-      timeoutsRef.current.push(clearFloating);
+    const revealTimeout = setTimeout(() => {
+      const optimisticReward = activeRewardByHour.get(targetHour)?.awardedPoints ?? targetBox.reward ?? 0;
 
-      try {
-        const rewardResult = await rewardOpenPromise;
+      if (activeVaultDateKey === activeStudyDayKey) {
+        setOpenedBoxes((prev) => {
+          const nextOpenedBoxes = normalizeStudyBoxHours([...prev, targetHour]);
+          writeStudyBoxOpenedCache(studyBoxCacheUid, activeStudyDayKey, nextOpenedBoxes);
+          return nextOpenedBoxes;
+        });
+      } else {
+        setCarryoverOpenedBoxes((prev) => {
+          const nextOpenedBoxes = normalizeStudyBoxHours([...prev, targetHour]);
+          writeStudyBoxOpenedCache(studyBoxCacheUid, activeVaultDateKey, nextOpenedBoxes);
+          return nextOpenedBoxes;
+        });
+      }
+
+      openingBoxHoursRef.current.delete(targetHour);
+      setOpeningBoxHours(Array.from(openingBoxHoursRef.current).sort((a, b) => a - b));
+
+      if (activeRevealTokenRef.current === revealToken) {
+        const floatingKey = Date.now();
+        setRevealedReward(optimisticReward);
+        setBoxStage('revealed');
+        setFloatingGain({ key: floatingKey, amount: optimisticReward });
+        const clearFloating = setTimeout(() => {
+          setFloatingGain((current) => (current?.key === floatingKey ? null : current));
+        }, 1800);
+        timeoutsRef.current.push(clearFloating);
+      }
+
+      void rewardOpenPromise.then((rewardResult) => {
         if (!rewardResult.ok) throw rewardResult.error;
         const result = rewardResult.result;
         if (!Array.isArray(result.openedStudyBoxes) || !Array.isArray(result.claimedStudyBoxes)) {
@@ -1130,7 +1169,7 @@ export default function GrowthPage() {
         const reward =
           nextRewardEntry?.awardedPoints
           ?? activeRewardByHour.get(targetHour)?.awardedPoints
-          ?? selectedBox.reward
+          ?? targetBox.reward
           ?? 0;
 
         if (activeVaultDateKey === activeStudyDayKey) {
@@ -1145,28 +1184,39 @@ export default function GrowthPage() {
           writeStudyBoxOpenedCache(studyBoxCacheUid, activeVaultDateKey, nextOpenedBoxes);
         }
         if (typeof result.pointsBalance === 'number') {
-          setPointBalance(Math.max(0, result.pointsBalance));
+          setPointBalance((current) => Math.max(current, result.pointsBalance || 0));
         }
 
-        setRevealedReward(reward);
-        setFloatingGain((current) => current ? { ...current, amount: reward } : current);
-      } catch (error) {
-        console.error('[point-track] reward box open failed', error);
-        if (activeVaultDateKey === activeStudyDayKey) {
-          setOpenedBoxes(persistedOpenedBoxes);
-          setClaimedBoxes(persistedClaimedBoxes);
-          setRewardEntries(persistedRewardEntries);
-        } else {
-          setCarryoverOpenedBoxes(normalizeStudyBoxHours([
-            ...persistedCarryoverOpenedBoxes,
-            ...readStudyBoxOpenedCache(user?.uid, previousStudyDayKey),
-          ]));
+        if (activeRevealTokenRef.current === revealToken) {
+          setRevealedReward(reward);
+          setFloatingGain((current) => current ? { ...current, amount: reward } : current);
         }
-        setBoxStage('idle');
-        setFloatingGain(null);
-      } finally {
-        setIsClaimingBox(false);
-      }
+      }).catch((error) => {
+        console.error('[point-track] reward box open failed', error);
+
+        if (activeVaultDateKey === activeStudyDayKey) {
+          setOpenedBoxes((prev) => {
+            const nextOpenedBoxes = normalizeStudyBoxHours(prev.filter((hour) => hour !== targetHour));
+            writeStudyBoxOpenedCache(studyBoxCacheUid, activeStudyDayKey, nextOpenedBoxes);
+            return nextOpenedBoxes;
+          });
+        } else {
+          setCarryoverOpenedBoxes((prev) => {
+            const nextOpenedBoxes = normalizeStudyBoxHours(prev.filter((hour) => hour !== targetHour));
+            writeStudyBoxOpenedCache(studyBoxCacheUid, activeVaultDateKey, nextOpenedBoxes);
+            return nextOpenedBoxes;
+          });
+        }
+
+        if (activeRevealTokenRef.current === revealToken) {
+          setBoxStage('idle');
+          setRevealedReward(null);
+          setFloatingGain(null);
+        }
+      }).finally(() => {
+        openingBoxHoursRef.current.delete(targetHour);
+        setOpeningBoxHours(Array.from(openingBoxHoursRef.current).sort((a, b) => a - b));
+      });
     }, REWARD_TEXT_REVEAL_DELAY_MS);
 
     timeoutsRef.current.push(revealTimeout);
@@ -1178,9 +1228,7 @@ export default function GrowthPage() {
       handleVaultChange(false);
       return;
     }
-    setSelectedBoxHour(nextReady.hour);
-    setBoxStage('idle');
-    setRevealedReward(null);
+    handleRevealBox(nextReady.hour);
   };
 
   const handleHeroCta = () => {
@@ -1641,12 +1689,12 @@ export default function GrowthPage() {
               >
                 <div className="flex justify-center">
                   <RewardHeroBox
-                    state={selectedBox?.state === 'ready' ? 'ready' : 'charging'}
+                    state={isSelectedBoxVisuallyReady ? 'ready' : 'charging'}
                     stage={boxStage}
-                    intense={selectedBox?.state === 'ready'}
+                    intense={isSelectedBoxVisuallyReady}
                     rarity={selectedBox?.rarity ?? null}
                     label={selectedBox ? `${selectedBox.hour}시간 상자` : '상자'}
-                    onClick={selectedBox?.state === 'ready' ? handleRevealBox : undefined}
+                    onClick={selectedBox?.state === 'ready' && boxStage === 'idle' ? () => handleRevealBox() : undefined}
                   />
                 </div>
 
@@ -1697,7 +1745,7 @@ export default function GrowthPage() {
                 ) : (
                   <Button
                     className="h-12 flex-1 rounded-[1.2rem] bg-[linear-gradient(180deg,#ffb24d_0%,#ff8a20_100%)] text-sm font-black text-white hover:brightness-105"
-                    onClick={selectedBox?.state === 'ready' && boxStage === 'idle' ? handleRevealBox : () => handleVaultChange(false)}
+                    onClick={selectedBox?.state === 'ready' && boxStage === 'idle' ? () => handleRevealBox() : () => handleVaultChange(false)}
                     disabled={isOpeningReward}
                   >
                     {selectedBox?.state === 'ready' && boxStage === 'idle'
