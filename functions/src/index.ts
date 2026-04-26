@@ -18,6 +18,7 @@ if (admin.apps.length === 0) {
 const region = "asia-northeast3";
 const geminiApiKey = defineSecret("GEMINI_API_KEY");
 const MANUAL_PARENT_SMS_UID = "__manual_parent__";
+const STUDENT_SMS_FALLBACK_UID = "__student__";
 const allowedRoles = ["student", "teacher", "parent", "centerAdmin"] as const;
 const adminRoles = new Set(["centerAdmin", "owner", "admin", "centerManager"]);
 type AllowedRole = (typeof allowedRoles)[number];
@@ -97,6 +98,7 @@ type SmsRecipientPreferenceDoc = {
   phoneNumber?: string;
   enabled?: boolean;
   isManualRecipient?: boolean;
+  isFallbackRecipient?: boolean;
   eventToggles?: Partial<Record<ParentSmsEventType, boolean>>;
   updatedAt?: admin.firestore.Timestamp;
   updatedBy?: string;
@@ -2305,9 +2307,10 @@ async function collectParentRecipients(
 ): Promise<SmsRecipient[]> {
   const studentSnap = await db.doc(`centers/${centerId}/students/${studentId}`).get();
   if (!studentSnap.exists) return [];
-  if (shouldExcludeFromSmsQueries(studentSnap.data(), studentId)) return [];
+  const studentData = studentSnap.data() || {};
+  if (shouldExcludeFromSmsQueries(studentData, studentId)) return [];
 
-  const parentUidsRaw = studentSnap.data()?.parentUids;
+  const parentUidsRaw = studentData.parentUids;
   const parentUids = Array.isArray(parentUidsRaw)
     ? parentUidsRaw.filter((uid): uid is string => typeof uid === "string" && uid.trim().length > 0)
     : [];
@@ -2353,6 +2356,29 @@ async function collectParentRecipients(
       phoneNumber,
     });
     usedPhones.add(phoneNumber);
+  }
+
+  if (recipients.length === 0) {
+    const [fallbackPrefSnap, studentMemberSnap] = await Promise.all([
+      db.doc(`centers/${centerId}/smsRecipientPreferences/${buildSmsRecipientPreferenceId(studentId, STUDENT_SMS_FALLBACK_UID)}`).get(),
+      db.doc(`centers/${centerId}/members/${studentId}`).get(),
+    ]);
+    const fallbackPref = fallbackPrefSnap.exists ? (fallbackPrefSnap.data() as SmsRecipientPreferenceDoc) : null;
+    const studentMemberData = studentMemberSnap.exists ? studentMemberSnap.data() : null;
+    const fallbackPhoneNumber = resolveFirstValidPhoneNumber(
+      fallbackPref?.phoneNumber,
+      studentData.phoneNumber,
+      studentMemberData?.phoneNumber
+    );
+
+    if (fallbackPhoneNumber && !usedPhones.has(fallbackPhoneNumber)) {
+      recipients.push({
+        parentUid: STUDENT_SMS_FALLBACK_UID,
+        parentName: asTrimmedString(fallbackPref?.parentName, "학생 본인"),
+        phoneNumber: fallbackPhoneNumber,
+      });
+      usedPhones.add(fallbackPhoneNumber);
+    }
   }
 
   return recipients;
@@ -6189,7 +6215,14 @@ export const updateSmsRecipientPreference = functions.region(region).https.onCal
 
   const centerId = asTrimmedString(data?.centerId);
   const studentId = asTrimmedString(data?.studentId);
-  const parentUid = asTrimmedString(data?.parentUid);
+  const requestedParentUid = asTrimmedString(data?.parentUid);
+  const isManualRecipientRequest = data?.isManualRecipient === true || requestedParentUid === MANUAL_PARENT_SMS_UID;
+  const isFallbackRecipientRequest = data?.isFallbackRecipient === true || requestedParentUid === STUDENT_SMS_FALLBACK_UID;
+  const parentUid = isManualRecipientRequest
+    ? MANUAL_PARENT_SMS_UID
+    : isFallbackRecipientRequest
+      ? STUDENT_SMS_FALLBACK_UID
+      : requestedParentUid;
   if (!centerId || !studentId || !parentUid) {
     throw new functions.https.HttpsError("invalid-argument", "centerId, studentId, parentUid가 필요합니다.");
   }
@@ -6205,12 +6238,14 @@ export const updateSmsRecipientPreference = functions.region(region).https.onCal
     throw new functions.https.HttpsError("not-found", "학생 정보를 찾을 수 없습니다.");
   }
 
-  const studentName = asTrimmedString(studentSnap.data()?.name, "학생");
+  const studentData = studentSnap.data() || {};
+  const studentName = asTrimmedString(studentData.name, "학생");
   const phoneNumberOverride = normalizePhoneNumber(data?.phoneNumberOverride || "");
   const enabled = data?.enabled !== false;
   const eventToggles = normalizeSmsEventToggles(data?.eventToggles);
+  const parentNameOverride = asTrimmedString(data?.parentNameOverride);
 
-  if (parentUid === MANUAL_PARENT_SMS_UID) {
+  if (isManualRecipientRequest) {
     if (!phoneNumberOverride) {
       throw new functions.https.HttpsError("invalid-argument", "보호자 휴대폰 번호가 필요합니다.");
     }
@@ -6219,7 +6254,7 @@ export const updateSmsRecipientPreference = functions.region(region).https.onCal
       studentId,
       studentName,
       parentUid,
-      parentName: "보호자",
+      parentName: parentNameOverride || "보호자",
       phoneNumber: phoneNumberOverride,
       enabled,
       eventToggles,
@@ -6231,7 +6266,34 @@ export const updateSmsRecipientPreference = functions.region(region).https.onCal
     return { ok: true };
   }
 
-  const parentUids = normalizeStringArray(studentSnap.data()?.parentUids);
+  if (isFallbackRecipientRequest) {
+    const studentMemberSnap = await db.doc(`centers/${centerId}/members/${studentId}`).get();
+    const fallbackPhoneNumber = resolveFirstValidPhoneNumber(
+      phoneNumberOverride,
+      studentData.phoneNumber,
+      studentMemberSnap.data()?.phoneNumber
+    );
+    if (!fallbackPhoneNumber) {
+      throw new functions.https.HttpsError("invalid-argument", "학생 휴대폰 번호가 필요합니다.");
+    }
+
+    await db.doc(`centers/${centerId}/smsRecipientPreferences/${buildSmsRecipientPreferenceId(studentId, parentUid)}`).set({
+      studentId,
+      studentName,
+      parentUid,
+      parentName: parentNameOverride || "학생 본인",
+      phoneNumber: fallbackPhoneNumber,
+      enabled,
+      eventToggles,
+      isFallbackRecipient: true,
+      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      updatedBy: context.auth.uid,
+    }, { merge: true });
+
+    return { ok: true };
+  }
+
+  const parentUids = normalizeStringArray(studentData.parentUids);
   if (!parentUids.includes(parentUid)) {
     throw new functions.https.HttpsError("failed-precondition", "해당 학생에 연결된 학부모가 아닙니다.");
   }

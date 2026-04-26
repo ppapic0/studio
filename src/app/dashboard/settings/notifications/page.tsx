@@ -169,6 +169,7 @@ type SmsRecipientPreferenceDoc = {
   phoneNumber?: string;
   enabled?: boolean;
   isManualRecipient?: boolean;
+  isFallbackRecipient?: boolean;
   eventToggles?: Partial<Record<ParentSmsEventType, boolean>>;
   updatedAt?: { toDate?: () => Date };
 };
@@ -1299,6 +1300,9 @@ export default function NotificationSettingsPage() {
         enabled: nextEnabled,
         eventToggles: nextEventToggles,
         phoneNumberOverride: phoneNumberOverride || undefined,
+        parentNameOverride: row.parentName,
+        isManualRecipient: row.isManualRecipient === true || row.parentUid === MANUAL_PARENT_SMS_UID,
+        isFallbackRecipient: row.isFallbackRecipient === true || row.parentUid === STUDENT_SMS_FALLBACK_UID,
       });
       toast({
         title: '수신 설정 저장 완료',
