@@ -594,22 +594,22 @@ service cloud.firestore {
 
       match /consultingLeads/{leadId} {
         allow read: if isTeacherOrAdmin(centerId);
-        allow create: if isCenterAdmin(centerId) || canTeacherCreateWebsiteLead(centerId);
-        allow update: if isCenterAdmin(centerId) || canTeacherLinkLeadToWaitlist(centerId);
+        allow create: if isTeacherOrAdmin(centerId);
+        allow update: if isTeacherOrAdmin(centerId);
         allow delete: if isCenterAdmin(centerId);
       }
 
       match /admissionWaitlist/{entryId} {
         allow read: if isTeacherOrAdmin(centerId);
-        allow create: if isCenterAdmin(centerId) || canTeacherCreateWaitlistFromLead(centerId);
-        allow update: if isCenterAdmin(centerId) || canTeacherAttachWebsiteWaitlistToLead(centerId);
+        allow create: if isTeacherOrAdmin(centerId);
+        allow update: if isTeacherOrAdmin(centerId);
         allow delete: if isCenterAdmin(centerId);
       }
 
       match /websiteConsultRequests/{reqId} {
         allow read: if isTeacherOrAdmin(centerId);
         allow create: if isCenterAdmin(centerId);
-        allow update: if isCenterAdmin(centerId) || canTeacherLinkWebsiteRequestToLead(centerId);
+        allow update: if isTeacherOrAdmin(centerId);
         allow delete: if isCenterAdmin(centerId);
       }
 

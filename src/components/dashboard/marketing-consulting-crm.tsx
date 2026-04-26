@@ -11,10 +11,13 @@ import {
   query,
   serverTimestamp,
   updateDoc,
+  writeBatch,
 } from 'firebase/firestore';
 import {
+  ArrowRightCircle,
   Download,
   Flame,
+  Inbox,
   ListChecks,
   Loader2,
   Megaphone,
@@ -32,7 +35,7 @@ import { useCollection, useFirestore, useUser } from '@/firebase';
 import { useAppContext } from '@/contexts/app-context';
 import { useMemoFirebase } from '@/hooks/use-memo-firebase';
 import { useToast } from '@/hooks/use-toast';
-import { canManageLeadRecords, canReadFinance, canTransitionLeadPipeline } from '@/lib/dashboard-access';
+import { canManageLeadRecords, canReadFinance, canTransitionLeadPipeline, isAdminRole } from '@/lib/dashboard-access';
 import type { WebsiteBookingAccess, WebsiteConsultReservation, WebsiteSeatHoldRequest } from '@/lib/types';
 import { cn } from '@/lib/utils';
 
@@ -66,6 +69,7 @@ type LeadStatus = 'new' | 'contacted' | 'consulted' | 'enrolled' | 'closed';
 type WaitlistStatus = 'waiting' | 'admitted' | 'cancelled';
 type ServiceType = 'korean_academy' | 'study_center';
 type ReferralRoute = '추천' | '네이버' | '카페' | '광고' | '기타';
+type LeadDbSegment = 'contacts' | 'enrolled';
 
 interface ConsultingLead {
   id: string;
@@ -220,8 +224,12 @@ const SERVICE_TYPE_META: Record<ServiceType, { label: string; color: string }> =
   study_center: { label: '관리형 스터디센터', color: 'bg-sky-100 text-sky-700 border-sky-200' },
 };
 
-const SERVICE_TYPE_NONE = '__none__';
 const ALL_SERVICE_TYPES: ServiceType[] = ['korean_academy', 'study_center'];
+
+const LEAD_DB_SEGMENT_META: Record<LeadDbSegment, { label: string; description: string }> = {
+  contacts: { label: '연락처만 있는 DB', description: '등록 전 상담·문의 연락처' },
+  enrolled: { label: '재원생 DB', description: '등록 완료된 학생 연락처' },
+};
 
 const REFERRAL_ROUTES: ReferralRoute[] = ['추천', '네이버', '카페', '광고', '기타'];
 
@@ -236,7 +244,7 @@ const INITIAL_FORM = (): LeadFormState => ({
   referrerName: '',
   consultationDate: format(new Date(), 'yyyy-MM-dd'),
   status: 'new',
-  serviceType: '',
+  serviceType: 'study_center',
   memo: '',
 });
 
@@ -302,6 +310,14 @@ function getServiceTypeBadgeMeta(serviceType?: ServiceType | null) {
   return { label: '서비스 미분류', color: 'bg-slate-100 text-slate-600 border-slate-200' };
 }
 
+function resolveLeadServiceBucket(serviceType?: ServiceType | null): ServiceType {
+  return serviceType === 'korean_academy' ? 'korean_academy' : 'study_center';
+}
+
+function resolveLeadDbSegment(status?: LeadStatus | null): LeadDbSegment {
+  return status === 'enrolled' ? 'enrolled' : 'contacts';
+}
+
 function getUnifiedLeadSortMs(item: Pick<UnifiedLeadListItem, 'consultationDate' | 'createdAt'>) {
   return toDateMs(item.createdAt) || toDateMs(item.consultationDate);
 }
@@ -322,25 +338,29 @@ export function MarketingConsultingCRM({
   const canOpenFinance = canReadFinance(activeMembership?.role);
   const canManageLeadData = canManageLeadRecords(activeMembership?.role);
   const canTransitionPipeline = canTransitionLeadPipeline(activeMembership?.role);
+  const canDeleteLeadData = isAdminRole(activeMembership?.role);
 
   const [form, setForm] = useState<LeadFormState>(INITIAL_FORM);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<'all' | LeadStatus>('all');
+  const [leadServiceFilter, setLeadServiceFilter] = useState<ServiceType>('study_center');
+  const [leadDbSegmentFilter, setLeadDbSegmentFilter] = useState<LeadDbSegment>('contacts');
   const [leadsPage, setLeadsPage] = useState(0);
+  const [movingWebsiteRequestId, setMovingWebsiteRequestId] = useState<string | null>(null);
 
   // Waitlist states
   const [waitlistModal, setWaitlistModal] = useState<WaitlistModal>(INITIAL_WAITLIST_MODAL);
   const [isSavingWaitlist, setIsSavingWaitlist] = useState(false);
-  const [waitlistServiceFilter, setWaitlistServiceFilter] = useState<'all' | ServiceType>('all');
+  const [waitlistServiceFilter, setWaitlistServiceFilter] = useState<ServiceType>('study_center');
   const [waitlistStatusFilter, setWaitlistStatusFilter] = useState<'all' | WaitlistStatus>('all');
   const [waitlistSearch, setWaitlistSearch] = useState('');
   const [selectedDrawer, setSelectedDrawer] = useState<{ type: 'lead' | 'website' | 'waitlist'; id: string } | null>(null);
 
   useEffect(() => {
     setLeadsPage(0);
-  }, [searchTerm, statusFilter]);
+  }, [leadDbSegmentFilter, leadServiceFilter, searchTerm, statusFilter]);
 
   // ── Firestore queries ─────────────────────────────────────────────────────
 
@@ -420,7 +440,11 @@ export function MarketingConsultingCRM({
   const websiteRequestById = useMemo(() => {
     return new Map(websiteRequests.map((request) => [request.id, request] as const));
   }, [websiteRequests]);
-  const visibleWebsiteRequests = websiteRequests;
+  const visibleWebsiteRequests = useMemo(
+    () => websiteRequests.filter((request) => !request.linkedLeadId),
+    [websiteRequests]
+  );
+  const movedWebsiteRequestCount = websiteRequests.length - visibleWebsiteRequests.length;
   const websiteReservations = useMemo(
     () => [...(websiteReservationsRaw || [])].sort((a, b) => toDateMs(b.createdAt) - toDateMs(a.createdAt)),
     [websiteReservationsRaw]
@@ -507,9 +531,9 @@ export function MarketingConsultingCRM({
   }, [leadById, waitlist, websiteRequestById]);
 
   const unifiedLeadItems = useMemo<UnifiedLeadListItem[]>(() => {
-    const manualLeadItems: UnifiedLeadListItem[] = leads.map((lead) => ({
+    return leads.map((lead) => ({
       key: `lead-${lead.id}`,
-      type: 'lead',
+      type: 'lead' as const,
       id: lead.id,
       receiptId: lead.receiptId,
       studentName: lead.studentName || '(학생명 미입력)',
@@ -521,42 +545,24 @@ export function MarketingConsultingCRM({
       status: lead.status || 'new',
       serviceType: lead.serviceType,
       requestTypeLabel: lead.requestTypeLabel,
-      sourceLabel: '수기 리드',
-      routeLabel: lead.referralRoute || lead.marketingChannel || '기타',
+      sourceLabel: lead.source === 'website' ? '웹 접수 DB 이동' : '수기 리드',
+      routeLabel: lead.referralRoute || lead.marketingChannel || (lead.source === 'website' ? '웹사이트' : '기타'),
       consultationDate: lead.consultationDate,
       memo: lead.memo,
       createdAt: lead.createdAt,
       lead,
-    }));
-    const websiteLeadItems: UnifiedLeadListItem[] = visibleWebsiteRequests.map((request) => ({
-      key: `website-${request.id}`,
-      type: 'website',
-      id: request.id,
-      receiptId: request.receiptId,
-      studentName: request.studentName || '(학생명 미입력)',
-      parentPhone: request.consultPhone || '',
-      school: request.school,
-      grade: request.grade,
-      status: request.status || 'new',
-      serviceType: request.serviceType,
-      requestTypeLabel: request.requestTypeLabel,
-      sourceLabel: request.sourceLabel || '웹사이트 상담폼',
-      routeLabel: request.sourceLabel || '웹사이트',
-      consultationDate: request.consultationDate,
-      createdAt: request.createdAt,
-      websiteRequest: request,
-    }));
-
-    return [...manualLeadItems, ...websiteLeadItems].sort(
+    })).sort(
       (left, right) => getUnifiedLeadSortMs(right) - getUnifiedLeadSortMs(left)
     );
-  }, [leads, visibleWebsiteRequests]);
+  }, [leads]);
 
   const LEADS_PER_PAGE = 5;
 
   const filteredLeads = useMemo(() => {
     const keyword = searchTerm.trim().toLowerCase();
     return unifiedLeadItems.filter((item) => {
+      if (resolveLeadServiceBucket(item.serviceType) !== leadServiceFilter) return false;
+      if (resolveLeadDbSegment(item.status) !== leadDbSegmentFilter) return false;
       if (statusFilter !== 'all' && item.status !== statusFilter) return false;
       if (!keyword) return true;
       return [
@@ -578,7 +584,7 @@ export function MarketingConsultingCRM({
         .toLowerCase()
         .includes(keyword);
     });
-  }, [searchTerm, statusFilter, unifiedLeadItems]);
+  }, [leadDbSegmentFilter, leadServiceFilter, searchTerm, statusFilter, unifiedLeadItems]);
 
   const pagedLeads = useMemo(
     () => filteredLeads.slice(leadsPage * LEADS_PER_PAGE, (leadsPage + 1) * LEADS_PER_PAGE),
@@ -589,7 +595,7 @@ export function MarketingConsultingCRM({
   const filteredWaitlist = useMemo(() => {
     const keyword = waitlistSearch.trim().toLowerCase();
     return waitlist.filter((entry) => {
-      if (waitlistServiceFilter !== 'all' && entry.serviceType !== waitlistServiceFilter) return false;
+      if (entry.serviceType !== waitlistServiceFilter) return false;
       if (waitlistStatusFilter !== 'all' && entry.status !== waitlistStatusFilter) return false;
       if (!keyword) return true;
       return [entry.studentName, entry.parentPhone, entry.studentPhone, entry.school, entry.grade, entry.referralRoute, entry.referrerName]
@@ -660,11 +666,15 @@ export function MarketingConsultingCRM({
       total: unifiedLeadItems.length,
       leadCount: leads.length,
       websiteCount: visibleWebsiteRequests.length,
+      movedWebsiteCount: movedWebsiteRequestCount,
       waitlistCount: waitlist.length,
-      koreanLeadCount: unifiedLeadItems.filter((item) => item.serviceType === 'korean_academy').length,
-      studyCenterLeadCount: unifiedLeadItems.filter((item) => item.serviceType === 'study_center').length,
+      activeLeadCount: filteredLeads.length,
+      contactLeadCount: unifiedLeadItems.filter((item) => resolveLeadDbSegment(item.status) === 'contacts').length,
+      enrolledLeadCount: unifiedLeadItems.filter((item) => resolveLeadDbSegment(item.status) === 'enrolled').length,
+      koreanLeadCount: unifiedLeadItems.filter((item) => resolveLeadServiceBucket(item.serviceType) === 'korean_academy').length,
+      studyCenterLeadCount: unifiedLeadItems.filter((item) => resolveLeadServiceBucket(item.serviceType) === 'study_center').length,
     }),
-    [leads.length, unifiedLeadItems, visibleWebsiteRequests.length, waitlist.length]
+    [filteredLeads.length, leads.length, movedWebsiteRequestCount, unifiedLeadItems, visibleWebsiteRequests.length, waitlist.length]
   );
 
   // ── Handlers ─────────────────────────────────────────────────────────────
@@ -688,7 +698,7 @@ export function MarketingConsultingCRM({
       referrerName: lead.referrerName || '',
       consultationDate: lead.consultationDate || format(new Date(), 'yyyy-MM-dd'),
       status: lead.status || 'new',
-      serviceType: lead.serviceType || '',
+      serviceType: lead.serviceType || 'study_center',
       memo: lead.memo || '',
     });
   };
@@ -717,7 +727,7 @@ export function MarketingConsultingCRM({
         referrerName: form.referralRoute === '추천' ? form.referrerName.trim() : '',
         consultationDate: form.consultationDate,
         status: form.status,
-        serviceType: form.serviceType || null,
+        serviceType: form.serviceType || 'study_center',
         memo: form.memo.trim(),
         updatedAt: serverTimestamp(),
       };
@@ -742,7 +752,7 @@ export function MarketingConsultingCRM({
   };
 
   const handleDelete = async (leadId: string) => {
-    if (!firestore || !centerId || !canManageLeadData) return;
+    if (!firestore || !centerId || !canDeleteLeadData) return;
     try {
       await deleteDoc(doc(firestore, 'centers', centerId, 'consultingLeads', leadId));
       if (editingId === leadId) resetForm();
@@ -780,13 +790,109 @@ export function MarketingConsultingCRM({
   };
 
   const handleWebsiteDelete = async (requestId: string) => {
-    if (!firestore || !centerId || !canManageLeadData) return;
+    if (!firestore || !centerId || !canDeleteLeadData) return;
     try {
       await deleteDoc(doc(firestore, 'centers', centerId, 'websiteConsultRequests', requestId));
       toast({ title: '웹 상담 접수가 삭제되었습니다.' });
     } catch (error) {
       console.error(error);
       toast({ variant: 'destructive', title: '삭제 실패', description: '웹 상담 접수 삭제 중 오류가 발생했습니다.' });
+    }
+  };
+
+  const handleMoveWebsiteRequestToDb = async (request: WebsiteConsultRequest) => {
+    if (!firestore || !centerId || !canManageLeadData) return;
+    if (request.linkedLeadId) {
+      toast({ title: '이미 DB로 이동된 접수입니다.' });
+      return;
+    }
+
+    setMovingWebsiteRequestId(request.id);
+    try {
+      const batch = writeBatch(firestore);
+      const leadRef = doc(collection(firestore, 'centers', centerId, 'consultingLeads'));
+      const websiteRequestRef = doc(firestore, 'centers', centerId, 'websiteConsultRequests', request.id);
+      const existingWaitlistEntries = waitlistBySourceWebsiteRequestId.get(request.id) || [];
+      const shouldCreateWaitlist =
+        request.requestType === 'study_center_waitlist' && existingWaitlistEntries.length === 0;
+
+      batch.set(leadRef, {
+        receiptId: request.receiptId || '',
+        studentName: request.studentName || '',
+        parentName: '',
+        parentPhone: request.consultPhone || '',
+        studentPhone: '',
+        school: request.school || '',
+        grade: request.grade || '',
+        marketingChannel: request.sourceLabel || '웹사이트 상담폼',
+        referralRoute: '기타',
+        referrerName: '',
+        consultationDate: request.consultationDate || format(new Date(), 'yyyy-MM-dd'),
+        status: request.status || 'new',
+        serviceType: request.serviceType || 'study_center',
+        requestType: request.requestType || '',
+        requestTypeLabel: request.requestTypeLabel || '',
+        memo: request.requestTypeLabel
+          ? `${request.requestTypeLabel} 접수에서 DB 이동`
+          : '웹사이트 상담폼 접수에서 DB 이동',
+        source: 'website',
+        sourceRequestId: request.id,
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+        createdByUid: user?.uid || null,
+      });
+
+      batch.update(websiteRequestRef, {
+        linkedLeadId: leadRef.id,
+        updatedAt: serverTimestamp(),
+      });
+
+      existingWaitlistEntries.forEach((entry) => {
+        batch.update(doc(firestore, 'centers', centerId, 'admissionWaitlist', entry.id), {
+          sourceLeadId: leadRef.id,
+          updatedAt: serverTimestamp(),
+        });
+      });
+
+      if (shouldCreateWaitlist) {
+        const waitlistRef = doc(collection(firestore, 'centers', centerId, 'admissionWaitlist'));
+        batch.set(waitlistRef, {
+          studentName: request.studentName || '',
+          parentPhone: request.consultPhone || '',
+          studentPhone: '',
+          school: request.school || '',
+          grade: request.grade || '',
+          serviceType: 'study_center' as ServiceType,
+          referralRoute: '기타',
+          referrerName: '',
+          status: 'waiting' as WaitlistStatus,
+          memo: request.requestTypeLabel ? `${request.requestTypeLabel} 접수에서 DB 이동` : '웹사이트 입학 대기 접수',
+          waitlistDate: request.consultationDate || format(new Date(), 'yyyy-MM-dd'),
+          sourceLeadId: leadRef.id,
+          sourceWebsiteRequestId: request.id,
+          receiptId: request.receiptId || '',
+          requestType: request.requestType || '',
+          requestTypeLabel: request.requestTypeLabel || '',
+          createdAt: serverTimestamp(),
+          updatedAt: serverTimestamp(),
+        });
+      }
+
+      await batch.commit();
+      toast({
+        title: 'DB로 이동 완료',
+        description: shouldCreateWaitlist
+          ? '리드 DB와 입학 대기 DB에 함께 반영했습니다.'
+          : '새 상담 접수를 리드 DB로 이동했습니다.',
+      });
+      setLeadServiceFilter(resolveLeadServiceBucket(request.serviceType));
+      setLeadDbSegmentFilter('contacts');
+      setSelectedDrawer({ type: 'lead', id: leadRef.id });
+    } catch (error) {
+      console.error(error);
+      toast({ variant: 'destructive', title: 'DB 이동 실패', description: '웹 상담 접수를 DB로 이동하는 중 오류가 발생했습니다.' });
+    } finally {
+      setMovingWebsiteRequestId(null);
     }
   };
 
@@ -957,7 +1063,7 @@ export function MarketingConsultingCRM({
   };
 
   const handleWaitlistDelete = async (entryId: string, sourceLeadId?: string) => {
-    if (!firestore || !centerId || !canManageLeadData) return;
+    if (!firestore || !centerId || !canDeleteLeadData) return;
     try {
       await deleteDoc(doc(firestore, 'centers', centerId, 'admissionWaitlist', entryId));
       if (sourceLeadId) {
@@ -1046,7 +1152,170 @@ export function MarketingConsultingCRM({
   return (
     <section className="space-y-4">
       {/* ════════════════════════════════════════════
-          통합 리드 DB
+          새 상담 접수함
+      ════════════════════════════════════════════ */}
+      <Card className="rounded-2xl border-none shadow-sm ring-1 ring-orange-100/80">
+        <CardHeader className={cn(isMobile ? 'p-5' : 'p-6')}>
+          <div className={cn('flex items-start justify-between gap-3', isMobile ? 'flex-col' : 'flex-row')}>
+            <div className="space-y-1">
+              <CardTitle className="flex items-center gap-2 text-lg font-black">
+                <Inbox className="h-5 w-5 text-orange-500" />
+                새 상담 접수함
+              </CardTitle>
+              <CardDescription className="font-semibold">
+                웹사이트 상담폼 원본은 여기서 먼저 확인하고, 필요할 때만 DB로 이동합니다.
+              </CardDescription>
+            </div>
+            <Badge className="border border-orange-200 bg-orange-50 px-3 py-1.5 font-black text-orange-700">
+              새 접수 {visibleWebsiteRequests.length}건
+            </Badge>
+          </div>
+        </CardHeader>
+        <CardContent className={cn('space-y-4', isMobile ? 'p-5 pt-0' : 'p-6 pt-0')}>
+          <div className={cn('grid gap-3', isMobile ? 'grid-cols-2' : 'grid-cols-4')}>
+            <Card className="rounded-xl border-none bg-orange-50 shadow-sm ring-1 ring-orange-100">
+              <CardContent className="p-4">
+                <p className="text-[11px] font-bold text-orange-700">새 접수</p>
+                <p className="mt-1 text-2xl font-black text-orange-700">{visibleWebsiteRequests.length}</p>
+              </CardContent>
+            </Card>
+            <Card className="rounded-xl border-none shadow-sm ring-1 ring-border/50">
+              <CardContent className="p-4">
+                <p className="text-[11px] font-bold text-muted-foreground">DB 이동 완료</p>
+                <p className="mt-1 text-2xl font-black text-[#14295F]">{movedWebsiteRequestCount}</p>
+              </CardContent>
+            </Card>
+            <Card className="rounded-xl border-none shadow-sm ring-1 ring-border/50">
+              <CardContent className="p-4">
+                <p className="text-[11px] font-bold text-muted-foreground">센터 접수</p>
+                <p className="mt-1 text-2xl font-black text-sky-600">
+                  {visibleWebsiteRequests.filter((request) => resolveLeadServiceBucket(request.serviceType) === 'study_center').length}
+                </p>
+              </CardContent>
+            </Card>
+            <Card className="rounded-xl border-none shadow-sm ring-1 ring-border/50">
+              <CardContent className="p-4">
+                <p className="text-[11px] font-bold text-muted-foreground">학원 접수</p>
+                <p className="mt-1 text-2xl font-black text-violet-600">
+                  {visibleWebsiteRequests.filter((request) => resolveLeadServiceBucket(request.serviceType) === 'korean_academy').length}
+                </p>
+              </CardContent>
+            </Card>
+          </div>
+
+          <div className="space-y-2">
+            {websiteRequestsLoading ? (
+              <div className="flex h-28 items-center justify-center rounded-xl border border-dashed">
+                <Loader2 className="h-6 w-6 animate-spin text-orange-400" />
+              </div>
+            ) : visibleWebsiteRequests.length === 0 ? (
+              <div className="rounded-xl border border-dashed border-orange-100 bg-orange-50/30 py-8 text-center text-sm font-semibold text-muted-foreground">
+                새로 확인할 웹사이트 상담 접수가 없습니다.
+              </div>
+            ) : (
+              visibleWebsiteRequests.map((request) => {
+                const serviceMeta = getServiceTypeBadgeMeta(request.serviceType);
+                const requestBadge = getWebsiteRequestStatusBadge(
+                  latestWebsiteReservationByLeadId.get(request.id),
+                  latestWebsiteSeatHoldByLeadId.get(request.id)
+                );
+                const isMoving = movingWebsiteRequestId === request.id;
+
+                return (
+                  <Card key={request.id} className="rounded-xl border-none shadow-sm ring-1 ring-orange-100">
+                    <CardContent className={cn('space-y-3', isMobile ? 'p-4' : 'p-5')}>
+                      <div className={cn('flex gap-2', isMobile ? 'flex-col' : 'items-start justify-between')}>
+                        <div className="space-y-1">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <p className="text-base font-black text-slate-800">{request.studentName || '(학생명 미입력)'}</p>
+                            {request.receiptId ? (
+                              <Badge variant="outline" className="text-[10px] font-black text-[#14295F]">
+                                접수번호 {request.receiptId}
+                              </Badge>
+                            ) : null}
+                            <Badge className={cn('border text-[10px] font-black', STATUS_META[request.status || 'new'].className)}>
+                              {STATUS_META[request.status || 'new'].label}
+                            </Badge>
+                            <Badge className={cn('border text-[10px] font-black', serviceMeta.color)}>
+                              {request.requestTypeLabel || serviceMeta.label}
+                            </Badge>
+                            {requestBadge ? (
+                              <Badge className={cn('border text-[10px] font-black', requestBadge.className)}>
+                                {requestBadge.label}
+                              </Badge>
+                            ) : null}
+                          </div>
+                          <div className="flex flex-wrap items-center gap-3 text-xs font-semibold text-slate-600">
+                            <span className="inline-flex items-center gap-1.5">
+                              <Phone className="h-3.5 w-3.5 text-slate-400" />
+                              {request.consultPhone || '-'}
+                            </span>
+                            {request.school && <span>학교: {request.school}</span>}
+                            {request.grade && <span>{request.grade}</span>}
+                            <span>접수일: {request.consultationDate || '-'}</span>
+                            <span>접수시각: {formatDateTimeLabel(request.createdAt)}</span>
+                          </div>
+                        </div>
+
+                        <div className={cn('flex gap-2', isMobile ? 'w-full flex-wrap' : 'items-center')}>
+                          <Button
+                            type="button"
+                            variant="outline"
+                            className="h-9 rounded-lg px-3 text-xs font-black"
+                            onClick={() => setSelectedDrawer({ type: 'website', id: request.id })}
+                          >
+                            상세 보기
+                          </Button>
+                          {canManageLeadData ? (
+                            <Select
+                              value={request.status || 'new'}
+                              onValueChange={(value) => handleWebsiteStatusUpdate(request.id, value as LeadStatus)}
+                            >
+                              <SelectTrigger className="h-9 min-w-[120px] rounded-lg text-xs font-black">
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {Object.entries(STATUS_META).map(([value, meta]) => (
+                                  <SelectItem key={value} value={value}>{meta.label}</SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          ) : null}
+                          {canManageLeadData ? (
+                            <Button
+                              type="button"
+                              className="h-9 rounded-lg bg-[#14295F] px-3 text-xs font-black hover:bg-[#0f214d]"
+                              onClick={() => void handleMoveWebsiteRequestToDb(request)}
+                              disabled={isMoving}
+                            >
+                              {isMoving ? <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" /> : <ArrowRightCircle className="mr-1 h-3.5 w-3.5" />}
+                              DB로 이동
+                            </Button>
+                          ) : null}
+                          {canDeleteLeadData ? (
+                            <Button
+                              type="button"
+                              variant="outline"
+                              className="h-9 rounded-lg border-rose-200 px-3 text-xs font-black text-rose-600 hover:bg-rose-50"
+                              onClick={() => void handleWebsiteDelete(request.id)}
+                            >
+                              <Trash2 className="mr-1 h-3.5 w-3.5" />
+                              삭제
+                            </Button>
+                          ) : null}
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                );
+              })
+            )}
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* ════════════════════════════════════════════
+          리드 DB
       ════════════════════════════════════════════ */}
       <Card className="rounded-2xl border-none shadow-sm ring-1 ring-border/50">
           <CardHeader className={cn(isMobile ? 'p-5' : 'p-6')}>
@@ -1054,10 +1323,10 @@ export function MarketingConsultingCRM({
               <div className="space-y-1">
                 <CardTitle className="flex items-center gap-2 text-lg font-black">
                   <Megaphone className="h-5 w-5 text-primary" />
-                  통합 리드 DB
+                  리드 DB
                 </CardTitle>
                 <CardDescription className="font-semibold">
-                  수기 리드와 웹사이트 상담폼 접수를 리드 현황에서 함께 보고, 국어/센터 문의를 바로 구분합니다.
+                  DB로 이동된 상담 연락처만 관리합니다. 센터/학원, 재원생/연락처 DB를 분리해서 봅니다.
                 </CardDescription>
               </div>
               <div className="flex flex-wrap gap-2">
@@ -1090,34 +1359,81 @@ export function MarketingConsultingCRM({
             <div className={cn('grid gap-3', isMobile ? 'grid-cols-2' : 'md:grid-cols-5')}>
               <Card className="rounded-xl border-none bg-primary shadow-sm">
                 <CardContent className="p-4">
-                  <p className="text-[11px] font-bold text-black">리드 현황</p>
-                  <p className="mt-1 text-2xl font-black text-black">{unifiedSummary.total}</p>
+                  <p className="text-[11px] font-bold text-black">현재 보기</p>
+                  <p className="mt-1 text-2xl font-black text-black">{unifiedSummary.activeLeadCount}</p>
                 </CardContent>
               </Card>
               <Card className="rounded-xl border-none shadow-sm ring-1 ring-border/50">
                 <CardContent className="p-4">
-                  <p className="text-[11px] font-bold text-muted-foreground">수기 리드</p>
+                  <p className="text-[11px] font-bold text-muted-foreground">전체 DB</p>
                   <p className="mt-1 text-2xl font-black text-indigo-600">{unifiedSummary.leadCount}</p>
                 </CardContent>
               </Card>
               <Card className="rounded-xl border-none shadow-sm ring-1 ring-border/50">
                 <CardContent className="p-4">
-                  <p className="text-[11px] font-bold text-muted-foreground">웹 상담폼</p>
-                  <p className="mt-1 text-2xl font-black text-emerald-600">{unifiedSummary.websiteCount}</p>
+                  <p className="text-[11px] font-bold text-muted-foreground">연락처 DB</p>
+                  <p className="mt-1 text-2xl font-black text-emerald-600">{unifiedSummary.contactLeadCount}</p>
                 </CardContent>
               </Card>
               <Card className="rounded-xl border-none shadow-sm ring-1 ring-border/50">
                 <CardContent className="p-4">
-                  <p className="text-[11px] font-bold text-muted-foreground">국어 문의</p>
-                  <p className="mt-1 text-2xl font-black text-violet-600">{unifiedSummary.koreanLeadCount}</p>
+                  <p className="text-[11px] font-bold text-muted-foreground">재원생 DB</p>
+                  <p className="mt-1 text-2xl font-black text-violet-600">{unifiedSummary.enrolledLeadCount}</p>
                 </CardContent>
               </Card>
               <Card className="rounded-xl border-none shadow-sm ring-1 ring-border/50">
                 <CardContent className="p-4">
-                  <p className="text-[11px] font-bold text-muted-foreground">센터 문의</p>
-                  <p className="mt-1 text-2xl font-black text-sky-600">{unifiedSummary.studyCenterLeadCount}</p>
+                  <p className="text-[11px] font-bold text-muted-foreground">새 접수함</p>
+                  <p className="mt-1 text-2xl font-black text-sky-600">{unifiedSummary.websiteCount}</p>
                 </CardContent>
               </Card>
+            </div>
+
+            <div className="grid gap-3 md:grid-cols-2">
+              <div className="flex gap-1 rounded-lg bg-slate-100 p-1">
+                {(
+                  [
+                    { value: 'study_center', label: '센터 DB', count: unifiedSummary.studyCenterLeadCount },
+                    { value: 'korean_academy', label: '학원 DB', count: unifiedSummary.koreanLeadCount },
+                  ] as const
+                ).map((tab) => (
+                  <button
+                    key={tab.value}
+                    type="button"
+                    onClick={() => setLeadServiceFilter(tab.value)}
+                    className={cn(
+                      'flex-1 rounded-md px-3 py-2 text-xs font-black transition-all',
+                      leadServiceFilter === tab.value
+                        ? 'bg-white text-slate-900 shadow-sm'
+                        : 'text-slate-500 hover:text-slate-700'
+                    )}
+                  >
+                    {tab.label} {tab.count}건
+                  </button>
+                ))}
+              </div>
+              <div className="flex gap-1 rounded-lg bg-slate-100 p-1">
+                {(
+                  [
+                    { value: 'contacts', count: unifiedSummary.contactLeadCount },
+                    { value: 'enrolled', count: unifiedSummary.enrolledLeadCount },
+                  ] as const
+                ).map((tab) => (
+                  <button
+                    key={tab.value}
+                    type="button"
+                    onClick={() => setLeadDbSegmentFilter(tab.value)}
+                    className={cn(
+                      'flex-1 rounded-md px-3 py-2 text-xs font-black transition-all',
+                      leadDbSegmentFilter === tab.value
+                        ? 'bg-white text-slate-900 shadow-sm'
+                        : 'text-slate-500 hover:text-slate-700'
+                    )}
+                  >
+                    {LEAD_DB_SEGMENT_META[tab.value].label} {tab.count}건
+                  </button>
+                ))}
+              </div>
             </div>
 
             {/* ── 유입 경로 상위 ── */}
@@ -1252,19 +1568,13 @@ export function MarketingConsultingCRM({
                   <div className="grid gap-1.5">
                     <Label className="text-xs font-black">상담 유형</Label>
                     <Select
-                      value={form.serviceType}
-                      onValueChange={(value) =>
-                        setForm((p) => ({
-                          ...p,
-                          serviceType: value === SERVICE_TYPE_NONE ? '' : (value as ServiceType),
-                        }))
-                      }
+                      value={form.serviceType || 'study_center'}
+                      onValueChange={(value) => setForm((p) => ({ ...p, serviceType: value as ServiceType }))}
                     >
                       <SelectTrigger className="h-10 rounded-lg font-bold">
-                        <SelectValue placeholder="선택 안함" />
+                        <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value={SERVICE_TYPE_NONE} className="font-semibold text-slate-400">선택 안함</SelectItem>
                         {(Object.entries(SERVICE_TYPE_META) as [ServiceType, { label: string; color: string }][]).map(([value, meta]) => (
                           <SelectItem key={value} value={value} className="font-semibold">{meta.label}</SelectItem>
                         ))}
@@ -1305,8 +1615,8 @@ export function MarketingConsultingCRM({
 
             <AdminWorkbenchCommandBar
               eyebrow="홍보/상담 워크벤치"
-              title="리드 현황"
-              description="수기 리드와 웹 상담폼 접수를 한 목록에서 확인합니다."
+              title={`${leadServiceFilter === 'study_center' ? '센터' : '학원'} ${LEAD_DB_SEGMENT_META[leadDbSegmentFilter].label}`}
+              description={LEAD_DB_SEGMENT_META[leadDbSegmentFilter].description}
               searchValue={searchTerm}
               onSearchChange={setSearchTerm}
               searchPlaceholder="이름, 학교, 전화번호, 서비스, 유입경로 검색"
@@ -1505,7 +1815,7 @@ export function MarketingConsultingCRM({
                               {waitlistButtonLabel}
                             </Button>
                           )}
-                          {canManageLeadData ? (
+                          {canDeleteLeadData ? (
                             <Button
                               type="button"
                               variant="outline"
@@ -1586,7 +1896,7 @@ export function MarketingConsultingCRM({
                 입학 대기 DB
               </CardTitle>
               <CardDescription className="font-semibold">
-                국어 학원 / 관리형 스터디센터 입학 대기 명단을 통합 관리합니다.
+                국어 학원과 관리형 스터디센터 대기 명단을 분리해서 관리합니다.
               </CardDescription>
             </div>
           </CardHeader>
@@ -1613,8 +1923,8 @@ export function MarketingConsultingCRM({
             <div className={cn('grid gap-3', isMobile ? 'grid-cols-2' : 'grid-cols-4')}>
               <Card className="rounded-xl border-none shadow-sm ring-1 ring-border/50">
                 <CardContent className="p-4">
-                  <p className="text-[11px] font-bold text-[#14295F]">전체 대기</p>
-                  <p className="mt-1 text-2xl font-black text-[#14295F]">{waitlistSummary.waiting}</p>
+                  <p className="text-[11px] font-bold text-[#14295F]">현재 보기</p>
+                  <p className="mt-1 text-2xl font-black text-[#14295F]">{filteredWaitlist.length}</p>
                 </CardContent>
               </Card>
               <Card className="rounded-xl border-none shadow-sm ring-1 ring-border/50">
@@ -1653,9 +1963,8 @@ export function MarketingConsultingCRM({
             <div className="flex gap-1 rounded-lg bg-slate-100 p-1">
               {(
                 [
-                  { value: 'all', label: '전체' },
-                  { value: 'korean_academy', label: '국어 학원' },
                   { value: 'study_center', label: '관리형 스터디센터' },
+                  { value: 'korean_academy', label: '국어 학원' },
                 ] as const
               ).map((tab) => (
                 <button
@@ -1676,8 +1985,8 @@ export function MarketingConsultingCRM({
 
             <AdminWorkbenchCommandBar
               eyebrow="입학 대기 워크벤치"
-              title="입학 대기 운영 인덱스"
-              description="학원과 스터디센터 대기 학생을 같은 패턴으로 정렬하고, 우측 상세에서 후속 조치를 이어갑니다."
+              title={`${waitlistServiceFilter === 'study_center' ? '스터디센터' : '국어 학원'} 입학 대기 DB`}
+              description="선택한 DB 안에서만 대기 학생을 정렬하고 후속 조치를 이어갑니다."
               searchValue={waitlistSearch}
               onSearchChange={setWaitlistSearch}
               searchPlaceholder="이름, 학교, 전화번호 검색"
@@ -1697,15 +2006,14 @@ export function MarketingConsultingCRM({
                 <Label className="text-[10px] font-black uppercase tracking-[0.16em] text-slate-500">서비스 필터</Label>
                 <Select
                   value={waitlistServiceFilter}
-                  onValueChange={(value) => setWaitlistServiceFilter(value as 'all' | ServiceType)}
+                  onValueChange={(value) => setWaitlistServiceFilter(value as ServiceType)}
                 >
                   <SelectTrigger className="h-11 min-w-[180px] rounded-xl border-2 font-black">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="all">전체 서비스</SelectItem>
-                    <SelectItem value="korean_academy">국어 학원</SelectItem>
                     <SelectItem value="study_center">관리형 스터디센터</SelectItem>
+                    <SelectItem value="korean_academy">국어 학원</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -1802,7 +2110,7 @@ export function MarketingConsultingCRM({
                               </SelectContent>
                             </Select>
                           ) : null}
-                          {canManageLeadData ? (
+                          {canDeleteLeadData ? (
                             <Button
                               type="button"
                               variant="outline"
@@ -1956,7 +2264,9 @@ export function MarketingConsultingCRM({
                       })()}
                     </div>
                     <p className="mt-3 text-sm font-bold text-slate-500">
-                      웹 상담폼 접수 원본을 리드 현황에서 바로 확인 중입니다.
+                      {selectedWebsiteRequest.linkedLeadId
+                        ? '이 접수는 이미 DB로 이동되어 원본 기록으로 보관 중입니다.'
+                        : 'DB 이동 전 원본 접수함에 따로 보관 중입니다.'}
                     </p>
                   </div>
                 </div>
@@ -1985,6 +2295,21 @@ export function MarketingConsultingCRM({
                 <div className="rounded-2xl border border-slate-200 bg-white p-4">
                   <p className="text-[10px] font-black uppercase tracking-widest text-slate-500">바로 할 일</p>
                   <div className="mt-3 flex flex-wrap gap-2">
+                    {canManageLeadData && !selectedWebsiteRequest.linkedLeadId ? (
+                      <Button
+                        type="button"
+                        className="h-10 rounded-xl bg-[#14295F] font-black hover:bg-[#0f214d]"
+                        onClick={() => void handleMoveWebsiteRequestToDb(selectedWebsiteRequest)}
+                        disabled={movingWebsiteRequestId === selectedWebsiteRequest.id}
+                      >
+                        {movingWebsiteRequestId === selectedWebsiteRequest.id ? (
+                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        ) : (
+                          <ArrowRightCircle className="mr-2 h-4 w-4" />
+                        )}
+                        DB로 이동
+                      </Button>
+                    ) : null}
                     {canManageLeadData ? (
                       <Select
                         value={selectedWebsiteRequest.status || 'new'}
@@ -2000,7 +2325,7 @@ export function MarketingConsultingCRM({
                         </SelectContent>
                       </Select>
                     ) : null}
-                    {canTransitionPipeline ? (
+                    {canTransitionPipeline && selectedWebsiteRequest.linkedLeadId ? (
                       <Button
                         type="button"
                         className="h-10 rounded-xl font-black"
@@ -2009,7 +2334,7 @@ export function MarketingConsultingCRM({
                         입학 대기 등록
                       </Button>
                     ) : null}
-                    {canManageLeadData ? (
+                    {canDeleteLeadData ? (
                       <Button
                         type="button"
                         variant="outline"
@@ -2084,14 +2409,16 @@ export function MarketingConsultingCRM({
                           {WAITLIST_STATUS_META[status].label}
                         </Button>
                       ))}
-                      <Button
-                        type="button"
-                        variant="outline"
-                        className="h-10 rounded-xl font-black text-rose-600"
-                        onClick={() => void handleWaitlistDelete(selectedWaitlistEntry.id, selectedWaitlistEntry.sourceLeadId)}
-                      >
-                        삭제
-                      </Button>
+                      {canDeleteLeadData ? (
+                        <Button
+                          type="button"
+                          variant="outline"
+                          className="h-10 rounded-xl font-black text-rose-600"
+                          onClick={() => void handleWaitlistDelete(selectedWaitlistEntry.id, selectedWaitlistEntry.sourceLeadId)}
+                        >
+                          삭제
+                        </Button>
+                      ) : null}
                     </div>
                   ) : (
                     <p className="mt-3 text-sm font-bold text-slate-500">
@@ -2132,9 +2459,7 @@ export function MarketingConsultingCRM({
                 <span className="text-xl">
                   {waitlistServiceFilter === 'korean_academy'
                     ? waitlistSummary.waitingAcademy
-                    : waitlistServiceFilter === 'study_center'
-                      ? waitlistSummary.waitingStudy
-                      : waitlistSummary.waiting}
+                    : waitlistSummary.waitingStudy}
                 </span>
                 명 대기 중!
               </p>

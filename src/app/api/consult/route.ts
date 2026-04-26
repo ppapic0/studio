@@ -1,6 +1,5 @@
 import { NextRequest } from "next/server";
 import { z } from "zod";
-import * as admin from "firebase-admin";
 
 import {
   applyIpRateLimit,
@@ -49,22 +48,6 @@ function getKoreaDateKey() {
     month: "2-digit",
     day: "2-digit",
   }).format(new Date());
-}
-
-async function getNextWaitlistQueueNumber(centerId: string) {
-  const waitlistCollection = adminDb.collection("centers").doc(centerId).collection("admissionWaitlist");
-  const [countSnap, latestQueueSnap] = await Promise.all([
-    waitlistCollection.count().get(),
-    waitlistCollection.orderBy("queueNumber", "desc").limit(1).get().catch(() => null),
-  ]);
-
-  const totalCount = countSnap.data().count ?? 0;
-  const latestQueueNumber =
-    latestQueueSnap?.docs[0]?.data()?.queueNumber && Number.isFinite(latestQueueSnap.docs[0].data().queueNumber)
-      ? Number(latestQueueSnap.docs[0].data().queueNumber)
-      : 0;
-
-  return Math.max(totalCount, latestQueueNumber) + 1;
 }
 
 function resolveRequestType(
@@ -121,14 +104,6 @@ export async function POST(request: NextRequest) {
     const consultationDate = getKoreaDateKey();
     const requestId = adminDb.collection("marketingConsultRequests").doc().id;
     const receiptId = requestId.slice(0, 8).toUpperCase();
-    const shouldAutoCreateWaitlist = Boolean(centerId) && serviceType === "study_center";
-    const autoWaitlistId = shouldAutoCreateWaitlist
-      ? adminDb.collection("centers").doc(centerId!).collection("admissionWaitlist").doc().id
-      : null;
-    const autoWaitlistQueueNumber =
-      shouldAutoCreateWaitlist && centerId
-        ? await getNextWaitlistQueueNumber(centerId)
-        : null;
     const consents = {
       privacy: buildClientConsentSnapshot({
         agreed: privacyConsentRequired,
@@ -185,44 +160,14 @@ export async function POST(request: NextRequest) {
         .collection("websiteConsultRequests")
         .doc(requestId);
       batch.set(centerRequestRef, { ...centerPayload, receiptId });
-
-      if (autoWaitlistId) {
-        const waitlistRef = adminDb
-          .collection("centers")
-          .doc(centerId)
-          .collection("admissionWaitlist")
-          .doc(autoWaitlistId);
-
-        batch.set(waitlistRef, {
-          studentName: fields.studentName,
-          parentPhone: fields.consultPhone,
-          studentPhone: "",
-          school: fields.school,
-          grade: fields.grade,
-          serviceType,
-          status: "waiting",
-          queueNumber: autoWaitlistQueueNumber,
-          memo: `${WEBSITE_CONSULT_LABEL} · ${requestTypeLabel}`,
-          waitlistDate: consultationDate,
-          sourceLeadId: null,
-          sourceWebsiteRequestId: requestId,
-          receiptId,
-          requestType,
-          requestTypeLabel,
-          createdAt: admin.firestore.FieldValue.serverTimestamp(),
-          updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-        });
-      }
     }
 
     await batch.commit();
 
     const successMessage =
       requestType === "study_center_waitlist"
-        ? "입학 대기 신청이 접수되었습니다. 대기 인원에 반영되었습니다."
-        : requestType === "study_center_consult"
-          ? "상담 신청이 접수되었습니다. 대기 인원에 먼저 반영되었습니다."
-          : "상담 신청이 접수되었습니다.";
+        ? "입학 대기 신청이 접수되었습니다. 센터에서 확인 후 안내드리겠습니다."
+        : "상담 신청이 접수되었습니다. 센터에서 확인 후 연락드리겠습니다.";
 
     return noStoreJson({
       ok: true,
@@ -230,7 +175,7 @@ export async function POST(request: NextRequest) {
       receiptId,
       createdAt,
       requestTypeLabel,
-      waitlistRegistered: shouldAutoCreateWaitlist,
+      waitlistRegistered: false,
     });
   } catch (error) {
     console.error("[consult][POST] failed", error);
