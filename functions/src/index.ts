@@ -1,4 +1,4 @@
-import { defineSecret, defineString } from "firebase-functions/params";
+import { defineSecret } from "firebase-functions/params";
 import * as functions from "firebase-functions";
 import * as admin from "firebase-admin";
 import { onCall, HttpsError } from "firebase-functions/v2/https";
@@ -17,9 +17,9 @@ if (admin.apps.length === 0) {
 
 const region = "asia-northeast3";
 const geminiApiKey = defineSecret("GEMINI_API_KEY");
-const smsVpcConnector = defineString("SMS_VPC_CONNECTOR");
+const SMS_VPC_CONNECTOR = "projects/studio-2815552762-86e0f/locations/asia-northeast3/connectors/sms-egress-connector";
 const smsDispatcherFunctions = functions.region(region).runWith({
-  vpcConnector: smsVpcConnector,
+  vpcConnector: SMS_VPC_CONNECTOR,
   vpcConnectorEgressSettings: "ALL_TRAFFIC",
 });
 const MANUAL_PARENT_SMS_UID = "__manual_parent__";
@@ -6996,10 +6996,6 @@ export const scheduledSmsQueueDispatcher = smsDispatcherFunctions
   .pubsub.schedule("every 1 minutes")
   .timeZone("Asia/Seoul")
   .onRun(async () => {
-    if (!smsVpcConnector.value()) {
-      console.warn("[sms-dispatcher] SMS_VPC_CONNECTOR is not configured; outbound SMS traffic may not use the static egress IP.");
-    }
-
     const db = admin.firestore();
     const now = new Date();
     const todayKey = toDateKey(toKstDate(now));

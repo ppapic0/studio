@@ -48,6 +48,11 @@ if (admin.apps.length === 0) {
 }
 const region = "asia-northeast3";
 const geminiApiKey = (0, params_1.defineSecret)("GEMINI_API_KEY");
+const SMS_VPC_CONNECTOR = "projects/studio-2815552762-86e0f/locations/asia-northeast3/connectors/sms-egress-connector";
+const smsDispatcherFunctions = functions.region(region).runWith({
+    vpcConnector: SMS_VPC_CONNECTOR,
+    vpcConnectorEgressSettings: "ALL_TRAFFIC",
+});
 const MANUAL_PARENT_SMS_UID = "__manual_parent__";
 const STUDENT_SMS_FALLBACK_UID = "__student__";
 const allowedRoles = ["student", "teacher", "parent", "centerAdmin"];
@@ -5586,8 +5591,7 @@ exports.sendManualStudentSms = functions.region(region).https.onCall(async (data
         message: queueResult.message,
     };
 });
-exports.scheduledSmsQueueDispatcher = functions
-    .region(region)
+exports.scheduledSmsQueueDispatcher = smsDispatcherFunctions
     .pubsub.schedule("every 1 minutes")
     .timeZone("Asia/Seoul")
     .onRun(async () => {
@@ -6210,8 +6214,21 @@ async function syncStudyLogDayTotalMinutes(db, centerId, studentId, dateKey) {
     const sessionsSnap = await db.collection(`centers/${centerId}/studyLogs/${studentId}/days/${dateKey}/sessions`).get();
     const sessionTotalMinutes = sessionsSnap.docs.reduce((sum, docSnap) => {
         var _a, _b;
-        const raw = Number((_b = (_a = docSnap.data()) === null || _a === void 0 ? void 0 : _a.durationMinutes) !== null && _b !== void 0 ? _b : 0);
-        return sum + (Number.isFinite(raw) ? Math.max(0, Math.round(raw)) : 0);
+        const data = (docSnap.data() || {});
+        const rawMinutes = Number((_a = data.durationMinutes) !== null && _a !== void 0 ? _a : 0);
+        if (Number.isFinite(rawMinutes) && rawMinutes > 0) {
+            return sum + Math.max(0, Math.round(rawMinutes));
+        }
+        const rawSeconds = Number((_b = data.durationSeconds) !== null && _b !== void 0 ? _b : 0);
+        if (Number.isFinite(rawSeconds) && rawSeconds > 0) {
+            return sum + Math.max(1, Math.ceil(rawSeconds / 60));
+        }
+        const startMs = toMillisSafe(data.startTime);
+        const endMs = toMillisSafe(data.endTime);
+        if (startMs > 0 && endMs > startMs) {
+            return sum + Math.max(1, Math.ceil((endMs - startMs) / MINUTE_MS));
+        }
+        return sum;
     }, 0);
     const firstSessionStartAt = (_a = sessionsSnap.docs
         .map((docSnap) => { var _a; return toTimestampOrNow((_a = docSnap.data()) === null || _a === void 0 ? void 0 : _a.startTime); })
