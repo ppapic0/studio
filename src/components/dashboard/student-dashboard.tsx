@@ -74,7 +74,6 @@ import { Input } from '../ui/input';
 import { Textarea } from '../ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
 import { StudyPlanItem, StudyLogDay, GrowthProgress, StudentProfile, StudySession, AttendanceRequest, AttendanceCurrent, DailyReport, PenaltyLog, PointBoostEvent, type SupportedUniversityThemeKey, type User as UserType, type SupportThreadKind } from '@/lib/types';
-import { sendKakaoNotification } from '@/lib/kakao-service';
 import { VisualReportViewer } from '@/components/dashboard/visual-report-viewer';
 import { buildDailyReportPreview } from '@/lib/daily-report-preview';
 import { resolveStudentTargetDailyMinutesOrFallback } from '@/lib/student-target-minutes';
@@ -90,6 +89,10 @@ import {
   syncAutoAttendanceRecord,
   toDateSafe as toDateSafeAttendance,
 } from '@/lib/attendance-auto';
+import {
+  appendAttendanceEventToBatch,
+  mergeAttendanceDailyStatToBatch,
+} from '@/lib/attendance-events';
 import { resolveSeatIdentity } from '@/lib/seat-layout';
 import {
   NAVY_REWARD_THEME,
@@ -2072,7 +2075,9 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
         }
       } else {
         const nowTs = Date.now();
+        const nowDate = new Date(nowTs);
         const batch = writeBatch(firestore);
+        const startSeatStatus = seatDoc?.data?.()?.status as AttendanceCurrent['status'] | undefined;
         const todayPointStatus = (progress?.dailyPointStatus?.[activeStudyDayKey] || {}) as Record<string, any>;
         const isFirstCheckInToday = !todayPointStatus.checkedIn;
         const checkInProgressUpdate: Record<string, any> = {
@@ -2129,6 +2134,27 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
           wroteSomething = true;
         }
 
+        const startAttendanceEventType = startSeatStatus === 'away' || startSeatStatus === 'break' ? 'away_end' : 'check_in';
+        appendAttendanceEventToBatch(batch, firestore, centerId, {
+          studentId: studentUid,
+          dateKey: activeStudyDayKey,
+          eventType: startAttendanceEventType,
+          occurredAt: nowDate,
+          source: 'student_dashboard',
+          seatId: startSeatRef?.id || null,
+          statusBefore: startSeatStatus || null,
+          statusAfter: 'studying',
+          meta: {
+            studentName: user.displayName || '학생',
+          },
+        });
+        mergeAttendanceDailyStatToBatch(batch, firestore, centerId, studentUid, activeStudyDayKey, {
+          attendanceStatus: 'studying',
+          checkInAt: startAttendanceEventType === 'check_in' ? nowDate : undefined,
+          source: 'student_dashboard',
+        });
+        wroteSomething = true;
+
         let startCommitError: any = null;
         let usedStartFallback = false;
         try {
@@ -2171,19 +2197,11 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
           centerId,
           studentId: studentUid,
           studentName: user.displayName || '학생',
-          targetDate: new Date(nowTs),
-          checkInAt: new Date(nowTs),
+          targetDate: nowDate,
+          checkInAt: nowDate,
           confirmedByUserId: authUid || user.uid,
         }).catch((syncError: any) => {
           logHandledClientIssue('[student-track] auto attendance sync skipped', syncError);
-        });
-
-        void sendKakaoNotification(firestore, centerId, {
-          studentId: studentUid,
-          studentName: user.displayName || '\uD559\uC0DD',
-          type: 'entry',
-        }).catch((notifyError: any) => {
-          logHandledClientIssue('[student-track] entry notification skipped', notifyError);
         });
 
         setStartTime(nowTs);
