@@ -63,6 +63,12 @@ type RoomSnapshot = {
   exitCount: number;
 };
 
+type SeatTimeChip = {
+  key: string;
+  label: string;
+  className: string;
+};
+
 const DEFAULT_PRESENTATION = {
   surfaceClass: 'border-[#DCE7FF] bg-white text-[#14295F]',
   chipClass: 'bg-slate-100 text-slate-700',
@@ -271,6 +277,29 @@ export function CenterAdminAttendanceBoard({
                   const scheduleMovementLabel = signal?.scheduleMovementSummary || null;
                   const isNoAttendanceDay = Boolean(signal?.isNoAttendanceDay || signal?.boardStatus === 'excused_absent');
                   const isCheckedOutLate = Boolean(signal?.boardStatus === 'checked_out' && signal.wasLateToday);
+                  const firstCheckInTimeLabel = signal?.firstCheckInLabel || signal?.checkedAtLabel || null;
+                  const plannedDepartureTimeLabel = signal?.plannedDepartureTime && !isNoAttendanceDay
+                    ? signal.routineExpectedArrivalTime
+                      ? `${signal.routineExpectedArrivalTime}~${signal.plannedDepartureTime}`
+                      : signal.plannedDepartureTime
+                    : null;
+                  const seatTimeChips = [
+                    firstCheckInTimeLabel
+                      ? {
+                          key: 'firstCheckIn',
+                          label: `입실 ${firstCheckInTimeLabel}`,
+                          className: 'border-white/85 bg-white/92 text-[#14295F]',
+                        }
+                      : null,
+                    plannedDepartureTimeLabel
+                      ? {
+                          key: 'plannedDeparture',
+                          label: `하원 ${plannedDepartureTimeLabel}`,
+                          className: 'border-[#FFD0A6] bg-[#FFF1E2] text-[#C95A08]',
+                        }
+                      : null,
+                  ].filter(Boolean) as SeatTimeChip[];
+                  const hasSeatTimeChips = seatTimeChips.length > 0;
                   const checkoutMetaChips =
                     signal?.boardStatus === 'checked_out'
                       ? [
@@ -288,7 +317,7 @@ export function CenterAdminAttendanceBoard({
                           },
                           {
                             key: 'lastCheckOut',
-                            label: `하원 ${signal.lastCheckOutLabel || '-'}`,
+                            label: `실제 하원 ${signal.lastCheckOutLabel || '-'}`,
                             className: 'border-white/85 bg-white/92 text-[#14295F]',
                           },
                         ]
@@ -343,15 +372,37 @@ export function CenterAdminAttendanceBoard({
                       <span className="absolute left-2.5 top-2 text-[9px] font-black tracking-tight text-[#14295F]/46">
                         {seatDisplayLabel}
                       </span>
-                      <div className="flex h-full flex-col justify-end gap-1.5 pt-5">
+                      <div className={cn('flex h-full flex-col justify-end pt-5', hasSeatTimeChips ? 'gap-1' : 'gap-1.5')}>
                         <p
                           className={cn(
-                            'line-clamp-2 break-keep font-black leading-[1.1] tracking-tight text-[#14295F]',
-                            isMobile ? 'text-[12px]' : 'text-[13px]'
+                            'break-keep font-black tracking-tight text-[#14295F]',
+                            hasSeatTimeChips
+                              ? isMobile
+                                ? 'truncate text-[10px] leading-none'
+                                : 'truncate text-[11px] leading-[1.05]'
+                              : isMobile
+                                ? 'line-clamp-2 text-[12px] leading-[1.1]'
+                                : 'line-clamp-2 text-[13px] leading-[1.1]'
                           )}
                         >
                           {displayName}
                         </p>
+                        {hasSeatTimeChips ? (
+                          <div className="flex w-full min-w-0 flex-col gap-1">
+                            {seatTimeChips.map((chip) => (
+                              <span
+                                key={chip.key}
+                                className={cn(
+                                  'inline-flex max-w-full items-center rounded-full border px-2 py-0.5 font-black leading-none tracking-tight shadow-[0_10px_18px_-16px_rgba(20,41,95,0.35)]',
+                                  chip.className,
+                                  isMobile ? 'min-h-[16px] text-[7.5px]' : 'min-h-[18px] text-[8.5px]'
+                                )}
+                              >
+                                <span className="truncate">{chip.label}</span>
+                              </span>
+                            ))}
+                          </div>
+                        ) : null}
                         {shouldShowSeatMeta && (
                           <span
                             className={cn(

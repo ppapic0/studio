@@ -1120,6 +1120,10 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
         roomId: attendanceSignal.roomId,
         roomSeatNo: attendanceSignal.roomSeatNo,
         attendanceStatus: attendanceSignal.seatStatus,
+        checkedAtLabel: attendanceSignal.checkedAtLabel,
+        firstCheckInLabel: attendanceSignal.firstCheckInLabel,
+        routineExpectedArrivalTime: attendanceSignal.routineExpectedArrivalTime,
+        plannedDepartureTime: attendanceSignal.plannedDepartureTime,
         compositeHealth,
         domainScores: {
           operational: operationalScore,
@@ -4494,6 +4498,31 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
                     hasOccupant && overlayPresentation.isDark
                       ? 'text-white drop-shadow-[0_1px_6px_rgba(15,23,42,0.28)]'
                       : 'text-slate-950';
+                  const firstCheckInTimeLabel = seatSignal?.firstCheckInLabel || seatSignal?.checkedAtLabel || null;
+                  const plannedDepartureTimeLabel = seatSignal?.plannedDepartureTime
+                    ? seatSignal.routineExpectedArrivalTime
+                      ? `${seatSignal.routineExpectedArrivalTime}~${seatSignal.plannedDepartureTime}`
+                      : seatSignal.plannedDepartureTime
+                    : null;
+                  const seatTimeChips = !isEditMode && seatSignal
+                    ? [
+                        firstCheckInTimeLabel
+                          ? {
+                              key: 'firstCheckIn',
+                              label: `입실 ${firstCheckInTimeLabel}`,
+                              className: 'border-white/80 bg-white/92 text-[#14295F]',
+                            }
+                          : null,
+                        plannedDepartureTimeLabel
+                          ? {
+                              key: 'plannedDeparture',
+                              label: `하원 ${plannedDepartureTimeLabel}`,
+                              className: 'border-[#FFD0A6] bg-[#FFF1E2] text-[#C95A08]',
+                            }
+                          : null,
+                      ].filter(Boolean) as { key: string; label: string; className: string }[]
+                    : [];
+                  const hasSeatTimeChips = seatTimeChips.length > 0;
 
                   return (
                     <div
@@ -4563,20 +4592,40 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
                         <div
                           className={cn(
                             'flex h-full w-full flex-col items-center justify-center text-center',
-                            compact ? 'px-1 pt-2' : 'px-1.5'
+                            hasSeatTimeChips ? (compact ? 'gap-0.5 px-0.5 pt-2' : 'gap-1 px-1.5 pt-2') : compact ? 'px-1 pt-2' : 'px-1.5'
                           )}
                         >
                           <span
                             className={cn(
-                              'w-full font-black tracking-tight whitespace-normal break-keep text-center',
+                              'w-full font-black tracking-tight break-keep text-center',
                               nameTextClass,
-                              compact
-                                ? 'text-[10px] leading-[1.12] [display:-webkit-box] [-webkit-box-orient:vertical] [-webkit-line-clamp:2] overflow-hidden'
-                                : 'text-[12px] leading-[1.18] [display:-webkit-box] [-webkit-box-orient:vertical] [-webkit-line-clamp:2] overflow-hidden'
+                              hasSeatTimeChips
+                                ? compact
+                                  ? 'truncate text-[8.5px] leading-none'
+                                  : 'truncate text-[10px] leading-[1.05]'
+                                : compact
+                                  ? 'whitespace-normal text-[10px] leading-[1.12] [display:-webkit-box] [-webkit-box-orient:vertical] [-webkit-line-clamp:2] overflow-hidden'
+                                  : 'whitespace-normal text-[12px] leading-[1.18] [display:-webkit-box] [-webkit-box-orient:vertical] [-webkit-line-clamp:2] overflow-hidden'
                             )}
                           >
                             {occupantName}
                           </span>
+                          {hasSeatTimeChips ? (
+                            <div className="flex w-full min-w-0 flex-col items-center gap-0.5">
+                              {seatTimeChips.map((chip) => (
+                                <span
+                                  key={chip.key}
+                                  className={cn(
+                                    'inline-flex max-w-full items-center justify-center rounded-full border px-1.5 py-0.5 font-black leading-none shadow-[0_8px_14px_-12px_rgba(20,41,95,0.34)]',
+                                    chip.className,
+                                    compact ? 'min-h-[12px] text-[5.5px]' : 'min-h-[15px] text-[7px]'
+                                  )}
+                                >
+                                  <span className="truncate">{chip.label}</span>
+                                </span>
+                              ))}
+                            </div>
+                          ) : null}
                         </div>
                       ) : (
                         <div className="flex flex-col items-center">

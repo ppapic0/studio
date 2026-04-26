@@ -30,6 +30,10 @@ export interface CenterAdminStudentSeatSignal {
   roomId?: string;
   roomSeatNo?: number;
   attendanceStatus: AttendanceCurrent['status'];
+  checkedAtLabel?: string | null;
+  firstCheckInLabel?: string | null;
+  routineExpectedArrivalTime?: string | null;
+  plannedDepartureTime?: string | null;
   compositeHealth: number;
   domainScores: CenterAdminSeatDomainScores;
   todayMinutes: number;
