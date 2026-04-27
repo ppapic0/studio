@@ -238,6 +238,59 @@ function pushBreakdownItem(
   items.push({ key, label, points: normalizedPoints, tone });
 }
 
+function sumBreakdownItemPoints(items: DailyPointBreakdownItem[], tone?: DailyPointBreakdownItemTone): number {
+  return items.reduce((sum, item) => {
+    if (tone && item.tone !== tone) return sum;
+    return sum + Math.max(0, Math.floor(item.points));
+  }, 0);
+}
+
+function pushMissingBreakdownItemsFromFallback({
+  items,
+  fallbackItems,
+  keyPrefix,
+  coveredPoints,
+  missingPoints,
+}: {
+  items: DailyPointBreakdownItem[];
+  fallbackItems: DailyPointBreakdownItem[];
+  keyPrefix: string;
+  coveredPoints: number;
+  missingPoints: number;
+}) {
+  let coveredRemaining = Math.max(0, Math.floor(coveredPoints));
+  let missingRemaining = Math.max(0, Math.floor(missingPoints));
+  if (missingRemaining <= 0) return 0;
+
+  fallbackItems.forEach((fallbackItem) => {
+    if (missingRemaining <= 0) return;
+
+    const fallbackPoints = Math.max(0, Math.floor(fallbackItem.points));
+    if (fallbackPoints <= 0) return;
+
+    if (coveredRemaining >= fallbackPoints) {
+      coveredRemaining -= fallbackPoints;
+      return;
+    }
+
+    const uncoveredFallbackPoints = fallbackPoints - coveredRemaining;
+    coveredRemaining = 0;
+    const pointsToAppend = Math.min(missingRemaining, uncoveredFallbackPoints);
+    if (pointsToAppend <= 0) return;
+
+    pushBreakdownItem(
+      items,
+      `${keyPrefix}-${fallbackItem.key}`,
+      fallbackItem.label,
+      pointsToAppend,
+      fallbackItem.tone
+    );
+    missingRemaining -= pointsToAppend;
+  });
+
+  return missingRemaining;
+}
+
 function getRankRewardBreakdownItems(dayStatus: Record<string, any> | undefined, maxPoints: number): DailyPointBreakdownItem[] {
   const items: DailyPointBreakdownItem[] = [];
   let remaining = Math.max(0, Math.floor(maxPoints));
@@ -521,7 +574,32 @@ export function getDailyPointBreakdown(dayStatus?: Record<string, any>) {
   const pointItems = normalizeDailyPointEventItems(dayStatus?.pointEvents, totalPoints);
 
   if (pointItems.length > 0) {
-    const eventTotal = pointItems.reduce((sum, item) => sum + item.points, 0);
+    const initialEventTotal = sumBreakdownItemPoints(pointItems);
+
+    const rankEventPoints = sumBreakdownItemPoints(pointItems, 'rank');
+    const missingRankPoints = Math.min(
+      Math.max(0, rankPoints - rankEventPoints),
+      Math.max(0, totalPoints - initialEventTotal)
+    );
+    if (missingRankPoints > 0) {
+      const remainingMissingRankPoints = pushMissingBreakdownItemsFromFallback({
+        items: pointItems,
+        fallbackItems: getRankRewardBreakdownItems(dayStatus, rankPoints),
+        keyPrefix: 'inferred',
+        coveredPoints: rankEventPoints,
+        missingPoints: missingRankPoints,
+      });
+      pushBreakdownItem(pointItems, 'rank-reward-record', '랭킹 보상', remainingMissingRankPoints, 'rank');
+    }
+
+    const studyBoxEventPoints = sumBreakdownItemPoints(pointItems, 'box');
+    const missingStudyBoxPoints = Math.min(
+      Math.max(0, studyBoxPoints - studyBoxEventPoints),
+      Math.max(0, totalPoints - sumBreakdownItemPoints(pointItems))
+    );
+    pushBreakdownItem(pointItems, 'study-box-record', '상자', missingStudyBoxPoints, 'box');
+
+    const eventTotal = sumBreakdownItemPoints(pointItems);
     const hasPlanCompletionEvent = pointItems.some((item) => item.tone === 'plan');
     const inferredPlanPoints = hasPlanCompletionEvent
       ? 0
