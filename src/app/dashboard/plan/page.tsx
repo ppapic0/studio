@@ -1766,7 +1766,7 @@ export default function StudyPlanPage() {
     () => [...studyTimeSummary.labeledBreakdown].sort((left, right) => right.minutes - left.minutes),
     [studyTimeSummary.labeledBreakdown]
   );
-  const visibleChecklistTasks = useMemo(() => orderedChecklistTasks.slice(0, 5), [orderedChecklistTasks]);
+  const visibleChecklistTasks = useMemo(() => orderedChecklistTasks.slice(0, 6), [orderedChecklistTasks]);
   const hiddenChecklistTaskCount = Math.max(0, checklistTasks.length - visibleChecklistTasks.length);
   const latestDiagnostic = effectivePlannerDiagnostic;
   const mainRecommendations = useMemo(
