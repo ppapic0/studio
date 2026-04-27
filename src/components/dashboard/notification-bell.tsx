@@ -364,7 +364,7 @@ export function NotificationBell() {
         </DropdownMenuTrigger>
         <DropdownMenuContent
           align="end"
-          className="w-[330px] rounded-[2rem] border-none shadow-2xl p-4 animate-in fade-in zoom-in duration-300"
+          className="max-h-[min(78vh,36rem)] w-[min(calc(100vw-2rem),380px)] overflow-y-auto rounded-[2rem] border-none p-4 shadow-2xl animate-in fade-in zoom-in duration-300"
           onCloseAutoFocus={(event) => event.preventDefault()}
         >
           <DropdownMenuLabel className="font-black text-xs uppercase tracking-[0.2em] opacity-50 px-2 py-2 flex items-center justify-between">
@@ -441,17 +441,17 @@ export function NotificationBell() {
                         {item.kind === 'announcement' ? <AlertTriangle className="h-5 w-5" /> : <FileText className="h-5 w-5" />}
                       </div>
                       <div className="grid gap-1 flex-1 min-w-0">
-                        <div className="flex items-center gap-2">
-                          <p className="text-sm font-black tracking-tight whitespace-nowrap truncate">{item.title}</p>
+                        <div className="flex min-w-0 items-start gap-2">
+                          <p className="line-clamp-2 min-w-0 flex-1 break-keep text-sm font-black leading-snug tracking-tight">{item.title}</p>
                           {item.unread && (
-                            <Badge className="border-none bg-emerald-100 text-emerald-700 font-black text-[8px] px-1.5 h-4">
+                            <Badge className="h-4 shrink-0 border-none bg-emerald-100 px-1.5 text-[8px] font-black text-emerald-700">
                               신규
                             </Badge>
                           )}
                         </div>
-                        <div className="flex items-center gap-1.5 opacity-45">
-                          <Clock className="h-2.5 w-2.5" />
-                          <span className="text-[9px] font-bold">{item.description}</span>
+                        <div className="flex min-w-0 items-start gap-1.5 opacity-45">
+                          <Clock className="mt-0.5 h-2.5 w-2.5 shrink-0" />
+                          <span className="line-clamp-2 min-w-0 text-[9px] font-bold leading-4">{item.description}</span>
                         </div>
                       </div>
                       <ChevronRight className="h-4 w-4 opacity-20 group-hover:translate-x-1 transition-all" />
@@ -462,15 +462,15 @@ export function NotificationBell() {
                         <Crown className="h-5 w-5" />
                       </div>
                       <div className="grid gap-1 flex-1 min-w-0">
-                        <div className="flex items-center gap-2">
-                          <p className="text-sm font-black tracking-tight whitespace-nowrap truncate">{item.title}</p>
+                        <div className="flex min-w-0 items-start gap-2">
+                          <p className="line-clamp-2 min-w-0 flex-1 break-keep text-sm font-black leading-snug tracking-tight">{item.title}</p>
                           {item.unread && (
-                            <Badge className="border-none bg-amber-100 text-amber-700 font-black text-[8px] px-1.5 h-4">
+                            <Badge className="h-4 shrink-0 border-none bg-amber-100 px-1.5 text-[8px] font-black text-amber-700">
                               신규
                             </Badge>
                           )}
                         </div>
-                        <p className="text-[11px] font-semibold text-muted-foreground line-clamp-2">
+                        <p className="line-clamp-2 min-w-0 text-[11px] font-semibold leading-4 text-muted-foreground">
                           {item.description}
                         </p>
                       </div>
@@ -482,15 +482,15 @@ export function NotificationBell() {
                         <MessageSquareMore className="h-5 w-5" />
                       </div>
                       <div className="grid gap-1 flex-1 min-w-0">
-                        <div className="flex items-center gap-2">
-                          <p className="text-sm font-black tracking-tight whitespace-nowrap truncate">{item.title}</p>
+                        <div className="flex min-w-0 items-start gap-2">
+                          <p className="line-clamp-2 min-w-0 flex-1 break-keep text-sm font-black leading-snug tracking-tight">{item.title}</p>
                           {item.unread && (
-                            <Badge className="border-none bg-rose-100 text-rose-700 font-black text-[8px] px-1.5 h-4">
+                            <Badge className="h-4 shrink-0 border-none bg-rose-100 px-1.5 text-[8px] font-black text-rose-700">
                               신규
                             </Badge>
                           )}
                         </div>
-                        <p className="text-[11px] font-semibold text-muted-foreground line-clamp-2">
+                        <p className="line-clamp-2 min-w-0 text-[11px] font-semibold leading-4 text-muted-foreground">
                           {item.description}
                         </p>
                       </div>
