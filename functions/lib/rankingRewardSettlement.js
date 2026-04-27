@@ -362,6 +362,10 @@ function buildCompetitionWindow(targetDate) {
         awardsAt: addMinutes(endsAt, DAILY_RANK_REWARD_DELAY_MINUTES),
     };
 }
+function buildCompetitionWindowWithKeys(targetDate) {
+    const window = buildCompetitionWindow(targetDate);
+    return Object.assign(Object.assign({}, window), { competitionDateKey: toDateKey(window.competitionDate), coveredDateKeys: getDateKeysCoveredByWindow(window.startsAt, window.endsAt) });
+}
 function getDateKeysCoveredByWindow(startsAt, endsAt) {
     const keys = [];
     const cursor = startOfKstDay(startsAt);
@@ -495,6 +499,131 @@ function getStudyLogDayDateKey(docSnap, data) {
     return typeof data.dateKey === "string" && data.dateKey.trim()
         ? data.dateKey.trim()
         : docSnap.id;
+}
+function buildCompetitionWindowsInRange(startDate, endDate) {
+    const windows = [];
+    let cursor = startOfKstDay(startDate);
+    const inclusiveEnd = startOfKstDay(endDate);
+    while (cursor.getTime() <= inclusiveEnd.getTime()) {
+        windows.push(buildCompetitionWindowWithKeys(cursor));
+        cursor = shiftKstDate(cursor, 1);
+    }
+    return windows;
+}
+function getCoveredDateKeysFromCompetitionWindows(windows) {
+    return Array.from(new Set(windows.flatMap((window) => window.coveredDateKeys))).sort();
+}
+async function fetchStudyLogDayDocsForCompetitionWindows(db, centerId, context, windows) {
+    const dateKeys = getCoveredDateKeysFromCompetitionWindows(windows);
+    const dayRefs = context.includedStudentIds.flatMap((studentId) => dateKeys.map((dateKey) => db.doc(`centers/${centerId}/studyLogs/${studentId}/days/${dateKey}`)));
+    const dayDocs = [];
+    for (const chunk of chunkItems(dayRefs, 350)) {
+        if (chunk.length === 0)
+            continue;
+        const chunkSnapshots = await db.getAll(...chunk);
+        dayDocs.push(...chunkSnapshots);
+    }
+    return dayDocs;
+}
+async function fetchStudyLogSessionSnapshots(dayDocs, shouldInclude) {
+    const sessionRequests = dayDocs.flatMap((docSnap) => {
+        if (!docSnap.exists)
+            return [];
+        const data = docSnap.data();
+        const studentId = getStudyLogDayStudentId(docSnap, data);
+        const dateKey = getStudyLogDayDateKey(docSnap, data);
+        if (!studentId || !dateKey || isSyntheticStudentId(studentId) || !shouldInclude(studentId))
+            return [];
+        return [{
+                studentId,
+                dateKey,
+                snapshotRef: docSnap.ref.collection("sessions"),
+            }];
+    });
+    const snapshots = [];
+    for (const chunk of chunkItems(sessionRequests, 40)) {
+        if (chunk.length === 0)
+            continue;
+        const chunkSnapshots = await Promise.all(chunk.map(({ snapshotRef }) => snapshotRef.get()));
+        chunkSnapshots.forEach((snapshot, index) => {
+            var _a, _b, _c, _d;
+            snapshots.push({
+                studentId: (_b = (_a = chunk[index]) === null || _a === void 0 ? void 0 : _a.studentId) !== null && _b !== void 0 ? _b : "",
+                dateKey: (_d = (_c = chunk[index]) === null || _c === void 0 ? void 0 : _c.dateKey) !== null && _d !== void 0 ? _d : "",
+                snapshot,
+            });
+        });
+    }
+    return snapshots;
+}
+function collectCompetitionWindowMinutesByDateFromSessionSnapshots(sessionSnapshots, windows, shouldInclude, referenceLimitMs) {
+    const minutesByStudentDate = new Map();
+    if (windows.length === 0)
+        return minutesByStudentDate;
+    sessionSnapshots.forEach(({ studentId: fallbackStudentId, dateKey: fallbackDateKey, snapshot }) => {
+        snapshot.forEach((docSnap) => {
+            const data = docSnap.data();
+            const studentId = typeof data.studentId === "string" && data.studentId.trim()
+                ? data.studentId.trim()
+                : fallbackStudentId;
+            const { startedAtMs, referenceMs } = getSessionReferenceMillis(data);
+            if (!studentId || isSyntheticStudentId(studentId) || !shouldInclude(studentId) || startedAtMs <= 0 || referenceMs <= 0)
+                return;
+            const effectiveReferenceMs = Math.min(referenceMs, referenceLimitMs);
+            if (effectiveReferenceMs <= startedAtMs)
+                return;
+            windows.forEach((window) => {
+                if (!window.coveredDateKeys.includes(fallbackDateKey))
+                    return;
+                const value = getDailyWindowOverlapMinutes(startedAtMs, effectiveReferenceMs, window);
+                if (value <= 0)
+                    return;
+                addRankMinutesByDate(minutesByStudentDate, studentId, window.competitionDateKey, value);
+            });
+        });
+    });
+    return minutesByStudentDate;
+}
+async function addLiveAttendanceMinutesToPeriodTotals(db, centerId, windows, context, totals) {
+    if (windows.length === 0)
+        return;
+    const attendanceBuckets = new Map();
+    const attendanceSnap = await db.collection(`centers/${centerId}/attendanceCurrent`).get();
+    attendanceSnap.forEach((docSnap) => {
+        const data = docSnap.data();
+        const studentId = typeof data.studentId === "string" ? data.studentId : "";
+        if (!studentId || isSyntheticStudentId(studentId) || !context.shouldInclude(studentId))
+            return;
+        const current = attendanceBuckets.get(studentId) || [];
+        current.push(data);
+        attendanceBuckets.set(studentId, current);
+    });
+    attendanceBuckets.forEach((records, studentId) => {
+        const selectedRecord = pickPreferredAttendanceRecord(records);
+        if (!selectedRecord)
+            return;
+        windows.forEach((window) => {
+            const liveMinutes = getLiveAttendanceOverlapMinutes(selectedRecord, window.endsAt.getTime(), window);
+            if (liveMinutes <= 0)
+                return;
+            totals.set(studentId, (totals.get(studentId) || 0) + liveMinutes);
+        });
+    });
+}
+async function buildPeriodAwardEntries(db, centerId, range, startDate, endDate, context) {
+    const windows = buildCompetitionWindowsInRange(startDate, endDate);
+    const dayDocs = await fetchStudyLogDayDocsForCompetitionWindows(db, centerId, context, windows);
+    const sessionSnapshots = await fetchStudyLogSessionSnapshots(dayDocs, context.shouldInclude);
+    const referenceLimitMs = Math.max(...windows.map((window) => window.endsAt.getTime()));
+    const minutesByStudentDate = collectCompetitionWindowMinutesByDateFromSessionSnapshots(sessionSnapshots, windows, context.shouldInclude, referenceLimitMs);
+    const totals = foldRankMinutesByDate(minutesByStudentDate);
+    await addLiveAttendanceMinutesToPeriodTotals(db, centerId, windows, context, totals);
+    const rankedEntries = applyCompetitionRanks(Array.from(totals.entries()).map(([studentId, value]) => ({
+        studentId,
+        value,
+        profile: context.getProfile(studentId),
+    })));
+    return buildAwardEntries(range, rankedEntries);
 }
 function applyCompetitionRanks(entries) {
     const sorted = [...entries].sort((left, right) => right.value - left.value);
@@ -731,64 +860,10 @@ async function buildDailyAwardEntries(db, centerId, competitionDate, context) {
     return buildAwardEntries("daily", rankedEntries);
 }
 async function buildWeeklyAwardEntries(db, centerId, startDate, endDate, context) {
-    const dateKeys = [];
-    let cursor = startOfKstDay(startDate);
-    const inclusiveEnd = startOfKstDay(endDate);
-    while (cursor.getTime() <= inclusiveEnd.getTime()) {
-        dateKeys.push(toDateKey(cursor));
-        cursor = shiftKstDate(cursor, 1);
-    }
-    const snapshots = await Promise.all(dateKeys.map((dateKey) => db.collection(`centers/${centerId}/dailyStudentStats/${dateKey}/students`).get()));
-    const totals = new Map();
-    snapshots.forEach((snapshot) => {
-        snapshot.forEach((docSnap) => {
-            var _a, _b;
-            const data = docSnap.data();
-            const studentId = typeof data.studentId === "string" ? data.studentId : docSnap.id;
-            const baseValue = Number((_a = data.totalStudyMinutes) !== null && _a !== void 0 ? _a : 0);
-            const adjustment = Number((_b = data.manualAdjustmentMinutes) !== null && _b !== void 0 ? _b : 0);
-            const value = Math.max(0, (Number.isFinite(baseValue) ? baseValue : 0) + (Number.isFinite(adjustment) ? adjustment : 0));
-            if (!studentId || isSyntheticStudentId(studentId) || !context.shouldInclude(studentId) || value <= 0)
-                return;
-            totals.set(studentId, (totals.get(studentId) || 0) + value);
-        });
-    });
-    const rankedEntries = applyCompetitionRanks(Array.from(totals.entries()).map(([studentId, value]) => ({
-        studentId,
-        value,
-        profile: context.getProfile(studentId),
-    })));
-    return buildAwardEntries("weekly", rankedEntries);
+    return buildPeriodAwardEntries(db, centerId, "weekly", startDate, endDate, context);
 }
-async function buildMonthlyAwardEntries(db, centerId, monthKey, context) {
-    const monthlySnap = await db.collection(`centers/${centerId}/leaderboards/${monthKey}_study-time/entries`).get();
-    const rankedEntries = applyCompetitionRanks(monthlySnap.docs
-        .map((docSnap) => {
-        var _a;
-        const data = docSnap.data();
-        const studentId = typeof data.studentId === "string" ? data.studentId : docSnap.id;
-        const value = Math.max(0, Number((_a = data.value) !== null && _a !== void 0 ? _a : 0));
-        if (!studentId || isSyntheticStudentId(studentId) || !context.shouldInclude(studentId) || value <= 0)
-            return null;
-        const profile = context.getProfile(studentId);
-        return {
-            studentId,
-            value,
-            profile: {
-                displayNameSnapshot: typeof data.displayNameSnapshot === "string" && data.displayNameSnapshot.trim()
-                    ? data.displayNameSnapshot.trim()
-                    : profile.displayNameSnapshot,
-                classNameSnapshot: typeof data.classNameSnapshot === "string" && data.classNameSnapshot.trim()
-                    ? data.classNameSnapshot.trim()
-                    : profile.classNameSnapshot,
-                schoolNameSnapshot: typeof data.schoolNameSnapshot === "string" && data.schoolNameSnapshot.trim()
-                    ? data.schoolNameSnapshot.trim()
-                    : profile.schoolNameSnapshot,
-            },
-        };
-    })
-        .filter((entry) => Boolean(entry)));
-    return buildAwardEntries("monthly", rankedEntries);
+async function buildMonthlyAwardEntries(db, centerId, startDate, endDate, context) {
+    return buildPeriodAwardEntries(db, centerId, "monthly", startDate, endDate, context);
 }
 async function claimSettlement(db, settlementRef, now, payload) {
     return db.runTransaction(async (transaction) => {
@@ -1378,7 +1453,7 @@ exports.scheduledRankingRewardSettlement = functions
                 try {
                     const isRewardEligible = isMonthlyRankRewardEligiblePeriod(monthlyCandidate.periodKey);
                     const awards = isRewardEligible
-                        ? await buildMonthlyAwardEntries(db, centerId, monthlyCandidate.monthKey, await getContext())
+                        ? await buildMonthlyAwardEntries(db, centerId, monthlyCandidate.startDate, monthlyCandidate.endDate, await getContext())
                         : [];
                     const appliedAwards = isRewardEligible
                         ? await applyAwardEntries(db, centerId, "monthly", {

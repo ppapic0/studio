@@ -79,6 +79,15 @@ function buildCompetitionWindow(targetDate: Date) {
   };
 }
 
+export function getDailyRankCompetitionWindow(targetDate: Date) {
+  const window = buildCompetitionWindow(targetDate);
+  return {
+    ...window,
+    competitionDateKey: toKstDateKey(window.competitionDate),
+    coveredDateKeys: getDateKeysCoveredByWindow(window.startsAt, window.endsAt),
+  };
+}
+
 function addMinutes(date: Date, minutes: number) {
   return new Date(date.getTime() + minutes * 60 * 1000);
 }
@@ -186,9 +195,9 @@ export function getDailyRankWindowOverlapSeconds(
 
 export function getDailyRankWindowState(baseDate: Date = new Date()): DailyRankWindowState {
   const nowKst = toKstDate(baseDate);
-  const todayWindow = buildCompetitionWindow(nowKst);
-  const previousWindow = buildCompetitionWindow(shiftDate(nowKst, -1));
-  const nextWindow = buildCompetitionWindow(shiftDate(nowKst, 1));
+  const todayWindow = getDailyRankCompetitionWindow(nowKst);
+  const previousWindow = getDailyRankCompetitionWindow(shiftDate(nowKst, -1));
+  const nextWindow = getDailyRankCompetitionWindow(shiftDate(nowKst, 1));
 
   const isPreviousWindowLive = nowKst >= previousWindow.startsAt && nowKst < previousWindow.endsAt;
   const isPreviousWindowSettlementPending = nowKst >= previousWindow.endsAt && nowKst < previousWindow.awardsAt;
@@ -209,11 +218,11 @@ export function getDailyRankWindowState(baseDate: Date = new Date()): DailyRankW
     isLive: isPreviousWindowLive || isTodayWindowLive,
     isSettlementPending: isPreviousWindowSettlementPending,
     competitionDate: activeWindow.competitionDate,
-    competitionDateKey: toKstDateKey(activeWindow.competitionDate),
+    competitionDateKey: activeWindow.competitionDateKey,
     startsAt: activeWindow.startsAt,
     endsAt: activeWindow.endsAt,
     awardsAt: activeWindow.awardsAt,
-    coveredDateKeys: getDateKeysCoveredByWindow(activeWindow.startsAt, activeWindow.endsAt),
+    coveredDateKeys: activeWindow.coveredDateKeys,
     nextOpensAt,
     nextOpensAtLabel: buildRelativeOpenLabel(nowKst, nextOpensAt),
     windowLabel: getDailyRankWindowLabel(),

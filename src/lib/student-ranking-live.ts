@@ -55,14 +55,11 @@ export function getLiveAdjustedStudentRankValue({
     return baseValue;
   }
 
-  const liveMinutes =
-    range === 'daily'
-      ? getDailyRankWindowOverlapMinutes(
-          effectiveStartedAtMs,
-          nowMs,
-          dailyRankWindow ?? getDailyRankWindowState(new Date(nowMs))
-        )
-      : Math.max(1, Math.ceil((nowMs - effectiveStartedAtMs) / 60000));
+  const liveMinutes = getDailyRankWindowOverlapMinutes(
+    effectiveStartedAtMs,
+    nowMs,
+    dailyRankWindow ?? getDailyRankWindowState(new Date(nowMs))
+  );
 
   return baseValue + liveMinutes;
 }

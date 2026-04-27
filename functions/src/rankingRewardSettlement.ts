@@ -442,6 +442,15 @@ function buildCompetitionWindow(targetDate: Date) {
   };
 }
 
+function buildCompetitionWindowWithKeys(targetDate: Date) {
+  const window = buildCompetitionWindow(targetDate);
+  return {
+    ...window,
+    competitionDateKey: toDateKey(window.competitionDate),
+    coveredDateKeys: getDateKeysCoveredByWindow(window.startsAt, window.endsAt),
+  };
+}
+
 function getDateKeysCoveredByWindow(startsAt: Date, endsAt: Date) {
   const keys: string[] = [];
   const cursor = startOfKstDay(startsAt);
@@ -605,6 +614,181 @@ function getStudyLogDayDateKey(
   return typeof data.dateKey === "string" && data.dateKey.trim()
     ? data.dateKey.trim()
     : docSnap.id;
+}
+
+function buildCompetitionWindowsInRange(startDate: Date, endDate: Date) {
+  const windows: ReturnType<typeof buildCompetitionWindowWithKeys>[] = [];
+  let cursor = startOfKstDay(startDate);
+  const inclusiveEnd = startOfKstDay(endDate);
+
+  while (cursor.getTime() <= inclusiveEnd.getTime()) {
+    windows.push(buildCompetitionWindowWithKeys(cursor));
+    cursor = shiftKstDate(cursor, 1);
+  }
+
+  return windows;
+}
+
+function getCoveredDateKeysFromCompetitionWindows(windows: ReturnType<typeof buildCompetitionWindowWithKeys>[]) {
+  return Array.from(new Set(windows.flatMap((window) => window.coveredDateKeys))).sort();
+}
+
+async function fetchStudyLogDayDocsForCompetitionWindows(
+  db: admin.firestore.Firestore,
+  centerId: string,
+  context: CenterStudentContext,
+  windows: ReturnType<typeof buildCompetitionWindowWithKeys>[]
+) {
+  const dateKeys = getCoveredDateKeysFromCompetitionWindows(windows);
+  const dayRefs = context.includedStudentIds.flatMap((studentId) =>
+    dateKeys.map((dateKey) => db.doc(`centers/${centerId}/studyLogs/${studentId}/days/${dateKey}`))
+  );
+  const dayDocs: FirebaseFirestore.DocumentSnapshot[] = [];
+  for (const chunk of chunkItems(dayRefs, 350)) {
+    if (chunk.length === 0) continue;
+    const chunkSnapshots = await db.getAll(...chunk);
+    dayDocs.push(...chunkSnapshots);
+  }
+
+  return dayDocs;
+}
+
+async function fetchStudyLogSessionSnapshots(
+  dayDocs: FirebaseFirestore.DocumentSnapshot[],
+  shouldInclude: (studentId: string) => boolean
+) {
+  const sessionRequests = dayDocs.flatMap((docSnap) => {
+    if (!docSnap.exists) return [];
+
+    const data = docSnap.data() as Record<string, unknown>;
+    const studentId = getStudyLogDayStudentId(docSnap, data);
+    const dateKey = getStudyLogDayDateKey(docSnap, data);
+
+    if (!studentId || !dateKey || isSyntheticStudentId(studentId) || !shouldInclude(studentId)) return [];
+
+    return [{
+      studentId,
+      dateKey,
+      snapshotRef: docSnap.ref.collection("sessions"),
+    }];
+  });
+
+  const snapshots: Array<{ studentId: string; dateKey: string; snapshot: FirebaseFirestore.QuerySnapshot }> = [];
+  for (const chunk of chunkItems(sessionRequests, 40)) {
+    if (chunk.length === 0) continue;
+    const chunkSnapshots = await Promise.all(chunk.map(({ snapshotRef }) => snapshotRef.get()));
+    chunkSnapshots.forEach((snapshot, index) => {
+      snapshots.push({
+        studentId: chunk[index]?.studentId ?? "",
+        dateKey: chunk[index]?.dateKey ?? "",
+        snapshot,
+      });
+    });
+  }
+
+  return snapshots;
+}
+
+function collectCompetitionWindowMinutesByDateFromSessionSnapshots(
+  sessionSnapshots: Array<{ studentId: string; dateKey: string; snapshot: FirebaseFirestore.QuerySnapshot }>,
+  windows: ReturnType<typeof buildCompetitionWindowWithKeys>[],
+  shouldInclude: (studentId: string) => boolean,
+  referenceLimitMs: number
+) {
+  const minutesByStudentDate = new Map<string, number>();
+  if (windows.length === 0) return minutesByStudentDate;
+
+  sessionSnapshots.forEach(({ studentId: fallbackStudentId, dateKey: fallbackDateKey, snapshot }) => {
+    snapshot.forEach((docSnap) => {
+      const data = docSnap.data() as Record<string, unknown>;
+      const studentId = typeof data.studentId === "string" && data.studentId.trim()
+        ? data.studentId.trim()
+        : fallbackStudentId;
+      const { startedAtMs, referenceMs } = getSessionReferenceMillis(data);
+      if (!studentId || isSyntheticStudentId(studentId) || !shouldInclude(studentId) || startedAtMs <= 0 || referenceMs <= 0) return;
+
+      const effectiveReferenceMs = Math.min(referenceMs, referenceLimitMs);
+      if (effectiveReferenceMs <= startedAtMs) return;
+
+      windows.forEach((window) => {
+        if (!window.coveredDateKeys.includes(fallbackDateKey)) return;
+        const value = getDailyWindowOverlapMinutes(startedAtMs, effectiveReferenceMs, window);
+        if (value <= 0) return;
+        addRankMinutesByDate(minutesByStudentDate, studentId, window.competitionDateKey, value);
+      });
+    });
+  });
+
+  return minutesByStudentDate;
+}
+
+async function addLiveAttendanceMinutesToPeriodTotals(
+  db: admin.firestore.Firestore,
+  centerId: string,
+  windows: ReturnType<typeof buildCompetitionWindowWithKeys>[],
+  context: CenterStudentContext,
+  totals: Map<string, number>
+) {
+  if (windows.length === 0) return;
+
+  const attendanceBuckets = new Map<string, Record<string, unknown>[]>();
+  const attendanceSnap = await db.collection(`centers/${centerId}/attendanceCurrent`).get();
+  attendanceSnap.forEach((docSnap) => {
+    const data = docSnap.data() as Record<string, unknown>;
+    const studentId = typeof data.studentId === "string" ? data.studentId : "";
+    if (!studentId || isSyntheticStudentId(studentId) || !context.shouldInclude(studentId)) return;
+
+    const current = attendanceBuckets.get(studentId) || [];
+    current.push(data);
+    attendanceBuckets.set(studentId, current);
+  });
+
+  attendanceBuckets.forEach((records, studentId) => {
+    const selectedRecord = pickPreferredAttendanceRecord(records);
+    if (!selectedRecord) return;
+
+    windows.forEach((window) => {
+      const liveMinutes = getLiveAttendanceOverlapMinutes(
+        selectedRecord,
+        window.endsAt.getTime(),
+        window
+      );
+      if (liveMinutes <= 0) return;
+      totals.set(studentId, (totals.get(studentId) || 0) + liveMinutes);
+    });
+  });
+}
+
+async function buildPeriodAwardEntries(
+  db: admin.firestore.Firestore,
+  centerId: string,
+  range: Extract<StudentRankingRange, "weekly" | "monthly">,
+  startDate: Date,
+  endDate: Date,
+  context: CenterStudentContext
+) {
+  const windows = buildCompetitionWindowsInRange(startDate, endDate);
+  const dayDocs = await fetchStudyLogDayDocsForCompetitionWindows(db, centerId, context, windows);
+  const sessionSnapshots = await fetchStudyLogSessionSnapshots(dayDocs, context.shouldInclude);
+  const referenceLimitMs = Math.max(...windows.map((window) => window.endsAt.getTime()));
+  const minutesByStudentDate = collectCompetitionWindowMinutesByDateFromSessionSnapshots(
+    sessionSnapshots,
+    windows,
+    context.shouldInclude,
+    referenceLimitMs
+  );
+  const totals = foldRankMinutesByDate(minutesByStudentDate);
+  await addLiveAttendanceMinutesToPeriodTotals(db, centerId, windows, context, totals);
+
+  const rankedEntries = applyCompetitionRanks(
+    Array.from(totals.entries()).map(([studentId, value]) => ({
+      studentId,
+      value,
+      profile: context.getProfile(studentId),
+    }))
+  );
+
+  return buildAwardEntries(range, rankedEntries);
 }
 
 function applyCompetitionRanks<T extends { value: number }>(entries: T[]): Array<T & { rank: number }> {
@@ -914,80 +1098,17 @@ async function buildWeeklyAwardEntries(
   endDate: Date,
   context: CenterStudentContext
 ) {
-  const dateKeys: string[] = [];
-  let cursor = startOfKstDay(startDate);
-  const inclusiveEnd = startOfKstDay(endDate);
-
-  while (cursor.getTime() <= inclusiveEnd.getTime()) {
-    dateKeys.push(toDateKey(cursor));
-    cursor = shiftKstDate(cursor, 1);
-  }
-
-  const snapshots = await Promise.all(
-    dateKeys.map((dateKey) => db.collection(`centers/${centerId}/dailyStudentStats/${dateKey}/students`).get())
-  );
-
-  const totals = new Map<string, number>();
-  snapshots.forEach((snapshot) => {
-    snapshot.forEach((docSnap) => {
-      const data = docSnap.data() as Record<string, unknown>;
-      const studentId = typeof data.studentId === "string" ? data.studentId : docSnap.id;
-      const baseValue = Number(data.totalStudyMinutes ?? 0);
-      const adjustment = Number(data.manualAdjustmentMinutes ?? 0);
-      const value = Math.max(0, (Number.isFinite(baseValue) ? baseValue : 0) + (Number.isFinite(adjustment) ? adjustment : 0));
-      if (!studentId || isSyntheticStudentId(studentId) || !context.shouldInclude(studentId) || value <= 0) return;
-      totals.set(studentId, (totals.get(studentId) || 0) + value);
-    });
-  });
-
-  const rankedEntries = applyCompetitionRanks(
-    Array.from(totals.entries()).map(([studentId, value]) => ({
-      studentId,
-      value,
-      profile: context.getProfile(studentId),
-    }))
-  );
-
-  return buildAwardEntries("weekly", rankedEntries);
+  return buildPeriodAwardEntries(db, centerId, "weekly", startDate, endDate, context);
 }
 
 async function buildMonthlyAwardEntries(
   db: admin.firestore.Firestore,
   centerId: string,
-  monthKey: string,
+  startDate: Date,
+  endDate: Date,
   context: CenterStudentContext
 ) {
-  const monthlySnap = await db.collection(`centers/${centerId}/leaderboards/${monthKey}_study-time/entries`).get();
-
-  const rankedEntries = applyCompetitionRanks(
-    monthlySnap.docs
-      .map((docSnap) => {
-        const data = docSnap.data() as Record<string, unknown>;
-        const studentId = typeof data.studentId === "string" ? data.studentId : docSnap.id;
-        const value = Math.max(0, Number(data.value ?? 0));
-        if (!studentId || isSyntheticStudentId(studentId) || !context.shouldInclude(studentId) || value <= 0) return null;
-
-        const profile = context.getProfile(studentId);
-        return {
-          studentId,
-          value,
-          profile: {
-            displayNameSnapshot: typeof data.displayNameSnapshot === "string" && data.displayNameSnapshot.trim()
-              ? data.displayNameSnapshot.trim()
-              : profile.displayNameSnapshot,
-            classNameSnapshot: typeof data.classNameSnapshot === "string" && data.classNameSnapshot.trim()
-              ? data.classNameSnapshot.trim()
-              : profile.classNameSnapshot,
-            schoolNameSnapshot: typeof data.schoolNameSnapshot === "string" && data.schoolNameSnapshot.trim()
-              ? data.schoolNameSnapshot.trim()
-              : profile.schoolNameSnapshot,
-          },
-        };
-      })
-      .filter((entry): entry is { studentId: string; value: number; profile: StudentProfileSnapshot } => Boolean(entry))
-  );
-
-  return buildAwardEntries("monthly", rankedEntries);
+  return buildPeriodAwardEntries(db, centerId, "monthly", startDate, endDate, context);
 }
 
 async function claimSettlement(
@@ -1687,7 +1808,13 @@ export const scheduledRankingRewardSettlement = functions
           try {
             const isRewardEligible = isMonthlyRankRewardEligiblePeriod(monthlyCandidate.periodKey);
             const awards = isRewardEligible
-              ? await buildMonthlyAwardEntries(db, centerId, monthlyCandidate.monthKey, await getContext())
+              ? await buildMonthlyAwardEntries(
+                db,
+                centerId,
+                monthlyCandidate.startDate,
+                monthlyCandidate.endDate,
+                await getContext()
+              )
               : [];
             const appliedAwards = isRewardEligible
               ? await applyAwardEntries(db, centerId, "monthly", {
