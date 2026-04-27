@@ -37,6 +37,7 @@ const seatHoldStatusSchema = z.object({
   centerId: z.string().trim().min(1, '센터 정보를 확인해 주세요.'),
   seatHoldId: z.string().trim().min(1, '좌석예약 요청 정보를 확인해 주세요.'),
   nextStatus: z.enum(['held', 'pending_transfer', 'canceled']),
+  replaceStudentId: z.string().trim().min(1).optional(),
   seatAssignment: z
     .object({
       seatId: z.string().trim().min(1, '좌석 정보를 확인해 주세요.'),
@@ -100,7 +101,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const { centerId, seatHoldId, nextStatus, seatAssignment } = parsed.data;
+    const { centerId, seatHoldId, nextStatus, seatAssignment, replaceStudentId } = parsed.data;
     const membership = await getCenterMembership(session.uid, centerId);
 
     if (!isAdminRole(membership.role) || !isActiveMembershipStatus(membership.status)) {
@@ -230,9 +231,18 @@ export async function POST(request: NextRequest) {
       const targetSeatNo = seatAssignment?.seatNo || getGlobalSeatNo(targetRoomId, targetRoomSeatNo);
       const targetSeatLabel = seatAssignment?.seatLabel?.trim() || seatLabelsBySeatId[targetSeatId] || String(targetRoomSeatNo);
       const targetSeatGenderPolicy = seatAssignment?.seatGenderPolicy || seatGenderBySeatId[targetSeatId] || null;
+      const replaceStudentDoc = replaceStudentId ? studentsSnap.docs.find((doc) => doc.id === replaceStudentId) || null : null;
+      const replaceStudentData = replaceStudentDoc?.data() as StudentProfile | undefined;
+      const replaceStudentRoomId = replaceStudentData?.roomId?.trim() || fallbackRoomId;
+      const replaceStudentMatchesTarget =
+        Boolean(replaceStudentDoc) &&
+        Number(replaceStudentData?.roomSeatNo) === targetRoomSeatNo &&
+        replaceStudentRoomId === targetRoomId;
 
-      const occupiedByStudent = studentsSnap.docs.some((doc) => {
-        const student = doc.data() as StudentProfile;
+      const occupiedByStudent = studentsSnap.docs.some((studentDoc) => {
+        if (replaceStudentMatchesTarget && studentDoc.id === replaceStudentId) return false;
+
+        const student = studentDoc.data() as StudentProfile;
         const studentRoomId = student.roomId?.trim() || fallbackRoomId;
         return Number(student.roomSeatNo) === targetRoomSeatNo && studentRoomId === targetRoomId;
       });
@@ -243,6 +253,8 @@ export async function POST(request: NextRequest) {
       const occupiedByAttendance = attendanceSnap.docs.some((doc) => {
         const attendance = doc.data() as AttendanceCurrent;
         if (doc.id === targetSeatId) {
+          if (replaceStudentMatchesTarget && attendance.studentId === replaceStudentId) return false;
+
           const manualName = typeof attendance.manualOccupantName === 'string' ? attendance.manualOccupantName.trim() : '';
           const isSameReservationHold =
             manualName === `예약 ${seatHold.studentName}` ||
@@ -271,6 +283,18 @@ export async function POST(request: NextRequest) {
       });
       if (alreadyConfirmed) {
         throw new ApiError(409, '이미 다른 요청이 확정된 좌석입니다.');
+      }
+
+      if (replaceStudentMatchesTarget && replaceStudentDoc) {
+        transaction.update(replaceStudentDoc.ref, {
+          seatId: admin.firestore.FieldValue.delete(),
+          seatNo: 0,
+          roomId: admin.firestore.FieldValue.delete(),
+          roomSeatNo: admin.firestore.FieldValue.delete(),
+          seatLabel: admin.firestore.FieldValue.delete(),
+          seatZone: admin.firestore.FieldValue.delete(),
+          updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        });
       }
 
       transaction.update(seatHoldRef, {
