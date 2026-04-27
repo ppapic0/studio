@@ -730,7 +730,9 @@ function getRankRewardAwardTotal(dayStatus: Record<string, unknown>): number {
 function resolveOpenedStudyBoxHoursFromDayStatus(dayStatus: Record<string, unknown>): number[] {
   const explicitOpenedStudyBoxes = normalizeStudyBoxHoursFromUnknown(dayStatus.openedStudyBoxes);
   const claimedStudyBoxes = normalizeStudyBoxHoursFromUnknown(dayStatus.claimedStudyBoxes);
+  const hasExplicitOpenedStudyBoxes = Object.prototype.hasOwnProperty.call(dayStatus, "openedStudyBoxes");
 
+  if (hasExplicitOpenedStudyBoxes) return explicitOpenedStudyBoxes;
   if (claimedStudyBoxes.length === 0) return explicitOpenedStudyBoxes;
 
   const rewardEntries = normalizeStudyBoxRewardEntries(dayStatus.studyBoxRewards);
@@ -11234,7 +11236,17 @@ export const openStudyRewardBoxSecure = functions.region(region).https.onCall(as
     studyDayRef.collection("sessions").orderBy("startTime", "asc").get(),
   ]);
 
-  const persistedDayMinutes = Math.max(0, Math.floor(parseFiniteNumber(studyDaySnap.data()?.totalMinutes) ?? 0));
+  const studyDayData = (studyDaySnap.data() || {}) as Record<string, unknown>;
+  const persistedBaseDayMinutes = Math.max(
+    0,
+    Math.floor(
+      parseFiniteNumber(studyDayData.totalMinutes)
+      ?? parseFiniteNumber(studyDayData.totalStudyMinutes)
+      ?? 0
+    )
+  );
+  const persistedAdjustmentMinutes = Math.floor(parseFiniteNumber(studyDayData.manualAdjustmentMinutes) ?? 0);
+  const persistedDayMinutes = Math.max(0, persistedBaseDayMinutes + persistedAdjustmentMinutes);
   const nowMs = Date.now();
   const nowDate = new Date(nowMs);
   const currentStudyDayKey = toStudyDayKey(nowDate);

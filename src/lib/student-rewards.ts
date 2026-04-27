@@ -326,7 +326,13 @@ export function getRankRewardPoints(dayStatus?: Record<string, any>): number {
 function inferOpenedStudyBoxHours(dayStatus?: Record<string, any>): number[] {
   const claimedStudyBoxes = getClaimedStudyBoxes(dayStatus);
   const explicitOpenedStudyBoxes = normalizeStudyBoxHourValues(dayStatus?.openedStudyBoxes);
+  const hasExplicitOpenedStudyBoxes = Boolean(
+    dayStatus &&
+    typeof dayStatus === 'object' &&
+    Object.prototype.hasOwnProperty.call(dayStatus, 'openedStudyBoxes')
+  );
 
+  if (hasExplicitOpenedStudyBoxes) return explicitOpenedStudyBoxes;
   if (claimedStudyBoxes.length === 0) return explicitOpenedStudyBoxes;
 
   const rewardByHour = new Map<number, number>();

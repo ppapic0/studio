@@ -143,6 +143,19 @@ function formatPointBoostMultiplierLabel(value: number) {
   return `${label}배`;
 }
 
+function getEffectiveStudyLogMinutes(log?: Partial<StudyLogDay> | null) {
+  if (!log) return 0;
+  const baseMinutes = Number(log.totalMinutes ?? (log as Record<string, unknown>).totalStudyMinutes ?? 0);
+  const adjustmentMinutes = Number(log.manualAdjustmentMinutes ?? 0);
+  return Math.max(
+    0,
+    Math.round(
+      (Number.isFinite(baseMinutes) ? baseMinutes : 0) +
+      (Number.isFinite(adjustmentMinutes) ? adjustmentMinutes : 0)
+    )
+  );
+}
+
 function formatPointBoostWindowLabel(event: PointBoostEvent) {
   const startAtMs = toTimestampMs(event.startAt);
   const endAtMs = toTimestampMs(event.endAt);
@@ -509,17 +522,17 @@ export default function GrowthPage() {
     return (seasonStudyLogs || []).find((log) => log.dateKey === activeStudyDayKey) || null;
   }, [activeStudyDayKey, seasonStudyLogs]);
 
-  const todayMinutes = Math.max(0, Number(todayLog?.totalMinutes || 0));
+  const todayMinutes = getEffectiveStudyLogMinutes(todayLog);
   const weeklyMinutes = useMemo(() => {
     const keys = new Set(Array.from({ length: 7 }, (_, index) => format(subDays(activeStudyDayDate, index), 'yyyy-MM-dd')));
     return (seasonStudyLogs || [])
       .filter((log) => keys.has(log.dateKey))
-      .reduce((sum, log) => sum + Math.max(0, Number(log.totalMinutes || 0)), 0);
+      .reduce((sum, log) => sum + getEffectiveStudyLogMinutes(log), 0);
   }, [activeStudyDayDate, seasonStudyLogs]);
   const monthlyMinutes = useMemo(() => {
     return (seasonStudyLogs || [])
       .filter((log) => log.dateKey.startsWith(periodKey))
-      .reduce((sum, log) => sum + Math.max(0, Number(log.totalMinutes || 0)), 0);
+      .reduce((sum, log) => sum + getEffectiveStudyLogMinutes(log), 0);
   }, [seasonStudyLogs, periodKey]);
 
   const todayStatus = useMemo(() => {
@@ -984,6 +997,7 @@ export default function GrowthPage() {
     const nextDayStatus = {
       ...todayStatus,
       claimedStudyBoxes: nextClaimedBoxes,
+      openedStudyBoxes: normalizeStudyBoxHours(openedBoxes),
       studyBoxRewards: nextRewardEntries,
     };
 

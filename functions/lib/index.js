@@ -441,6 +441,9 @@ function resolveOpenedStudyBoxHoursFromDayStatus(dayStatus) {
     var _a;
     const explicitOpenedStudyBoxes = normalizeStudyBoxHoursFromUnknown(dayStatus.openedStudyBoxes);
     const claimedStudyBoxes = normalizeStudyBoxHoursFromUnknown(dayStatus.claimedStudyBoxes);
+    const hasExplicitOpenedStudyBoxes = Object.prototype.hasOwnProperty.call(dayStatus, "openedStudyBoxes");
+    if (hasExplicitOpenedStudyBoxes)
+        return explicitOpenedStudyBoxes;
     if (claimedStudyBoxes.length === 0)
         return explicitOpenedStudyBoxes;
     const rewardEntries = normalizeStudyBoxRewardEntries(dayStatus.studyBoxRewards);
@@ -9042,7 +9045,7 @@ exports.claimPlannerCompletionRewardSecure = functions.region(region).https.onCa
     return Object.assign(Object.assign({ ok: true }, result), { rewardLimit: PLANNER_COMPLETION_DAILY_REWARD_LIMIT });
 });
 exports.openStudyRewardBoxSecure = functions.region(region).https.onCall(async (data, context) => {
-    var _a, _b, _c, _d, _e, _f;
+    var _a, _b, _c, _d, _e, _f, _g;
     const db = admin.firestore();
     if (!((_a = context.auth) === null || _a === void 0 ? void 0 : _a.uid)) {
         throw new functions.https.HttpsError("unauthenticated", "로그인이 필요합니다.");
@@ -9087,7 +9090,10 @@ exports.openStudyRewardBoxSecure = functions.region(region).https.onCall(async (
         progressRef.get(),
         studyDayRef.collection("sessions").orderBy("startTime", "asc").get(),
     ]);
-    const persistedDayMinutes = Math.max(0, Math.floor((_d = parseFiniteNumber((_c = studyDaySnap.data()) === null || _c === void 0 ? void 0 : _c.totalMinutes)) !== null && _d !== void 0 ? _d : 0));
+    const studyDayData = (studyDaySnap.data() || {});
+    const persistedBaseDayMinutes = Math.max(0, Math.floor((_d = (_c = parseFiniteNumber(studyDayData.totalMinutes)) !== null && _c !== void 0 ? _c : parseFiniteNumber(studyDayData.totalStudyMinutes)) !== null && _d !== void 0 ? _d : 0));
+    const persistedAdjustmentMinutes = Math.floor((_e = parseFiniteNumber(studyDayData.manualAdjustmentMinutes)) !== null && _e !== void 0 ? _e : 0);
+    const persistedDayMinutes = Math.max(0, persistedBaseDayMinutes + persistedAdjustmentMinutes);
     const nowMs = Date.now();
     const nowDate = new Date(nowMs);
     const currentStudyDayKey = toStudyDayKey(nowDate);
@@ -9152,11 +9158,11 @@ exports.openStudyRewardBoxSecure = functions.region(region).https.onCall(async (
     let boostEventId = null;
     if (earnedAtMs) {
         const pointBoostDocs = await listPointBoostEventDocs(db, centerId);
-        const matchedBoostDoc = (_e = pointBoostDocs.find((docSnap) => isPointBoostEventActiveAt(docSnap.data(), earnedAtMs))) !== null && _e !== void 0 ? _e : null;
+        const matchedBoostDoc = (_f = pointBoostDocs.find((docSnap) => isPointBoostEventActiveAt(docSnap.data(), earnedAtMs))) !== null && _f !== void 0 ? _f : null;
         const matchedBoostEvent = matchedBoostDoc === null || matchedBoostDoc === void 0 ? void 0 : matchedBoostDoc.data();
         if (matchedBoostEvent) {
             boostMultiplier = matchedBoostEvent.multiplier;
-            boostEventId = (_f = matchedBoostDoc === null || matchedBoostDoc === void 0 ? void 0 : matchedBoostDoc.id) !== null && _f !== void 0 ? _f : null;
+            boostEventId = (_g = matchedBoostDoc === null || matchedBoostDoc === void 0 ? void 0 : matchedBoostDoc.id) !== null && _g !== void 0 ? _g : null;
         }
     }
     const reward = Object.assign(Object.assign({}, baseReward), { awardedPoints: Math.max(0, Math.round(baseReward.basePoints * boostMultiplier)), multiplier: boostMultiplier, earnedAt: earnedAtMs ? new Date(earnedAtMs).toISOString() : null, boostEventId });
