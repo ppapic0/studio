@@ -249,6 +249,8 @@ type DailyPointEventDoc = {
   range?: "daily" | "weekly" | "monthly";
   rank?: number;
   periodKey?: string;
+  awardDateKey?: string;
+  paidAt?: string;
   deltaPoints?: number;
   direction?: "add" | "subtract";
   reason?: string;
@@ -623,6 +625,12 @@ function normalizeDailyPointEventEntry(value: unknown): DailyPointEventDoc | nul
 
   const periodKey = asTrimmedString(value.periodKey);
   if (periodKey) event.periodKey = periodKey;
+
+  const awardDateKey = asTrimmedString(value.awardDateKey);
+  if (awardDateKey) event.awardDateKey = awardDateKey;
+
+  const paidAt = asTrimmedString(value.paidAt);
+  if (paidAt) event.paidAt = paidAt;
 
   const deltaPoints = Math.round(parseFiniteNumber(value.deltaPoints) ?? Number.NaN);
   if (Number.isFinite(deltaPoints) && deltaPoints !== 0) {
@@ -11419,7 +11427,7 @@ export const ensureCurrentUserMemberships = functions
     };
   });
 
-export { scheduledRankingRewardSettlement } from "./rankingRewardSettlement";
+export { scheduledRankingRewardSettlement, reissueDailyRankingRewardV2Secure } from "./rankingRewardSettlement";
 export {
   approveGiftishowOrderSecure,
   cancelGiftishowSendFailSecure,

@@ -8,10 +8,12 @@ export type StudentRankRewardTier = {
 export type DailyRankWindowState = {
   nowKst: Date;
   isLive: boolean;
+  isSettlementPending: boolean;
   competitionDate: Date;
   competitionDateKey: string;
   startsAt: Date;
   endsAt: Date;
+  awardsAt: Date;
   coveredDateKeys: string[];
   nextOpensAt: Date;
   nextOpensAtLabel: string;
@@ -21,6 +23,7 @@ export type DailyRankWindowState = {
 const WEEKDAY_DAILY_RANK_START_HOUR = 17;
 const WEEKEND_DAILY_RANK_START_HOUR = 8;
 const DAILY_RANK_END_HOUR = 1;
+const DAILY_RANK_REWARD_DELAY_MINUTES = 5;
 
 export const STUDENT_RANK_REWARD_TIERS: Record<StudentRankingRange, StudentRankRewardTier[]> = {
   daily: [{ rank: 1, points: 500 }],
@@ -72,7 +75,18 @@ function buildCompetitionWindow(targetDate: Date) {
     competitionDate,
     startsAt,
     endsAt,
+    awardsAt: addMinutes(endsAt, DAILY_RANK_REWARD_DELAY_MINUTES),
   };
+}
+
+function addMinutes(date: Date, minutes: number) {
+  return new Date(date.getTime() + minutes * 60 * 1000);
+}
+
+function shiftDate(date: Date, days: number) {
+  const next = new Date(date);
+  next.setDate(next.getDate() + days);
+  return next;
 }
 
 function buildRelativeOpenLabel(nowKst: Date, opensAt: Date) {
@@ -173,22 +187,32 @@ export function getDailyRankWindowOverlapSeconds(
 export function getDailyRankWindowState(baseDate: Date = new Date()): DailyRankWindowState {
   const nowKst = toKstDate(baseDate);
   const todayWindow = buildCompetitionWindow(nowKst);
-  const previousDate = new Date(nowKst);
-  previousDate.setDate(previousDate.getDate() - 1);
-  const previousWindow = buildCompetitionWindow(previousDate);
+  const previousWindow = buildCompetitionWindow(shiftDate(nowKst, -1));
+  const nextWindow = buildCompetitionWindow(shiftDate(nowKst, 1));
 
   const isPreviousWindowLive = nowKst >= previousWindow.startsAt && nowKst < previousWindow.endsAt;
+  const isPreviousWindowSettlementPending = nowKst >= previousWindow.endsAt && nowKst < previousWindow.awardsAt;
   const isTodayWindowLive = nowKst >= todayWindow.startsAt && nowKst < todayWindow.endsAt;
-  const activeWindow = isPreviousWindowLive ? previousWindow : isTodayWindowLive ? todayWindow : todayWindow;
-  const nextOpensAt = isPreviousWindowLive || isTodayWindowLive ? activeWindow.startsAt : todayWindow.startsAt;
+  const activeWindow = isPreviousWindowLive || isPreviousWindowSettlementPending
+    ? previousWindow
+    : isTodayWindowLive
+      ? todayWindow
+      : todayWindow;
+  const nextOpensAt = isPreviousWindowLive || isPreviousWindowSettlementPending || isTodayWindowLive
+    ? nextWindow.startsAt
+    : nowKst < todayWindow.startsAt
+      ? todayWindow.startsAt
+      : nextWindow.startsAt;
 
   return {
     nowKst,
     isLive: isPreviousWindowLive || isTodayWindowLive,
+    isSettlementPending: isPreviousWindowSettlementPending,
     competitionDate: activeWindow.competitionDate,
     competitionDateKey: toKstDateKey(activeWindow.competitionDate),
     startsAt: activeWindow.startsAt,
     endsAt: activeWindow.endsAt,
+    awardsAt: activeWindow.awardsAt,
     coveredDateKeys: getDateKeysCoveredByWindow(activeWindow.startsAt, activeWindow.endsAt),
     nextOpensAt,
     nextOpensAtLabel: buildRelativeOpenLabel(nowKst, nextOpensAt),

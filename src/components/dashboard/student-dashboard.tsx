@@ -2562,7 +2562,8 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
       return rankedEntries.map(({ value, displayNameSnapshot, ...entry }) => entry);
     };
 
-    const mappedDailyEntries = buildRankPreviewEntries(validDailyRankEntries, 'daily', dailyRankWindow.isLive);
+    const allowDailyLiveTrack = dailyRankWindow.isLive || dailyRankWindow.isSettlementPending;
+    const mappedDailyEntries = buildRankPreviewEntries(validDailyRankEntries, 'daily', allowDailyLiveTrack);
     const hasDailySelfEntry = Boolean(studentUid && mappedDailyEntries.some((entry) => entry.studentId === studentUid));
     const dailySelfFallbackMinutes = studentUid
       ? getLiveAdjustedStudentRankValue({
@@ -2580,7 +2581,7 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
         })
       : 0;
     const shouldAddDailySelfFallback = Boolean(
-      dailyRankWindow.isLive &&
+      allowDailyLiveTrack &&
       studentUid &&
       !hasDailySelfEntry &&
       dailySelfFallbackMinutes > 0
@@ -2643,12 +2644,16 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
         minutes: effectiveDailyMinutes,
         badge: rankSnapshotLoading
           ? '집계 중'
+          : dailyRankWindow.isSettlementPending
+            ? '집계 중'
           : dailyRankWindow.isLive
             ? effectiveDailyRank > 0
               ? `오늘 ${effectiveDailyRank}위`
               : '집계 준비중'
             : '집계 대기',
-        caption: dailyRankWindow.isLive
+        caption: dailyRankWindow.isSettlementPending
+          ? '마감 결과를 정산하고 있어요'
+          : dailyRankWindow.isLive
           ? effectiveDailyDisplaySeconds > 0
             ? isTimerActive
               ? `${formatStudyDurationWithSeconds(effectiveDailyDisplaySeconds)} 누적`
@@ -2657,7 +2662,9 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
           : dailyWaitingTopMinutes > 0
             ? `어제 1위 ${formatStudyMinutes(dailyWaitingTopMinutes)}`
             : `다음 오픈 ${dailyRankWindow.nextOpensAtLabel}`,
-        description: dailyRankWindow.isLive
+        description: dailyRankWindow.isSettlementPending
+          ? `01:05에 ${formatStudentRankRewardSummary('daily')} 지급`
+          : dailyRankWindow.isLive
           ? `${dailyRankWindow.windowLabel} 공부 기록만 반영 · ${formatStudentRankRewardSummary('daily')}`
           : dailyWaitingTopMinutes > 0
             ? `어제 1위 ${formatStudyMinutes(dailyWaitingTopMinutes)} · ${formatStudentRankRewardSummary('daily')}`
@@ -2735,11 +2742,11 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
     dailyRankWindow,
   ]);
     const preferredHomeRankRange = useMemo<RankRange>(() => {
-      if (validDailyRankEntries.length > 0 || dailyRankWindow.isLive) return 'daily';
+      if (validDailyRankEntries.length > 0 || dailyRankWindow.isLive || dailyRankWindow.isSettlementPending) return 'daily';
       if (validWeeklyRankEntries.length > 0) return 'weekly';
       if (validRankEntries.length > 0) return 'monthly';
       return 'weekly';
-    }, [dailyRankWindow.isLive, validDailyRankEntries.length, validRankEntries.length, validWeeklyRankEntries.length]);
+    }, [dailyRankWindow.isLive, dailyRankWindow.isSettlementPending, validDailyRankEntries.length, validRankEntries.length, validWeeklyRankEntries.length]);
   const selectedHomeRank = homeRankMap[selectedRankRange];
   const handleSelectHomeRankRange = useCallback((nextRange: RankRange) => {
     hasManualHomeRankRangeRef.current = true;

@@ -18,6 +18,8 @@ type DailyPointEventDoc = {
   range?: StudentRankingRange;
   rank?: number;
   periodKey?: string;
+  awardDateKey?: string;
+  paidAt?: string;
   deltaPoints?: number;
   direction?: "add" | "subtract";
   reason?: string;
@@ -47,6 +49,16 @@ type CenterStudentContext = {
   getProfile: (studentId: string) => StudentProfileSnapshot;
 };
 
+type DailyRankAwardCancellation = {
+  studentId: string;
+  cancelledPoints: number;
+  balanceDeduction: number;
+  balanceDeficit: number;
+  pointsBalance: number;
+  totalPointsEarned: number;
+  dailyPointAmount: number;
+};
+
 type RankingNotificationTarget = {
   periodKey: string;
   awardDateKey: string;
@@ -55,9 +67,12 @@ type RankingNotificationTarget = {
 const WEEKDAY_DAILY_RANK_START_HOUR = 17;
 const WEEKEND_DAILY_RANK_START_HOUR = 8;
 const DAILY_RANK_END_HOUR = 1;
+const DAILY_RANK_REWARD_DELAY_MINUTES = 5;
 const ACTIVE_LIVE_RANK_STATUSES = new Set(["studying"]);
 const MONTHLY_RANK_REWARD_FIRST_ELIGIBLE_PERIOD_KEY = "2026-05";
 const MONTHLY_RANK_REWARD_PRELAUNCH_SKIP_REASON = "monthly_rank_rewards_start_from_2026_05";
+const RANKING_ENGINE_VERSION = "v2";
+const DEFAULT_DAILY_RANK_REISSUE_DATE_KEY = "2026-04-26";
 
 const STUDENT_RANK_REWARD_TIERS: Record<StudentRankingRange, StudentRankRewardTier[]> = {
   daily: [{ rank: 1, points: 500 }],
@@ -109,6 +124,10 @@ function shiftKstDate(date: Date, days: number) {
   const next = cloneDate(date);
   next.setDate(next.getDate() + days);
   return next;
+}
+
+function addMinutes(date: Date, minutes: number) {
+  return new Date(date.getTime() + minutes * 60 * 1000);
 }
 
 function startOfKstWeek(date: Date) {
@@ -187,6 +206,12 @@ function normalizeDailyPointEventEntry(value: unknown): DailyPointEventDoc | nul
 
   const periodKey = asNonEmptyString(value.periodKey);
   if (periodKey) event.periodKey = periodKey;
+
+  const awardDateKey = asNonEmptyString(value.awardDateKey);
+  if (awardDateKey) event.awardDateKey = awardDateKey;
+
+  const paidAt = asNonEmptyString(value.paidAt);
+  if (paidAt) event.paidAt = paidAt;
 
   const deltaPoints = Math.round(parseFiniteNumber(value.deltaPoints) ?? Number.NaN);
   if (Number.isFinite(deltaPoints) && deltaPoints !== 0) {
@@ -401,6 +426,7 @@ function buildCompetitionWindow(targetDate: Date) {
     competitionDate,
     startsAt,
     endsAt,
+    awardsAt: addMinutes(endsAt, DAILY_RANK_REWARD_DELAY_MINUTES),
   };
 }
 
@@ -537,12 +563,6 @@ function addRankMinutesByDate(target: Map<string, number>, studentId: string, da
   target.set(key, (target.get(key) || 0) + minutes);
 }
 
-function mergeRankMinutesByDate(target: Map<string, number>, studentId: string, dateKey: string, minutes: number) {
-  if (!studentId || !dateKey || minutes <= 0) return;
-  const key = buildStudentDateRankKey(studentId, dateKey);
-  target.set(key, Math.max(target.get(key) || 0, minutes));
-}
-
 function foldRankMinutesByDate(source: Map<string, number>) {
   const totals = new Map<string, number>();
 
@@ -573,13 +593,6 @@ function getStudyLogDayDateKey(
   return typeof data.dateKey === "string" && data.dateKey.trim()
     ? data.dateKey.trim()
     : docSnap.id;
-}
-
-function getStudyLogDayTotalMinutes(data: Record<string, unknown>) {
-  const baseValue = Number(data.totalMinutes ?? data.totalStudyMinutes ?? 0);
-  const adjustment = Number(data.manualAdjustmentMinutes ?? 0);
-  const value = (Number.isFinite(baseValue) ? baseValue : 0) + (Number.isFinite(adjustment) ? adjustment : 0);
-  return Number.isFinite(value) ? Math.max(0, Math.round(value)) : 0;
 }
 
 function applyCompetitionRanks<T extends { value: number }>(entries: T[]): Array<T & { rank: number }> {
@@ -843,17 +856,6 @@ async function buildDailyAwardEntries(
     });
   }
 
-  dailyDayDocs.forEach((docSnap) => {
-    if (!docSnap.exists) return;
-    const data = docSnap.data() as Record<string, unknown>;
-    const studentId = getStudyLogDayStudentId(docSnap, data);
-    const dateKey = getStudyLogDayDateKey(docSnap, data);
-    const value = getStudyLogDayTotalMinutes(data);
-
-    if (!studentId || !dateKey || isSyntheticStudentId(studentId) || !context.shouldInclude(studentId) || value <= 0) return;
-    mergeRankMinutesByDate(minutesByStudentDate, studentId, dateKey, value);
-  });
-
   const totals = foldRankMinutesByDate(minutesByStudentDate);
 
   const attendanceBuckets = new Map<string, Record<string, unknown>[]>();
@@ -1074,15 +1076,18 @@ async function applyAwardEntries(
 
       if (awardedPoints > 0) {
         const source = `${range}_rank` as DailyPointEventDoc["source"];
+        const paidAt = new Date().toISOString();
         pointStatusPayload.pointEvents = upsertDailyPointEvent(currentDayStatus.pointEvents, {
           id: `rank:${range}:${target.periodKey}:${award.rank}`,
           source,
           label: `${RANKING_RANGE_LABEL[range]} 랭킹 ${award.rank}위`,
           points: awardedPoints,
-          createdAt: new Date().toISOString(),
+          createdAt: paidAt,
           range,
           rank: award.rank,
           periodKey: target.periodKey,
+          awardDateKey: target.awardDateKey,
+          paidAt,
         });
       } else {
         pointStatusPayload.pointEvents = normalizeDailyPointEvents(currentDayStatus.pointEvents);
@@ -1138,16 +1143,19 @@ async function applyAwardEntries(
 }
 
 function getDailySettlementCandidates(nowKst: Date, lookbackDays = 7) {
-  const candidates: Array<{ periodKey: string; competitionDate: Date }> = [];
+  const candidates: Array<{ periodKey: string; competitionDate: Date; windowStartsAt: Date; windowEndsAt: Date; awardsAt: Date }> = [];
 
   for (let index = 1; index <= lookbackDays; index += 1) {
     const competitionDate = shiftKstDate(startOfKstDay(nowKst), -index);
     const window = buildCompetitionWindow(competitionDate);
-    if (nowKst.getTime() < window.endsAt.getTime()) continue;
+    if (nowKst.getTime() < window.awardsAt.getTime()) continue;
 
     candidates.push({
       periodKey: toDateKey(competitionDate),
       competitionDate,
+      windowStartsAt: window.startsAt,
+      windowEndsAt: window.endsAt,
+      awardsAt: window.awardsAt,
     });
   }
 
@@ -1157,7 +1165,7 @@ function getDailySettlementCandidates(nowKst: Date, lookbackDays = 7) {
 function getWeeklySettlementCandidate(nowKst: Date) {
   const currentWeekStart = startOfKstWeek(nowKst);
   const releaseAt = cloneDate(currentWeekStart);
-  releaseAt.setHours(1, 0, 0, 0);
+  releaseAt.setHours(1, DAILY_RANK_REWARD_DELAY_MINUTES, 0, 0);
   if (nowKst.getTime() < releaseAt.getTime()) {
     return null;
   }
@@ -1175,7 +1183,7 @@ function getWeeklySettlementCandidate(nowKst: Date) {
 function getMonthlySettlementCandidate(nowKst: Date) {
   const currentMonthStart = startOfKstMonth(nowKst);
   const releaseAt = cloneDate(currentMonthStart);
-  releaseAt.setHours(1, 0, 0, 0);
+  releaseAt.setHours(1, DAILY_RANK_REWARD_DELAY_MINUTES, 0, 0);
   if (nowKst.getTime() < releaseAt.getTime()) {
     return null;
   }
@@ -1190,15 +1198,339 @@ function getMonthlySettlementCandidate(nowKst: Date) {
   };
 }
 
+function isValidDateKey(value: string) {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
+  const [year, month, day] = value.split("-").map((part) => Number(part));
+  const date = new Date(year, month - 1, day);
+  return (
+    date.getFullYear() === year
+    && date.getMonth() === month - 1
+    && date.getDate() === day
+  );
+}
+
+function parseDateKeyAsKstDate(dateKey: string) {
+  const [year, month, day] = dateKey.split("-").map((part) => Number(part));
+  const date = new Date(year, month - 1, day);
+  date.setHours(0, 0, 0, 0);
+  return date;
+}
+
+function normalizeMembershipRoleValue(value: unknown): string {
+  if (typeof value !== "string") return "";
+  const normalized = value.trim().toLowerCase().replace(/[\s_-]+/g, "");
+  if (normalized === "owner" || normalized === "admin" || normalized === "centermanager" || normalized === "centeradmin") {
+    return "centerAdmin";
+  }
+  if (normalized === "teacher") return "teacher";
+  if (normalized === "parent") return "parent";
+  if (normalized === "student") return "student";
+  return "";
+}
+
+function isAdminRole(value: unknown): boolean {
+  return normalizeMembershipRoleValue(value) === "centerAdmin";
+}
+
+async function assertActiveCenterAdmin(
+  db: admin.firestore.Firestore,
+  centerId: string,
+  uid: string
+) {
+  const [memberSnap, userCenterSnap] = await Promise.all([
+    db.doc(`centers/${centerId}/members/${uid}`).get(),
+    db.doc(`userCenters/${uid}/centers/${centerId}`).get(),
+  ]);
+  const memberData = memberSnap.exists ? (memberSnap.data() as Record<string, unknown>) : null;
+  const userCenterData = userCenterSnap.exists ? (userCenterSnap.data() as Record<string, unknown>) : null;
+  const memberRole = normalizeMembershipRoleValue(memberData?.role);
+  const userCenterRole = normalizeMembershipRoleValue(userCenterData?.role);
+  const memberIsActive = isAdminRole(memberRole) && normalizeMembershipStatus(memberData?.status) === "active";
+  const userCenterIsActive = isAdminRole(userCenterRole) && normalizeMembershipStatus(userCenterData?.status) === "active";
+
+  if (!memberIsActive && !userCenterIsActive) {
+    throw new functions.https.HttpsError("permission-denied", "Only active center admins can reissue ranking rewards.", {
+      userMessage: "센터 관리자만 랭킹 포인트 재정산을 실행할 수 있습니다.",
+    });
+  }
+}
+
+function isDailyRankEventForPeriod(event: DailyPointEventDoc, periodKey: string) {
+  if (event.source !== "daily_rank") return false;
+  if (event.periodKey && event.periodKey !== periodKey) return false;
+  if (event.periodKey === periodKey) return true;
+  return event.id.startsWith(`rank:daily:${periodKey}:`);
+}
+
+function getDailyRankAwardPointsForPeriod(dayStatus: Record<string, unknown>, periodKey: string) {
+  const fieldPoints = Math.max(
+    Math.floor(parseFiniteNumber(dayStatus.dailyRankRewardAmount) ?? 0),
+    Math.floor(parseFiniteNumber(dayStatus.dailyTopRewardAmount) ?? 0)
+  );
+  const eventPoints = normalizeDailyPointEvents(dayStatus.pointEvents)
+    .filter((event) => isDailyRankEventForPeriod(event, periodKey))
+    .reduce((total, event) => total + Math.max(0, Math.floor(event.points)), 0);
+  return Math.max(0, fieldPoints, eventPoints);
+}
+
+async function collectDailyRankAwardStudentIds(
+  db: admin.firestore.Firestore,
+  centerId: string,
+  periodKey: string
+) {
+  const settlementRef = db.doc(`centers/${centerId}/rankingRewardSettlements/daily_${periodKey}`);
+  const [settlementSnap, progressSnap] = await Promise.all([
+    settlementRef.get(),
+    db.collection(`centers/${centerId}/growthProgress`).get(),
+  ]);
+  const studentIds = new Set<string>();
+  const settlementData = settlementSnap.exists ? (settlementSnap.data() as Record<string, unknown>) : {};
+  if (Array.isArray(settlementData.awards)) {
+    settlementData.awards.forEach((entry) => {
+      if (!isPlainObject(entry)) return;
+      const studentId = asNonEmptyString(entry.studentId);
+      if (studentId && !isSyntheticStudentId(studentId)) studentIds.add(studentId);
+    });
+  }
+
+  progressSnap.forEach((docSnap) => {
+    if (isSyntheticStudentId(docSnap.id)) return;
+    const data = docSnap.data() as Record<string, unknown>;
+    const dailyPointStatus = isPlainObject(data.dailyPointStatus)
+      ? (data.dailyPointStatus as Record<string, unknown>)
+      : {};
+    const dayStatus = isPlainObject(dailyPointStatus[periodKey])
+      ? (dailyPointStatus[periodKey] as Record<string, unknown>)
+      : {};
+    if (getDailyRankAwardPointsForPeriod(dayStatus, periodKey) > 0) {
+      studentIds.add(docSnap.id);
+    }
+  });
+
+  return Array.from(studentIds);
+}
+
+async function cancelDailyRankAwardForStudent(params: {
+  db: admin.firestore.Firestore;
+  centerId: string;
+  studentId: string;
+  periodKey: string;
+  adminUid: string;
+  reissueId: string;
+}): Promise<DailyRankAwardCancellation | null> {
+  const { db, centerId, studentId, periodKey, adminUid, reissueId } = params;
+  const progressRef = db.doc(`centers/${centerId}/growthProgress/${studentId}`);
+  const logRef = db.collection(`centers/${centerId}/rankingRewardReissueLogs`).doc();
+
+  return db.runTransaction(async (transaction) => {
+    const progressSnap = await transaction.get(progressRef);
+    if (!progressSnap.exists) return null;
+
+    const progressData = progressSnap.data() as Record<string, unknown>;
+    const dailyPointStatus = isPlainObject(progressData.dailyPointStatus)
+      ? (progressData.dailyPointStatus as Record<string, unknown>)
+      : {};
+    const currentDayStatus = isPlainObject(dailyPointStatus[periodKey])
+      ? (dailyPointStatus[periodKey] as Record<string, unknown>)
+      : {};
+    const cancelPoints = getDailyRankAwardPointsForPeriod(currentDayStatus, periodKey);
+    if (cancelPoints <= 0) return null;
+
+    const currentBalance = Math.max(0, Math.floor(parseFiniteNumber(progressData.pointsBalance) ?? 0));
+    const currentTotalEarned = Math.max(0, Math.floor(parseFiniteNumber(progressData.totalPointsEarned) ?? 0));
+    const currentDailyAmount = Math.max(0, Math.floor(parseFiniteNumber(currentDayStatus.dailyPointAmount) ?? 0));
+    const balanceDeduction = Math.min(currentBalance, cancelPoints);
+    const balanceDeficit = Math.max(0, cancelPoints - currentBalance);
+    const nextEvents = normalizeDailyPointEvents(currentDayStatus.pointEvents)
+      .filter((event) => !isDailyRankEventForPeriod(event, periodKey));
+    const nextDayStatus = {
+      ...currentDayStatus,
+      dailyPointAmount: Math.max(0, currentDailyAmount - cancelPoints),
+      dailyRankRewardAmount: 0,
+      dailyTopRewardAmount: 0,
+      dailyRankRewardRank: 0,
+      pointEvents: nextEvents,
+      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+    };
+    const nextBalance = currentBalance - balanceDeduction;
+    const nextTotalEarned = Math.max(0, currentTotalEarned - cancelPoints);
+
+    transaction.set(progressRef, {
+      pointsBalance: nextBalance,
+      totalPointsEarned: nextTotalEarned,
+      dailyPointStatus: {
+        [periodKey]: nextDayStatus,
+      },
+      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+    }, { merge: true });
+    transaction.set(logRef, {
+      centerId,
+      studentId,
+      periodKey,
+      awardDateKey: periodKey,
+      action: "cancel_daily_rank_reward",
+      reissueId,
+      cancelledPoints: cancelPoints,
+      balanceDeduction,
+      balanceDeficit,
+      beforePointsBalance: currentBalance,
+      afterPointsBalance: nextBalance,
+      beforeTotalPointsEarned: currentTotalEarned,
+      afterTotalPointsEarned: nextTotalEarned,
+      beforeDailyPointAmount: currentDailyAmount,
+      afterDailyPointAmount: nextDayStatus.dailyPointAmount,
+      adjustedBy: adminUid,
+      createdAt: admin.firestore.FieldValue.serverTimestamp(),
+      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+    });
+
+    return {
+      studentId,
+      cancelledPoints: cancelPoints,
+      balanceDeduction,
+      balanceDeficit,
+      pointsBalance: nextBalance,
+      totalPointsEarned: nextTotalEarned,
+      dailyPointAmount: nextDayStatus.dailyPointAmount,
+    };
+  });
+}
+
+export const reissueDailyRankingRewardV2Secure = functions
+  .region(region)
+  .runWith({ timeoutSeconds: 540, memory: "1GB" })
+  .https.onCall(async (data, context) => {
+    const db = admin.firestore();
+    if (!context.auth?.uid) {
+      throw new functions.https.HttpsError("unauthenticated", "로그인이 필요합니다.");
+    }
+
+    const centerId = asNonEmptyString(data?.centerId);
+    const periodKey = asNonEmptyString(data?.dateKey) || DEFAULT_DAILY_RANK_REISSUE_DATE_KEY;
+    if (!centerId) {
+      throw new functions.https.HttpsError("invalid-argument", "centerId is required.", {
+        userMessage: "센터 정보를 다시 확인해 주세요.",
+      });
+    }
+    if (!isValidDateKey(periodKey)) {
+      throw new functions.https.HttpsError("invalid-argument", "Invalid dateKey.", {
+        userMessage: "재정산할 랭킹 날짜를 다시 확인해 주세요.",
+      });
+    }
+
+    await assertActiveCenterAdmin(db, centerId, context.auth.uid);
+
+    const reissueRef = db.collection(`centers/${centerId}/rankingRewardReissues`).doc(`daily_${periodKey}_${Date.now()}`);
+    const reissueId = reissueRef.id;
+    const contextSnapshot = await loadCenterStudentContext(db, centerId);
+    const competitionDate = parseDateKeyAsKstDate(periodKey);
+    const dailyWindow = buildCompetitionWindow(competitionDate);
+    const newAwards = await buildDailyAwardEntries(db, centerId, competitionDate, contextSnapshot);
+    const oldAwardStudentIds = await collectDailyRankAwardStudentIds(db, centerId, periodKey);
+    const studentsToCancel = Array.from(new Set(oldAwardStudentIds));
+    const cancellations: DailyRankAwardCancellation[] = [];
+
+    await reissueRef.set({
+      centerId,
+      range: "daily",
+      periodKey,
+      awardDateKey: periodKey,
+      rankingEngineVersion: RANKING_ENGINE_VERSION,
+      status: "processing",
+      requestedBy: context.auth.uid,
+      windowStartsAt: admin.firestore.Timestamp.fromDate(dailyWindow.startsAt),
+      windowEndsAt: admin.firestore.Timestamp.fromDate(dailyWindow.endsAt),
+      scheduledAwardAt: admin.firestore.Timestamp.fromDate(dailyWindow.awardsAt),
+      createdAt: admin.firestore.FieldValue.serverTimestamp(),
+      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+    }, { merge: true });
+
+    for (const studentId of studentsToCancel) {
+      const cancellation = await cancelDailyRankAwardForStudent({
+        db,
+        centerId,
+        studentId,
+        periodKey,
+        adminUid: context.auth.uid,
+        reissueId,
+      });
+      if (cancellation) cancellations.push(cancellation);
+    }
+
+    const appliedAwards = await applyAwardEntries(db, centerId, "daily", {
+      periodKey,
+      awardDateKey: periodKey,
+    }, newAwards);
+    const settlementRef = db.doc(`centers/${centerId}/rankingRewardSettlements/daily_${periodKey}`);
+    await completeSettlement(settlementRef, {
+      centerId,
+      range: "daily",
+      periodKey,
+      sourceDateKey: periodKey,
+      awardDateKey: periodKey,
+      rankingEngineVersion: RANKING_ENGINE_VERSION,
+      reissued: true,
+      reissueId,
+      reissuedBy: context.auth.uid,
+      windowStartsAt: admin.firestore.Timestamp.fromDate(dailyWindow.startsAt),
+      windowEndsAt: admin.firestore.Timestamp.fromDate(dailyWindow.endsAt),
+      scheduledAwardAt: admin.firestore.Timestamp.fromDate(dailyWindow.awardsAt),
+      cancelledAwardCount: cancellations.length,
+      cancelledPointTotal: cancellations.reduce((total, entry) => total + entry.cancelledPoints, 0),
+      balanceDeficitTotal: cancellations.reduce((total, entry) => total + entry.balanceDeficit, 0),
+      awardCount: appliedAwards.length,
+      awards: appliedAwards.map((award) => ({
+        studentId: award.studentId,
+        rank: award.rank,
+        points: award.points,
+        value: award.value,
+        displayNameSnapshot: award.displayNameSnapshot,
+      })),
+    });
+    await reissueRef.set({
+      status: "completed",
+      cancelledAwardCount: cancellations.length,
+      cancelledPointTotal: cancellations.reduce((total, entry) => total + entry.cancelledPoints, 0),
+      balanceDeficitTotal: cancellations.reduce((total, entry) => total + entry.balanceDeficit, 0),
+      awardCount: appliedAwards.length,
+      awards: appliedAwards.map((award) => ({
+        studentId: award.studentId,
+        rank: award.rank,
+        points: award.points,
+        value: award.value,
+        displayNameSnapshot: award.displayNameSnapshot,
+      })),
+      completedAt: admin.firestore.FieldValue.serverTimestamp(),
+      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+    }, { merge: true });
+
+    return {
+      ok: true,
+      reissueId,
+      centerId,
+      periodKey,
+      cancelledAwardCount: cancellations.length,
+      cancelledPointTotal: cancellations.reduce((total, entry) => total + entry.cancelledPoints, 0),
+      balanceDeficitTotal: cancellations.reduce((total, entry) => total + entry.balanceDeficit, 0),
+      awardCount: appliedAwards.length,
+      awards: appliedAwards.map((award) => ({
+        studentId: award.studentId,
+        rank: award.rank,
+        points: award.points,
+        value: award.value,
+      })),
+    };
+  });
+
 export const scheduledRankingRewardSettlement = functions
   .region(region)
-  .pubsub.schedule("every 10 minutes")
+  .pubsub.schedule("every 5 minutes")
   .timeZone("Asia/Seoul")
   .onRun(async () => {
     const db = admin.firestore();
     const now = new Date();
     const nowKst = toKstDate(now);
-    const awardDateKey = toDateKey(nowKst);
+    const settlementDateKey = toDateKey(nowKst);
     const dailyCandidates = getDailySettlementCandidates(nowKst);
     const weeklyCandidate = getWeeklySettlementCandidate(nowKst);
     const monthlyCandidate = getMonthlySettlementCandidate(nowKst);
@@ -1223,12 +1555,18 @@ export const scheduledRankingRewardSettlement = functions
 
       for (const candidate of dailyCandidates) {
         const settlementRef = db.doc(`centers/${centerId}/rankingRewardSettlements/daily_${candidate.periodKey}`);
+        const awardDateKey = candidate.periodKey;
         const claimed = await claimSettlement(db, settlementRef, now, {
           centerId,
           range: "daily",
           periodKey: candidate.periodKey,
           sourceDateKey: candidate.periodKey,
           awardDateKey,
+          settlementDateKey,
+          rankingEngineVersion: RANKING_ENGINE_VERSION,
+          windowStartsAt: admin.firestore.Timestamp.fromDate(candidate.windowStartsAt),
+          windowEndsAt: admin.firestore.Timestamp.fromDate(candidate.windowEndsAt),
+          scheduledAwardAt: admin.firestore.Timestamp.fromDate(candidate.awardsAt),
         });
         if (!claimed) continue;
 
@@ -1240,6 +1578,11 @@ export const scheduledRankingRewardSettlement = functions
           }, awards);
           await completeSettlement(settlementRef, {
             awardDateKey,
+            settlementDateKey,
+            rankingEngineVersion: RANKING_ENGINE_VERSION,
+            windowStartsAt: admin.firestore.Timestamp.fromDate(candidate.windowStartsAt),
+            windowEndsAt: admin.firestore.Timestamp.fromDate(candidate.windowEndsAt),
+            scheduledAwardAt: admin.firestore.Timestamp.fromDate(candidate.awardsAt),
             awardCount: appliedAwards.length,
             awards: appliedAwards.map((award) => ({
               studentId: award.studentId,
@@ -1257,6 +1600,7 @@ export const scheduledRankingRewardSettlement = functions
 
       if (weeklyCandidate) {
         const settlementRef = db.doc(`centers/${centerId}/rankingRewardSettlements/weekly_${weeklyCandidate.periodKey}`);
+        const awardDateKey = settlementDateKey;
         const claimed = await claimSettlement(db, settlementRef, now, {
           centerId,
           range: "weekly",
@@ -1299,6 +1643,7 @@ export const scheduledRankingRewardSettlement = functions
 
       if (monthlyCandidate) {
         const settlementRef = db.doc(`centers/${centerId}/rankingRewardSettlements/monthly_${monthlyCandidate.periodKey}`);
+        const awardDateKey = settlementDateKey;
         const claimed = await claimSettlement(db, settlementRef, now, {
           centerId,
           range: "monthly",

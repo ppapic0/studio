@@ -33,8 +33,8 @@ var __importStar = (this && this.__importStar) || (function () {
     };
 })();
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.createGiftishowOrderRequestSecure = exports.cancelGiftishowOrderSecure = exports.cancelGiftishowSendFailSecure = exports.approveGiftishowOrderSecure = exports.scheduledRankingRewardSettlement = exports.ensureCurrentUserMemberships = exports.scheduledOpenClawSnapshotExport = exports.generateOpenClawSnapshot = exports.refreshClassroomSignals = exports.stopStudentStudySessionSecure = exports.scheduledStudyBoxCarryoverExpiry = exports.openStudyRewardBoxSecure = exports.claimPlannerCompletionRewardSecure = exports.submitAttendanceRequestSecure = exports.applyPenaltyEventSecure = exports.adjustStudentPointBalanceSecure = exports.cancelPointBoostEventSecure = exports.createPointBoostEventSecure = exports.scheduledClassroomSignalsRefresh = exports.scheduledDailyRiskAlert = exports.repairRecentStudySessionTotals = exports.deleteManualStudySessionSecure = exports.updateManualStudySessionSecure = exports.createManualStudySessionSecure = exports.setStudentAttendanceStatusSecure = exports.onSessionWritten = exports.onSessionCreated = exports.scheduledWeeklyReport = exports.cleanupOldDocuments = exports.scheduledAttendanceCheck = exports.runLateArrivalCheck = exports.sendPaymentReminderBatch = exports.notifyDailyReportReady = exports.notifyAttendanceSms = exports.scheduledSmsQueueDispatcher = exports.sendManualStudentSms = exports.updateSmsRecipientPreference = exports.cancelSmsQueueItem = exports.retrySmsQueueItem = exports.saveNotificationSettingsSecure = exports.confirmInvoicePayment = exports.completeSignupWithInvite = exports.redeemInviteCode = exports.createCounselingDemoBundle = exports.registerStudent = exports.updateStudentAccount = exports.deleteTeacherAccount = exports.deleteStudentAccount = exports.repairTodayAttendanceSmsQueue = exports.onAttendanceEventCreated = void 0;
-exports.generateStudyPlan = exports.syncGiftishowCatalogSecure = exports.scheduledGiftishowCatalogSync = exports.saveGiftishowSettingsSecure = exports.resendGiftishowOrderSecure = exports.rejectGiftishowOrderSecure = exports.reconcilePendingGiftishowOrders = exports.getGiftishowBizmoneySecure = void 0;
+exports.cancelGiftishowOrderSecure = exports.cancelGiftishowSendFailSecure = exports.approveGiftishowOrderSecure = exports.reissueDailyRankingRewardV2Secure = exports.scheduledRankingRewardSettlement = exports.ensureCurrentUserMemberships = exports.scheduledOpenClawSnapshotExport = exports.generateOpenClawSnapshot = exports.refreshClassroomSignals = exports.stopStudentStudySessionSecure = exports.scheduledStudyBoxCarryoverExpiry = exports.openStudyRewardBoxSecure = exports.claimPlannerCompletionRewardSecure = exports.submitAttendanceRequestSecure = exports.applyPenaltyEventSecure = exports.adjustStudentPointBalanceSecure = exports.cancelPointBoostEventSecure = exports.createPointBoostEventSecure = exports.scheduledClassroomSignalsRefresh = exports.scheduledDailyRiskAlert = exports.repairRecentStudySessionTotals = exports.deleteManualStudySessionSecure = exports.updateManualStudySessionSecure = exports.createManualStudySessionSecure = exports.setStudentAttendanceStatusSecure = exports.onSessionWritten = exports.onSessionCreated = exports.scheduledWeeklyReport = exports.cleanupOldDocuments = exports.scheduledAttendanceCheck = exports.runLateArrivalCheck = exports.sendPaymentReminderBatch = exports.notifyDailyReportReady = exports.notifyAttendanceSms = exports.scheduledSmsQueueDispatcher = exports.sendManualStudentSms = exports.updateSmsRecipientPreference = exports.cancelSmsQueueItem = exports.retrySmsQueueItem = exports.saveNotificationSettingsSecure = exports.confirmInvoicePayment = exports.completeSignupWithInvite = exports.redeemInviteCode = exports.createCounselingDemoBundle = exports.registerStudent = exports.updateStudentAccount = exports.deleteTeacherAccount = exports.deleteStudentAccount = exports.repairTodayAttendanceSmsQueue = exports.onAttendanceEventCreated = void 0;
+exports.generateStudyPlan = exports.syncGiftishowCatalogSecure = exports.scheduledGiftishowCatalogSync = exports.saveGiftishowSettingsSecure = exports.resendGiftishowOrderSecure = exports.rejectGiftishowOrderSecure = exports.reconcilePendingGiftishowOrders = exports.getGiftishowBizmoneySecure = exports.createGiftishowOrderRequestSecure = void 0;
 const params_1 = require("firebase-functions/params");
 const functions = __importStar(require("firebase-functions"));
 const admin = __importStar(require("firebase-admin"));
@@ -344,6 +344,12 @@ function normalizeDailyPointEventEntry(value) {
     const periodKey = asTrimmedString(value.periodKey);
     if (periodKey)
         event.periodKey = periodKey;
+    const awardDateKey = asTrimmedString(value.awardDateKey);
+    if (awardDateKey)
+        event.awardDateKey = awardDateKey;
+    const paidAt = asTrimmedString(value.paidAt);
+    if (paidAt)
+        event.paidAt = paidAt;
     const deltaPoints = Math.round((_d = parseFiniteNumber(value.deltaPoints)) !== null && _d !== void 0 ? _d : Number.NaN);
     if (Number.isFinite(deltaPoints) && deltaPoints !== 0) {
         event.deltaPoints = deltaPoints;
@@ -9251,6 +9257,7 @@ exports.ensureCurrentUserMemberships = functions
 });
 var rankingRewardSettlement_1 = require("./rankingRewardSettlement");
 Object.defineProperty(exports, "scheduledRankingRewardSettlement", { enumerable: true, get: function () { return rankingRewardSettlement_1.scheduledRankingRewardSettlement; } });
+Object.defineProperty(exports, "reissueDailyRankingRewardV2Secure", { enumerable: true, get: function () { return rankingRewardSettlement_1.reissueDailyRankingRewardV2Secure; } });
 var giftishow_1 = require("./giftishow");
 Object.defineProperty(exports, "approveGiftishowOrderSecure", { enumerable: true, get: function () { return giftishow_1.approveGiftishowOrderSecure; } });
 Object.defineProperty(exports, "cancelGiftishowSendFailSecure", { enumerable: true, get: function () { return giftishow_1.cancelGiftishowSendFailSecure; } });

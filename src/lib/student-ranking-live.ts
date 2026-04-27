@@ -68,14 +68,25 @@ export function getLiveAdjustedStudentRankValue({
 }
 
 export function assignStudentRankingTrackRanks<T extends RankSortableEntry>(entries: T[]): Array<T & { rank: number }> {
+  let lastValue: number | null = null;
+  let currentRank = 0;
+
   return [...entries]
     .sort((left, right) => {
       const valueDiff = getSafeRankValue(right.value) - getSafeRankValue(left.value);
       if (valueDiff !== 0) return valueDiff;
       return (left.displayNameSnapshot || '').localeCompare(right.displayNameSnapshot || '', 'ko');
     })
-    .map((entry, index) => ({
-      ...entry,
-      rank: index + 1,
-    }));
+    .map((entry, index) => {
+      const value = getSafeRankValue(entry.value);
+      if (lastValue === null || value < lastValue) {
+        currentRank = index + 1;
+        lastValue = value;
+      }
+
+      return {
+        ...entry,
+        rank: currentRank,
+      };
+    });
 }

@@ -1357,10 +1357,12 @@ function DailyWaitingCard({
   windowLabel,
   nextOpensAtLabel,
   yesterdayTopMinutes,
+  isSettlementPending,
 }: {
   windowLabel: string;
   nextOpensAtLabel: string;
   yesterdayTopMinutes: number;
+  isSettlementPending: boolean;
 }) {
   return (
     <section className={cn(RANKING_SECTION_PANEL_CLASS, 'student-utility-card relative overflow-hidden p-5 text-white md:p-6')}>
@@ -1368,21 +1370,25 @@ function DailyWaitingCard({
       <div className="relative space-y-4">
         <div className={RANKING_KICKER_CLASS}>
           <Clock3 className="h-4 w-4" />
-          일간 랭킹 집계 대기
+          {isSettlementPending ? '일간 랭킹 집계 중' : '일간 랭킹 집계 대기'}
         </div>
         <div>
           <h2 className="font-aggro-display text-[2rem] font-black leading-[0.95] tracking-[-0.05em] text-white md:text-[2.4rem]">
-            오픈 시간에만
+            {isSettlementPending ? '마감 결과를' : '오픈 시간에만'}
             <br />
-            일간 랭킹이 열려요
+            {isSettlementPending ? '정산하고 있어요' : '일간 랭킹이 열려요'}
           </h2>
           <p className="mt-3 max-w-2xl text-sm font-semibold leading-7 text-[#B7C7E8] md:text-base">
-            {windowLabel}에 공부한 기록만 일간 순위에 실시간 반영됩니다. 지금은 대기 상태라서 다음 오픈 시간에 다시 집계가 시작돼요.
+            {isSettlementPending
+              ? `${windowLabel} 기록 집계가 끝났고, 01:05에 랭킹 포인트가 지급됩니다.`
+              : `${windowLabel}에 공부한 기록만 일간 순위에 실시간 반영됩니다. 지금은 대기 상태라서 다음 오픈 시간에 다시 집계가 시작돼요.`}
           </p>
         </div>
         <div className="grid gap-3 md:grid-cols-2">
           <div className="rounded-[22px] border border-white/10 bg-[rgba(255,255,255,0.05)] p-4 shadow-[0_14px_28px_-24px_rgba(0,0,0,0.56)]">
-            <div className="text-[11px] font-black tracking-[0.18em] text-[#AFC0E6]">다음 오픈</div>
+            <div className="text-[11px] font-black tracking-[0.18em] text-[#AFC0E6]">
+              {isSettlementPending ? '포인트 지급' : '다음 오픈'}
+            </div>
             <div className="font-aggro-display mt-2 text-[1.7rem] font-black tracking-[-0.04em] text-white">{nextOpensAtLabel}</div>
           </div>
           <div className="rounded-[22px] border border-white/10 bg-[rgba(255,255,255,0.05)] p-4 shadow-[0_14px_28px_-24px_rgba(0,0,0,0.56)]">
@@ -1659,10 +1665,11 @@ export default function RankingBattlePage() {
           nowMs: clockNowMs,
           viewerId,
           selfLiveStartedAtMs,
+          dailyRankWindow,
         }),
       }))
     );
-  }, [baseEntries, clockNowMs, range, selfLiveStartedAtMs, viewerId]);
+  }, [baseEntries, clockNowMs, dailyRankWindow, range, selfLiveStartedAtMs, viewerId]);
 
   const shouldShowEmptyState = !loading && currentRangeEntries.length === 0 && selfLiveStartedAtMs <= 0;
 
@@ -1793,9 +1800,13 @@ export default function RankingBattlePage() {
           <HeroBattleHeader
             range={range}
             onRangeChange={handleRangeChange}
-            activeMessage={`다음 오픈 ${dailyRankWindow.nextOpensAtLabel}부터 일간 랭킹이 다시 실시간으로 열려요.`}
+            activeMessage={
+              dailyRankWindow.isSettlementPending
+                ? '마감된 일간 랭킹을 정산하고 있어요. 01:05에 포인트가 지급됩니다.'
+                : `다음 오픈 ${dailyRankWindow.nextOpensAtLabel}부터 일간 랭킹이 다시 실시간으로 열려요.`
+            }
             isLive={false}
-            statusLabel="집계 대기"
+            statusLabel={dailyRankWindow.isSettlementPending ? '집계 중' : '집계 대기'}
             subtitleOverride={`${dailyRankWindow.windowLabel}에 공부한 기록만 일간 랭킹에 반영됩니다.`}
             isMobile={isMobile}
           />
@@ -1810,8 +1821,9 @@ export default function RankingBattlePage() {
             <div className="space-y-5">
               <DailyWaitingCard
                 windowLabel={dailyRankWindow.windowLabel}
-                nextOpensAtLabel={dailyRankWindow.nextOpensAtLabel}
+                nextOpensAtLabel={dailyRankWindow.isSettlementPending ? '01:05' : dailyRankWindow.nextOpensAtLabel}
                 yesterdayTopMinutes={dailyWaitingTopMinutes}
+                isSettlementPending={dailyRankWindow.isSettlementPending}
               />
             </div>
           </div>
