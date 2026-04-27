@@ -10,6 +10,12 @@
         "functions",
         "node_modules",
         ".next",
+        ".playwright-cli",
+        "docs",
+        "output",
+        "tmp",
+        "*.log",
+        "*.err.log",
         ".next_old_*",
         ".playwright-cli_old_*",
         "output_old_*"
