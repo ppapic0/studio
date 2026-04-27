@@ -222,10 +222,23 @@ function getCenterPointEvents(dayStatus: unknown): Record<string, any>[] {
     : [];
 }
 
+function hasCenterManualPointAdjustment(dayStatus: Record<string, any>): boolean {
+  const manualAdjustmentPoints = Number(dayStatus.manualAdjustmentPoints ?? 0);
+  if (Number.isFinite(manualAdjustmentPoints) && Math.round(manualAdjustmentPoints) !== 0) return true;
+  return getCenterPointEvents(dayStatus).some((event) => {
+    const source = typeof event.source === 'string' ? event.source : '';
+    const deltaPoints = Number(event.deltaPoints ?? 0);
+    return source === 'manual_adjustment' && Number.isFinite(deltaPoints) && Math.round(deltaPoints) !== 0;
+  });
+}
+
 function getCenterPointDayAmount(dayStatus: unknown): number {
   if (!dayStatus || typeof dayStatus !== 'object') return 0;
   const status = dayStatus as Record<string, any>;
   const directAmount = parsePositivePointValue(status.dailyPointAmount);
+  if (hasCenterManualPointAdjustment(status)) {
+    return directAmount;
+  }
   const eventAmount = getCenterPointEvents(status).reduce(
     (sum, event) => sum + parsePositivePointValue(event.points),
     0
@@ -235,6 +248,11 @@ function getCenterPointDayAmount(dayStatus: unknown): number {
 
 function getCenterPointDayDetail(dayStatus: unknown): string {
   const labels = getCenterPointEvents(dayStatus)
+    .sort((left, right) => {
+      const leftSource = typeof left.source === 'string' ? left.source : '';
+      const rightSource = typeof right.source === 'string' ? right.source : '';
+      return Number(rightSource === 'manual_adjustment') - Number(leftSource === 'manual_adjustment');
+    })
     .map((event) => {
       const label = typeof event.label === 'string' ? event.label.trim() : '';
       const reason = typeof event.reason === 'string' ? event.reason.trim() : '';

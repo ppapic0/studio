@@ -601,6 +601,29 @@ type PointHistoryDailySummary = PointHistorySummary & {
   grants: PointHistoryGrantRow[];
 };
 
+type PointAdjustmentMode = 'add' | 'subtract';
+
+type PointAdjustmentTarget = PointHistoryGrantRow & {
+  currentBalance: number;
+  currentTotalEarned: number;
+};
+
+type AdjustStudentPointBalanceInput = {
+  centerId: string;
+  studentId: string;
+  dateKey: string;
+  deltaPoints: number;
+  reason: string;
+};
+
+type AdjustStudentPointBalanceResult = {
+  ok: boolean;
+  adjustmentId: string;
+  pointsBalance: number;
+  totalPointsEarned: number;
+  dailyPointAmount: number;
+};
+
 const POINT_HISTORY_WINDOW_ORDER: PointHistoryWindow[] = ['today', '7d', '30d'];
 
 const EMPTY_POINT_HISTORY_SUMMARY: PointHistorySummary = {
@@ -820,6 +843,11 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
   const [isTodayPointsDialogOpen, setIsTodayPointsDialogOpen] = useState(false);
   const [selectedPointHistoryWindow, setSelectedPointHistoryWindow] = useState<PointHistoryWindow>('today');
   const [expandedPointHistoryDateKey, setExpandedPointHistoryDateKey] = useState<string | null>(null);
+  const [pointAdjustmentTarget, setPointAdjustmentTarget] = useState<PointAdjustmentTarget | null>(null);
+  const [pointAdjustmentMode, setPointAdjustmentMode] = useState<PointAdjustmentMode>('add');
+  const [pointAdjustmentAmountDraft, setPointAdjustmentAmountDraft] = useState('');
+  const [pointAdjustmentReasonDraft, setPointAdjustmentReasonDraft] = useState('');
+  const [isPointAdjustmentSaving, setIsPointAdjustmentSaving] = useState(false);
   const [isPointBoostDialogOpen, setIsPointBoostDialogOpen] = useState(false);
   const [pointBoostModeDraft, setPointBoostModeDraft] = useState<'day' | 'window'>('day');
   const [pointBoostDateDraft, setPointBoostDateDraft] = useState('');
@@ -5948,6 +5976,91 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
     setExpandedPointHistoryDateKey(null);
     setIsTodayPointsDialogOpen(true);
   };
+  const resetPointAdjustmentDialog = () => {
+    setPointAdjustmentTarget(null);
+    setPointAdjustmentMode('add');
+    setPointAdjustmentAmountDraft('');
+    setPointAdjustmentReasonDraft('');
+  };
+  const openPointAdjustmentDialog = (grant: PointHistoryGrantRow) => {
+    const progress = progressById.get(grant.studentId);
+    setPointAdjustmentTarget({
+      ...grant,
+      currentBalance: Math.max(0, Math.floor(Number(progress?.pointsBalance || 0))),
+      currentTotalEarned: Math.max(0, Math.floor(Number(progress?.totalPointsEarned || 0))),
+    });
+    setPointAdjustmentMode('add');
+    setPointAdjustmentAmountDraft('');
+    setPointAdjustmentReasonDraft('');
+  };
+  const handleSubmitPointAdjustment = async () => {
+    if (!functions || !centerId || !pointAdjustmentTarget) return;
+
+    const amount = Math.floor(Number(pointAdjustmentAmountDraft));
+    const reason = pointAdjustmentReasonDraft.trim();
+    if (!Number.isFinite(amount) || amount < 1 || amount > 100000) {
+      toast({
+        variant: 'destructive',
+        title: '포인트 확인 필요',
+        description: '수정 포인트는 1~100,000 사이로 입력해 주세요.',
+      });
+      return;
+    }
+    if (!reason) {
+      toast({
+        variant: 'destructive',
+        title: '수정 사유 필요',
+        description: '나중에 확인할 수 있도록 포인트 수정 사유를 입력해 주세요.',
+      });
+      return;
+    }
+
+    const deltaPoints = pointAdjustmentMode === 'add' ? amount : -amount;
+    if (deltaPoints < 0 && amount > pointAdjustmentTarget.currentBalance) {
+      toast({
+        variant: 'destructive',
+        title: '차감 불가',
+        description: '보유 포인트보다 크게 차감할 수 없습니다.',
+      });
+      return;
+    }
+    if (deltaPoints < 0 && amount > pointAdjustmentTarget.totalPoints) {
+      toast({
+        variant: 'destructive',
+        title: '차감 불가',
+        description: '해당 일자의 포인트보다 크게 차감할 수 없습니다.',
+      });
+      return;
+    }
+
+    setIsPointAdjustmentSaving(true);
+    try {
+      const adjustStudentPoints = httpsCallable<AdjustStudentPointBalanceInput, AdjustStudentPointBalanceResult>(
+        functions,
+        'adjustStudentPointBalanceSecure'
+      );
+      const result = await adjustStudentPoints({
+        centerId,
+        studentId: pointAdjustmentTarget.studentId,
+        dateKey: pointAdjustmentTarget.dateKey,
+        deltaPoints,
+        reason,
+      });
+      toast({
+        title: '포인트 수정 완료',
+        description: `${pointAdjustmentTarget.studentName} 학생 ${deltaPoints > 0 ? '+' : ''}${deltaPoints.toLocaleString()}pt · 잔액 ${Number(result.data.pointsBalance || 0).toLocaleString()}pt`,
+      });
+      resetPointAdjustmentDialog();
+    } catch (error) {
+      toast({
+        variant: 'destructive',
+        title: '포인트 수정 실패',
+        description: getCallableErrorMessage(error, '잠시 후 다시 시도해 주세요.'),
+      });
+    } finally {
+      setIsPointAdjustmentSaving(false);
+    }
+  };
   const openAdminAttendanceBoardFromSignal = (signal: {
     roomId?: string;
   }) => {
@@ -7367,7 +7480,10 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
             open={isTodayPointsDialogOpen}
             onOpenChange={(open) => {
               setIsTodayPointsDialogOpen(open);
-              if (!open) setExpandedPointHistoryDateKey(null);
+              if (!open) {
+                setExpandedPointHistoryDateKey(null);
+                resetPointAdjustmentDialog();
+              }
             }}
           >
             <DialogContent motionPreset="dashboard-premium" className={cn(studioDialogContentClassName, 'sm:max-w-3xl')}>
@@ -7482,7 +7598,19 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
                                       {grant.className}
                                     </Badge>
                                   </div>
-                                  <p className="shrink-0 text-sm font-black text-emerald-700">{formatPointsInPt(grant.totalPoints)}</p>
+                                  <div className="flex shrink-0 items-center gap-2">
+                                    <p className="text-sm font-black text-emerald-700">{formatPointsInPt(grant.totalPoints)}</p>
+                                    <Button
+                                      type="button"
+                                      variant="outline"
+                                      size="sm"
+                                      className="h-8 rounded-xl border-[#DCE7FF] px-2.5 text-[11px] font-black text-[#2554D7]"
+                                      onClick={() => openPointAdjustmentDialog(grant)}
+                                    >
+                                      <ArrowRightLeft className="mr-1 h-3.5 w-3.5" />
+                                      수정
+                                    </Button>
+                                  </div>
                                 </div>
                               ))}
                             </div>
@@ -7504,7 +7632,19 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
                                       </div>
                                       <p className="mt-1 truncate text-[11px] font-bold text-[#6E7EA3]">{grant.detail}</p>
                                     </div>
-                                    <p className="shrink-0 text-sm font-black text-emerald-700">{formatPointsInPt(grant.totalPoints)}</p>
+                                    <div className="flex shrink-0 items-center gap-2">
+                                      <p className="text-sm font-black text-emerald-700">{formatPointsInPt(grant.totalPoints)}</p>
+                                      <Button
+                                        type="button"
+                                        variant="outline"
+                                        size="sm"
+                                        className="h-8 rounded-xl border-[#DCE7FF] px-2.5 text-[11px] font-black text-[#2554D7]"
+                                        onClick={() => openPointAdjustmentDialog(grant)}
+                                      >
+                                        <ArrowRightLeft className="mr-1 h-3.5 w-3.5" />
+                                        수정
+                                      </Button>
+                                    </div>
                                   </div>
                                 ))}
                               </div>
@@ -7526,6 +7666,126 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
                     닫기
                   </Button>
                 </DialogClose>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+
+          <Dialog
+            open={Boolean(pointAdjustmentTarget)}
+            onOpenChange={(open) => {
+              if (!open && !isPointAdjustmentSaving) resetPointAdjustmentDialog();
+            }}
+          >
+            <DialogContent motionPreset="dashboard-premium" className="overflow-hidden rounded-[2rem] border border-[#DCE7FF] p-0 shadow-2xl sm:max-w-md">
+              <div className="bg-[#14295F] px-5 py-5 text-white">
+                <DialogHeader className="text-left">
+                  <Badge className="w-fit border-none bg-white/16 px-2.5 py-1 text-[10px] font-black text-white">포인트 수동 수정</Badge>
+                  <DialogTitle className="text-xl font-black tracking-tight">학생 포인트를 조정합니다</DialogTitle>
+                  <DialogDescription className="text-sm font-semibold leading-5 text-white/72">
+                    수정 사유와 함께 학생별 포인트 내역에 기록됩니다.
+                  </DialogDescription>
+                </DialogHeader>
+              </div>
+
+              {pointAdjustmentTarget ? (
+                <div className="grid gap-4 bg-[#F7FAFF] px-5 py-5">
+                  <div className="grid gap-2 rounded-[1.25rem] border border-[#DCE7FF] bg-white p-4">
+                    <div className="flex items-center justify-between gap-3">
+                      <div className="min-w-0">
+                        <p className="truncate text-sm font-black text-[#14295F]">{pointAdjustmentTarget.studentName}</p>
+                        <p className="mt-1 text-[11px] font-bold text-[#6E7EA3]">{pointAdjustmentTarget.dateKey} · {pointAdjustmentTarget.className}</p>
+                      </div>
+                      <Badge className="shrink-0 border-none bg-emerald-100 px-3 py-1 text-[11px] font-black text-emerald-700">
+                        {formatPointsInPt(pointAdjustmentTarget.totalPoints)}
+                      </Badge>
+                    </div>
+                    <div className="grid grid-cols-2 gap-2">
+                      <div className="rounded-xl bg-[#F8FBFF] px-3 py-2">
+                        <p className="text-[10px] font-black uppercase tracking-[0.16em] text-[#6E7EA3]">현재 잔액</p>
+                        <p className="dashboard-number mt-1 text-base text-[#14295F]">{formatPointsInPt(pointAdjustmentTarget.currentBalance)}</p>
+                      </div>
+                      <div className="rounded-xl bg-[#F8FBFF] px-3 py-2">
+                        <p className="text-[10px] font-black uppercase tracking-[0.16em] text-[#6E7EA3]">일자 포인트</p>
+                        <p className="dashboard-number mt-1 text-base text-[#14295F]">{formatPointsInPt(pointAdjustmentTarget.totalPoints)}</p>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="grid gap-2">
+                    <Label className="text-xs font-black text-[#14295F]">수정 유형</Label>
+                    <div className="grid grid-cols-2 gap-2 rounded-2xl border border-[#DCE7FF] bg-white p-1.5">
+                      {(['add', 'subtract'] as PointAdjustmentMode[]).map((mode) => {
+                        const isSelected = pointAdjustmentMode === mode;
+                        return (
+                          <Button
+                            key={mode}
+                            type="button"
+                            variant={isSelected ? 'default' : 'ghost'}
+                            className={cn(
+                              'h-10 rounded-xl font-black',
+                              isSelected
+                                ? mode === 'add'
+                                  ? 'bg-emerald-600 text-white hover:bg-emerald-700'
+                                  : 'bg-[#FF7A16] text-white hover:bg-[#e86d12]'
+                                : 'text-[#6E7EA3] hover:bg-[#F4F7FF]'
+                            )}
+                            onClick={() => setPointAdjustmentMode(mode)}
+                          >
+                            {mode === 'add' ? '추가' : '차감'}
+                          </Button>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  <div className="grid gap-2">
+                    <Label htmlFor="point-adjustment-amount" className="text-xs font-black text-[#14295F]">포인트</Label>
+                    <Input
+                      id="point-adjustment-amount"
+                      type="number"
+                      min={1}
+                      max={100000}
+                      inputMode="numeric"
+                      value={pointAdjustmentAmountDraft}
+                      onChange={(event) => setPointAdjustmentAmountDraft(event.target.value)}
+                      placeholder="예: 100"
+                      className="h-11 rounded-xl border-[#DCE7FF] bg-white font-bold text-[#14295F]"
+                    />
+                  </div>
+
+                  <div className="grid gap-2">
+                    <Label htmlFor="point-adjustment-reason" className="text-xs font-black text-[#14295F]">수정 사유</Label>
+                    <Textarea
+                      id="point-adjustment-reason"
+                      value={pointAdjustmentReasonDraft}
+                      onChange={(event) => setPointAdjustmentReasonDraft(event.target.value.slice(0, 160))}
+                      placeholder="예: 출석 기록 누락 보정"
+                      className="min-h-24 rounded-xl border-[#DCE7FF] bg-white text-sm font-bold text-[#14295F]"
+                    />
+                    <p className="text-[11px] font-bold text-[#6E7EA3]">사유는 감사 로그와 학생 포인트 내역에 함께 남습니다.</p>
+                  </div>
+                </div>
+              ) : null}
+
+              <DialogFooter className="border-t border-[#DCE7FF] bg-white px-5 py-4">
+                <Button
+                  type="button"
+                  variant="ghost"
+                  className="h-11 rounded-xl px-5 font-black text-[#6E7EA3]"
+                  disabled={isPointAdjustmentSaving}
+                  onClick={resetPointAdjustmentDialog}
+                >
+                  취소
+                </Button>
+                <Button
+                  type="button"
+                  className="h-11 rounded-xl bg-[#14295F] px-5 font-black text-white hover:bg-[#10224C]"
+                  disabled={isPointAdjustmentSaving}
+                  onClick={() => void handleSubmitPointAdjustment()}
+                >
+                  {isPointAdjustmentSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
+                  저장
+                </Button>
               </DialogFooter>
             </DialogContent>
           </Dialog>

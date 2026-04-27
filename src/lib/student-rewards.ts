@@ -143,8 +143,20 @@ function normalizeDailyPointEventItems(value: unknown, maxTotal: number): DailyP
   let remaining = maxTotal;
   const seenKeys = new Set<string>();
   const items: DailyPointBreakdownItem[] = [];
+  const eventEntries = value
+    .map((event, index) => ({ event, index }))
+    .sort((left, right) => {
+      const leftSource = typeof (left.event as Record<string, any> | null)?.source === 'string'
+        ? String((left.event as Record<string, any>).source)
+        : '';
+      const rightSource = typeof (right.event as Record<string, any> | null)?.source === 'string'
+        ? String((right.event as Record<string, any>).source)
+        : '';
+      const manualRank = Number(rightSource === 'manual_adjustment') - Number(leftSource === 'manual_adjustment');
+      return manualRank || left.index - right.index;
+    });
 
-  value.forEach((event, index) => {
+  eventEntries.forEach(({ event, index }) => {
     if (!event || typeof event !== 'object' || remaining <= 0) return;
 
     const points = getNormalizedRewardAmount((event as Record<string, any>).points);
@@ -394,10 +406,26 @@ export function getDailyAwardedPointTotal(dayStatus?: Record<string, any>): numb
   const earnedPointTotal = getDailyStudyBoxAwardPoints(dayStatus) + getRankRewardPoints(dayStatus);
   const total = Number(dayStatus?.dailyPointAmount ?? 0);
   if (Number.isFinite(total)) {
+    if (hasManualPointAdjustment(dayStatus)) {
+      return Math.max(0, Math.floor(total));
+    }
     return Math.max(0, Math.max(Math.floor(total), earnedPointTotal));
   }
 
   return earnedPointTotal;
+}
+
+function hasManualPointAdjustment(dayStatus?: Record<string, any>): boolean {
+  if (!dayStatus || typeof dayStatus !== 'object') return false;
+  const manualAdjustmentPoints = Number(dayStatus.manualAdjustmentPoints ?? 0);
+  if (Number.isFinite(manualAdjustmentPoints) && Math.round(manualAdjustmentPoints) !== 0) return true;
+  const events = Array.isArray(dayStatus.pointEvents) ? dayStatus.pointEvents : [];
+  return events.some((event) => {
+    if (!event || typeof event !== 'object') return false;
+    const source = typeof event.source === 'string' ? event.source : '';
+    const deltaPoints = Number(event.deltaPoints ?? 0);
+    return source === 'manual_adjustment' && Number.isFinite(deltaPoints) && Math.round(deltaPoints) !== 0;
+  });
 }
 
 export function getDailyStudyBoxAwardPoints(dayStatus?: Record<string, any>): number {

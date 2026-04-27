@@ -134,7 +134,7 @@ function asNonEmptyString(value) {
     return typeof value === "string" ? value.trim() : "";
 }
 function normalizeDailyPointEventEntry(value) {
-    var _a, _b;
+    var _a, _b, _c;
     if (!isPlainObject(value))
         return null;
     const id = asNonEmptyString(value.id);
@@ -163,6 +163,17 @@ function normalizeDailyPointEventEntry(value) {
     const periodKey = asNonEmptyString(value.periodKey);
     if (periodKey)
         event.periodKey = periodKey;
+    const deltaPoints = Math.round((_c = parseFiniteNumber(value.deltaPoints)) !== null && _c !== void 0 ? _c : Number.NaN);
+    if (Number.isFinite(deltaPoints) && deltaPoints !== 0) {
+        event.deltaPoints = deltaPoints;
+    }
+    const direction = asNonEmptyString(value.direction);
+    if (direction === "add" || direction === "subtract") {
+        event.direction = direction;
+    }
+    const reason = asNonEmptyString(value.reason);
+    if (reason)
+        event.reason = reason.slice(0, 160);
     return event;
 }
 function normalizeDailyPointEvents(value) {
@@ -251,7 +262,17 @@ function getLegacyDailyPointAwardTotal(dayStatus) {
 function getDailyAwardedPointTotal(dayStatus) {
     var _a;
     const dailyPointAmount = Math.max(0, Math.floor((_a = parseFiniteNumber(dayStatus.dailyPointAmount)) !== null && _a !== void 0 ? _a : 0));
+    if (hasManualPointAdjustment(dayStatus)) {
+        return dailyPointAmount;
+    }
     return Math.max(dailyPointAmount, getLegacyDailyPointAwardTotal(dayStatus));
+}
+function hasManualPointAdjustment(dayStatus) {
+    var _a;
+    const manualAdjustmentPoints = Math.round((_a = parseFiniteNumber(dayStatus.manualAdjustmentPoints)) !== null && _a !== void 0 ? _a : 0);
+    if (manualAdjustmentPoints !== 0)
+        return true;
+    return normalizeDailyPointEvents(dayStatus.pointEvents).some((entry) => { var _a; return entry.source === "manual_adjustment" && Math.round((_a = parseFiniteNumber(entry.deltaPoints)) !== null && _a !== void 0 ? _a : 0) !== 0; });
 }
 function getRankRewardAwardTotal(dayStatus) {
     var _a, _b, _c, _d;

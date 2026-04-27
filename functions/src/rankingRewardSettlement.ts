@@ -18,6 +18,9 @@ type DailyPointEventDoc = {
   range?: StudentRankingRange;
   rank?: number;
   periodKey?: string;
+  deltaPoints?: number;
+  direction?: "add" | "subtract";
+  reason?: string;
 };
 
 type StudentRankRewardTier = {
@@ -185,6 +188,19 @@ function normalizeDailyPointEventEntry(value: unknown): DailyPointEventDoc | nul
   const periodKey = asNonEmptyString(value.periodKey);
   if (periodKey) event.periodKey = periodKey;
 
+  const deltaPoints = Math.round(parseFiniteNumber(value.deltaPoints) ?? Number.NaN);
+  if (Number.isFinite(deltaPoints) && deltaPoints !== 0) {
+    event.deltaPoints = deltaPoints;
+  }
+
+  const direction = asNonEmptyString(value.direction);
+  if (direction === "add" || direction === "subtract") {
+    event.direction = direction;
+  }
+
+  const reason = asNonEmptyString(value.reason);
+  if (reason) event.reason = reason.slice(0, 160);
+
   return event;
 }
 
@@ -292,7 +308,18 @@ function getLegacyDailyPointAwardTotal(dayStatus: Record<string, unknown>): numb
 
 function getDailyAwardedPointTotal(dayStatus: Record<string, unknown>): number {
   const dailyPointAmount = Math.max(0, Math.floor(parseFiniteNumber(dayStatus.dailyPointAmount) ?? 0));
+  if (hasManualPointAdjustment(dayStatus)) {
+    return dailyPointAmount;
+  }
   return Math.max(dailyPointAmount, getLegacyDailyPointAwardTotal(dayStatus));
+}
+
+function hasManualPointAdjustment(dayStatus: Record<string, unknown>): boolean {
+  const manualAdjustmentPoints = Math.round(parseFiniteNumber(dayStatus.manualAdjustmentPoints) ?? 0);
+  if (manualAdjustmentPoints !== 0) return true;
+  return normalizeDailyPointEvents(dayStatus.pointEvents).some((entry) =>
+    entry.source === "manual_adjustment" && Math.round(parseFiniteNumber(entry.deltaPoints) ?? 0) !== 0
+  );
 }
 
 function getRankRewardAwardTotal(dayStatus: Record<string, unknown>) {

@@ -33,8 +33,8 @@ var __importStar = (this && this.__importStar) || (function () {
     };
 })();
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.getGiftishowBizmoneySecure = exports.createGiftishowOrderRequestSecure = exports.cancelGiftishowOrderSecure = exports.cancelGiftishowSendFailSecure = exports.approveGiftishowOrderSecure = exports.scheduledRankingRewardSettlement = exports.ensureCurrentUserMemberships = exports.scheduledOpenClawSnapshotExport = exports.generateOpenClawSnapshot = exports.refreshClassroomSignals = exports.stopStudentStudySessionSecure = exports.scheduledStudyBoxCarryoverExpiry = exports.openStudyRewardBoxSecure = exports.claimPlannerCompletionRewardSecure = exports.submitAttendanceRequestSecure = exports.applyPenaltyEventSecure = exports.cancelPointBoostEventSecure = exports.createPointBoostEventSecure = exports.scheduledClassroomSignalsRefresh = exports.scheduledDailyRiskAlert = exports.repairRecentStudySessionTotals = exports.deleteManualStudySessionSecure = exports.updateManualStudySessionSecure = exports.createManualStudySessionSecure = exports.setStudentAttendanceStatusSecure = exports.onSessionWritten = exports.onSessionCreated = exports.scheduledWeeklyReport = exports.cleanupOldDocuments = exports.scheduledAttendanceCheck = exports.runLateArrivalCheck = exports.sendPaymentReminderBatch = exports.notifyDailyReportReady = exports.notifyAttendanceSms = exports.scheduledSmsQueueDispatcher = exports.sendManualStudentSms = exports.updateSmsRecipientPreference = exports.cancelSmsQueueItem = exports.retrySmsQueueItem = exports.saveNotificationSettingsSecure = exports.confirmInvoicePayment = exports.completeSignupWithInvite = exports.redeemInviteCode = exports.createCounselingDemoBundle = exports.registerStudent = exports.updateStudentAccount = exports.deleteTeacherAccount = exports.deleteStudentAccount = exports.repairTodayAttendanceSmsQueue = exports.onAttendanceEventCreated = void 0;
-exports.generateStudyPlan = exports.syncGiftishowCatalogSecure = exports.scheduledGiftishowCatalogSync = exports.saveGiftishowSettingsSecure = exports.resendGiftishowOrderSecure = exports.rejectGiftishowOrderSecure = exports.reconcilePendingGiftishowOrders = void 0;
+exports.createGiftishowOrderRequestSecure = exports.cancelGiftishowOrderSecure = exports.cancelGiftishowSendFailSecure = exports.approveGiftishowOrderSecure = exports.scheduledRankingRewardSettlement = exports.ensureCurrentUserMemberships = exports.scheduledOpenClawSnapshotExport = exports.generateOpenClawSnapshot = exports.refreshClassroomSignals = exports.stopStudentStudySessionSecure = exports.scheduledStudyBoxCarryoverExpiry = exports.openStudyRewardBoxSecure = exports.claimPlannerCompletionRewardSecure = exports.submitAttendanceRequestSecure = exports.applyPenaltyEventSecure = exports.adjustStudentPointBalanceSecure = exports.cancelPointBoostEventSecure = exports.createPointBoostEventSecure = exports.scheduledClassroomSignalsRefresh = exports.scheduledDailyRiskAlert = exports.repairRecentStudySessionTotals = exports.deleteManualStudySessionSecure = exports.updateManualStudySessionSecure = exports.createManualStudySessionSecure = exports.setStudentAttendanceStatusSecure = exports.onSessionWritten = exports.onSessionCreated = exports.scheduledWeeklyReport = exports.cleanupOldDocuments = exports.scheduledAttendanceCheck = exports.runLateArrivalCheck = exports.sendPaymentReminderBatch = exports.notifyDailyReportReady = exports.notifyAttendanceSms = exports.scheduledSmsQueueDispatcher = exports.sendManualStudentSms = exports.updateSmsRecipientPreference = exports.cancelSmsQueueItem = exports.retrySmsQueueItem = exports.saveNotificationSettingsSecure = exports.confirmInvoicePayment = exports.completeSignupWithInvite = exports.redeemInviteCode = exports.createCounselingDemoBundle = exports.registerStudent = exports.updateStudentAccount = exports.deleteTeacherAccount = exports.deleteStudentAccount = exports.repairTodayAttendanceSmsQueue = exports.onAttendanceEventCreated = void 0;
+exports.generateStudyPlan = exports.syncGiftishowCatalogSecure = exports.scheduledGiftishowCatalogSync = exports.saveGiftishowSettingsSecure = exports.resendGiftishowOrderSecure = exports.rejectGiftishowOrderSecure = exports.reconcilePendingGiftishowOrders = exports.getGiftishowBizmoneySecure = void 0;
 const params_1 = require("firebase-functions/params");
 const functions = __importStar(require("firebase-functions"));
 const admin = __importStar(require("firebase-admin"));
@@ -312,7 +312,7 @@ function normalizePlannerCompletionRewardTaskIds(value) {
         .filter((entry) => entry.length > 0))).slice(-200);
 }
 function normalizeDailyPointEventEntry(value) {
-    var _a, _b, _c;
+    var _a, _b, _c, _d;
     if (!isPlainObject(value))
         return null;
     const id = asTrimmedString(value.id);
@@ -344,6 +344,17 @@ function normalizeDailyPointEventEntry(value) {
     const periodKey = asTrimmedString(value.periodKey);
     if (periodKey)
         event.periodKey = periodKey;
+    const deltaPoints = Math.round((_d = parseFiniteNumber(value.deltaPoints)) !== null && _d !== void 0 ? _d : Number.NaN);
+    if (Number.isFinite(deltaPoints) && deltaPoints !== 0) {
+        event.deltaPoints = deltaPoints;
+    }
+    const direction = asTrimmedString(value.direction);
+    if (direction === "add" || direction === "subtract") {
+        event.direction = direction;
+    }
+    const reason = asTrimmedString(value.reason);
+    if (reason)
+        event.reason = reason.slice(0, 160);
     return event;
 }
 function normalizeDailyPointEvents(value) {
@@ -376,7 +387,17 @@ function getLegacyDailyPointAwardTotal(dayStatus) {
 function getDailyAwardedPointTotal(dayStatus) {
     var _a;
     const dailyPointAmount = Math.max(0, Math.floor((_a = parseFiniteNumber(dayStatus.dailyPointAmount)) !== null && _a !== void 0 ? _a : 0));
+    if (hasManualPointAdjustment(dayStatus)) {
+        return dailyPointAmount;
+    }
     return Math.max(dailyPointAmount, getLegacyDailyPointAwardTotal(dayStatus));
+}
+function hasManualPointAdjustment(dayStatus) {
+    var _a;
+    const manualAdjustmentPoints = Math.round((_a = parseFiniteNumber(dayStatus.manualAdjustmentPoints)) !== null && _a !== void 0 ? _a : 0);
+    if (manualAdjustmentPoints !== 0)
+        return true;
+    return normalizeDailyPointEvents(dayStatus.pointEvents).some((entry) => { var _a; return entry.source === "manual_adjustment" && Math.round((_a = parseFiniteNumber(entry.deltaPoints)) !== null && _a !== void 0 ? _a : 0) !== 0; });
 }
 function getRankRewardAwardTotal(dayStatus) {
     var _a, _b, _c, _d;
@@ -8016,6 +8037,156 @@ exports.cancelPointBoostEventSecure = functions.region(region).https.onCall(asyn
         ok: true,
         eventId,
     };
+});
+exports.adjustStudentPointBalanceSecure = functions.region(region).https.onCall(async (data, context) => {
+    var _a, _b;
+    const db = admin.firestore();
+    if (!((_a = context.auth) === null || _a === void 0 ? void 0 : _a.uid)) {
+        throw new functions.https.HttpsError("unauthenticated", "로그인이 필요합니다.");
+    }
+    const authUid = context.auth.uid;
+    const centerId = asTrimmedString(data === null || data === void 0 ? void 0 : data.centerId);
+    const studentId = asTrimmedString(data === null || data === void 0 ? void 0 : data.studentId);
+    const dateKey = asTrimmedString(data === null || data === void 0 ? void 0 : data.dateKey);
+    const deltaPoints = Math.round((_b = parseFiniteNumber(data === null || data === void 0 ? void 0 : data.deltaPoints)) !== null && _b !== void 0 ? _b : Number.NaN);
+    const reason = asTrimmedString(data === null || data === void 0 ? void 0 : data.reason).slice(0, 160);
+    const absPoints = Math.abs(deltaPoints);
+    if (!centerId || !studentId) {
+        throw new functions.https.HttpsError("invalid-argument", "centerId/studentId is required.", {
+            userMessage: "포인트를 수정할 학생 정보를 다시 확인해 주세요.",
+        });
+    }
+    if (!isValidDateKey(dateKey)) {
+        throw new functions.https.HttpsError("invalid-argument", "Invalid dateKey.", {
+            userMessage: "포인트 수정 일자를 다시 확인해 주세요.",
+        });
+    }
+    if (!Number.isFinite(deltaPoints) || deltaPoints === 0 || absPoints < 1 || absPoints > 100000) {
+        throw new functions.https.HttpsError("invalid-argument", "Invalid point delta.", {
+            userMessage: "포인트는 1~100,000 사이의 숫자로 입력해 주세요.",
+        });
+    }
+    if (reason.length < 2) {
+        throw new functions.https.HttpsError("invalid-argument", "Reason is required.", {
+            userMessage: "포인트 수정 사유를 입력해 주세요.",
+        });
+    }
+    const membership = await resolveCenterMembershipRole(db, centerId, authUid);
+    if (!membership.role || !isAdminRole(membership.role) || !isActiveMembershipStatus(membership.status)) {
+        throw new functions.https.HttpsError("permission-denied", "Only center admins can adjust student points.", {
+            userMessage: "센터 관리자만 학생 포인트를 수정할 수 있습니다.",
+        });
+    }
+    const [studentMemberSnap, studentProfileSnap] = await Promise.all([
+        db.doc(`centers/${centerId}/members/${studentId}`).get(),
+        db.doc(`centers/${centerId}/students/${studentId}`).get(),
+    ]);
+    if (!studentMemberSnap.exists && !studentProfileSnap.exists) {
+        throw new functions.https.HttpsError("not-found", "Student not found.", {
+            userMessage: "포인트를 수정할 학생을 찾지 못했습니다.",
+        });
+    }
+    const studentMemberData = studentMemberSnap.exists ? studentMemberSnap.data() : {};
+    const studentProfileData = studentProfileSnap.exists ? studentProfileSnap.data() : {};
+    const targetRole = normalizeMembershipRoleValue(studentMemberData.role);
+    if (targetRole && targetRole !== "student") {
+        throw new functions.https.HttpsError("failed-precondition", "Target member is not a student.", {
+            userMessage: "학생 계정에만 포인트를 수정할 수 있습니다.",
+        });
+    }
+    const studentName = asTrimmedString(studentMemberData.displayName)
+        || asTrimmedString(studentProfileData.name)
+        || asTrimmedString(studentProfileData.displayName)
+        || "학생";
+    const adminName = asTrimmedString(context.auth.token.name) || "센터관리자";
+    const direction = deltaPoints > 0 ? "add" : "subtract";
+    const label = direction === "add" ? "관리자 포인트 추가" : "관리자 포인트 차감";
+    const progressRef = db.doc(`centers/${centerId}/growthProgress/${studentId}`);
+    const logRef = db.collection(`centers/${centerId}/pointAdjustmentLogs`).doc();
+    const eventCreatedAt = new Date().toISOString();
+    const result = await db.runTransaction(async (transaction) => {
+        var _a, _b, _c, _d;
+        const progressSnap = await transaction.get(progressRef);
+        const progressData = progressSnap.exists ? progressSnap.data() : {};
+        const dailyPointStatus = isPlainObject(progressData.dailyPointStatus)
+            ? progressData.dailyPointStatus
+            : {};
+        const currentDayStatus = isPlainObject(dailyPointStatus[dateKey])
+            ? dailyPointStatus[dateKey]
+            : {};
+        const currentBalance = Math.max(0, Math.floor((_a = parseFiniteNumber(progressData.pointsBalance)) !== null && _a !== void 0 ? _a : 0));
+        const currentTotalEarned = Math.max(0, Math.floor((_b = parseFiniteNumber(progressData.totalPointsEarned)) !== null && _b !== void 0 ? _b : 0));
+        const currentDailyAmount = Math.max(0, Math.floor((_c = parseFiniteNumber(currentDayStatus.dailyPointAmount)) !== null && _c !== void 0 ? _c : 0));
+        const currentManualAdjustment = Math.round((_d = parseFiniteNumber(currentDayStatus.manualAdjustmentPoints)) !== null && _d !== void 0 ? _d : 0);
+        if (deltaPoints < 0 && currentBalance < absPoints) {
+            throw new functions.https.HttpsError("failed-precondition", "Insufficient point balance.", {
+                userMessage: "보유 포인트보다 크게 차감할 수 없습니다.",
+            });
+        }
+        if (deltaPoints < 0 && currentDailyAmount < absPoints) {
+            throw new functions.https.HttpsError("failed-precondition", "Insufficient daily points.", {
+                userMessage: "해당 일자의 포인트보다 크게 차감할 수 없습니다.",
+            });
+        }
+        if (currentTotalEarned + deltaPoints < 0) {
+            throw new functions.https.HttpsError("failed-precondition", "Total earned points cannot be negative.", {
+                userMessage: "누적 포인트가 음수가 되도록 차감할 수 없습니다.",
+            });
+        }
+        const nextBalance = currentBalance + deltaPoints;
+        const nextTotalEarned = currentTotalEarned + deltaPoints;
+        const nextDailyAmount = currentDailyAmount + deltaPoints;
+        const nextManualAdjustment = currentManualAdjustment + deltaPoints;
+        const nextPointEvents = upsertDailyPointEvent(currentDayStatus.pointEvents, {
+            id: `manual_adjustment:${dateKey}:${logRef.id}`,
+            source: "manual_adjustment",
+            label,
+            points: absPoints,
+            deltaPoints,
+            direction,
+            reason,
+            createdAt: eventCreatedAt,
+        });
+        transaction.set(progressRef, {
+            pointsBalance: nextBalance,
+            totalPointsEarned: nextTotalEarned,
+            dailyPointStatus: {
+                [dateKey]: Object.assign(Object.assign({}, currentDayStatus), { dailyPointAmount: nextDailyAmount, manualAdjustmentPoints: nextManualAdjustment, pointEvents: nextPointEvents, updatedAt: admin.firestore.FieldValue.serverTimestamp() }),
+            },
+            updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        }, { merge: true });
+        transaction.set(logRef, {
+            centerId,
+            studentId,
+            studentName,
+            dateKey,
+            deltaPoints,
+            points: absPoints,
+            direction,
+            reason,
+            beforePointsBalance: currentBalance,
+            afterPointsBalance: nextBalance,
+            beforeTotalPointsEarned: currentTotalEarned,
+            afterTotalPointsEarned: nextTotalEarned,
+            beforeDailyPointAmount: currentDailyAmount,
+            afterDailyPointAmount: nextDailyAmount,
+            adjustedBy: authUid,
+            adjustedByName: adminName,
+            createdAt: admin.firestore.FieldValue.serverTimestamp(),
+            updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        });
+        return {
+            ok: true,
+            adjustmentId: logRef.id,
+            studentId,
+            dateKey,
+            deltaPoints,
+            pointsBalance: nextBalance,
+            totalPointsEarned: nextTotalEarned,
+            dailyPointAmount: nextDailyAmount,
+        };
+    });
+    return result;
 });
 exports.applyPenaltyEventSecure = functions.region(region).https.onCall(async (data, context) => {
     var _a, _b;

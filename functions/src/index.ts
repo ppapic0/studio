@@ -249,6 +249,9 @@ type DailyPointEventDoc = {
   range?: "daily" | "weekly" | "monthly";
   rank?: number;
   periodKey?: string;
+  deltaPoints?: number;
+  direction?: "add" | "subtract";
+  reason?: string;
 };
 
 type PointBoostEventMode = "day" | "window";
@@ -621,6 +624,19 @@ function normalizeDailyPointEventEntry(value: unknown): DailyPointEventDoc | nul
   const periodKey = asTrimmedString(value.periodKey);
   if (periodKey) event.periodKey = periodKey;
 
+  const deltaPoints = Math.round(parseFiniteNumber(value.deltaPoints) ?? Number.NaN);
+  if (Number.isFinite(deltaPoints) && deltaPoints !== 0) {
+    event.deltaPoints = deltaPoints;
+  }
+
+  const direction = asTrimmedString(value.direction);
+  if (direction === "add" || direction === "subtract") {
+    event.direction = direction;
+  }
+
+  const reason = asTrimmedString(value.reason);
+  if (reason) event.reason = reason.slice(0, 160);
+
   return event;
 }
 
@@ -656,7 +672,18 @@ function getLegacyDailyPointAwardTotal(dayStatus: Record<string, unknown>): numb
 
 function getDailyAwardedPointTotal(dayStatus: Record<string, unknown>): number {
   const dailyPointAmount = Math.max(0, Math.floor(parseFiniteNumber(dayStatus.dailyPointAmount) ?? 0));
+  if (hasManualPointAdjustment(dayStatus)) {
+    return dailyPointAmount;
+  }
   return Math.max(dailyPointAmount, getLegacyDailyPointAwardTotal(dayStatus));
+}
+
+function hasManualPointAdjustment(dayStatus: Record<string, unknown>): boolean {
+  const manualAdjustmentPoints = Math.round(parseFiniteNumber(dayStatus.manualAdjustmentPoints) ?? 0);
+  if (manualAdjustmentPoints !== 0) return true;
+  return normalizeDailyPointEvents(dayStatus.pointEvents).some((entry) =>
+    entry.source === "manual_adjustment" && Math.round(parseFiniteNumber(entry.deltaPoints) ?? 0) !== 0
+  );
 }
 
 function getRankRewardAwardTotal(dayStatus: Record<string, unknown>): number {
@@ -9952,6 +9979,176 @@ export const cancelPointBoostEventSecure = functions.region(region).https.onCall
     ok: true,
     eventId,
   };
+});
+
+export const adjustStudentPointBalanceSecure = functions.region(region).https.onCall(async (data, context) => {
+  const db = admin.firestore();
+
+  if (!context.auth?.uid) {
+    throw new functions.https.HttpsError("unauthenticated", "로그인이 필요합니다.");
+  }
+
+  const authUid = context.auth.uid;
+  const centerId = asTrimmedString(data?.centerId);
+  const studentId = asTrimmedString(data?.studentId);
+  const dateKey = asTrimmedString(data?.dateKey);
+  const deltaPoints = Math.round(parseFiniteNumber(data?.deltaPoints) ?? Number.NaN);
+  const reason = asTrimmedString(data?.reason).slice(0, 160);
+  const absPoints = Math.abs(deltaPoints);
+
+  if (!centerId || !studentId) {
+    throw new functions.https.HttpsError("invalid-argument", "centerId/studentId is required.", {
+      userMessage: "포인트를 수정할 학생 정보를 다시 확인해 주세요.",
+    });
+  }
+  if (!isValidDateKey(dateKey)) {
+    throw new functions.https.HttpsError("invalid-argument", "Invalid dateKey.", {
+      userMessage: "포인트 수정 일자를 다시 확인해 주세요.",
+    });
+  }
+  if (!Number.isFinite(deltaPoints) || deltaPoints === 0 || absPoints < 1 || absPoints > 100000) {
+    throw new functions.https.HttpsError("invalid-argument", "Invalid point delta.", {
+      userMessage: "포인트는 1~100,000 사이의 숫자로 입력해 주세요.",
+    });
+  }
+  if (reason.length < 2) {
+    throw new functions.https.HttpsError("invalid-argument", "Reason is required.", {
+      userMessage: "포인트 수정 사유를 입력해 주세요.",
+    });
+  }
+
+  const membership = await resolveCenterMembershipRole(db, centerId, authUid);
+  if (!membership.role || !isAdminRole(membership.role) || !isActiveMembershipStatus(membership.status)) {
+    throw new functions.https.HttpsError("permission-denied", "Only center admins can adjust student points.", {
+      userMessage: "센터 관리자만 학생 포인트를 수정할 수 있습니다.",
+    });
+  }
+
+  const [studentMemberSnap, studentProfileSnap] = await Promise.all([
+    db.doc(`centers/${centerId}/members/${studentId}`).get(),
+    db.doc(`centers/${centerId}/students/${studentId}`).get(),
+  ]);
+  if (!studentMemberSnap.exists && !studentProfileSnap.exists) {
+    throw new functions.https.HttpsError("not-found", "Student not found.", {
+      userMessage: "포인트를 수정할 학생을 찾지 못했습니다.",
+    });
+  }
+
+  const studentMemberData = studentMemberSnap.exists ? (studentMemberSnap.data() as Record<string, unknown>) : {};
+  const studentProfileData = studentProfileSnap.exists ? (studentProfileSnap.data() as Record<string, unknown>) : {};
+  const targetRole = normalizeMembershipRoleValue(studentMemberData.role);
+  if (targetRole && targetRole !== "student") {
+    throw new functions.https.HttpsError("failed-precondition", "Target member is not a student.", {
+      userMessage: "학생 계정에만 포인트를 수정할 수 있습니다.",
+    });
+  }
+
+  const studentName =
+    asTrimmedString(studentMemberData.displayName)
+    || asTrimmedString(studentProfileData.name)
+    || asTrimmedString(studentProfileData.displayName)
+    || "학생";
+  const adminName = asTrimmedString((context.auth.token as Record<string, unknown>).name) || "센터관리자";
+  const direction = deltaPoints > 0 ? "add" : "subtract";
+  const label = direction === "add" ? "관리자 포인트 추가" : "관리자 포인트 차감";
+  const progressRef = db.doc(`centers/${centerId}/growthProgress/${studentId}`);
+  const logRef = db.collection(`centers/${centerId}/pointAdjustmentLogs`).doc();
+  const eventCreatedAt = new Date().toISOString();
+
+  const result = await db.runTransaction(async (transaction) => {
+    const progressSnap = await transaction.get(progressRef);
+    const progressData = progressSnap.exists ? (progressSnap.data() as Record<string, unknown>) : {};
+    const dailyPointStatus = isPlainObject(progressData.dailyPointStatus)
+      ? (progressData.dailyPointStatus as Record<string, unknown>)
+      : {};
+    const currentDayStatus = isPlainObject(dailyPointStatus[dateKey])
+      ? (dailyPointStatus[dateKey] as Record<string, unknown>)
+      : {};
+    const currentBalance = Math.max(0, Math.floor(parseFiniteNumber(progressData.pointsBalance) ?? 0));
+    const currentTotalEarned = Math.max(0, Math.floor(parseFiniteNumber(progressData.totalPointsEarned) ?? 0));
+    const currentDailyAmount = Math.max(0, Math.floor(parseFiniteNumber(currentDayStatus.dailyPointAmount) ?? 0));
+    const currentManualAdjustment = Math.round(parseFiniteNumber(currentDayStatus.manualAdjustmentPoints) ?? 0);
+
+    if (deltaPoints < 0 && currentBalance < absPoints) {
+      throw new functions.https.HttpsError("failed-precondition", "Insufficient point balance.", {
+        userMessage: "보유 포인트보다 크게 차감할 수 없습니다.",
+      });
+    }
+    if (deltaPoints < 0 && currentDailyAmount < absPoints) {
+      throw new functions.https.HttpsError("failed-precondition", "Insufficient daily points.", {
+        userMessage: "해당 일자의 포인트보다 크게 차감할 수 없습니다.",
+      });
+    }
+    if (currentTotalEarned + deltaPoints < 0) {
+      throw new functions.https.HttpsError("failed-precondition", "Total earned points cannot be negative.", {
+        userMessage: "누적 포인트가 음수가 되도록 차감할 수 없습니다.",
+      });
+    }
+
+    const nextBalance = currentBalance + deltaPoints;
+    const nextTotalEarned = currentTotalEarned + deltaPoints;
+    const nextDailyAmount = currentDailyAmount + deltaPoints;
+    const nextManualAdjustment = currentManualAdjustment + deltaPoints;
+    const nextPointEvents = upsertDailyPointEvent(currentDayStatus.pointEvents, {
+      id: `manual_adjustment:${dateKey}:${logRef.id}`,
+      source: "manual_adjustment",
+      label,
+      points: absPoints,
+      deltaPoints,
+      direction,
+      reason,
+      createdAt: eventCreatedAt,
+    });
+
+    transaction.set(progressRef, {
+      pointsBalance: nextBalance,
+      totalPointsEarned: nextTotalEarned,
+      dailyPointStatus: {
+        [dateKey]: {
+          ...currentDayStatus,
+          dailyPointAmount: nextDailyAmount,
+          manualAdjustmentPoints: nextManualAdjustment,
+          pointEvents: nextPointEvents,
+          updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        },
+      },
+      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+    }, { merge: true });
+
+    transaction.set(logRef, {
+      centerId,
+      studentId,
+      studentName,
+      dateKey,
+      deltaPoints,
+      points: absPoints,
+      direction,
+      reason,
+      beforePointsBalance: currentBalance,
+      afterPointsBalance: nextBalance,
+      beforeTotalPointsEarned: currentTotalEarned,
+      afterTotalPointsEarned: nextTotalEarned,
+      beforeDailyPointAmount: currentDailyAmount,
+      afterDailyPointAmount: nextDailyAmount,
+      adjustedBy: authUid,
+      adjustedByName: adminName,
+      createdAt: admin.firestore.FieldValue.serverTimestamp(),
+      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+    });
+
+    return {
+      ok: true,
+      adjustmentId: logRef.id,
+      studentId,
+      dateKey,
+      deltaPoints,
+      pointsBalance: nextBalance,
+      totalPointsEarned: nextTotalEarned,
+      dailyPointAmount: nextDailyAmount,
+    };
+  });
+
+  return result;
 });
 
 export const applyPenaltyEventSecure = functions.region(region).https.onCall(async (data, context) => {
