@@ -8765,6 +8765,67 @@ function buildAttendanceSeatPatch(params: {
   return patch;
 }
 
+async function resolveOpenStudyStartMsFromAttendanceEvidence(params: {
+  db: admin.firestore.Firestore;
+  centerId: string;
+  studentId: string;
+  dateKey: string;
+  nowMs: number;
+  seatData: Record<string, unknown>;
+}): Promise<number> {
+  const seatStartMs = toMillisSafe(params.seatData.lastCheckInAt);
+  if (seatStartMs > 0 && seatStartMs < params.nowMs) {
+    return seatStartMs;
+  }
+
+  const bounds = getStudyDayWindowBounds(params.dateKey);
+  const eventsSnap = await params.db
+    .collection(`centers/${params.centerId}/attendanceEvents`)
+    .where("studentId", "==", params.studentId)
+    .where("dateKey", "==", params.dateKey)
+    .limit(120)
+    .get();
+
+  let openStartMs: number | null = null;
+  eventsSnap.docs
+    .map((docSnap) => {
+      const data = (docSnap.data() || {}) as Record<string, unknown>;
+      return {
+        eventType: asTrimmedString(data.eventType),
+        occurredAtMs: toMillisSafe(data.occurredAt) || toMillisSafe(data.createdAt),
+      };
+    })
+    .filter((event) => event.occurredAtMs >= bounds.startMs && event.occurredAtMs < params.nowMs)
+    .sort((left, right) => left.occurredAtMs - right.occurredAtMs)
+    .forEach((event) => {
+      if (event.eventType === "check_in" || event.eventType === "away_end") {
+        openStartMs = event.occurredAtMs;
+        return;
+      }
+      if (event.eventType === "away_start" || event.eventType === "check_out") {
+        openStartMs = null;
+      }
+    });
+
+  if (openStartMs !== null && openStartMs > 0 && openStartMs < params.nowMs) {
+    return Math.max(bounds.startMs, openStartMs);
+  }
+
+  const [statSnap, daySnap] = await Promise.all([
+    params.db.doc(`centers/${params.centerId}/attendanceDailyStats/${params.dateKey}/students/${params.studentId}`).get(),
+    params.db.doc(`centers/${params.centerId}/studyLogs/${params.studentId}/days/${params.dateKey}`).get(),
+  ]);
+  const statData = statSnap.exists ? ((statSnap.data() || {}) as Record<string, unknown>) : {};
+  const dayData = daySnap.exists ? ((daySnap.data() || {}) as Record<string, unknown>) : {};
+  const statCheckInMs = toMillisSafe(statData.checkInAt);
+  const lastSessionEndMs = toMillisSafe(dayData.lastSessionEndAt);
+  if (statCheckInMs > 0 && statCheckInMs < params.nowMs && statCheckInMs > lastSessionEndMs) {
+    return Math.max(bounds.startMs, statCheckInMs);
+  }
+
+  return 0;
+}
+
 async function applyAttendanceStatusTransition(
   params: ApplyAttendanceStatusTransitionParams
 ): Promise<ApplyAttendanceStatusTransitionResult> {
@@ -8823,7 +8884,16 @@ async function applyAttendanceStatusTransition(
 
   const initialSeatData = (seatDoc.data() || {}) as Record<string, unknown>;
   const initialStatus = normalizeAttendanceSeatStatus(initialSeatData.status);
-  const initialStartMs = toMillisSafe(initialSeatData.lastCheckInAt);
+  const initialStartMs = initialStatus === "studying" && nextStatus !== "studying"
+    ? await resolveOpenStudyStartMsFromAttendanceEvidence({
+        db,
+        centerId,
+        studentId,
+        dateKey: attendanceDateKey,
+        nowMs,
+        seatData: initialSeatData,
+      })
+    : toMillisSafe(initialSeatData.lastCheckInAt);
   let finalized: FinalizeStudySessionResult | null = null;
 
   if (initialStatus === "studying" && nextStatus !== "studying" && initialStartMs > 0 && nowMs > initialStartMs) {
