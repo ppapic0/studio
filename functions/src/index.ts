@@ -10121,6 +10121,147 @@ export const adjustStudentPointBalanceSecure = functions.region(region).https.on
   return result;
 });
 
+export const adjustStudentPenaltyBalanceSecure = functions.region(region).https.onCall(async (data, context) => {
+  const db = admin.firestore();
+
+  if (!context.auth?.uid) {
+    throw new functions.https.HttpsError("unauthenticated", "로그인이 필요합니다.");
+  }
+
+  const authUid = context.auth.uid;
+  const centerId = asTrimmedString(data?.centerId);
+  const studentId = asTrimmedString(data?.studentId);
+  const dateKey = asTrimmedString(data?.dateKey, toDateKey(toKstDate()));
+  const deltaPoints = Math.round(parseFiniteNumber(data?.deltaPoints) ?? Number.NaN);
+  const reason = asTrimmedString(data?.reason).slice(0, 160);
+  const absPoints = Math.abs(deltaPoints);
+
+  if (!centerId || !studentId) {
+    throw new functions.https.HttpsError("invalid-argument", "centerId/studentId is required.", {
+      userMessage: "벌점을 조정할 학생 정보를 다시 확인해 주세요.",
+    });
+  }
+  if (!isValidDateKey(dateKey)) {
+    throw new functions.https.HttpsError("invalid-argument", "Invalid dateKey.", {
+      userMessage: "벌점 조정 일자를 다시 확인해 주세요.",
+    });
+  }
+  if (!Number.isFinite(deltaPoints) || deltaPoints === 0 || absPoints < 1 || absPoints > 1000) {
+    throw new functions.https.HttpsError("invalid-argument", "Invalid penalty delta.", {
+      userMessage: "벌점은 1~1,000 사이의 숫자로 입력해 주세요.",
+    });
+  }
+  if (reason.length < 2) {
+    throw new functions.https.HttpsError("invalid-argument", "Reason is required.", {
+      userMessage: "벌점 조정 사유를 입력해 주세요.",
+    });
+  }
+
+  const membership = await resolveCenterMembershipRole(db, centerId, authUid);
+  if (!membership.role || !isAdminRole(membership.role) || !isActiveMembershipStatus(membership.status)) {
+    throw new functions.https.HttpsError("permission-denied", "Only center admins can adjust student penalties.", {
+      userMessage: "센터 관리자만 학생 벌점을 조정할 수 있습니다.",
+    });
+  }
+
+  const [studentMemberSnap, studentProfileSnap] = await Promise.all([
+    db.doc(`centers/${centerId}/members/${studentId}`).get(),
+    db.doc(`centers/${centerId}/students/${studentId}`).get(),
+  ]);
+  if (!studentMemberSnap.exists && !studentProfileSnap.exists) {
+    throw new functions.https.HttpsError("not-found", "Student not found.", {
+      userMessage: "벌점을 조정할 학생을 찾지 못했습니다.",
+    });
+  }
+
+  const studentMemberData = studentMemberSnap.exists ? (studentMemberSnap.data() as Record<string, unknown>) : {};
+  const studentProfileData = studentProfileSnap.exists ? (studentProfileSnap.data() as Record<string, unknown>) : {};
+  const targetRole = normalizeMembershipRoleValue(studentMemberData.role);
+  if (targetRole && targetRole !== "student") {
+    throw new functions.https.HttpsError("failed-precondition", "Target member is not a student.", {
+      userMessage: "학생 계정에만 벌점을 조정할 수 있습니다.",
+    });
+  }
+
+  const studentName =
+    asTrimmedString(studentMemberData.displayName)
+    || asTrimmedString(studentMemberData.name)
+    || asTrimmedString(studentProfileData.name)
+    || asTrimmedString(studentProfileData.displayName)
+    || "학생";
+  const adminName = asTrimmedString((context.auth.token as Record<string, unknown>).name) || "센터관리자";
+  const direction = deltaPoints > 0 ? "add" : "subtract";
+  const label = direction === "add" ? "관리자 벌점 부여" : "관리자 벌점 삭감";
+  const progressRef = db.doc(`centers/${centerId}/growthProgress/${studentId}`);
+  const adjustmentLogRef = db.collection(`centers/${centerId}/penaltyAdjustmentLogs`).doc();
+  const penaltyLogRef = db.collection(`centers/${centerId}/penaltyLogs`).doc(`manual_adjustment_${adjustmentLogRef.id}`);
+
+  const result = await db.runTransaction(async (transaction) => {
+    const progressSnap = await transaction.get(progressRef);
+    const progressData = progressSnap.exists ? (progressSnap.data() as Record<string, unknown>) : {};
+    const currentPenaltyPoints = Math.max(0, Math.floor(parseFiniteNumber(progressData.penaltyPoints) ?? 0));
+
+    if (deltaPoints < 0 && currentPenaltyPoints < absPoints) {
+      throw new functions.https.HttpsError("failed-precondition", "Insufficient penalty points.", {
+        userMessage: "현재 벌점보다 크게 삭감할 수 없습니다.",
+      });
+    }
+
+    const nextPenaltyPoints = currentPenaltyPoints + deltaPoints;
+
+    transaction.set(progressRef, {
+      penaltyPoints: nextPenaltyPoints,
+      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+    }, { merge: true });
+
+    transaction.set(penaltyLogRef, {
+      centerId,
+      studentId,
+      studentName,
+      pointsDelta: deltaPoints,
+      points: absPoints,
+      reason,
+      source: "manual_adjustment",
+      direction,
+      label,
+      penaltyDateKey: dateKey,
+      createdByUserId: authUid,
+      createdByName: adminName,
+      createdAt: admin.firestore.FieldValue.serverTimestamp(),
+    }, { merge: true });
+
+    transaction.set(adjustmentLogRef, {
+      centerId,
+      studentId,
+      studentName,
+      dateKey,
+      deltaPoints,
+      points: absPoints,
+      direction,
+      reason,
+      beforePenaltyPoints: currentPenaltyPoints,
+      afterPenaltyPoints: nextPenaltyPoints,
+      penaltyLogId: penaltyLogRef.id,
+      adjustedBy: authUid,
+      adjustedByName: adminName,
+      createdAt: admin.firestore.FieldValue.serverTimestamp(),
+      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+    });
+
+    return {
+      ok: true,
+      adjustmentId: adjustmentLogRef.id,
+      penaltyLogId: penaltyLogRef.id,
+      studentId,
+      dateKey,
+      deltaPoints,
+      penaltyPoints: nextPenaltyPoints,
+    };
+  });
+
+  return result;
+});
+
 export const applyPenaltyEventSecure = functions.region(region).https.onCall(async (data, context) => {
   const db = admin.firestore();
 

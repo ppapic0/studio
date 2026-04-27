@@ -624,6 +624,22 @@ type AdjustStudentPointBalanceResult = {
   dailyPointAmount: number;
 };
 
+type FocusAdjustmentKind = 'point' | 'penalty';
+
+type AdjustStudentPenaltyBalanceInput = {
+  centerId: string;
+  studentId: string;
+  dateKey: string;
+  deltaPoints: number;
+  reason: string;
+};
+
+type AdjustStudentPenaltyBalanceResult = {
+  ok: boolean;
+  adjustmentId: string;
+  penaltyPoints: number;
+};
+
 const POINT_HISTORY_WINDOW_ORDER: PointHistoryWindow[] = ['today', '7d', '30d'];
 
 const EMPTY_POINT_HISTORY_SUMMARY: PointHistorySummary = {
@@ -862,6 +878,11 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
   const [manualStudySessionEndDraft, setManualStudySessionEndDraft] = useState('');
   const [manualStudySessionNoteDraft, setManualStudySessionNoteDraft] = useState('');
   const [isManualStudySessionSaving, setIsManualStudySessionSaving] = useState(false);
+  const [focusAdjustmentKind, setFocusAdjustmentKind] = useState<FocusAdjustmentKind | null>(null);
+  const [focusAdjustmentMode, setFocusAdjustmentMode] = useState<PointAdjustmentMode>('add');
+  const [focusAdjustmentAmountDraft, setFocusAdjustmentAmountDraft] = useState('');
+  const [focusAdjustmentReasonDraft, setFocusAdjustmentReasonDraft] = useState('');
+  const [isFocusAdjustmentSaving, setIsFocusAdjustmentSaving] = useState(false);
   const [isEditStudySessionDialogOpen, setIsEditStudySessionDialogOpen] = useState(false);
   const [editingStudySession, setEditingStudySession] = useState<FocusTodaySessionRow | null>(null);
   const [editStudySessionStartDraft, setEditStudySessionStartDraft] = useState('');
@@ -3185,6 +3206,16 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
     [progressList, selectedFocusStudentId]
   );
 
+  const selectedFocusAdjustmentSnapshot = useMemo(() => {
+    const dayStatusRaw = selectedFocusProgress?.dailyPointStatus?.[todayKey || ''];
+    const dayStatus = dayStatusRaw && typeof dayStatusRaw === 'object' ? dayStatusRaw as Record<string, unknown> : {};
+    return {
+      pointsBalance: Math.max(0, Math.floor(Number(selectedFocusProgress?.pointsBalance || 0))),
+      todayPoints: Math.max(0, Math.floor(Number(dayStatus.dailyPointAmount || 0))),
+      penaltyPoints: Math.max(0, Math.floor(Number(selectedFocusProgress?.penaltyPoints || 0))),
+    };
+  }, [selectedFocusProgress, todayKey]);
+
   const selectedFocusStoredTodayStudyMinutes = useMemo(
     () => Math.max(0, Math.round(Number(selectedFocusStudent?.todayMinutes ?? selectedFocusStat?.totalStudyMinutes ?? 0))),
     [selectedFocusStat?.totalStudyMinutes, selectedFocusStudent?.todayMinutes]
@@ -4539,6 +4570,127 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
             >
               {isEditStudySessionSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
               수정 저장
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    );
+  }
+
+  function renderFocusAdjustmentDialog() {
+    const kindLabel = focusAdjustmentKind === 'penalty' ? '벌점' : '포인트';
+    const currentValue =
+      focusAdjustmentKind === 'penalty'
+        ? selectedFocusAdjustmentSnapshot.penaltyPoints
+        : selectedFocusAdjustmentSnapshot.pointsBalance;
+    const todayPointLabel =
+      focusAdjustmentKind === 'point'
+        ? `${selectedFocusAdjustmentSnapshot.todayPoints.toLocaleString()}pt`
+        : '오늘 기준';
+
+    return (
+      <Dialog
+        open={Boolean(focusAdjustmentKind)}
+        onOpenChange={(open) => {
+          if (!open && !isFocusAdjustmentSaving) {
+            resetFocusAdjustmentDialog();
+          }
+        }}
+      >
+        <DialogContent motionPreset="dashboard-premium" className={cn(studioDialogContentClassName, 'sm:max-w-xl')}>
+          <div className={studioDialogHeaderClassName}>
+            <DialogHeader className="text-left">
+              <div className="flex flex-wrap items-center gap-2">
+                <Badge className="border-none bg-white/18 px-2.5 py-1 text-[10px] font-black text-white">운영 조정</Badge>
+                <Badge className="border-none bg-white px-2.5 py-1 text-[10px] font-black text-[#14295F]">
+                  {selectedFocusStudent?.name || '학생'}
+                </Badge>
+              </div>
+              <DialogTitle className="text-2xl font-black tracking-tight">{kindLabel} 바로 조정</DialogTitle>
+              <DialogDescription className="text-sm font-medium text-white/76">
+                추가와 차감을 즉시 반영하고 조정 사유를 감사 기록에 남깁니다.
+              </DialogDescription>
+            </DialogHeader>
+          </div>
+
+          <div className="bg-[linear-gradient(180deg,#F7FAFF_0%,#EEF4FF_100%)] px-5 py-5">
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div className="rounded-2xl border border-[#DCE7FF] bg-white p-4">
+                <p className="text-[10px] font-black uppercase tracking-[0.14em] text-[#5c6e97]">
+                  현재 {kindLabel}
+                </p>
+                <p className="dashboard-number mt-2 text-xl text-[#14295F]">
+                  {currentValue.toLocaleString()}{focusAdjustmentKind === 'point' ? 'pt' : '점'}
+                </p>
+              </div>
+              <div className="rounded-2xl border border-[#FFD7BA] bg-[#FFF8F2] p-4">
+                <p className="text-[10px] font-black uppercase tracking-[0.14em] text-[#C95A08]">기준 일자</p>
+                <p className="mt-2 text-sm font-black text-[#14295F]">{todayKey || '오늘'} · {todayPointLabel}</p>
+              </div>
+            </div>
+
+            <div className="mt-4">
+              <Label className="text-[11px] font-black uppercase tracking-[0.14em] text-[#5c6e97]">조정 유형</Label>
+              <div className="mt-2 grid grid-cols-2 gap-2 rounded-[1rem] border border-[#DCE7FF] bg-white p-1.5">
+                {(['add', 'subtract'] as const).map((mode) => (
+                  <Button
+                    key={mode}
+                    type="button"
+                    variant={focusAdjustmentMode === mode ? 'default' : 'ghost'}
+                    className={cn(
+                      'h-10 rounded-xl text-xs font-black',
+                      focusAdjustmentMode === mode
+                        ? mode === 'add'
+                          ? 'bg-[#14295F] text-white hover:bg-[#10224C]'
+                          : 'bg-[#FF7A16] text-white hover:bg-[#F06D0E]'
+                        : 'text-[#14295F] hover:bg-[#EEF4FF]'
+                    )}
+                    onClick={() => setFocusAdjustmentMode(mode)}
+                  >
+                    {mode === 'add' ? '추가' : '차감'}
+                  </Button>
+                ))}
+              </div>
+            </div>
+
+            <div className="mt-4 flex flex-col gap-2">
+              <Label className="text-[11px] font-black uppercase tracking-[0.14em] text-[#5c6e97]">{kindLabel}</Label>
+              <Input
+                type="number"
+                min={1}
+                max={focusAdjustmentKind === 'point' ? 100000 : 1000}
+                value={focusAdjustmentAmountDraft}
+                onChange={(event) => setFocusAdjustmentAmountDraft(event.target.value)}
+                placeholder={focusAdjustmentKind === 'point' ? '예: 500' : '예: 1'}
+                className="h-11 rounded-xl border-[#DCE7FF] font-bold text-[#14295F] placeholder:text-[#7F91B3]"
+              />
+            </div>
+
+            <div className="mt-4 flex flex-col gap-2">
+              <Label className="text-[11px] font-black uppercase tracking-[0.14em] text-[#5c6e97]">조정 사유</Label>
+              <Textarea
+                value={focusAdjustmentReasonDraft}
+                onChange={(event) => setFocusAdjustmentReasonDraft(event.target.value)}
+                placeholder="예: 운영자 확인 후 기록 보정"
+                className="min-h-[96px] rounded-xl border-[#DCE7FF] font-bold text-[#14295F] placeholder:text-[#7F91B3]"
+              />
+            </div>
+          </div>
+
+          <DialogFooter className="border-t border-[#DCE7FF] bg-white px-5 py-4">
+            <DialogClose asChild>
+              <Button type="button" variant="outline" className="rounded-xl border-[#DCE7FF] font-black text-[#14295F]">
+                취소
+              </Button>
+            </DialogClose>
+            <Button
+              type="button"
+              onClick={() => void handleSubmitFocusAdjustment()}
+              disabled={isFocusAdjustmentSaving}
+              className="rounded-xl bg-[#14295F] font-black text-white hover:bg-[#10224C]"
+            >
+              {isFocusAdjustmentSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
+              저장
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -6212,6 +6364,114 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
       setIsPointAdjustmentSaving(false);
     }
   };
+  const resetFocusAdjustmentDialog = () => {
+    setFocusAdjustmentKind(null);
+    setFocusAdjustmentMode('add');
+    setFocusAdjustmentAmountDraft('');
+    setFocusAdjustmentReasonDraft('');
+  };
+  const openFocusAdjustmentDialog = (kind: FocusAdjustmentKind, mode: PointAdjustmentMode = 'add') => {
+    setFocusAdjustmentKind(kind);
+    setFocusAdjustmentMode(mode);
+    setFocusAdjustmentAmountDraft('');
+    setFocusAdjustmentReasonDraft('');
+  };
+  const handleSubmitFocusAdjustment = async () => {
+    if (!functions || !centerId || !selectedFocusStudentId || !todayKey || !focusAdjustmentKind) return;
+
+    const amount = Math.floor(Number(focusAdjustmentAmountDraft));
+    const reason = focusAdjustmentReasonDraft.trim();
+    const maxAmount = focusAdjustmentKind === 'point' ? 100000 : 1000;
+    const label = focusAdjustmentKind === 'point' ? '포인트' : '벌점';
+    if (!Number.isFinite(amount) || amount < 1 || amount > maxAmount) {
+      toast({
+        variant: 'destructive',
+        title: `${label} 확인 필요`,
+        description: `${label}는 1~${maxAmount.toLocaleString()} 사이로 입력해 주세요.`,
+      });
+      return;
+    }
+    if (!reason) {
+      toast({
+        variant: 'destructive',
+        title: '조정 사유 필요',
+        description: '나중에 확인할 수 있도록 조정 사유를 입력해 주세요.',
+      });
+      return;
+    }
+
+    const deltaPoints = focusAdjustmentMode === 'add' ? amount : -amount;
+    if (focusAdjustmentKind === 'point' && deltaPoints < 0 && amount > selectedFocusAdjustmentSnapshot.pointsBalance) {
+      toast({
+        variant: 'destructive',
+        title: '포인트 차감 불가',
+        description: '보유 포인트보다 크게 차감할 수 없습니다.',
+      });
+      return;
+    }
+    if (focusAdjustmentKind === 'point' && deltaPoints < 0 && amount > selectedFocusAdjustmentSnapshot.todayPoints) {
+      toast({
+        variant: 'destructive',
+        title: '포인트 차감 불가',
+        description: '오늘 일자에 기록된 포인트보다 크게 차감할 수 없습니다.',
+      });
+      return;
+    }
+    if (focusAdjustmentKind === 'penalty' && deltaPoints < 0 && amount > selectedFocusAdjustmentSnapshot.penaltyPoints) {
+      toast({
+        variant: 'destructive',
+        title: '벌점 차감 불가',
+        description: '현재 벌점보다 크게 차감할 수 없습니다.',
+      });
+      return;
+    }
+
+    setIsFocusAdjustmentSaving(true);
+    try {
+      if (focusAdjustmentKind === 'point') {
+        const adjustStudentPoints = httpsCallable<AdjustStudentPointBalanceInput, AdjustStudentPointBalanceResult>(
+          functions,
+          'adjustStudentPointBalanceSecure'
+        );
+        const result = await adjustStudentPoints({
+          centerId,
+          studentId: selectedFocusStudentId,
+          dateKey: todayKey,
+          deltaPoints,
+          reason,
+        });
+        toast({
+          title: '포인트 조정 완료',
+          description: `${selectedFocusStudent?.name || '학생'} ${deltaPoints > 0 ? '+' : ''}${deltaPoints.toLocaleString()}pt · 잔액 ${Number(result.data.pointsBalance || 0).toLocaleString()}pt`,
+        });
+      } else {
+        const adjustStudentPenalty = httpsCallable<AdjustStudentPenaltyBalanceInput, AdjustStudentPenaltyBalanceResult>(
+          functions,
+          'adjustStudentPenaltyBalanceSecure'
+        );
+        const result = await adjustStudentPenalty({
+          centerId,
+          studentId: selectedFocusStudentId,
+          dateKey: todayKey,
+          deltaPoints,
+          reason,
+        });
+        toast({
+          title: '벌점 조정 완료',
+          description: `${selectedFocusStudent?.name || '학생'} ${deltaPoints > 0 ? '+' : ''}${deltaPoints.toLocaleString()}점 · 현재 ${Number(result.data.penaltyPoints || 0).toLocaleString()}점`,
+        });
+      }
+      resetFocusAdjustmentDialog();
+    } catch (error) {
+      toast({
+        variant: 'destructive',
+        title: `${label} 조정 실패`,
+        description: getCallableErrorMessage(error, '잠시 후 다시 시도해 주세요.'),
+      });
+    } finally {
+      setIsFocusAdjustmentSaving(false);
+    }
+  };
   const openAdminAttendanceBoardFromSignal = (signal: {
     roomId?: string;
   }) => {
@@ -7625,6 +7885,7 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
           {renderLayoutSeatActionDialog()}
           {renderManualStudySessionDialog()}
           {renderEditStudySessionDialog()}
+          {renderFocusAdjustmentDialog()}
           {renderHomeInsightsSection()}
 
           <Dialog
@@ -9254,6 +9515,59 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
                           <UserX className="mr-1.5 h-3.5 w-3.5" />
                         )}
                         퇴실
+                      </Button>
+                    </div>
+                  </div>
+
+                  <div className="mt-4 rounded-2xl border border-[#DCE7FF] bg-white p-3">
+                    <div className="flex flex-wrap items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <p className="text-[10px] font-black uppercase tracking-[0.14em] text-[#5C6E97]">바로 보상·벌점 조정</p>
+                        <p className="mt-1 text-xs font-bold text-[#6E7EA3]">
+                          보유 {selectedFocusAdjustmentSnapshot.pointsBalance.toLocaleString()}pt · 오늘 {selectedFocusAdjustmentSnapshot.todayPoints.toLocaleString()}pt · 벌점 {selectedFocusAdjustmentSnapshot.penaltyPoints.toLocaleString()}점
+                        </p>
+                      </div>
+                    </div>
+                    <div className="mt-3 grid gap-2 sm:grid-cols-4">
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        className="h-10 rounded-xl border-[#DCE7FF] bg-[#F7FAFF] px-2 text-xs font-black text-[#14295F] hover:bg-[#EEF4FF]"
+                        onClick={() => openFocusAdjustmentDialog('point', 'add')}
+                      >
+                        <PlusCircle className="mr-1.5 h-3.5 w-3.5" />
+                        포인트 부여
+                      </Button>
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        className="h-10 rounded-xl border-[#FFD7BA] bg-[#FFF8F2] px-2 text-xs font-black text-[#C95A08] hover:bg-[#FFF2E8]"
+                        onClick={() => openFocusAdjustmentDialog('point', 'subtract')}
+                      >
+                        <ArrowDownRight className="mr-1.5 h-3.5 w-3.5" />
+                        포인트 차감
+                      </Button>
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        className="h-10 rounded-xl border-rose-200 bg-rose-50 px-2 text-xs font-black text-rose-700 hover:bg-rose-100"
+                        onClick={() => openFocusAdjustmentDialog('penalty', 'add')}
+                      >
+                        <ShieldAlert className="mr-1.5 h-3.5 w-3.5" />
+                        벌점 부여
+                      </Button>
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        className="h-10 rounded-xl border-emerald-200 bg-emerald-50 px-2 text-xs font-black text-emerald-700 hover:bg-emerald-100"
+                        onClick={() => openFocusAdjustmentDialog('penalty', 'subtract')}
+                      >
+                        <ArrowUpRight className="mr-1.5 h-3.5 w-3.5" />
+                        벌점 삭감
                       </Button>
                     </div>
                   </div>
