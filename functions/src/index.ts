@@ -8830,15 +8830,24 @@ async function resolveOpenStudyStartMsFromAttendanceEvidence(params: {
   }
 
   const bounds = getStudyDayWindowBounds(params.dateKey);
-  const eventsSnap = await params.db
-    .collection(`centers/${params.centerId}/attendanceEvents`)
-    .where("studentId", "==", params.studentId)
-    .where("dateKey", "==", params.dateKey)
-    .limit(120)
-    .get();
+  const previousDate = new Date(`${params.dateKey}T00:00:00+09:00`);
+  previousDate.setDate(previousDate.getDate() - 1);
+  const previousDateKey = toDateKey(previousDate);
+  const evidenceDateKeys = Array.from(new Set([params.dateKey, previousDateKey]));
+  const eventsSnaps = await Promise.all(
+    evidenceDateKeys.map((dateKey) =>
+      params.db
+        .collection(`centers/${params.centerId}/attendanceEvents`)
+        .where("studentId", "==", params.studentId)
+        .where("dateKey", "==", dateKey)
+        .limit(120)
+        .get()
+    )
+  );
 
   let openStartMs: number | null = null;
-  eventsSnap.docs
+  eventsSnaps
+    .flatMap((snap) => snap.docs)
     .map((docSnap) => {
       const data = (docSnap.data() || {}) as Record<string, unknown>;
       return {
@@ -8846,7 +8855,7 @@ async function resolveOpenStudyStartMsFromAttendanceEvidence(params: {
         occurredAtMs: toMillisSafe(data.occurredAt) || toMillisSafe(data.createdAt),
       };
     })
-    .filter((event) => event.occurredAtMs >= bounds.startMs && event.occurredAtMs < params.nowMs)
+    .filter((event) => event.occurredAtMs > 0 && event.occurredAtMs < params.nowMs)
     .sort((left, right) => left.occurredAtMs - right.occurredAtMs)
     .forEach((event) => {
       if (event.eventType === "check_in" || event.eventType === "away_end") {
@@ -8862,14 +8871,33 @@ async function resolveOpenStudyStartMsFromAttendanceEvidence(params: {
     return Math.max(bounds.startMs, openStartMs);
   }
 
-  const [statSnap, daySnap] = await Promise.all([
-    params.db.doc(`centers/${params.centerId}/attendanceDailyStats/${params.dateKey}/students/${params.studentId}`).get(),
-    params.db.doc(`centers/${params.centerId}/studyLogs/${params.studentId}/days/${params.dateKey}`).get(),
+  const [statSnaps, daySnaps] = await Promise.all([
+    Promise.all(
+      evidenceDateKeys.map((dateKey) =>
+        params.db.doc(`centers/${params.centerId}/attendanceDailyStats/${dateKey}/students/${params.studentId}`).get()
+      )
+    ),
+    Promise.all(
+      evidenceDateKeys.map((dateKey) =>
+        params.db.doc(`centers/${params.centerId}/studyLogs/${params.studentId}/days/${dateKey}`).get()
+      )
+    ),
   ]);
-  const statData = statSnap.exists ? ((statSnap.data() || {}) as Record<string, unknown>) : {};
-  const dayData = daySnap.exists ? ((daySnap.data() || {}) as Record<string, unknown>) : {};
-  const statCheckInMs = toMillisSafe(statData.checkInAt);
-  const lastSessionEndMs = toMillisSafe(dayData.lastSessionEndAt);
+  let statCheckInMs = 0;
+  statSnaps.forEach((statSnap) => {
+    const statData = statSnap.exists ? ((statSnap.data() || {}) as Record<string, unknown>) : {};
+    const candidateMs = toMillisSafe(statData.checkInAt);
+    if (candidateMs > 0 && candidateMs < params.nowMs && candidateMs > statCheckInMs) {
+      statCheckInMs = candidateMs;
+    }
+  });
+  const lastSessionEndMs = Math.max(
+    0,
+    ...daySnaps.map((daySnap) => {
+      const dayData = daySnap.exists ? ((daySnap.data() || {}) as Record<string, unknown>) : {};
+      return toMillisSafe(dayData.lastSessionEndAt);
+    })
+  );
   if (statCheckInMs > 0 && statCheckInMs < params.nowMs && statCheckInMs > lastSessionEndMs) {
     return Math.max(bounds.startMs, statCheckInMs);
   }
@@ -9309,9 +9337,16 @@ export const setStudentAttendanceStatusSecure = smsDispatcherFunctions.https.onC
     },
   });
 
-  await queueAttendanceTransitionSmsAfterCommit(db, {
+  void queueAttendanceTransitionSmsAfterCommit(db, {
     centerId,
     result,
+  }).catch((error) => {
+    console.error("[attendance-sms-v2] post-transition queue failed", {
+      centerId,
+      eventId: result.eventId || null,
+      eventType: result.eventType || null,
+      message: error instanceof Error ? error.message : String(error),
+    });
   });
 
   return result;
@@ -11540,9 +11575,16 @@ export const stopStudentStudySessionSecure = smsDispatcherFunctions.https.onCall
     fallbackStartTimeMs,
   });
 
-  await queueAttendanceTransitionSmsAfterCommit(db, {
+  void queueAttendanceTransitionSmsAfterCommit(db, {
     centerId,
     result,
+  }).catch((error) => {
+    console.error("[attendance-sms-v2] post-stop queue failed", {
+      centerId,
+      eventId: result.eventId || null,
+      eventType: result.eventType || null,
+      message: error instanceof Error ? error.message : String(error),
+    });
   });
 
   return {
