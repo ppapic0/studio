@@ -2727,6 +2727,8 @@ async function appendSmsDeliveryLog(
   params: {
     centerId: string;
     queueId?: string | null;
+    dedupeKey?: string | null;
+    sourceEventId?: string | null;
     studentId?: string | null;
     studentName?: string | null;
     parentUid?: string | null;
@@ -2753,6 +2755,8 @@ async function appendSmsDeliveryLog(
   await logRef.set({
     centerId: params.centerId,
     queueId: params.queueId || null,
+    dedupeKey: params.dedupeKey || null,
+    sourceEventId: params.sourceEventId || null,
     studentId: params.studentId || null,
     studentName: params.studentName || null,
     parentUid: params.parentUid || null,
@@ -3198,6 +3202,8 @@ async function queueParentSmsNotification(
         createdAt: ts,
         eventAt: eventAtTs,
         suppressedReason: recipient.suppressedReason,
+        dedupeKey,
+        sourceEventId: asTrimmedString(params.sourceEventId) || null,
       })
     )
   );
@@ -3363,6 +3369,7 @@ async function queueCustomParentSmsNotification(
         status: "suppressed_opt_out",
         createdAt: ts,
         suppressedReason: recipient.suppressedReason,
+        dedupeKey: params.dedupeKey || null,
       })
     )
   );
@@ -3554,8 +3561,7 @@ async function queueAttendanceEventSmsV2(
   }
 }
 
-export const onAttendanceEventCreated = functions
-  .region(region)
+export const onAttendanceEventCreated = smsDispatcherFunctions
   .firestore.document("centers/{centerId}/attendanceEvents/{eventId}")
   .onCreate(async (snap, context) => {
     const db = admin.firestore();
@@ -3881,7 +3887,7 @@ async function repairRecentAttendanceSmsQueueForCenter(
   });
 }
 
-export const repairTodayAttendanceSmsQueue = functions.region(region).https.onCall(async (data, context) => {
+export const repairTodayAttendanceSmsQueue = smsDispatcherFunctions.https.onCall(async (data, context) => {
   const db = admin.firestore();
 
   if (!context.auth) {
@@ -4142,6 +4148,8 @@ async function dispatchSmsQueueItem(
   const receiver = normalizePhoneNumber(queueData.phoneNumber || queueData.to || "");
   const queueId = queueRef.id;
   const queueEventAt = toTimestampOrNow(queueData.eventAt || queueData?.metadata?.eventAt);
+  const queueDedupeKey = asTrimmedString(queueData.dedupeKey);
+  const queueSourceEventId = asTrimmedString(queueData.sourceEventId || queueData?.metadata?.sourceEventId);
   const studentId = asTrimmedString(queueData.studentId);
   const studentName = asTrimmedString(queueData.studentName || queueData?.metadata?.studentName, "학생");
   const parentUid = asTrimmedString(queueData.parentUid);
@@ -4183,6 +4191,8 @@ async function dispatchSmsQueueItem(
       createdAt: nowTs,
       eventAt: queueEventAt,
       suppressedReason: "student_fallback_blocked",
+      dedupeKey: queueDedupeKey || null,
+      sourceEventId: queueSourceEventId || null,
     });
     return;
   }
@@ -4217,6 +4227,8 @@ async function dispatchSmsQueueItem(
       failedAt: nowTs,
       errorCode: "INVALID_QUEUE_ITEM",
       errorMessage: "수신번호 또는 문자 본문이 비어 있습니다.",
+      dedupeKey: queueDedupeKey || null,
+      sourceEventId: queueSourceEventId || null,
     });
     return;
   }
@@ -4336,6 +4348,8 @@ async function dispatchSmsQueueItem(
       createdAt: nowTs,
       eventAt: queueEventAt,
       sentAt: nowTs,
+      dedupeKey: queueDedupeKey || null,
+      sourceEventId: queueSourceEventId || null,
     });
     return;
   }
@@ -4400,6 +4414,8 @@ async function dispatchSmsQueueItem(
     failedAt: nowTs,
     errorCode: lastErrorCode,
     errorMessage: lastErrorMessage,
+    dedupeKey: queueDedupeKey || null,
+    sourceEventId: queueSourceEventId || null,
   });
 }
 function isAdminRole(role: unknown): boolean {
@@ -9108,7 +9124,7 @@ async function applyAttendanceStatusTransition(
   });
 }
 
-export const setStudentAttendanceStatusSecure = functions.region(region).https.onCall(async (data, context) => {
+export const setStudentAttendanceStatusSecure = smsDispatcherFunctions.https.onCall(async (data, context) => {
   const db = admin.firestore();
   if (!context.auth?.uid) {
     throw new functions.https.HttpsError("unauthenticated", "로그인이 필요합니다.");
@@ -11363,7 +11379,7 @@ export const scheduledStudyBoxCarryoverExpiry = functions
   });
 
 
-export const stopStudentStudySessionSecure = functions.region(region).https.onCall(async (data, context) => {
+export const stopStudentStudySessionSecure = smsDispatcherFunctions.https.onCall(async (data, context) => {
   const db = admin.firestore();
 
   if (!context.auth?.uid) {

@@ -112,6 +112,8 @@ type SmsQueueRow = {
 type SmsDeliveryLogRow = {
   id: string;
   queueId?: string;
+  dedupeKey?: string;
+  sourceEventId?: string;
   studentId?: string;
   studentName?: string;
   parentUid?: string;
@@ -505,6 +507,63 @@ function resolveSmsEventDisplayDate(
   return resolvedDate;
 }
 
+function getSmsDeliveryLogSortMs(row: SmsDeliveryLogRow) {
+  return (
+    toDateSafe(row.sentAt)?.getTime() ||
+    toDateSafe(row.failedAt)?.getTime() ||
+    toDateSafe(row.createdAt)?.getTime() ||
+    toDateSafe(row.eventAt)?.getTime() ||
+    0
+  );
+}
+
+function getSmsDeliveryLogFinalPriority(row: SmsDeliveryLogRow) {
+  if (row.status === 'sent') return 4;
+  if (row.status === 'suppressed_opt_out') return 3;
+  if (row.status === 'failed') return 2;
+  return 1;
+}
+
+function getSmsDeliveryLogAttemptGroupKey(row: SmsDeliveryLogRow) {
+  if (row.queueId) return `queue:${row.queueId}`;
+  if (row.dedupeKey) {
+    return `dedupe:${row.dedupeKey}:${row.parentUid || row.phoneNumber || ''}`;
+  }
+  if (row.sourceEventId) {
+    return `event:${row.sourceEventId}:${row.parentUid || row.phoneNumber || ''}`;
+  }
+  const eventMs = toDateSafe(row.eventAt)?.getTime();
+  const fallbackMs = eventMs || getSmsDeliveryLogSortMs(row);
+  const fallbackMinute = fallbackMs > 0 ? Math.floor(fallbackMs / 60000) : row.id;
+  return [
+    'fallback',
+    row.studentId || '',
+    row.parentUid || '',
+    normalizePhoneNumber(row.phoneNumber),
+    row.eventType || '',
+    fallbackMinute,
+    row.renderedMessage || '',
+  ].join(':');
+}
+
+function collapseSmsDeliveryLogAttempts(rows: SmsDeliveryLogRow[]) {
+  const byAttemptGroup = new Map<string, SmsDeliveryLogRow>();
+  rows.forEach((row) => {
+    const key = getSmsDeliveryLogAttemptGroupKey(row);
+    const prev = byAttemptGroup.get(key);
+    if (!prev) {
+      byAttemptGroup.set(key, row);
+      return;
+    }
+    const prevPriority = getSmsDeliveryLogFinalPriority(prev);
+    const nextPriority = getSmsDeliveryLogFinalPriority(row);
+    if (nextPriority > prevPriority || (nextPriority === prevPriority && getSmsDeliveryLogSortMs(row) >= getSmsDeliveryLogSortMs(prev))) {
+      byAttemptGroup.set(key, row);
+    }
+  });
+  return Array.from(byAttemptGroup.values()).sort((a, b) => getSmsDeliveryLogSortMs(b) - getSmsDeliveryLogSortMs(a));
+}
+
 function formatShortDateLabel(date: Date) {
   return `${date.getMonth() + 1}.${String(date.getDate()).padStart(2, '0')}`;
 }
@@ -638,6 +697,10 @@ export default function NotificationSettingsPage() {
     return query(collection(firestore, 'centers', centerId, 'smsDeliveryLogs'), orderBy('createdAt', 'desc'), limit(1200));
   }, [firestore, centerId, isAdmin]);
   const { data: smsDeliveryLogsRaw } = useCollection<SmsDeliveryLogRow>(smsDeliveryLogsQuery, { enabled: isAdmin });
+  const smsDeliveryLogsFinalRows = useMemo(
+    () => collapseSmsDeliveryLogAttempts(smsDeliveryLogsRaw || []),
+    [smsDeliveryLogsRaw]
+  );
 
   const legacySmsLogsQuery = useMemoFirebase(() => {
     if (!firestore || !centerId || !isAdmin) return null;
@@ -820,7 +883,7 @@ export default function NotificationSettingsPage() {
       };
     });
     const dayMap = new Map(range.map((item) => [item.key, item] as const));
-    (smsDeliveryLogsRaw || []).forEach((row) => {
+    smsDeliveryLogsFinalRows.forEach((row) => {
       const key =
         row.dateKey ||
         toDateKeyFromValue(row.sentAt) ||
@@ -847,7 +910,7 @@ export default function NotificationSettingsPage() {
       totalIssue: range.reduce((sum, item) => sum + item.issue, 0),
       pendingTodayCount,
     };
-  }, [smsDeliveryLogsRaw, smsQueueRaw]);
+  }, [smsDeliveryLogsFinalRows, smsQueueRaw]);
 
   const smsTrendChart = useMemo(() => {
     const width = 640;
@@ -955,7 +1018,7 @@ export default function NotificationSettingsPage() {
   const todayBoardRows = useMemo<StudentSmsBoardRow[]>(() => {
     const todayKey = todayDateKey;
     const queueRows = smsQueueRaw || [];
-    const deliveryRows = smsDeliveryLogsRaw || [];
+    const deliveryRows = smsDeliveryLogsFinalRows;
     const keyword = studentBoardSearchTerm.trim().toLowerCase();
     return recipientRows
       .map((student) => {
@@ -1153,7 +1216,7 @@ export default function NotificationSettingsPage() {
     attendanceEventsByStudentId,
     attendanceRecordsByStudentId,
     recipientRows,
-    smsDeliveryLogsRaw,
+    smsDeliveryLogsFinalRows,
     smsQueueRaw,
     studentBoardSearchTerm,
     todayDateKey,
@@ -1213,7 +1276,7 @@ export default function NotificationSettingsPage() {
   }, [recipientRows, recipientSearchTerm]);
 
   const historyRows = useMemo(() => {
-    const deliveryRows = (smsDeliveryLogsRaw || []).map((row) => ({
+    const deliveryRows = smsDeliveryLogsFinalRows.map((row) => ({
       id: `delivery-${row.id}`,
       studentId: row.studentId || '',
       studentName: row.studentName || studentsById.get(row.studentId || '')?.name || '학생',
@@ -1269,7 +1332,7 @@ export default function NotificationSettingsPage() {
     legacySmsLogsRaw,
     selectedHistoryDate,
     selectedHistoryStudentId,
-    smsDeliveryLogsRaw,
+    smsDeliveryLogsFinalRows,
     studentsById,
   ]);
 

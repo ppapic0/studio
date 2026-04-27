@@ -1954,6 +1954,8 @@ async function appendSmsDeliveryLog(db, params) {
     await logRef.set({
         centerId: params.centerId,
         queueId: params.queueId || null,
+        dedupeKey: params.dedupeKey || null,
+        sourceEventId: params.sourceEventId || null,
         studentId: params.studentId || null,
         studentName: params.studentName || null,
         parentUid: params.parentUid || null,
@@ -2281,6 +2283,8 @@ async function queueParentSmsNotification(db, params) {
         createdAt: ts,
         eventAt: eventAtTs,
         suppressedReason: recipient.suppressedReason,
+        dedupeKey,
+        sourceEventId: asTrimmedString(params.sourceEventId) || null,
     })));
     if (shouldDispatchImmediately && immediateDispatchQueueItems.length > 0) {
         await Promise.allSettled(immediateDispatchQueueItems.map((queueItem) => dispatchSmsQueueItem(db, centerId, queueItem.ref, queueItem.data, 1)));
@@ -2406,6 +2410,7 @@ async function queueCustomParentSmsNotification(db, params) {
         status: "suppressed_opt_out",
         createdAt: ts,
         suppressedReason: recipient.suppressedReason,
+        dedupeKey: params.dedupeKey || null,
     })));
     return {
         queuedCount: allowedRecipients.length,
@@ -2559,8 +2564,7 @@ async function queueAttendanceEventSmsV2(db, params) {
         };
     }
 }
-exports.onAttendanceEventCreated = functions
-    .region(region)
+exports.onAttendanceEventCreated = smsDispatcherFunctions
     .firestore.document("centers/{centerId}/attendanceEvents/{eventId}")
     .onCreate(async (snap, context) => {
     const db = admin.firestore();
@@ -2801,7 +2805,7 @@ async function repairRecentAttendanceSmsQueueForCenter(db, centerId, dateKey, wi
         limit: 300,
     });
 }
-exports.repairTodayAttendanceSmsQueue = functions.region(region).https.onCall(async (data, context) => {
+exports.repairTodayAttendanceSmsQueue = smsDispatcherFunctions.https.onCall(async (data, context) => {
     var _a;
     const db = admin.firestore();
     if (!context.auth) {
@@ -3009,7 +3013,7 @@ async function sendSmsViaCustomEndpoint(params) {
     }
 }
 async function dispatchSmsQueueItem(db, centerId, queueRef, queueData, attemptCount) {
-    var _a, _b;
+    var _a, _b, _c;
     const nowTs = admin.firestore.Timestamp.now();
     const settings = await loadNotificationSettings(db, centerId);
     const provider = (settings.smsProvider || queueData.provider || "none");
@@ -3017,8 +3021,10 @@ async function dispatchSmsQueueItem(db, centerId, queueRef, queueData, attemptCo
     const receiver = normalizePhoneNumber(queueData.phoneNumber || queueData.to || "");
     const queueId = queueRef.id;
     const queueEventAt = toTimestampOrNow(queueData.eventAt || ((_a = queueData === null || queueData === void 0 ? void 0 : queueData.metadata) === null || _a === void 0 ? void 0 : _a.eventAt));
+    const queueDedupeKey = asTrimmedString(queueData.dedupeKey);
+    const queueSourceEventId = asTrimmedString(queueData.sourceEventId || ((_b = queueData === null || queueData === void 0 ? void 0 : queueData.metadata) === null || _b === void 0 ? void 0 : _b.sourceEventId));
     const studentId = asTrimmedString(queueData.studentId);
-    const studentName = asTrimmedString(queueData.studentName || ((_b = queueData === null || queueData === void 0 ? void 0 : queueData.metadata) === null || _b === void 0 ? void 0 : _b.studentName), "학생");
+    const studentName = asTrimmedString(queueData.studentName || ((_c = queueData === null || queueData === void 0 ? void 0 : queueData.metadata) === null || _c === void 0 ? void 0 : _c.studentName), "학생");
     const parentUid = asTrimmedString(queueData.parentUid);
     const parentName = asTrimmedString(queueData.parentName);
     const eventType = String(queueData.eventType || "study_start");
@@ -3055,6 +3061,8 @@ async function dispatchSmsQueueItem(db, centerId, queueRef, queueData, attemptCo
             createdAt: nowTs,
             eventAt: queueEventAt,
             suppressedReason: "student_fallback_blocked",
+            dedupeKey: queueDedupeKey || null,
+            sourceEventId: queueSourceEventId || null,
         });
         return;
     }
@@ -3088,6 +3096,8 @@ async function dispatchSmsQueueItem(db, centerId, queueRef, queueData, attemptCo
             failedAt: nowTs,
             errorCode: "INVALID_QUEUE_ITEM",
             errorMessage: "수신번호 또는 문자 본문이 비어 있습니다.",
+            dedupeKey: queueDedupeKey || null,
+            sourceEventId: queueSourceEventId || null,
         });
         return;
     }
@@ -3202,6 +3212,8 @@ async function dispatchSmsQueueItem(db, centerId, queueRef, queueData, attemptCo
             createdAt: nowTs,
             eventAt: queueEventAt,
             sentAt: nowTs,
+            dedupeKey: queueDedupeKey || null,
+            sourceEventId: queueSourceEventId || null,
         });
         return;
     }
@@ -3264,6 +3276,8 @@ async function dispatchSmsQueueItem(db, centerId, queueRef, queueData, attemptCo
         failedAt: nowTs,
         errorCode: lastErrorCode,
         errorMessage: lastErrorMessage,
+        dedupeKey: queueDedupeKey || null,
+        sourceEventId: queueSourceEventId || null,
     });
 }
 function isAdminRole(role) {
@@ -7276,7 +7290,7 @@ async function applyAttendanceStatusTransition(params) {
         };
     });
 }
-exports.setStudentAttendanceStatusSecure = functions.region(region).https.onCall(async (data, context) => {
+exports.setStudentAttendanceStatusSecure = smsDispatcherFunctions.https.onCall(async (data, context) => {
     var _a;
     const db = admin.firestore();
     if (!((_a = context.auth) === null || _a === void 0 ? void 0 : _a.uid)) {
@@ -9182,7 +9196,7 @@ exports.scheduledStudyBoxCarryoverExpiry = functions
     });
     return null;
 });
-exports.stopStudentStudySessionSecure = functions.region(region).https.onCall(async (data, context) => {
+exports.stopStudentStudySessionSecure = smsDispatcherFunctions.https.onCall(async (data, context) => {
     var _a, _b;
     const db = admin.firestore();
     if (!((_a = context.auth) === null || _a === void 0 ? void 0 : _a.uid)) {
