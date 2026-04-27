@@ -36,6 +36,9 @@ export interface DashboardParentCommunicationRecord {
   title?: string;
   supportKind?: DashboardSupportKind | string | null;
   requestedUrl?: string | null;
+  requestedStartTime?: string | null;
+  requestedEndTime?: string | null;
+  requestedTimeRangeLabel?: string | null;
 }
 
 export interface NormalizedDashboardParentCommunication extends DashboardParentCommunicationRecord {
@@ -61,6 +64,9 @@ export interface CounselingTrackPreviewRow {
   senderRole?: string;
   parentName?: string;
   requestedUrl?: string | null;
+  requestedStartTime?: string | null;
+  requestedEndTime?: string | null;
+  requestedTimeRangeLabel?: string | null;
   type?: string;
   supportKind?: string | null;
 }
@@ -181,6 +187,17 @@ export function getCommunicationKindLabel(
   return '문의';
 }
 
+export function getWifiRequestTimeRangeLabel(
+  item: Pick<DashboardParentCommunicationRecord, 'requestedStartTime' | 'requestedEndTime' | 'requestedTimeRangeLabel'>
+): string {
+  const savedLabel = typeof item?.requestedTimeRangeLabel === 'string' ? item.requestedTimeRangeLabel.trim() : '';
+  if (savedLabel) return savedLabel;
+  const startTime = typeof item?.requestedStartTime === 'string' ? item.requestedStartTime.trim() : '';
+  const endTime = typeof item?.requestedEndTime === 'string' ? item.requestedEndTime.trim() : '';
+  if (!startTime || !endTime) return '';
+  return endTime <= startTime ? `${startTime} ~ 익일 ${endTime}` : `${startTime} ~ ${endTime}`;
+}
+
 type BuildCounselingTrackOverviewParams = {
   communications: DashboardParentCommunicationRecord[];
   reservations: CounselingReservation[];
@@ -240,6 +257,9 @@ export function buildCounselingTrackOverview({
       senderRole: item.senderRole,
       parentName: item.parentName,
       requestedUrl: item.requestedUrl,
+      requestedStartTime: item.requestedStartTime,
+      requestedEndTime: item.requestedEndTime,
+      requestedTimeRangeLabel: getWifiRequestTimeRangeLabel(item),
       type: item.type,
       supportKind: item.supportKind,
     }));

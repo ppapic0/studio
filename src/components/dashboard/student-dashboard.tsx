@@ -166,6 +166,9 @@ type StudentWifiRequestRecord = {
   body?: string;
   supportKind?: SupportThreadKind | null;
   requestedUrl?: string | null;
+  requestedStartTime?: string | null;
+  requestedEndTime?: string | null;
+  requestedTimeRangeLabel?: string | null;
   status?: string;
   createdAt?: Timestamp;
   updatedAt?: Timestamp;
@@ -423,6 +426,20 @@ function normalizeWifiMacAddress(value: string) {
 
 function getWifiMacHexLength(value: string) {
   return value.trim() ? value.replace(/[^0-9a-f]/gi, '').length : 0;
+}
+
+function normalizeWifiRequestTime(value: string) {
+  const trimmed = value.trim();
+  if (!trimmed) return null;
+  if (!/^([01]\d|2[0-3]):[0-5]\d$/.test(trimmed)) {
+    throw new Error('invalid-time');
+  }
+  return trimmed;
+}
+
+function buildWifiRequestTimeRangeLabel(startTime?: string | null, endTime?: string | null) {
+  if (!startTime || !endTime) return '';
+  return endTime <= startTime ? `${startTime} ~ 익일 ${endTime}` : `${startTime} ~ ${endTime}`;
 }
 
 function getWifiRequestStatusMeta(status?: string) {
@@ -1299,6 +1316,8 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
   const [isWifiRequestDialogOpen, setIsWifiRequestDialogOpen] = useState(false);
   const [wifiRequestTitle, setWifiRequestTitle] = useState('');
   const [wifiRequestUrl, setWifiRequestUrl] = useState('');
+  const [wifiRequestStartTime, setWifiRequestStartTime] = useState('');
+  const [wifiRequestEndTime, setWifiRequestEndTime] = useState('');
   const [wifiRequestMacAddress, setWifiRequestMacAddress] = useState('');
   const [wifiRequestReason, setWifiRequestReason] = useState('');
   const [isWifiRequestSubmitting, setIsWifiRequestSubmitting] = useState(false);
@@ -2269,11 +2288,44 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
       return;
     }
 
+    let normalizedStartTime: string | null = null;
+    let normalizedEndTime: string | null = null;
+    try {
+      normalizedStartTime = normalizeWifiRequestTime(wifiRequestStartTime);
+      normalizedEndTime = normalizeWifiRequestTime(wifiRequestEndTime);
+    } catch {
+      toast({
+        variant: 'destructive',
+        title: '해제 요청 시간을 확인해 주세요.',
+        description: '예: 18:00처럼 시작 시간과 종료 시간을 모두 입력해 주세요.',
+      });
+      return;
+    }
+
+    if (!normalizedStartTime || !normalizedEndTime) {
+      toast({
+        variant: 'destructive',
+        title: '해제 요청 시간을 입력해 주세요.',
+        description: '몇 시부터 몇 시까지 해제가 필요한지 함께 남겨 주세요.',
+      });
+      return;
+    }
+
+    if (normalizedStartTime === normalizedEndTime) {
+      toast({
+        variant: 'destructive',
+        title: '해제 요청 시간을 확인해 주세요.',
+        description: '시작 시간과 종료 시간이 같을 수 없습니다.',
+      });
+      return;
+    }
+
     setIsWifiRequestSubmitting(true);
     try {
       const defaultTitle = '와이파이 방화벽 해제 요청';
       const trimmedTitle = wifiRequestTitle.trim();
-      const requestBody = `사용 이유: ${trimmedReason}\nMAC 주소: ${normalizedMacAddress}`;
+      const requestedTimeRangeLabel = buildWifiRequestTimeRangeLabel(normalizedStartTime, normalizedEndTime);
+      const requestBody = `사용 이유: ${trimmedReason}\n해제 요청 시간: ${requestedTimeRangeLabel}\nMAC 주소: ${normalizedMacAddress}`;
       const requestStudentId = authUid || user.uid;
       const requestRef = await addDoc(collection(firestore, 'centers', activeMembership.id, 'parentCommunications'), {
         studentId: requestStudentId,
@@ -2286,6 +2338,9 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
         body: requestBody,
         supportKind: 'wifi_unblock' as SupportThreadKind,
         requestedUrl: normalizedUrl,
+        requestedStartTime: normalizedStartTime,
+        requestedEndTime: normalizedEndTime,
+        requestedTimeRangeLabel,
         status: 'requested',
         latestMessageAt: serverTimestamp(),
         latestMessagePreview: requestBody.length > 90 ? `${requestBody.slice(0, 90)}…` : requestBody,
@@ -2304,6 +2359,9 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
         body: requestBody,
         supportKind: 'wifi_unblock' as SupportThreadKind,
         requestedUrl: normalizedUrl,
+        requestedStartTime: normalizedStartTime,
+        requestedEndTime: normalizedEndTime,
+        requestedTimeRangeLabel,
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
       });
@@ -2314,6 +2372,8 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
       });
       setWifiRequestTitle('');
       setWifiRequestUrl('');
+      setWifiRequestStartTime('');
+      setWifiRequestEndTime('');
       setWifiRequestMacAddress('');
       setWifiRequestReason('');
       setIsWifiRequestDialogOpen(false);
@@ -4140,6 +4200,26 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
                         className="h-12 rounded-xl border-2 font-bold"
                       />
                     </div>
+                    <div className="grid gap-3 sm:grid-cols-2">
+                      <div className="space-y-1.5">
+                        <Label className="ml-1 text-[10px] font-black uppercase text-muted-foreground">해제 시작 시간</Label>
+                        <Input
+                          type="time"
+                          value={wifiRequestStartTime}
+                          onChange={(event) => setWifiRequestStartTime(event.target.value)}
+                          className="h-12 rounded-xl border-2 font-bold"
+                        />
+                      </div>
+                      <div className="space-y-1.5">
+                        <Label className="ml-1 text-[10px] font-black uppercase text-muted-foreground">해제 종료 시간</Label>
+                        <Input
+                          type="time"
+                          value={wifiRequestEndTime}
+                          onChange={(event) => setWifiRequestEndTime(event.target.value)}
+                          className="h-12 rounded-xl border-2 font-bold"
+                        />
+                      </div>
+                    </div>
                     <div className="space-y-1.5">
                       <div className="flex items-center justify-between gap-3 ml-1">
                         <Label className="text-[10px] font-black uppercase text-muted-foreground">기기 MAC 주소</Label>
@@ -4174,7 +4254,7 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
                     </div>
                     <Button
                       onClick={handleWifiRequestSubmit}
-                      disabled={isWifiRequestSubmitting || !wifiRequestUrl.trim() || !isWifiRequestMacComplete || !wifiRequestReason.trim()}
+                      disabled={isWifiRequestSubmitting || !wifiRequestUrl.trim() || !wifiRequestStartTime || !wifiRequestEndTime || !isWifiRequestMacComplete || !wifiRequestReason.trim()}
                       className="h-14 rounded-2xl bg-[#FF7A16] font-black text-white hover:bg-[#E86C10]"
                     >
                       {isWifiRequestSubmitting ? <Loader2 className="h-5 w-5 animate-spin" /> : '해제 요청 보내기'}
@@ -4196,6 +4276,7 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
                           const statusMeta = getWifiRequestStatusMeta(item.status);
                           const timestampLabel = formatWifiRequestTimestamp(item.latestMessageAt || item.updatedAt || item.createdAt);
                           const hostLabel = getRequestedHostLabel(item.requestedUrl) || '요청 사이트';
+                          const timeRangeLabel = item.requestedTimeRangeLabel || buildWifiRequestTimeRangeLabel(item.requestedStartTime, item.requestedEndTime);
                           return (
                             <div
                               key={item.id}
@@ -4215,6 +4296,11 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
                                   <p className="mt-1 line-clamp-2 break-keep text-[12px] font-semibold leading-5 text-[#5A6F95]">
                                     {item.latestMessagePreview || item.body || '요청 사유가 등록되었습니다.'}
                                   </p>
+                                  {timeRangeLabel ? (
+                                    <p className="mt-2 inline-flex rounded-full bg-[#FFF6ED] px-2.5 py-1 text-[10px] font-black text-[#B56B24]">
+                                      요청 시간 {timeRangeLabel}
+                                    </p>
+                                  ) : null}
                                 </div>
                                 <Badge className={cn("border-none font-black shrink-0", statusMeta.badgeClass)}>
                                   {statusMeta.label}

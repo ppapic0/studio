@@ -1941,7 +1941,11 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
         rows: teacherCounselingTrackOverview.wifiRequests.map((item) => ({
           key: item.id,
           title: item.studentName,
-          detail: item.requestedUrl ? `${item.requestedUrl} · ${item.preview}` : item.preview,
+          detail: [
+            item.requestedUrl,
+            item.requestedTimeRangeLabel ? `요청 시간 ${item.requestedTimeRangeLabel}` : '',
+            item.preview,
+          ].filter(Boolean).join(' · '),
           meta: item.timeLabel,
           badge: item.badge,
           tone: item.tone,

@@ -1199,6 +1199,9 @@ export interface SupportThreadMessage {
   body: string;
   supportKind?: SupportThreadKind | null;
   requestedUrl?: string | null;
+  requestedStartTime?: string | null;
+  requestedEndTime?: string | null;
+  requestedTimeRangeLabel?: string | null;
   createdAt?: Timestamp;
   updatedAt?: Timestamp;
 }

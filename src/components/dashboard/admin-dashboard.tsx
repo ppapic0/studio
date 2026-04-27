@@ -7021,7 +7021,11 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
         rows: counselingTrackOverview.wifiRequests.map((item) => ({
           key: item.id,
           title: item.studentName,
-          detail: item.requestedUrl ? `${item.requestedUrl} · ${item.preview}` : item.preview,
+          detail: [
+            item.requestedUrl,
+            item.requestedTimeRangeLabel ? `요청 시간 ${item.requestedTimeRangeLabel}` : '',
+            item.preview,
+          ].filter(Boolean).join(' · '),
           meta: item.timeLabel,
           badge: item.badge,
           tone: item.tone,
@@ -7740,6 +7744,11 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
                               <p className="mt-1 text-[12px] font-bold leading-5 text-[#5c6e97] line-clamp-2">
                                 {item.preview || '방화벽 해제 사유가 접수되었습니다.'}
                               </p>
+                              {item.requestedTimeRangeLabel ? (
+                                <p className="mt-2 inline-flex rounded-full bg-white px-2.5 py-1 text-[10px] font-black text-[#C95A08]">
+                                  요청 시간 {item.requestedTimeRangeLabel}
+                                </p>
+                              ) : null}
                             </div>
                             <ChevronRight className="mt-1 h-4 w-4 shrink-0 text-[#5c6e97]" />
                           </div>

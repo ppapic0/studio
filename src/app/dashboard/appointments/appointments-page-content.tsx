@@ -98,6 +98,9 @@ type ParentCommunicationRecord = {
   repliedByUid?: string;
   supportKind?: SupportThreadKind | null;
   requestedUrl?: string | null;
+  requestedStartTime?: string | null;
+  requestedEndTime?: string | null;
+  requestedTimeRangeLabel?: string | null;
   latestMessageAt?: Timestamp;
   latestMessagePreview?: string;
 };
@@ -122,6 +125,9 @@ type SupportThreadTimelineEntry = {
   createdAt?: Timestamp;
   supportKind?: SupportThreadKind | null;
   requestedUrl?: string | null;
+  requestedStartTime?: string | null;
+  requestedEndTime?: string | null;
+  requestedTimeRangeLabel?: string | null;
   isInitialRequest?: boolean;
 };
 
@@ -162,6 +168,20 @@ function normalizeWifiMacAddress(value: string) {
 
 function getWifiMacHexLength(value: string) {
   return value.trim() ? value.replace(/[^0-9a-f]/gi, '').length : 0;
+}
+
+function normalizeWifiRequestTime(value: string) {
+  const trimmed = value.trim();
+  if (!trimmed) return null;
+  if (!/^([01]\d|2[0-3]):[0-5]\d$/.test(trimmed)) {
+    throw new Error('invalid-time');
+  }
+  return trimmed;
+}
+
+function buildWifiRequestTimeRangeLabel(startTime?: string | null, endTime?: string | null) {
+  if (!startTime || !endTime) return '';
+  return endTime <= startTime ? `${startTime} ~ 익일 ${endTime}` : `${startTime} ~ ${endTime}`;
 }
 
 function isStudentChatEnabledThread(item: Pick<ParentCommunicationRecord, 'senderRole' | 'supportKind'>) {
@@ -217,6 +237,8 @@ export function AppointmentsPageContent({
   const [inquiryTitle, setInquiryTitle] = useState('');
   const [inquiryBody, setInquiryBody] = useState('');
   const [firewallUrl, setFirewallUrl] = useState('');
+  const [firewallStartTime, setFirewallStartTime] = useState('');
+  const [firewallEndTime, setFirewallEndTime] = useState('');
   const [firewallMacAddress, setFirewallMacAddress] = useState('');
   const [replyDrafts, setReplyDrafts] = useState<Record<string, string>>({});
   const [threadDrafts, setThreadDrafts] = useState<Record<string, string>>({});
@@ -710,6 +732,8 @@ export function AppointmentsPageContent({
 
     let normalizedUrl: string | null = null;
     let normalizedMacAddress: string | null = null;
+    let normalizedStartTime: string | null = null;
+    let normalizedEndTime: string | null = null;
     if (inquiryType === 'firewall') {
       try {
         normalizedUrl = normalizeRequestedUrl(firewallUrl);
@@ -719,6 +743,36 @@ export function AppointmentsPageContent({
       }
       if (!normalizedUrl) {
         toast({ variant: 'destructive', title: '해제 요청 URL을 입력해 주세요.' });
+        return;
+      }
+
+      try {
+        normalizedStartTime = normalizeWifiRequestTime(firewallStartTime);
+        normalizedEndTime = normalizeWifiRequestTime(firewallEndTime);
+      } catch {
+        toast({
+          variant: 'destructive',
+          title: '해제 요청 시간을 확인해 주세요.',
+          description: '예: 18:00처럼 시작 시간과 종료 시간을 모두 입력해 주세요.',
+        });
+        return;
+      }
+
+      if (!normalizedStartTime || !normalizedEndTime) {
+        toast({
+          variant: 'destructive',
+          title: '해제 요청 시간을 입력해 주세요.',
+          description: '몇 시부터 몇 시까지 해제가 필요한지 함께 남겨 주세요.',
+        });
+        return;
+      }
+
+      if (normalizedStartTime === normalizedEndTime) {
+        toast({
+          variant: 'destructive',
+          title: '해제 요청 시간을 확인해 주세요.',
+          description: '시작 시간과 종료 시간이 같을 수 없습니다.',
+        });
         return;
       }
 
@@ -753,9 +807,12 @@ export function AppointmentsPageContent({
             ? '학생 질문'
             : '학생 건의사항';
       const supportKind = getStudentSupportKind(inquiryType);
+      const requestedTimeRangeLabel = inquiryType === 'firewall'
+        ? buildWifiRequestTimeRangeLabel(normalizedStartTime, normalizedEndTime)
+        : '';
       const inquiryContent =
         inquiryType === 'firewall' && normalizedMacAddress
-          ? `사용 이유: ${inquiryBody.trim()}\nMAC 주소: ${normalizedMacAddress}`
+          ? `사용 이유: ${inquiryBody.trim()}\n해제 요청 시간: ${requestedTimeRangeLabel}\nMAC 주소: ${normalizedMacAddress}`
           : inquiryBody.trim();
       const requestStudentId = authUid || user.uid;
       const communicationRef = await addDoc(collection(firestore, 'centers', centerId, 'parentCommunications'), {
@@ -774,6 +831,9 @@ export function AppointmentsPageContent({
         body: inquiryContent,
         supportKind,
         requestedUrl: normalizedUrl,
+        requestedStartTime: normalizedStartTime,
+        requestedEndTime: normalizedEndTime,
+        requestedTimeRangeLabel: requestedTimeRangeLabel || null,
         status: 'requested',
         latestMessageAt: serverTimestamp(),
         latestMessagePreview: inquiryContent.length > 90 ? `${inquiryContent.slice(0, 90)}…` : inquiryContent,
@@ -792,6 +852,9 @@ export function AppointmentsPageContent({
           body: inquiryContent,
           supportKind,
           requestedUrl: normalizedUrl,
+          requestedStartTime: normalizedStartTime,
+          requestedEndTime: normalizedEndTime,
+          requestedTimeRangeLabel: requestedTimeRangeLabel || null,
           createdAt: serverTimestamp(),
           updatedAt: serverTimestamp(),
         });
@@ -807,6 +870,9 @@ export function AppointmentsPageContent({
           body: inquiryContent,
           supportKind,
           requestedUrl: normalizedUrl,
+          requestedStartTime: normalizedStartTime,
+          requestedEndTime: normalizedEndTime,
+          requestedTimeRangeLabel: requestedTimeRangeLabel || null,
           status: 'requested',
           createdAt: Timestamp.now(),
           updatedAt: Timestamp.now(),
@@ -821,6 +887,8 @@ export function AppointmentsPageContent({
       setInquiryTitle('');
       setInquiryBody('');
       setFirewallUrl('');
+      setFirewallStartTime('');
+      setFirewallEndTime('');
       setFirewallMacAddress('');
       setInquiryType('question');
     } catch (e: any) {
@@ -904,6 +972,9 @@ export function AppointmentsPageContent({
           createdAt: item.createdAt || item.updatedAt,
           supportKind: item.supportKind || null,
           requestedUrl: item.requestedUrl || null,
+          requestedStartTime: item.requestedStartTime || null,
+          requestedEndTime: item.requestedEndTime || null,
+          requestedTimeRangeLabel: item.requestedTimeRangeLabel || null,
           isInitialRequest: true,
         }]
       : [];
@@ -918,6 +989,9 @@ export function AppointmentsPageContent({
         createdAt: message.createdAt,
         supportKind: message.supportKind || null,
         requestedUrl: message.requestedUrl || null,
+        requestedStartTime: message.requestedStartTime || null,
+        requestedEndTime: message.requestedEndTime || null,
+        requestedTimeRangeLabel: message.requestedTimeRangeLabel || null,
       })),
     ];
   };
@@ -1247,6 +1321,7 @@ export function AppointmentsPageContent({
 
   const renderRequestedUrlPanel = (item: ParentCommunicationRecord, surface: 'student' | 'staff') => {
     if (item.supportKind !== 'wifi_unblock' || !item.requestedUrl) return null;
+    const requestedTimeRangeLabel = item.requestedTimeRangeLabel || buildWifiRequestTimeRangeLabel(item.requestedStartTime, item.requestedEndTime);
 
     if (surface === 'staff') {
       return (
@@ -1272,6 +1347,12 @@ export function AppointmentsPageContent({
               {item.requestedUrl}
             </a>
           </div>
+          {requestedTimeRangeLabel ? (
+            <div className="mt-2 rounded-xl border border-[color:var(--accent-orange-border)] bg-white/80 p-3">
+              <p className="text-[10px] font-black text-[#c26a1c]">요청 시간</p>
+              <p className="mt-1 text-sm font-black text-[#14295F]">{requestedTimeRangeLabel}</p>
+            </div>
+          ) : null}
         </div>
       );
     }
@@ -1301,6 +1382,11 @@ export function AppointmentsPageContent({
           <Link2 className={cn('h-3.5 w-3.5 shrink-0', isStudentTrackTheme ? 'text-[#ffb170]' : 'text-orange-600')} />
           {item.requestedUrl}
         </a>
+        {requestedTimeRangeLabel ? (
+          <p className={cn('mt-2 inline-flex rounded-full px-2.5 py-1 text-[10px] font-black', isStudentTrackTheme ? 'bg-white/10 text-[#ffcf9f]' : 'bg-white text-orange-800')}>
+            요청 시간 {requestedTimeRangeLabel}
+          </p>
+        ) : null}
       </div>
     );
   };
@@ -2223,6 +2309,26 @@ export function AppointmentsPageContent({
                         placeholder="예: classroom.google.com 또는 https://classroom.google.com"
                         className={cn("h-11 rounded-xl border-2 font-bold", isStudentTrackTheme && studentTrackInputClass)}
                       />
+                      <div className={cn("grid gap-3", isMobile ? "grid-cols-1" : "grid-cols-2")}>
+                        <div className="space-y-1.5">
+                          <span className={cn("px-1 text-[10px] font-black uppercase", isStudentTrackTheme ? "text-white/60" : "text-muted-foreground")}>해제 시작 시간</span>
+                          <Input
+                            type="time"
+                            value={firewallStartTime}
+                            onChange={(e) => setFirewallStartTime(e.target.value)}
+                            className={cn("h-11 rounded-xl border-2 font-bold", isStudentTrackTheme && studentTrackInputClass)}
+                          />
+                        </div>
+                        <div className="space-y-1.5">
+                          <span className={cn("px-1 text-[10px] font-black uppercase", isStudentTrackTheme ? "text-white/60" : "text-muted-foreground")}>해제 종료 시간</span>
+                          <Input
+                            type="time"
+                            value={firewallEndTime}
+                            onChange={(e) => setFirewallEndTime(e.target.value)}
+                            className={cn("h-11 rounded-xl border-2 font-bold", isStudentTrackTheme && studentTrackInputClass)}
+                          />
+                        </div>
+                      </div>
                       <div className="space-y-1.5">
                         <div className="flex items-center justify-between gap-3 px-1">
                           <span className={cn("text-[10px] font-black uppercase", isStudentTrackTheme ? "text-white/60" : "text-muted-foreground")}>기기 MAC 주소</span>
@@ -2258,7 +2364,7 @@ export function AppointmentsPageContent({
                   <div className="flex justify-end">
                     <Button
                       onClick={handleSubmitInquiry}
-                      disabled={isSubmitting || !inquiryBody.trim() || (inquiryType === 'firewall' && (!firewallUrl.trim() || !isFirewallMacComplete))}
+                      disabled={isSubmitting || !inquiryBody.trim() || (inquiryType === 'firewall' && (!firewallUrl.trim() || !firewallStartTime || !firewallEndTime || !isFirewallMacComplete))}
                       className={cn("rounded-xl font-black h-11 px-6", counselingCtaClass)}
                     >
                       {isSubmitting ? <Loader2 className="animate-spin h-4 w-4" /> : '등록하기'}
@@ -2573,6 +2679,11 @@ export function AppointmentsPageContent({
                       <Link2 className="h-3.5 w-3.5 shrink-0 text-[#ffcf9f]" />
                       {liveSelectedSupportThread.requestedUrl}
                     </a>
+                    {(liveSelectedSupportThread.requestedTimeRangeLabel || buildWifiRequestTimeRangeLabel(liveSelectedSupportThread.requestedStartTime, liveSelectedSupportThread.requestedEndTime)) ? (
+                      <p className="mt-3 inline-flex rounded-full bg-white/10 px-3 py-1.5 text-[11px] font-black text-[#ffcf9f]">
+                        요청 시간 {liveSelectedSupportThread.requestedTimeRangeLabel || buildWifiRequestTimeRangeLabel(liveSelectedSupportThread.requestedStartTime, liveSelectedSupportThread.requestedEndTime)}
+                      </p>
+                    ) : null}
                   </div>
                 )}
               </div>
