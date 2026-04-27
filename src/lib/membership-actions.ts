@@ -57,14 +57,14 @@ export async function seedInitialData(db: Firestore, uid: string, centerId: stri
     }, { merge: true });
   });
 
-  // 테스트 학생 그룹 (랭킹 형성을 위한 LP 점수 차등 부여)
+  // 테스트 학생 그룹 (초기 포인트 차등 부여)
   const testStudents = [
-    { id: 'test-student-03-1', name: '김철수', class: '03반', lp: 32500, rank: 1 },
-    { id: 'test-student-03-2', name: '이현우', class: '03반', lp: 28200, rank: 2 },
-    { id: 'test-student-04-1', name: '최강산', class: '04반', lp: 24800, rank: 3 },
-    { id: 'test-student-04-2', name: '정유리', class: '04반', lp: 18500, rank: 4 },
-    { id: 'test-student-tutor-1', name: '박과외', class: '과외반', lp: 12200, rank: 5 },
-    { id: 'test-student-tutor-2', name: '한지수', class: '과외반', lp: 8000, rank: 6 },
+    { id: 'test-student-03-1', name: '김철수', class: '03반', points: 32500, rank: 1 },
+    { id: 'test-student-03-2', name: '이현우', class: '03반', points: 28200, rank: 2 },
+    { id: 'test-student-04-1', name: '최강산', class: '04반', points: 24800, rank: 3 },
+    { id: 'test-student-04-2', name: '정유리', class: '04반', points: 18500, rank: 4 },
+    { id: 'test-student-tutor-1', name: '박과외', class: '과외반', points: 12200, rank: 5 },
+    { id: 'test-student-tutor-2', name: '한지수', class: '과외반', points: 8000, rank: 6 },
   ];
 
   // 학생별 시퀀셜 데이터 생성
@@ -105,7 +105,7 @@ export async function seedInitialData(db: Firestore, uid: string, centerId: stri
     // 성장 지표 초기화
     const progressRef = doc(db, 'centers', centerId, 'growthProgress', sUid);
     batch.set(progressRef, {
-      pointsBalance: sInfo.lp,
+      pointsBalance: sInfo.points,
       totalPointsEarned: 15000,
       level: 5,
       stats: { focus: 50, consistency: 60, achievement: 40, resilience: 55 },

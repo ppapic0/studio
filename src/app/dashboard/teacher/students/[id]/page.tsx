@@ -660,7 +660,6 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
   const centerId = activeMembership?.id;
   const today = new Date();
   const todayKey = format(today, 'yyyy-MM-dd');
-  const periodKey = format(today, 'yyyy-MM');
 
   const isStudentSelfView = activeMembership?.role === 'student';
   const canManageStudentAccounts = !isStudentSelfView && canManageStaff(activeMembership?.role);
@@ -701,7 +700,6 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
   const [isQuickFeedbackSubmitting, setIsQuickFeedbackSubmitting] = useState(false);
 
   const [isEditStats, setIsEditStats] = useState(false);
-  const [editLp, setEditLp] = useState(0);
   const [editPenaltyPoints, setEditPenaltyPoints] = useState(0);
   const [editStats, setEditStats] = useState({ focus: 0, consistency: 0, achievement: 0, resilience: 0 });
   const [editTodayMinutes, setEditTodayMinutes] = useState(0);
@@ -823,7 +821,6 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
 
   useEffect(() => {
     if (progress) {
-      setEditLp(progress.seasonLp || 0);
       setEditPenaltyPoints(progress.penaltyPoints || 0);
       setEditStats({ focus: progress.stats?.focus || 0, consistency: progress.stats?.consistency || 0, achievement: progress.stats?.achievement || 0, resilience: progress.stats?.resilience || 0 });
     }
@@ -2038,7 +2035,6 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
     if (!firestore || !centerId || !studentId || !canEditGrowthData) return;
     setIsUpdating(true);
     try {
-      const normalizedLp = Math.max(0, Math.round(Number(editLp) || 0));
       const normalizedPenaltyPoints = Math.max(0, Math.round(Number(editPenaltyPoints) || 0));
       const normalizedTodayMinutes = Math.max(0, Math.round(Number(editTodayMinutes) || 0));
       const shouldStoreTodayAsAdjustment = activeSessionMinutes > 0;
@@ -2060,14 +2056,12 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
 
       const batch = writeBatch(firestore);
       const pRef = doc(firestore, 'centers', centerId, 'growthProgress', studentId);
-      const rRef = doc(firestore, 'centers', centerId, 'leaderboards', `${periodKey}_lp`, 'entries', studentId);
       const sRef = doc(firestore, 'centers', centerId, 'dailyStudentStats', todayKey, 'students', studentId);
       const dailyLogRef = doc(firestore, 'centers', centerId, 'studyLogs', studentId, 'days', todayKey);
 
       batch.set(
         pRef,
         {
-          seasonLp: normalizedLp,
           penaltyPoints: normalizedPenaltyPoints,
           stats: normalizedStats,
           updatedAt: serverTimestamp(),
@@ -2089,7 +2083,6 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
         },
         { merge: true }
       );
-      batch.set(rRef, { studentId, displayNameSnapshot: student?.name || '학생', value: normalizedLp, updatedAt: serverTimestamp() }, { merge: true });
 
       if (penaltyDelta !== 0) {
         const penaltyLogRef = doc(collection(firestore, 'centers', centerId, 'penaltyLogs'));
@@ -5183,23 +5176,15 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
           <div className="flex-1 overflow-y-auto bg-white p-10 space-y-10 custom-scrollbar">
             <section className="space-y-4">
               <div className="flex flex-wrap items-center justify-between gap-2">
-                <h4 className="text-xs font-black uppercase text-[#5c6e97] flex items-center gap-2 whitespace-nowrap"><Zap className="h-4 w-4 text-[#2554d4]" /> 시즌 성장 LP</h4>
-                <Badge className="border border-[#dbe7ff] bg-[#f8fbff] px-3 py-1 text-[10px] font-black text-[#14295F]">
-                  실제 포인트 {currentPointBalance.toLocaleString()}P
-                </Badge>
+                <h4 className="text-xs font-black uppercase text-[#5c6e97] flex items-center gap-2 whitespace-nowrap"><Zap className="h-4 w-4 text-[#2554d4]" /> 보유 포인트</h4>
               </div>
               <Card className="rounded-[1.5rem] border-2 border-[#dbe7ff] bg-[#f8fbff] p-6 flex flex-col items-center text-center gap-4">
+                <div className="text-5xl font-black text-[#14295F]">{currentPointBalance.toLocaleString()}<span className="ml-1 text-xl opacity-20">P</span></div>
                 {isEditStats && canEditGrowthData ? (
-                  <div className="w-full space-y-4">
-                    <Slider value={[editLp]} max={50000} step={100} onValueChange={([value]) => setEditLp(value)} />
-                    <Input type="number" value={editLp} onChange={(event) => setEditLp(Number(event.target.value))} className="h-12 rounded-xl border-2 border-[#dbe7ff] text-center font-black text-xl text-[#14295F]" />
-                    <p className="text-[11px] font-bold leading-relaxed text-[#5c6e97]">
-                      이 값은 등급/성장 랭킹용 LP입니다. 실제 포인트 증감은 포인트 수급 확인 또는 포인트 조정에서 처리됩니다.
-                    </p>
-                  </div>
-                ) : (
-                  <div className="text-5xl font-black text-[#14295F]">{(progress?.seasonLp || 0).toLocaleString()}<span className="ml-1 text-xl opacity-20">LP</span></div>
-                )}
+                  <p className="text-[11px] font-bold leading-relaxed text-[#5c6e97]">
+                    포인트 증감은 포인트 수급 확인 또는 포인트 조정에서 처리됩니다.
+                  </p>
+                ) : null}
               </Card>
             </section>
 

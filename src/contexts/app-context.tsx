@@ -3,7 +3,6 @@
 import React, { createContext, useContext, useState, ReactNode, useEffect, useMemo, useRef } from 'react';
 import { useUser, useFirestore, useFunctions } from '@/firebase';
 import { collection, onSnapshot, doc, query, where } from 'firebase/firestore';
-import { format } from 'date-fns';
 import { httpsCallable } from 'firebase/functions';
 
 export type CenterMembership = {
@@ -356,56 +355,31 @@ export function AppProvider({ children }: { children: ReactNode }) {
     }
 
     const centerId = activeMembership.id;
-    const periodKey = format(new Date(), 'yyyy-MM');
     const progressRef = doc(firestore, 'centers', centerId, 'growthProgress', studentId);
-    const rankRef = doc(firestore, 'centers', centerId, 'leaderboards', `${periodKey}_lp`, 'entries', studentId);
 
-    let latestLp = 0;
-    let latestRank = 999;
+    let latestPoints = 0;
 
     const updateTierState = () => {
-      if (latestLp >= 25000) {
-        if (latestRank === 1) setCurrentTier(TIERS.find((t) => t.name === '\uCC4C\uB9B0\uC800')!);
-        else if (latestRank === 2 || latestRank === 3) setCurrentTier(TIERS.find((t) => t.name === '\uADF8\uB79C\uB4DC\uB9C8\uC2A4\uD130')!);
-        else setCurrentTier(TIERS.find((t) => t.name === '\uB9C8\uC2A4\uD130')!);
-      } else {
-        const lowerTiers = TIERS.slice(0, 5);
-        const found = [...lowerTiers].reverse().find((t) => latestLp >= t.min) || TIERS[0];
-        setCurrentTier(found);
-      }
+      const found = [...TIERS.slice(0, 6)].reverse().find((tier) => latestPoints >= tier.min) || TIERS[0];
+      setCurrentTier(found);
     };
 
     const unsubProgress = onSnapshot(
       progressRef,
       (snap) => {
         if (snap.exists()) {
-          latestLp = snap.data().seasonLp || 0;
+          latestPoints = snap.data().pointsBalance || 0;
           updateTierState();
         }
       },
       () => {
-        latestLp = 0;
-        updateTierState();
-      }
-    );
-
-    const unsubRank = onSnapshot(
-      rankRef,
-      (snap) => {
-        if (snap.exists()) {
-          latestRank = snap.data().rank || 999;
-          updateTierState();
-        }
-      },
-      () => {
-        latestRank = 999;
+        latestPoints = 0;
         updateTierState();
       }
     );
 
     return () => {
       unsubProgress();
-      unsubRank();
     };
   }, [activeStudentId, user?.uid, firestore, activeMembership?.id, activeMembership?.role]);
 
