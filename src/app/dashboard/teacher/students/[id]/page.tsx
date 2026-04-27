@@ -1486,6 +1486,10 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
     () => pointHistoryRows.reduce((sum, row) => sum + row.totalPoints, 0),
     [pointHistoryRows]
   );
+  const currentPointBalance = useMemo(
+    () => Math.max(0, Math.round(Number(progress?.pointsBalance || 0))),
+    [progress?.pointsBalance]
+  );
   const selectedPointHistoryRow = useMemo(() => {
     if (pointHistoryRows.length === 0) return null;
     return pointHistoryRows.find((row) => row.dateKey === selectedPointHistoryDateKey) || pointHistoryRows[0];
@@ -5178,15 +5182,23 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
 
           <div className="flex-1 overflow-y-auto bg-white p-10 space-y-10 custom-scrollbar">
             <section className="space-y-4">
-              <h4 className="text-xs font-black uppercase text-[#5c6e97] flex items-center gap-2 whitespace-nowrap"><Zap className="h-4 w-4 text-[#2554d4]" /> 시즌 보유 포인트</h4>
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <h4 className="text-xs font-black uppercase text-[#5c6e97] flex items-center gap-2 whitespace-nowrap"><Zap className="h-4 w-4 text-[#2554d4]" /> 시즌 성장 LP</h4>
+                <Badge className="border border-[#dbe7ff] bg-[#f8fbff] px-3 py-1 text-[10px] font-black text-[#14295F]">
+                  실제 포인트 {currentPointBalance.toLocaleString()}P
+                </Badge>
+              </div>
               <Card className="rounded-[1.5rem] border-2 border-[#dbe7ff] bg-[#f8fbff] p-6 flex flex-col items-center text-center gap-4">
                 {isEditStats && canEditGrowthData ? (
                   <div className="w-full space-y-4">
                     <Slider value={[editLp]} max={50000} step={100} onValueChange={([value]) => setEditLp(value)} />
                     <Input type="number" value={editLp} onChange={(event) => setEditLp(Number(event.target.value))} className="h-12 rounded-xl border-2 border-[#dbe7ff] text-center font-black text-xl text-[#14295F]" />
+                    <p className="text-[11px] font-bold leading-relaxed text-[#5c6e97]">
+                      이 값은 등급/성장 랭킹용 LP입니다. 실제 포인트 증감은 포인트 수급 확인 또는 포인트 조정에서 처리됩니다.
+                    </p>
                   </div>
                 ) : (
-                  <div className="text-5xl font-black text-[#14295F]">{(progress?.seasonLp || 0).toLocaleString()}<span className="ml-1 text-xl opacity-20">점</span></div>
+                  <div className="text-5xl font-black text-[#14295F]">{(progress?.seasonLp || 0).toLocaleString()}<span className="ml-1 text-xl opacity-20">LP</span></div>
                 )}
               </Card>
             </section>
