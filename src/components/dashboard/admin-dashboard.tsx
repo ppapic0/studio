@@ -3226,7 +3226,7 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
     const dayStatus = dayStatusRaw && typeof dayStatusRaw === 'object' ? dayStatusRaw as Record<string, unknown> : {};
     return {
       pointsBalance: Math.max(0, Math.floor(Number(selectedFocusProgress?.pointsBalance || 0))),
-      todayPoints: Math.max(0, Math.floor(Number(dayStatus.dailyPointAmount || 0))),
+      todayPoints: Math.floor(Number(dayStatus.dailyPointAmount || 0)),
       penaltyPoints: Math.max(0, Math.floor(Number(selectedFocusProgress?.penaltyPoints || 0))),
     };
   }, [selectedFocusProgress, todayKey]);
@@ -6576,14 +6576,6 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
         variant: 'destructive',
         title: '포인트 차감 불가',
         description: '보유 포인트보다 크게 차감할 수 없습니다.',
-      });
-      return;
-    }
-    if (focusAdjustmentKind === 'point' && deltaPoints < 0 && amount > selectedFocusAdjustmentSnapshot.todayPoints) {
-      toast({
-        variant: 'destructive',
-        title: '포인트 차감 불가',
-        description: '오늘 일자에 기록된 포인트보다 크게 차감할 수 없습니다.',
       });
       return;
     }

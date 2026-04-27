@@ -8318,16 +8318,11 @@ exports.adjustStudentPointBalanceSecure = functions.region(region).https.onCall(
             : {};
         const currentBalance = Math.max(0, Math.floor((_a = parseFiniteNumber(progressData.pointsBalance)) !== null && _a !== void 0 ? _a : 0));
         const currentTotalEarned = Math.max(0, Math.floor((_b = parseFiniteNumber(progressData.totalPointsEarned)) !== null && _b !== void 0 ? _b : 0));
-        const currentDailyAmount = Math.max(0, Math.floor((_c = parseFiniteNumber(currentDayStatus.dailyPointAmount)) !== null && _c !== void 0 ? _c : 0));
+        const currentDailyAmount = Math.floor((_c = parseFiniteNumber(currentDayStatus.dailyPointAmount)) !== null && _c !== void 0 ? _c : 0);
         const currentManualAdjustment = Math.round((_d = parseFiniteNumber(currentDayStatus.manualAdjustmentPoints)) !== null && _d !== void 0 ? _d : 0);
         if (deltaPoints < 0 && currentBalance < absPoints) {
             throw new functions.https.HttpsError("failed-precondition", "Insufficient point balance.", {
                 userMessage: "보유 포인트보다 크게 차감할 수 없습니다.",
-            });
-        }
-        if (deltaPoints < 0 && currentDailyAmount < absPoints) {
-            throw new functions.https.HttpsError("failed-precondition", "Insufficient daily points.", {
-                userMessage: "해당 일자의 포인트보다 크게 차감할 수 없습니다.",
             });
         }
         if (currentTotalEarned + deltaPoints < 0) {

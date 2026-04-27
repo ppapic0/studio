@@ -140,7 +140,8 @@ function signedMinutesToLabel(minutes: number): string {
 }
 
 function formatPointAmount(points: number): string {
-  return `${Math.max(0, Math.round(points || 0)).toLocaleString()}P`;
+  const rounded = Math.round(Number(points) || 0);
+  return `${rounded.toLocaleString()}P`;
 }
 
 function formatPointHistoryDateLabel(dateKey: string): string {
@@ -2036,15 +2037,6 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
       });
       return;
     }
-    if (deltaPoints < 0 && amount > selectedPointHistoryRow.totalPoints) {
-      toast({
-        variant: 'destructive',
-        title: '차감 불가',
-        description: '선택한 날짜의 포인트보다 크게 차감할 수 없습니다.',
-      });
-      return;
-    }
-
     setIsPointAdjustmentSaving(true);
     try {
       const adjustStudentPoints = httpsCallable<AdjustStudentPointBalanceInput, AdjustStudentPointBalanceResult>(
@@ -4849,7 +4841,7 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
                   className="min-h-24 rounded-xl border-[#dbe7ff] bg-white text-sm font-bold text-[#14295F]"
                 />
                 <p className="text-[11px] font-bold text-[#5c6e97]">
-                  차감은 현재 잔액과 선택 날짜 포인트를 초과할 수 없습니다.
+                  차감은 현재 잔액을 초과할 수 없습니다.
                 </p>
               </div>
             </div>

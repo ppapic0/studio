@@ -143,9 +143,10 @@ function getDailyPointEventLabel(event: Record<string, any>): string {
 }
 
 function normalizeDailyPointEventItems(value: unknown, maxTotal: number): DailyPointBreakdownItem[] {
-  if (!Array.isArray(value) || maxTotal <= 0) return [];
+  if (!Array.isArray(value)) return [];
 
-  let remaining = maxTotal;
+  const shouldCapToTotal = maxTotal > 0;
+  let remaining = Math.max(0, maxTotal);
   const seenKeys = new Set<string>();
   const items: DailyPointBreakdownItem[] = [];
   const eventEntries = value
@@ -162,7 +163,7 @@ function normalizeDailyPointEventItems(value: unknown, maxTotal: number): DailyP
     });
 
   eventEntries.forEach(({ event, index }) => {
-    if (!event || typeof event !== 'object' || remaining <= 0) return;
+    if (!event || typeof event !== 'object' || (shouldCapToTotal && remaining <= 0)) return;
 
     const points = getNormalizedRewardAmount((event as Record<string, any>).points);
     if (points <= 0) return;
@@ -185,7 +186,7 @@ function normalizeDailyPointEventItems(value: unknown, maxTotal: number): DailyP
       : (event as Record<string, any>).direction === 'add'
         ? 'add'
         : undefined;
-    const cappedPoints = Math.min(remaining, points);
+    const cappedPoints = shouldCapToTotal ? Math.min(remaining, points) : points;
     if (cappedPoints <= 0) return;
 
     items.push({
@@ -197,7 +198,9 @@ function normalizeDailyPointEventItems(value: unknown, maxTotal: number): DailyP
       ...(reason ? { reason } : {}),
       ...(direction ? { direction } : {}),
     });
-    remaining -= cappedPoints;
+    if (shouldCapToTotal) {
+      remaining -= cappedPoints;
+    }
   });
 
   return items;
@@ -509,13 +512,10 @@ export function getDailyAwardedPointTotal(dayStatus?: Record<string, any>): numb
   const total = Number(dayStatus?.dailyPointAmount);
   if (hasManualPointAdjustment(dayStatus)) {
     const manualDelta = getManualPointAdjustmentDelta(dayStatus);
-    const adjustedEarnedTotal = Math.max(0, earnedPointTotal + manualDelta);
-    const storedTotal = Number.isFinite(total) ? Math.max(0, Math.floor(total)) : 0;
-
-    if (!hasStoredDailyPointAmount) return adjustedEarnedTotal;
-    if (Math.abs(storedTotal - adjustedEarnedTotal) <= 1) return storedTotal;
-    if (earnedPointTotal > 0) return adjustedEarnedTotal;
-    return Math.max(0, storedTotal + manualDelta);
+    if (hasStoredDailyPointAmount && Number.isFinite(total)) {
+      return Math.floor(total);
+    }
+    return earnedPointTotal + manualDelta;
   }
 
   if (hasStoredDailyPointAmount && Number.isFinite(total)) {
@@ -581,9 +581,10 @@ function getStoredStudyBoxRewardTotal(dayStatus?: Record<string, any>): number {
 
 export function getDailyPointBreakdown(dayStatus?: Record<string, any>) {
   const totalPoints = getDailyAwardedPointTotal(dayStatus);
-  const rankPoints = Math.min(totalPoints, getRankRewardPoints(dayStatus));
-  const studyBoxPoints = Math.min(Math.max(0, totalPoints - rankPoints), getDailyStudyBoxAwardPoints(dayStatus));
-  const nonPrimaryPoints = Math.max(0, totalPoints - rankPoints - studyBoxPoints);
+  const positiveTotalPoints = Math.max(0, totalPoints);
+  const rankPoints = Math.min(positiveTotalPoints, getRankRewardPoints(dayStatus));
+  const studyBoxPoints = Math.min(Math.max(0, positiveTotalPoints - rankPoints), getDailyStudyBoxAwardPoints(dayStatus));
+  const nonPrimaryPoints = Math.max(0, positiveTotalPoints - rankPoints - studyBoxPoints);
   const pointItems = normalizeDailyPointEventItems(dayStatus?.pointEvents, totalPoints);
 
   if (pointItems.length > 0) {
