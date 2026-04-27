@@ -394,7 +394,14 @@ function getDailyAwardedPointTotal(dayStatus) {
     var _a;
     const dailyPointAmount = Math.max(0, Math.floor((_a = parseFiniteNumber(dayStatus.dailyPointAmount)) !== null && _a !== void 0 ? _a : 0));
     if (hasManualPointAdjustment(dayStatus)) {
-        return dailyPointAmount;
+        const legacyPointAmount = getLegacyDailyPointAwardTotal(dayStatus);
+        const manualDelta = getManualPointAdjustmentDelta(dayStatus);
+        const adjustedLegacyAmount = Math.max(0, legacyPointAmount + manualDelta);
+        if (Math.abs(dailyPointAmount - adjustedLegacyAmount) <= 1)
+            return dailyPointAmount;
+        if (legacyPointAmount > 0)
+            return adjustedLegacyAmount;
+        return Math.max(0, dailyPointAmount + manualDelta);
     }
     return Math.max(dailyPointAmount, getLegacyDailyPointAwardTotal(dayStatus));
 }
@@ -404,6 +411,24 @@ function hasManualPointAdjustment(dayStatus) {
     if (manualAdjustmentPoints !== 0)
         return true;
     return normalizeDailyPointEvents(dayStatus.pointEvents).some((entry) => { var _a; return entry.source === "manual_adjustment" && Math.round((_a = parseFiniteNumber(entry.deltaPoints)) !== null && _a !== void 0 ? _a : 0) !== 0; });
+}
+function getManualPointAdjustmentDelta(dayStatus) {
+    var _a;
+    const storedManualAdjustmentPoints = Math.round((_a = parseFiniteNumber(dayStatus.manualAdjustmentPoints)) !== null && _a !== void 0 ? _a : 0);
+    if (storedManualAdjustmentPoints !== 0)
+        return storedManualAdjustmentPoints;
+    return normalizeDailyPointEvents(dayStatus.pointEvents).reduce((sum, entry) => {
+        var _a, _b;
+        if (entry.source !== "manual_adjustment")
+            return sum;
+        const deltaPoints = Math.round((_a = parseFiniteNumber(entry.deltaPoints)) !== null && _a !== void 0 ? _a : 0);
+        if (deltaPoints !== 0)
+            return sum + deltaPoints;
+        const points = Math.max(0, Math.floor((_b = parseFiniteNumber(entry.points)) !== null && _b !== void 0 ? _b : 0));
+        if (points <= 0)
+            return sum;
+        return entry.direction === "subtract" ? sum - points : sum + points;
+    }, 0);
 }
 function getRankRewardAwardTotal(dayStatus) {
     var _a, _b, _c, _d;

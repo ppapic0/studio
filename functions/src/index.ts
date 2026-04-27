@@ -681,7 +681,13 @@ function getLegacyDailyPointAwardTotal(dayStatus: Record<string, unknown>): numb
 function getDailyAwardedPointTotal(dayStatus: Record<string, unknown>): number {
   const dailyPointAmount = Math.max(0, Math.floor(parseFiniteNumber(dayStatus.dailyPointAmount) ?? 0));
   if (hasManualPointAdjustment(dayStatus)) {
-    return dailyPointAmount;
+    const legacyPointAmount = getLegacyDailyPointAwardTotal(dayStatus);
+    const manualDelta = getManualPointAdjustmentDelta(dayStatus);
+    const adjustedLegacyAmount = Math.max(0, legacyPointAmount + manualDelta);
+
+    if (Math.abs(dailyPointAmount - adjustedLegacyAmount) <= 1) return dailyPointAmount;
+    if (legacyPointAmount > 0) return adjustedLegacyAmount;
+    return Math.max(0, dailyPointAmount + manualDelta);
   }
   return Math.max(dailyPointAmount, getLegacyDailyPointAwardTotal(dayStatus));
 }
@@ -692,6 +698,22 @@ function hasManualPointAdjustment(dayStatus: Record<string, unknown>): boolean {
   return normalizeDailyPointEvents(dayStatus.pointEvents).some((entry) =>
     entry.source === "manual_adjustment" && Math.round(parseFiniteNumber(entry.deltaPoints) ?? 0) !== 0
   );
+}
+
+function getManualPointAdjustmentDelta(dayStatus: Record<string, unknown>): number {
+  const storedManualAdjustmentPoints = Math.round(parseFiniteNumber(dayStatus.manualAdjustmentPoints) ?? 0);
+  if (storedManualAdjustmentPoints !== 0) return storedManualAdjustmentPoints;
+
+  return normalizeDailyPointEvents(dayStatus.pointEvents).reduce((sum, entry) => {
+    if (entry.source !== "manual_adjustment") return sum;
+
+    const deltaPoints = Math.round(parseFiniteNumber(entry.deltaPoints) ?? 0);
+    if (deltaPoints !== 0) return sum + deltaPoints;
+
+    const points = Math.max(0, Math.floor(parseFiniteNumber(entry.points) ?? 0));
+    if (points <= 0) return sum;
+    return entry.direction === "subtract" ? sum - points : sum + points;
+  }, 0);
 }
 
 function getRankRewardAwardTotal(dayStatus: Record<string, unknown>): number {

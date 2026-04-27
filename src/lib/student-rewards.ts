@@ -501,12 +501,19 @@ export function getDailyAwardedPointTotal(dayStatus?: Record<string, any>): numb
     Object.prototype.hasOwnProperty.call(dayStatus, 'dailyPointAmount')
   );
   const total = Number(dayStatus?.dailyPointAmount);
-  if (hasStoredDailyPointAmount && Number.isFinite(total)) {
-    return Math.max(0, Math.floor(total));
+  if (hasManualPointAdjustment(dayStatus)) {
+    const manualDelta = getManualPointAdjustmentDelta(dayStatus);
+    const adjustedEarnedTotal = Math.max(0, earnedPointTotal + manualDelta);
+    const storedTotal = Number.isFinite(total) ? Math.max(0, Math.floor(total)) : 0;
+
+    if (!hasStoredDailyPointAmount) return adjustedEarnedTotal;
+    if (Math.abs(storedTotal - adjustedEarnedTotal) <= 1) return storedTotal;
+    if (earnedPointTotal > 0) return adjustedEarnedTotal;
+    return Math.max(0, storedTotal + manualDelta);
   }
 
-  if (hasManualPointAdjustment(dayStatus)) {
-    return Math.max(0, earnedPointTotal + getManualPointAdjustmentDelta(dayStatus));
+  if (hasStoredDailyPointAmount && Number.isFinite(total)) {
+    return Math.max(0, Math.floor(total));
   }
 
   return earnedPointTotal;
