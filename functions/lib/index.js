@@ -7205,17 +7205,20 @@ async function applyAttendanceStatusTransition(params) {
         })
         : toMillisSafe(preflightSeatData.lastCheckInAt);
     let finalized = null;
-    if (preflightStatus === "studying" && nextStatus !== "studying" && preflightStartMs <= 0) {
+    const shouldAllowCheckoutWithoutSession = preflightStatus === "studying" &&
+        nextStatus === "absent" &&
+        (preflightStartMs <= 0 || nowMs <= preflightStartMs);
+    if (preflightStatus === "studying" && nextStatus !== "studying" && preflightStartMs <= 0 && !shouldAllowCheckoutWithoutSession) {
         throw new functions.https.HttpsError("failed-precondition", "Open study session start is missing.", {
             userMessage: "공부 시작 시간을 찾지 못해 외출 처리할 수 없습니다. 관리자에게 세션 보정을 요청해 주세요.",
         });
     }
-    if (preflightStatus === "studying" && nextStatus !== "studying" && nowMs <= preflightStartMs) {
+    if (preflightStatus === "studying" && nextStatus !== "studying" && nowMs <= preflightStartMs && !shouldAllowCheckoutWithoutSession) {
         throw new functions.https.HttpsError("failed-precondition", "Open study session start is not before transition time.", {
             userMessage: "공부 시작 시간이 현재 시간보다 늦어 외출 처리할 수 없습니다. 잠시 후 다시 시도해 주세요.",
         });
     }
-    if (preflightStatus === "studying" && nextStatus !== "studying") {
+    if (preflightStatus === "studying" && nextStatus !== "studying" && !shouldAllowCheckoutWithoutSession) {
         finalized = await finalizeStudySession({
             db,
             centerId,
@@ -7255,7 +7258,7 @@ async function applyAttendanceStatusTransition(params) {
                 bonus6hAchieved: (_g = finalized === null || finalized === void 0 ? void 0 : finalized.bonus6hAchieved) !== null && _g !== void 0 ? _g : false,
             };
         }
-        if (prevStatus === "studying" && nextStatus !== "studying" && !finalized) {
+        if (prevStatus === "studying" && nextStatus !== "studying" && !finalized && !shouldAllowCheckoutWithoutSession) {
             throw new functions.https.HttpsError("failed-precondition", "Open study session was not finalized.", {
                 userMessage: "진행 중인 공부 세션을 먼저 저장하지 못해 외출 처리할 수 없습니다. 다시 시도해 주세요.",
             });
@@ -7372,10 +7375,13 @@ async function applyAttendanceStatusTransition(params) {
         if (eventType === "check_out") {
             statPatch.checkOutAt = nowTs;
             statPatch.hasCheckOutRecord = true;
+            if (shouldAllowCheckoutWithoutSession) {
+                statPatch.checkoutSessionMissing = true;
+            }
         }
         transaction.set(statRef, statPatch, { merge: true });
         if (eventType && eventRef) {
-            transaction.set(eventRef, Object.assign({ studentId, dateKey: attendanceDateKey, eventType, occurredAt: nowTs, createdAt: admin.firestore.FieldValue.serverTimestamp(), source: params.source, seatId: seatDoc.id, statusBefore: prevStatus, statusAfter: nextStatus }, (params.actorUid ? { actorUid: params.actorUid } : {})));
+            transaction.set(eventRef, Object.assign(Object.assign({ studentId, dateKey: attendanceDateKey, eventType, occurredAt: nowTs, createdAt: admin.firestore.FieldValue.serverTimestamp(), source: params.source, seatId: seatDoc.id, statusBefore: prevStatus, statusAfter: nextStatus }, (shouldAllowCheckoutWithoutSession ? { sessionFinalizeSkipped: true, sessionFinalizeSkipReason: "missing_open_session_start" } : {})), (params.actorUid ? { actorUid: params.actorUid } : {})));
         }
         if (eventType === "check_in" && progressSnap) {
             const progressData = progressSnap.exists ? (progressSnap.data() || {}) : {};

@@ -49,6 +49,23 @@ type KioskSuccessFeedback = {
   iconClass: string;
 };
 
+const getKioskErrorMessage = (error: unknown) => {
+  const raw = error as {
+    message?: unknown;
+    details?: unknown;
+    customData?: unknown;
+  };
+  const detailSources = [raw.details, raw.customData];
+  for (const source of detailSources) {
+    if (source && typeof source === 'object') {
+      const userMessage = (source as Record<string, unknown>).userMessage;
+      if (typeof userMessage === 'string' && userMessage.trim()) return userMessage.trim();
+    }
+  }
+  if (typeof raw.message === 'string' && raw.message.trim()) return raw.message.trim();
+  return '잠시 후 다시 시도해 주세요. 문제가 계속되면 관리자에게 알려주세요.';
+};
+
 const getKioskActionKey = (
   prevStatus: AttendanceCurrent['status'] | undefined,
   nextStatus: AttendanceCurrent['status']
@@ -230,7 +247,7 @@ export default function KioskPage() {
     }
 
     const prevStatus = seat.status;
-    if (prevStatus === nextStatus) {
+    if (prevStatus === nextStatus && nextStatus !== 'absent') {
       toast({ title: "이미 해당 상태입니다." });
       resetKiosk();
       return;
@@ -275,7 +292,11 @@ export default function KioskPage() {
       resetKiosk();
     } catch (e) {
       console.error(e);
-      toast({ variant: "destructive", title: "처리 실패" });
+      toast({
+        variant: "destructive",
+        title: "처리 실패",
+        description: getKioskErrorMessage(e),
+      });
     } finally {
       setIsProcessing(false);
     }
@@ -342,16 +363,16 @@ export default function KioskPage() {
         <div className="bg-primary p-5 rounded-[2.5rem] shadow-inner mb-4 animate-in zoom-in duration-700">
           <MonitorSmartphone className="h-12 w-12 text-white" />
         </div>
-        <h1 className="text-5xl font-black tracking-tighter text-primary">스마트 출입 키오스크</h1>
-        <p className="text-sm font-bold text-muted-foreground uppercase tracking-[0.4em] opacity-40">Number Pad Attendance Check-In</p>
+        <h1 className="text-5xl font-black tracking-tighter text-primary">출결 키오스크</h1>
+        <p className="text-base font-black text-muted-foreground">번호 입력 후 학생 상태 버튼 하나만 눌러주세요.</p>
       </header>
 
       <div className="w-full max-w-3xl relative z-10">
         {!showResults ? (
           <Card className="rounded-[4rem] border-none shadow-[0_50px_100px_-20px_rgba(0,0,0,0.15)] bg-white overflow-hidden ring-1 ring-black/5 animate-in slide-in-from-bottom-8 duration-700">
             <CardHeader className="bg-muted/5 border-b p-12 text-center">
-              <CardTitle className="text-3xl font-black tracking-tighter">번호 6자리를 입력하세요</CardTitle>
-              <CardDescription className="font-bold pt-3 text-base">출입 확인용 번호를 누르면 학생 정보를 바로 찾습니다.</CardDescription>
+              <CardTitle className="text-3xl font-black tracking-tighter">번호 6자리 입력</CardTitle>
+              <CardDescription className="font-bold pt-3 text-base">학생을 찾은 뒤 등원, 외출, 복귀, 퇴실 중 하나를 누릅니다.</CardDescription>
             </CardHeader>
             <CardContent className="relative p-12 space-y-12">
               {isSearching && (
@@ -457,17 +478,17 @@ export default function KioskPage() {
                       </Button>
 
                       <Button 
-                        disabled={isProcessing || seat?.status === 'absent'}
+                        disabled={isProcessing}
                         onClick={() => handleStatusUpdate(student, 'absent')}
                         className={cn(
                           "h-48 rounded-[2.5rem] font-black flex flex-col gap-4 shadow-xl transition-all active:scale-95",
-                          seat?.status === 'absent' ? "bg-muted text-muted-foreground opacity-40" : "bg-rose-500 hover:bg-rose-600 text-white shadow-rose-200"
+                          seat?.status === 'absent' ? "bg-rose-100 text-rose-700 shadow-rose-100" : "bg-rose-500 hover:bg-rose-600 text-white shadow-rose-200"
                         )}
                       >
                         <LogOut className="h-12 w-12" />
                         <div className="grid">
                           <span className="text-2xl">퇴실</span>
-                          <span className="text-[10px] opacity-60 uppercase tracking-widest">Check Out</span>
+                          <span className="text-[11px] opacity-75">퇴실 기록 남기기</span>
                         </div>
                       </Button>
                     </div>
