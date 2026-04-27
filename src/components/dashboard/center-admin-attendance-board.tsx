@@ -294,9 +294,7 @@ export function CenterAdminAttendanceBoard({
                   const latestAwayEndLabel = signal?.latestAwayEndLabel || null;
                   const actualCheckOutLabel = signal?.lastCheckOutLabel || null;
                   const plannedDepartureTimeLabel = signal?.plannedDepartureTime && !isNoAttendanceDay
-                    ? signal.routineExpectedArrivalTime
-                      ? `${signal.routineExpectedArrivalTime}~${signal.plannedDepartureTime}`
-                      : signal.plannedDepartureTime
+                    ? signal.plannedDepartureTime
                     : null;
                   const seatTimeChips = [
                     firstCheckInTimeLabel
@@ -330,7 +328,7 @@ export function CenterAdminAttendanceBoard({
                     plannedDepartureTimeLabel
                       ? {
                           key: 'plannedDeparture',
-                          label: `예정 ${plannedDepartureTimeLabel}`,
+                          label: `하원 ${plannedDepartureTimeLabel}`,
                           className: 'border-[#FFD0A6] bg-[#FFF1E2] text-[#C95A08]',
                         }
                       : null,
@@ -351,10 +349,12 @@ export function CenterAdminAttendanceBoard({
                   const attendanceTimeLabel = signal
                     ? isNoAttendanceDay
                       ? '미등원'
-                      : signal.boardStatus === 'checked_out'
-                      ? signal.wasLateToday
-                        ? '퇴실 · 지각'
-                        : '퇴실'
+                    : signal.boardStatus === 'checked_out'
+                      ? actualCheckOutLabel
+                        ? `퇴실 ${actualCheckOutLabel}`
+                        : signal.wasLateToday
+                          ? '퇴실 · 지각'
+                          : '퇴실'
                       : signal.attendanceDisplayStatus === 'confirmed_late' && signal.checkedAtLabel
                       ? `지각 ${signal.checkedAtLabel}`
                       : signal.checkedAtLabel
