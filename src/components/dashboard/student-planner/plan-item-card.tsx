@@ -19,6 +19,7 @@ type PlanItemCardProps = {
   onEdit?: () => void;
   isEditing?: boolean;
   disabled?: boolean;
+  completionDisabled?: boolean;
   isMobile: boolean;
   tone: 'emerald' | 'amber' | 'slate';
   badgeLabel?: string | null;
@@ -60,6 +61,7 @@ export function PlanItemCard({
   onEdit,
   isEditing = false,
   disabled = false,
+  completionDisabled = false,
   isMobile,
   tone,
   badgeLabel,
@@ -70,6 +72,8 @@ export function PlanItemCard({
   const toneValue = toneMap[tone];
   const [draftAmount, setDraftAmount] = useState(volumeMeta ? String(volumeMeta.actualAmount || 0) : '');
   const [isActualPanelOpen, setIsActualPanelOpen] = useState(false);
+  const isCompletionControlDisabled = disabled || (completionDisabled && !checked);
+  const canRecordActual = !disabled && !completionDisabled;
 
   useEffect(() => {
     if (volumeMeta) {
@@ -84,7 +88,7 @@ export function PlanItemCard({
   }, [volumeMeta]);
 
   const commitAmount = (nextValue: number) => {
-    if (!volumeMeta || disabled) return;
+    if (!volumeMeta || !canRecordActual) return;
     const safeValue = Number.isFinite(nextValue) ? Math.max(0, Math.round(nextValue)) : 0;
     setDraftAmount(String(safeValue));
     volumeMeta.onCommitActual(safeValue);
@@ -108,7 +112,7 @@ export function PlanItemCard({
           id={id}
           checked={checked}
           onCheckedChange={onToggle}
-          disabled={disabled}
+          disabled={isCompletionControlDisabled}
           className={cn('mt-1 rounded-xl border-2', compact ? 'h-5 w-5' : 'h-6 w-6')}
         />
 
@@ -169,7 +173,7 @@ export function PlanItemCard({
                   {isMobile ? <span className="sr-only">수정</span> : '수정'}
                 </Button>
               ) : null}
-              {volumeMeta && !disabled ? (
+              {volumeMeta && canRecordActual ? (
                 <Button
                   type="button"
                   variant="ghost"
@@ -219,7 +223,7 @@ export function PlanItemCard({
                 </span>
               </div>
 
-              {isActualPanelOpen && !disabled ? (
+              {isActualPanelOpen && canRecordActual ? (
                 <div className="mt-3 space-y-2">
                   <div className="flex flex-wrap gap-2">
                     <Button

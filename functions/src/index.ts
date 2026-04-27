@@ -10505,6 +10505,11 @@ export const claimPlannerCompletionRewardSecure = functions.region(region).https
       userMessage: "계획 날짜 정보가 올바르지 않습니다.",
     });
   }
+  if (dateKey !== toDateKey(toKstDate())) {
+    throw new functions.https.HttpsError("failed-precondition", "Planner rewards can only be claimed for today.", {
+      userMessage: "계획 완료 포인트는 해당 날짜 당일에만 적립할 수 있습니다.",
+    });
+  }
   if (!taskId) {
     throw new functions.https.HttpsError("invalid-argument", "taskId is required.", {
       userMessage: "완료한 계획 정보를 다시 확인해 주세요.",

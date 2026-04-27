@@ -45,6 +45,7 @@ type StudyPlanSheetProps = {
   isMobile: boolean;
   isSubmitting: boolean;
   isPast: boolean;
+  canCompleteTasks?: boolean;
   completedCount: number;
   subjectOptions: SubjectOption[];
   subjectValue: string;
@@ -166,6 +167,7 @@ export function StudyPlanSheet({
   isMobile,
   isSubmitting,
   isPast,
+  canCompleteTasks = true,
   completedCount,
   subjectOptions,
   subjectValue,
@@ -654,6 +656,7 @@ export function StudyPlanSheet({
                             onEdit={onUpdateStudyTask ? () => openStudyTaskEdit(task) : undefined}
                             isEditing={editDraft?.kind === 'study' && editDraft.id === task.id}
                             disabled={isPast}
+                            completionDisabled={!canCompleteTasks}
                             isMobile={isMobile}
                             tone="emerald"
                             badgeLabel={task.subject === 'etc' ? task.subjectLabel?.trim() || subject?.label || '직접 입력' : subject?.label || '직접 입력'}
@@ -749,6 +752,7 @@ export function StudyPlanSheet({
                               onEdit={onUpdatePersonalTask ? () => openPersonalTaskEdit(task) : undefined}
                               isEditing={editDraft?.kind === 'personal' && editDraft.id === task.id}
                               disabled={isPast}
+                              completionDisabled={!canCompleteTasks}
                               isMobile={isMobile}
                               tone="amber"
                               badgeLabel="기타 일정"

@@ -906,6 +906,7 @@ export default function StudyPlanPage() {
 
   const isPast = selectedDate ? isBefore(startOfDay(selectedDate), startOfDay(new Date())) : false;
   const isToday = selectedDate ? isSameDay(selectedDate, new Date()) : false;
+  const canCompleteSelectedDate = isToday;
 
   const weekDays = useMemo(() => {
     if (!selectedDate) return [];
@@ -3581,6 +3582,15 @@ export default function StudyPlanPage() {
     const itemRef = doc(firestore, 'centers', activeMembership.id, 'plans', studentUid, 'weeks', weekKey, 'items', item.id);
     const nextState = !item.done;
 
+    if (nextState && !canCompleteSelectedDate) {
+      toast({
+        variant: 'destructive',
+        title: '계획 완수는 당일에만 가능해요',
+        description: '미래 날짜 계획은 미리 작성할 수 있지만, 완료 체크와 포인트 적립은 해당 날짜가 된 뒤에만 열립니다.',
+      });
+      return;
+    }
+
     if (resolveStudyPlanMode(item) === 'volume') {
       if (!nextState) {
         await updateDoc(itemRef, {
@@ -3625,6 +3635,17 @@ export default function StudyPlanPage() {
       !weekKey ||
       !selectedDateKey
     ) {
+      return;
+    }
+
+    if (!canCompleteSelectedDate) {
+      toast({
+        variant: 'destructive',
+        title: '계획 완수는 당일에만 가능해요',
+        description: '미래 날짜 계획은 해당 날짜가 된 뒤에 완료 처리할 수 있습니다.',
+      });
+      setIsCompletionDialogOpen(false);
+      setCompletionReviewItem(null);
       return;
     }
 
@@ -3747,6 +3768,7 @@ export default function StudyPlanPage() {
   }, [
     activeMembership,
     awardPlannerCompletionPoints,
+    canCompleteSelectedDate,
     completionActualDurationDraft,
     completionMarkedDone,
     completionPercentDraft,
@@ -3762,6 +3784,14 @@ export default function StudyPlanPage() {
 
   const handleCommitStudyActualAmount = async (item: WithId<StudyPlanItem>, nextActualAmount: number) => {
     if (isPast || !firestore || !user || !activeMembership || !studentUid || !isStudent || !weekKey) return;
+    if (!canCompleteSelectedDate) {
+      toast({
+        variant: 'destructive',
+        title: '실제 기록은 당일에만 가능해요',
+        description: '미래 날짜 계획은 미리 작성만 가능하고, 실제 분량 기록은 해당 날짜에 입력해 주세요.',
+      });
+      return;
+    }
     const itemRef = doc(firestore, 'centers', activeMembership.id, 'plans', studentUid, 'weeks', weekKey, 'items', item.id);
     const safeActualAmount = Math.max(0, Math.round(nextActualAmount));
     const targetAmount = Math.max(0, item.targetAmount || 0);
@@ -4296,9 +4326,9 @@ export default function StudyPlanPage() {
                             isMobile ? "h-9 text-[11px]" : "h-10 text-xs"
                           )}
                           onClick={() => void handleToggleTask(task as WithId<StudyPlanItem>)}
-                          disabled={isPast}
+                          disabled={isPast || (!canCompleteSelectedDate && !task.done)}
                         >
-                          {task.done ? '완료됨' : '완료'}
+                          {task.done ? '완료됨' : canCompleteSelectedDate ? '완료' : '당일만'}
                         </Button>
                       </div>
                     );
@@ -4993,6 +5023,7 @@ export default function StudyPlanPage() {
         isMobile={isMobile}
         isSubmitting={isSubmitting}
         isPast={isPast}
+        canCompleteTasks={canCompleteSelectedDate}
         completedCount={completedStudyCount}
         subjectOptions={planSubjectOptions}
         subjectValue={newStudySubject}

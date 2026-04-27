@@ -972,8 +972,9 @@ export function PlannerMainView({ model }: PlannerMainViewProps) {
                           <button
                             type="button"
                             onClick={() => handleToggleTask(task)}
+                            disabled={!isToday && !isDone}
                             className={cn(
-                              'flex h-7 w-7 shrink-0 items-center justify-center rounded-full border text-xs font-black transition',
+                              'flex h-7 w-7 shrink-0 items-center justify-center rounded-full border text-xs font-black transition disabled:cursor-not-allowed disabled:opacity-45',
                               isDone ? 'border-emerald-300/40 bg-emerald-400/20 text-emerald-100' : 'border-white/16 bg-white/10 text-white'
                             )}
                           >
@@ -1040,7 +1041,8 @@ export function PlannerMainView({ model }: PlannerMainViewProps) {
                                     key={value}
                                     type="button"
                                     onClick={() => handleCommitStudyActualAmount(task, value)}
-                                    className="rounded-full border border-white/12 bg-white/[0.1] px-3 py-2 text-[11px] font-black text-white transition hover:bg-white/[0.14]"
+                                    disabled={!isToday}
+                                    className="rounded-full border border-white/12 bg-white/[0.1] px-3 py-2 text-[11px] font-black text-white transition hover:bg-white/[0.14] disabled:cursor-not-allowed disabled:opacity-45"
                                   >
                                     +{value}
                                   </button>
@@ -1053,9 +1055,10 @@ export function PlannerMainView({ model }: PlannerMainViewProps) {
                                 <button
                                   type="button"
                                   onClick={() => handleToggleTask(task)}
-                                  className="rounded-full bg-[linear-gradient(135deg,var(--student-night-panel)_0%,var(--student-night-panel-soft)_55%,var(--accent-orange)_170%)] px-4 py-2 text-[11px] font-black text-white"
+                                  disabled={!isToday}
+                                  className="rounded-full bg-[linear-gradient(135deg,var(--student-night-panel)_0%,var(--student-night-panel-soft)_55%,var(--accent-orange)_170%)] px-4 py-2 text-[11px] font-black text-white disabled:cursor-not-allowed disabled:opacity-45"
                                 >
-                                  완료
+                                  {isToday ? '완료' : '당일만'}
                                 </button>
                               ) : null}
                               <button
@@ -1551,6 +1554,7 @@ export function PlannerMainView({ model }: PlannerMainViewProps) {
         isMobile={isMobile}
         isSubmitting={isSubmitting}
         isPast={isPast}
+        canCompleteTasks={isToday}
         completedCount={completedStudyCount}
         subjectOptions={quickSubjectOptions}
         subjectValue={newStudySubject}

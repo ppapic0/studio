@@ -55,6 +55,17 @@ function parseFiniteNumber(value: unknown): number | null {
   return null;
 }
 
+function getKstTodayDateKey(baseDate: Date = new Date()): string {
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Asia/Seoul',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).formatToParts(baseDate);
+  const values = Object.fromEntries(parts.map((part) => [part.type, part.value]));
+  return `${values.year}-${values.month}-${values.day}`;
+}
+
 function normalizePlannerCompletionRewardTaskIds(value: unknown): string[] {
   if (!Array.isArray(value)) return [];
   return Array.from(
@@ -233,6 +244,9 @@ export async function claimPlannerCompletionRewardWithFallback(
   input: ClaimPlannerCompletionRewardWithFallbackInput
 ): Promise<ClaimPlannerCompletionRewardSecureResult> {
   if (!isPlannerCompletionRewardEligibleCategory(input.category)) {
+    return buildIneligibleResult();
+  }
+  if (input.dateKey !== getKstTodayDateKey()) {
     return buildIneligibleResult();
   }
 
