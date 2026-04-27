@@ -6977,13 +6977,6 @@ async function resolveAttendanceSeatDocForTransition(params) {
     const seatId = asTrimmedString(params.seatId);
     if (seatId) {
         const directSnap = await db.doc(`centers/${centerId}/attendanceCurrent/${seatId}`).get();
-        if (directSnap.exists) {
-            const directData = directSnap.data();
-            const directStudentId = asTrimmedString(directData.studentId);
-            if (!directStudentId || directStudentId === studentId) {
-                return directSnap;
-            }
-        }
         const seatSnap = await db
             .collection(`centers/${centerId}/attendanceCurrent`)
             .where("studentId", "==", studentId)
@@ -6991,7 +6984,27 @@ async function resolveAttendanceSeatDocForTransition(params) {
             .get();
         const existingStudentSeatDoc = pickPreferredAttendanceSeatDoc(seatSnap.docs);
         if (existingStudentSeatDoc) {
-            return existingStudentSeatDoc;
+            const directData = directSnap.exists ? directSnap.data() : {};
+            const directStudentId = asTrimmedString(directData.studentId);
+            const directStatus = normalizeAttendanceSeatStatus(directData.status);
+            const preferredStatus = normalizeAttendanceSeatStatus(existingStudentSeatDoc.data().status);
+            const directMatchesStudent = directSnap.exists && directStudentId === studentId;
+            const directIsPreferred = directSnap.exists && existingStudentSeatDoc.id === directSnap.id;
+            const directIsEmptyTarget = directSnap.exists && !directStudentId;
+            const shouldUseExistingStudentSeat = directIsPreferred ||
+                !directSnap.exists ||
+                !directMatchesStudent ||
+                getAttendanceActivityRank(preferredStatus) <= getAttendanceActivityRank(directStatus);
+            if (shouldUseExistingStudentSeat && !directIsEmptyTarget) {
+                return existingStudentSeatDoc;
+            }
+        }
+        if (directSnap.exists) {
+            const directData = directSnap.data();
+            const directStudentId = asTrimmedString(directData.studentId);
+            if (!directStudentId || directStudentId === studentId) {
+                return directSnap;
+            }
         }
         if (!directSnap.exists) {
             return directSnap;
@@ -7155,6 +7168,14 @@ async function applyAttendanceStatusTransition(params) {
         });
     }
     const preflightStatus = normalizeAttendanceSeatStatus(preflightSeatData.status);
+    if ((nextStatus === "away" || nextStatus === "break") &&
+        preflightStatus !== "studying" &&
+        preflightStatus !== "away" &&
+        preflightStatus !== "break") {
+        throw new functions.https.HttpsError("failed-precondition", "Only active study seats can move away.", {
+            userMessage: "입실 중인 학생만 외출 처리할 수 있습니다. 좌석 상태를 새로고침한 뒤 다시 확인해 주세요.",
+        });
+    }
     const preflightStartMs = preflightStatus === "studying" && nextStatus !== "studying"
         ? await resolveOpenStudyStartMsFromAttendanceEvidence({
             db,
@@ -7219,6 +7240,14 @@ async function applyAttendanceStatusTransition(params) {
         if (prevStatus === "studying" && nextStatus !== "studying" && !finalized) {
             throw new functions.https.HttpsError("failed-precondition", "Open study session was not finalized.", {
                 userMessage: "진행 중인 공부 세션을 먼저 저장하지 못해 외출 처리할 수 없습니다. 다시 시도해 주세요.",
+            });
+        }
+        if ((nextStatus === "away" || nextStatus === "break") &&
+            prevStatus !== "studying" &&
+            prevStatus !== "away" &&
+            prevStatus !== "break") {
+            throw new functions.https.HttpsError("failed-precondition", "Only active study seats can move away.", {
+                userMessage: "입실 중인 학생만 외출 처리할 수 있습니다. 좌석 상태를 새로고침한 뒤 다시 확인해 주세요.",
             });
         }
         if (prevStatus === nextStatus) {

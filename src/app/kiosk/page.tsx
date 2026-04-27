@@ -56,8 +56,29 @@ export default function KioskPage() {
   }, [firestore, centerId]);
   const { data: attendanceList } = useCollection<AttendanceCurrent>(attendanceQuery);
 
+  const getSeatActivityRank = (status?: AttendanceCurrent['status']) => {
+    if (status === 'studying') return 0;
+    if (status === 'away' || status === 'break') return 1;
+    if (status === 'absent') return 3;
+    return 2;
+  };
+
+  const pickPreferredSeatForKiosk = (seats: AttendanceCurrent[]) => {
+    return seats
+      .slice()
+      .sort((left, right) => {
+        const rankDiff = getSeatActivityRank(left.status) - getSeatActivityRank(right.status);
+        if (rankDiff !== 0) return rankDiff;
+        const leftTime = left.lastCheckInAt?.toMillis?.() || left.updatedAt?.toMillis?.() || 0;
+        const rightTime = right.lastCheckInAt?.toMillis?.() || right.updatedAt?.toMillis?.() || 0;
+        return rightTime - leftTime;
+      })[0] || null;
+  };
+
   const resolveSeatForStudent = (student: StudentProfile) => {
-    const liveSeat = attendanceList?.find((attendance) => attendance.studentId === student.id);
+    const liveSeat = pickPreferredSeatForKiosk(
+      (attendanceList || []).filter((attendance) => attendance.studentId === student.id)
+    );
     if (liveSeat) return liveSeat;
 
     const identity = resolveSeatIdentity(student);
