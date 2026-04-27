@@ -44,6 +44,7 @@ import {
   LineChart,
   Line,
   Bar,
+  Cell,
   CartesianGrid,
   XAxis,
   YAxis,
@@ -3634,6 +3635,119 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
       consistencyStat,
     };
   }, [selectedFocusStudent, focusStudentTrend, selectedFocusStat, selectedFocusProgress]);
+
+  const focusCounselingTrendData = useMemo(
+    () =>
+      focusStudentTrend.map((day) => ({
+        ...day,
+        studyHours: Number(((day.minutes || 0) / 60).toFixed(1)),
+      })),
+    [focusStudentTrend]
+  );
+  const hasFocusCounselingTrendData = focusCounselingTrendData.some(
+    (day) => (day.minutes ?? 0) > 0 || (day.score ?? 0) > 0 || (day.completion ?? 0) > 0
+  );
+
+  const selectedFocusCounselingLens = useMemo(() => {
+    if (!selectedFocusStudent || !selectedFocusKpi) return null;
+
+    const penaltyPoints = Math.max(0, selectedFocusProgress?.penaltyPoints || 0);
+    const completionRate = clampScore(selectedFocusPlanSummary.todayRate || selectedFocusStudent.completion || 0);
+    const focusRisk = clampScore(100 - selectedFocusStudent.score);
+    const planRisk = clampScore(100 - completionRate);
+    const studyRisk = clampScore(100 - (selectedFocusEffectiveTodayStudyMinutes / 180) * 100);
+    const growthRisk = todayLearningGrowthPercent < 0
+      ? clampScore(Math.abs(todayLearningGrowthPercent) * 1.4)
+      : clampScore(Math.max(0, 35 - todayLearningGrowthPercent) * 0.35);
+    const rhythmRisk = averageRhythmScore > 0 ? clampScore(100 - averageRhythmScore) : 28;
+    const recentAwayMinutes = Math.round(
+      awayTimeData.slice(-7).reduce((sum, day) => sum + (day.awayMinutes || 0), 0) / Math.max(1, Math.min(7, awayTimeData.length))
+    );
+    const awayRisk = clampScore((recentAwayMinutes / 60) * 100);
+    const penaltyRisk = clampScore((penaltyPoints / 10) * 100);
+
+    const factorData = [
+      { label: '집중', risk: Math.round(focusRisk), value: `${selectedFocusStudent.score}점`, fill: '#2554D7' },
+      { label: '계획', risk: Math.round(planRisk), value: `${completionRate}%`, fill: '#10B981' },
+      { label: '학습량', risk: Math.round(studyRisk), value: `${Math.floor(selectedFocusEffectiveTodayStudyMinutes / 60)}h ${selectedFocusEffectiveTodayStudyMinutes % 60}m`, fill: '#0EA5E9' },
+      { label: '성장', risk: Math.round(growthRisk), value: `${todayLearningGrowthPercent >= 0 ? '+' : ''}${todayLearningGrowthPercent}%`, fill: '#FF7A16' },
+      { label: '리듬', risk: Math.round(rhythmRisk), value: averageRhythmScore > 0 ? `${averageRhythmScore}점` : '수집중', fill: '#8B5CF6' },
+      { label: '외출', risk: Math.round(awayRisk), value: `${recentAwayMinutes}분`, fill: '#F59E0B' },
+      { label: '벌점', risk: Math.round(penaltyRisk), value: `${penaltyPoints}점`, fill: '#F43F5E' },
+    ];
+
+    const interventionScore = Math.round(
+      focusRisk * 0.22
+      + planRisk * 0.18
+      + studyRisk * 0.16
+      + growthRisk * 0.14
+      + rhythmRisk * 0.12
+      + awayRisk * 0.08
+      + penaltyRisk * 0.1
+    );
+
+    const priority = interventionScore >= 65
+      ? {
+          label: '오늘 면담',
+          badgeClass: 'bg-rose-500 text-white border-none',
+          ringClass: 'border-rose-200 bg-rose-50 text-rose-700',
+          summary: '오늘 바로 짧은 체크인이 필요합니다. 원인을 좁히고 오늘 남은 블록을 다시 잡아주세요.',
+        }
+      : interventionScore >= 40
+        ? {
+            label: '이번 주 관찰',
+            badgeClass: 'bg-[#FF7A16] text-white border-none',
+            ringClass: 'border-[#FFD7BA] bg-[#FFF8F2] text-[#C95A08]',
+            summary: '흐름이 흔들릴 수 있는 구간입니다. 계획 수와 시작 루틴을 가볍게 보정하면 좋습니다.',
+          }
+        : {
+            label: '유지·강화',
+            badgeClass: 'bg-emerald-500 text-white border-none',
+            ringClass: 'border-emerald-200 bg-emerald-50 text-emerald-700',
+            summary: '현재 흐름은 안정적입니다. 잘 되는 패턴을 칭찬하고 다음 목표만 살짝 올려주세요.',
+          };
+
+    const actionItems = [
+      focusRisk >= 35 ? '첫 60분 집중 환경과 휴대폰·자리 변수를 확인' : '',
+      planRisk >= 35 ? '오늘/내일 계획을 3~4개 핵심 과제로 줄여 성공률 확보' : '',
+      studyRisk >= 45 ? '등원 직후 90분짜리 고정 학습 블록을 먼저 배치' : '',
+      growthRisk >= 35 ? '최근 하락 원인을 과목·컨디션·등원시간 중 하나로 좁히기' : '',
+      rhythmRisk >= 35 ? '등원 후 시작 루틴을 10분 단위로 고정' : '',
+      awayRisk >= 35 ? '외출 전후 복귀 시간과 재시작 과제를 같이 지정' : '',
+      penaltyRisk >= 40 ? '벌점 사유를 학생과 재확인하고 오늘 지킬 규칙 1개만 합의' : '',
+    ].filter(Boolean);
+
+    const counselingQuestions = [
+      selectedFocusKpi.trendDirection === 'down'
+        ? '최근 3일 중 가장 집중이 안 된 날에 무엇이 달랐는지 물어보기'
+        : '최근 공부가 가장 잘 된 날의 조건을 학생이 직접 말하게 하기',
+      planRisk >= 35
+        ? '계획이 밀리는 이유가 양, 난이도, 시작 지연 중 무엇인지 확인하기'
+        : '오늘 완료한 계획 중 다음에도 반복할 수 있는 방식을 정리하기',
+      awayRisk >= 35
+        ? '외출 후 돌아와서 바로 시작하지 못하는 지점이 있는지 확인하기'
+        : '쉬는 시간과 공부 재시작 신호를 학생이 알고 있는지 확인하기',
+    ];
+
+    return {
+      factorData,
+      interventionScore,
+      priority,
+      actionItems: actionItems.length > 0 ? actionItems.slice(0, 4) : ['현재 루틴을 유지하고 다음 목표만 1단계 올려보기'],
+      counselingQuestions,
+      recentAwayMinutes,
+      headline: `${priority.label} · 개입 필요도 ${interventionScore}점`,
+    };
+  }, [
+    averageRhythmScore,
+    awayTimeData,
+    selectedFocusEffectiveTodayStudyMinutes,
+    selectedFocusKpi,
+    selectedFocusPlanSummary.todayRate,
+    selectedFocusProgress?.penaltyPoints,
+    selectedFocusStudent,
+    todayLearningGrowthPercent,
+  ]);
 
   const urgentInterventionStudents = useMemo(() => {
     return [...(heatmapInterventionSignals || [])]
@@ -9426,7 +9540,7 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
           }
         }}
       >
-        <DialogContent motionPreset="dashboard-premium" className={cn(studioDialogContentClassName, 'max-h-[92vh] flex flex-col sm:max-w-4xl')}>
+        <DialogContent motionPreset="dashboard-premium" className={cn(studioDialogContentClassName, 'max-h-[92vh] flex flex-col sm:max-w-5xl xl:max-w-6xl')}>
 
           <div className={cn(studioDialogHeaderClassName, 'flex-shrink-0')}>
             <DialogHeader className="space-y-4 text-left">
@@ -9481,12 +9595,111 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
                   </p>
                 </div>
               </div>
+              {selectedFocusCounselingLens ? (
+                <div className="rounded-[1.6rem] border border-white/12 bg-white/12 p-4 shadow-[0_18px_36px_-30px_rgba(0,0,0,0.35)]">
+                  <div className="flex flex-wrap items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <Badge className={cn('h-7 rounded-full px-3 text-[10px] font-black', selectedFocusCounselingLens.priority.badgeClass)}>
+                          {selectedFocusCounselingLens.headline}
+                        </Badge>
+                        <Badge className="h-7 rounded-full border border-white/16 bg-white/10 px-3 text-[10px] font-black text-white">
+                          상담 자료 모드
+                        </Badge>
+                      </div>
+                      <p className="mt-3 text-sm font-bold leading-6 text-white/82">
+                        {selectedFocusCounselingLens.priority.summary}
+                      </p>
+                    </div>
+                    <div className="shrink-0 rounded-[1.25rem] border border-white/12 bg-white/10 px-4 py-3 text-right">
+                      <p className="text-[10px] font-black uppercase tracking-[0.14em] text-white/60">개입 필요도</p>
+                      <p className="dashboard-number mt-1 text-[1.7rem] text-white">{selectedFocusCounselingLens.interventionScore}</p>
+                    </div>
+                  </div>
+                </div>
+              ) : null}
             </DialogHeader>
           </div>
 
           {/* ── SCROLLABLE BODY ── */}
           <div className="flex-1 overflow-y-auto bg-[linear-gradient(180deg,#F7FAFF_0%,#EEF4FF_100%)]">
             <div className="bg-transparent p-5 space-y-5">
+
+              {selectedFocusCounselingLens ? (
+                <div className="grid gap-4 lg:grid-cols-[1.12fr_0.88fr]">
+                  <div className="rounded-[1.8rem] border border-[#DCE7FF] bg-white p-4 shadow-[0_20px_38px_-30px_rgba(20,41,95,0.22)]">
+                    <div className="flex flex-wrap items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-2">
+                          <span className="inline-flex h-10 w-10 items-center justify-center rounded-[1.1rem] bg-[#14295F] text-white">
+                            <HeartHandshake className="h-4 w-4" />
+                          </span>
+                          <div>
+                            <p className={studioSectionEyebrowClassName}>상담 브리핑</p>
+                            <p className="mt-1 text-lg font-black tracking-tight text-[#14295F]">
+                              오늘 어디에 개입할지 먼저 봅니다
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                      <Badge className={cn('h-8 rounded-full px-3 text-[11px] font-black', selectedFocusCounselingLens.priority.badgeClass)}>
+                        {selectedFocusCounselingLens.priority.label}
+                      </Badge>
+                    </div>
+
+                    <div className="mt-4 grid gap-3 sm:grid-cols-[0.72fr_1.28fr]">
+                      <div className={cn('rounded-[1.35rem] border p-4', selectedFocusCounselingLens.priority.ringClass)}>
+                        <p className="text-[10px] font-black uppercase tracking-[0.14em] opacity-75">개입 필요도</p>
+                        <p className="dashboard-number mt-2 text-[2.35rem] leading-none">{selectedFocusCounselingLens.interventionScore}</p>
+                        <p className="mt-3 text-xs font-black leading-5">{selectedFocusCounselingLens.priority.summary}</p>
+                      </div>
+                      <div className="rounded-[1.35rem] border border-[#DCE7FF] bg-[#F7FAFF] p-4">
+                        <p className="text-[11px] font-black text-[#14295F]">오늘 바로 할 일</p>
+                        <div className="mt-3 space-y-2">
+                          {selectedFocusCounselingLens.actionItems.map((item, idx) => (
+                            <div key={`${idx}-${item}`} className="flex items-start gap-2 rounded-[1rem] border border-[#E4ECFA] bg-white px-3 py-2.5">
+                              <span className="mt-0.5 inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-[#EEF4FF] text-[10px] font-black text-[#2554D7]">
+                                {idx + 1}
+                              </span>
+                              <p className="text-xs font-bold leading-5 text-[#14295F]">{item}</p>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="rounded-[1.8rem] border border-[#DCE7FF] bg-white p-4 shadow-[0_20px_38px_-30px_rgba(20,41,95,0.2)]">
+                    <div className="flex items-center gap-2">
+                      <span className="inline-flex h-10 w-10 items-center justify-center rounded-[1.1rem] bg-[#FFF8F2] text-[#C95A08]">
+                        <MessageSquare className="h-4 w-4" />
+                      </span>
+                      <div>
+                        <p className={studioSectionEyebrowClassName}>상담 질문 카드</p>
+                        <p className="mt-1 text-base font-black tracking-tight text-[#14295F]">학생에게 바로 물어볼 것</p>
+                      </div>
+                    </div>
+                    <div className="mt-4 space-y-2">
+                      {selectedFocusCounselingLens.counselingQuestions.map((question, idx) => (
+                        <div key={`${idx}-${question}`} className="rounded-[1.15rem] border border-[#E4ECFA] bg-[#FBFCFF] px-3 py-2.5">
+                          <div className="flex items-start gap-2">
+                            <Badge className="mt-0.5 h-5 rounded-full border-none bg-[#EEF4FF] px-2 text-[9px] font-black text-[#2554D7]">
+                              Q{idx + 1}
+                            </Badge>
+                            <p className="text-xs font-bold leading-5 text-[#14295F]">{question}</p>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                    <div className="mt-4 rounded-[1.15rem] border border-[#DCE7FF] bg-[#F7FAFF] px-3 py-3">
+                      <p className="text-[10px] font-black uppercase tracking-[0.14em] text-[#5C6E97]">보호자 공유 포인트</p>
+                      <p className="mt-2 text-xs font-bold leading-5 text-[#14295F]">
+                        오늘은 {selectedFocusCounselingLens.priority.label} 상태입니다. 계획 완료율, 학습시간, 외출 흐름을 같이 보며 가정에서는 시작 루틴만 맞춰달라고 안내하면 좋습니다.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              ) : null}
 
               {selectedFocusOperationsSummary ? (
                 <div className="rounded-[1.8rem] border border-[#DCE7FF] bg-white p-4 shadow-[0_20px_38px_-30px_rgba(20,41,95,0.2)]">
@@ -10093,6 +10306,90 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
                   <p className={studioSectionEyebrowClassName}>집중도 KPI 그래프</p>
                   <p className="mt-2 text-lg font-black tracking-tight text-[#14295F]">학습 흐름과 리듬을 그래프로 읽는 운영 보드</p>
                 </div>
+
+                {selectedFocusCounselingLens ? (
+                  <div className="grid gap-4 lg:grid-cols-2">
+                    <div className={studioChartCardClassName}>
+                      <div className="mb-3 flex items-center justify-between gap-3">
+                        <div>
+                          <p className={studioSectionEyebrowClassName}>개입 원인 분해</p>
+                          <p className="mt-1 text-[11px] font-bold text-[#5c6e97]">높을수록 오늘 먼저 확인해야 하는 항목입니다.</p>
+                        </div>
+                        <Badge className={cn('h-7 rounded-full px-3 text-[10px] font-black', selectedFocusCounselingLens.priority.badgeClass)}>
+                          {selectedFocusCounselingLens.interventionScore}점
+                        </Badge>
+                      </div>
+                      <ResponsiveContainer width="100%" height={190}>
+                        <ComposedChart data={selectedFocusCounselingLens.factorData} margin={{ top: 8, right: 12, left: 6, bottom: 0 }}>
+                          <CartesianGrid strokeDasharray="3 3" stroke="#E4ECFA" vertical={false} />
+                          <XAxis dataKey="label" tick={{ fontSize: 10, fontWeight: 800, fill: '#5c6e97' }} tickLine={false} axisLine={false} />
+                          <YAxis domain={[0, 100]} tick={{ fontSize: 9, fontWeight: 700, fill: '#5c6e97' }} tickLine={false} axisLine={false} width={36} tickFormatter={(v) => `${Math.round(Number(v || 0))}`} />
+                          <Tooltip
+                            formatter={(v: number) => [`${Math.round(Number(v || 0))}점`, '개입 필요']}
+                            contentStyle={{ borderRadius: '14px', border: '1px solid #DCE7FF', boxShadow: '0 14px 30px rgba(20,41,95,0.12)', fontSize: '11px', fontWeight: 700, color: '#14295F' }}
+                          />
+                          <Bar dataKey="risk" radius={[7, 7, 0, 0]} barSize={28}>
+                            {selectedFocusCounselingLens.factorData.map((entry) => (
+                              <Cell key={entry.label} fill={entry.fill} />
+                            ))}
+                          </Bar>
+                        </ComposedChart>
+                      </ResponsiveContainer>
+                      <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
+                        {selectedFocusCounselingLens.factorData.slice(0, 4).map((item) => (
+                          <div key={`factor-${item.label}`} className="rounded-[0.9rem] border border-[#E4ECFA] bg-[#FBFCFF] px-2.5 py-2">
+                            <p className="text-[9px] font-black text-[#5C6E97]">{item.label}</p>
+                            <p className="mt-1 text-[11px] font-black text-[#14295F]">{item.value}</p>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div className={studioChartCardClassName}>
+                      <div className="mb-3 flex items-center justify-between gap-3">
+                        <div>
+                          <p className={studioSectionEyebrowClassName}>7일 상담 매트릭스</p>
+                          <p className="mt-1 text-[11px] font-bold text-[#5c6e97]">막대: 공부시간 · 선: 집중점수와 계획완료율</p>
+                        </div>
+                        {selectedFocusKpi ? (
+                          <Badge className="h-7 rounded-full border-none bg-[#EEF4FF] px-3 text-[10px] font-black text-[#14295F]">
+                            활동 {selectedFocusKpi.activeDaysCount}일
+                          </Badge>
+                        ) : null}
+                      </div>
+                      {trendLoading ? (
+                        <div className="flex h-[190px] items-center justify-center"><Loader2 className="h-5 w-5 animate-spin text-[#5c6e97]" /></div>
+                      ) : !hasFocusCounselingTrendData ? (
+                        <div className="flex h-[190px] items-center justify-center text-xs font-bold text-[#5c6e97]">상담용 추세 데이터를 수집 중입니다.</div>
+                      ) : (
+                        <ResponsiveContainer width="100%" height={190}>
+                          <ComposedChart data={focusCounselingTrendData} margin={{ top: 8, right: 44, left: 8, bottom: 0 }}>
+                            <CartesianGrid strokeDasharray="3 3" stroke="#E4ECFA" vertical={false} />
+                            <XAxis dataKey="date" tick={{ fontSize: 10, fontWeight: 800, fill: '#5c6e97' }} tickLine={false} axisLine={false} />
+                            <YAxis yAxisId="min" tick={{ fontSize: 9, fontWeight: 700, fill: '#5c6e97' }} tickLine={false} axisLine={false} width={44} tickFormatter={(v) => formatChartMinutesAxisTick(Number(v))} />
+                            <YAxis yAxisId="pct" orientation="right" domain={[0, 100]} tick={{ fontSize: 9, fontWeight: 700, fill: '#5c6e97' }} tickLine={false} axisLine={false} width={40} tickFormatter={(v) => `${Math.round(Number(v || 0))}`} />
+                            <Tooltip
+                              formatter={(v: number, name: string) => {
+                                if (name === 'minutes') return [`${Math.floor(Number(v || 0) / 60)}h ${Number(v || 0) % 60}m`, '공부시간'];
+                                if (name === 'score') return [`${Math.round(Number(v || 0))}점`, '집중점수'];
+                                return [`${Math.round(Number(v || 0))}%`, '계획완료'];
+                              }}
+                              contentStyle={{ borderRadius: '14px', border: '1px solid #DCE7FF', boxShadow: '0 14px 30px rgba(20,41,95,0.12)', fontSize: '11px', fontWeight: 700, color: '#14295F' }}
+                            />
+                            <Bar yAxisId="min" dataKey="minutes" fill="#C7D8FF" radius={[6, 6, 0, 0]} barSize={30} />
+                            <Line yAxisId="pct" type="monotone" dataKey="score" stroke="#14295F" strokeWidth={2.5} dot={{ r: 4, fill: '#14295F', strokeWidth: 0 }} activeDot={{ r: 5 }} />
+                            <Line yAxisId="pct" type="monotone" dataKey="completion" stroke="#10B981" strokeWidth={2.5} dot={{ r: 4, fill: '#10B981', strokeWidth: 0 }} activeDot={{ r: 5 }} />
+                          </ComposedChart>
+                        </ResponsiveContainer>
+                      )}
+                      <div className="mt-2 flex flex-wrap items-center justify-end gap-4">
+                        <div className="flex items-center gap-1"><div className="h-2.5 w-2.5 rounded bg-[#C7D8FF]" /><p className="text-[9px] font-bold text-[#5c6e97]">공부시간</p></div>
+                        <div className="flex items-center gap-1"><div className="h-2.5 w-2.5 rounded-full bg-[#14295F]" /><p className="text-[9px] font-bold text-[#5c6e97]">집중점수</p></div>
+                        <div className="flex items-center gap-1"><div className="h-2.5 w-2.5 rounded-full bg-emerald-500" /><p className="text-[9px] font-bold text-[#5c6e97]">계획완료</p></div>
+                      </div>
+                    </div>
+                  </div>
+                ) : null}
 
                 <div className={studioChartCardClassName}>
                   <div className="mb-3 flex items-center justify-between gap-3">
