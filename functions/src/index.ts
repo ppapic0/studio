@@ -3025,6 +3025,7 @@ async function queueParentSmsNotification(
     useExactEventAt?: boolean;
     dedupeKeyOverride?: string | null;
     sourceEventId?: string | null;
+    dispatchImmediately?: boolean;
   }
 ): Promise<{ queuedCount: number; recipientCount: number; suppressedCount: number; message: string; deduped?: boolean }> {
   const {
@@ -3105,13 +3106,19 @@ async function queueParentSmsNotification(
   const provider = settings.smsProvider || "none";
   const batch = db.batch();
   const initialStatus = buildSmsQueueInitialStatus(settings);
+  const shouldDispatchImmediately = params.dispatchImmediately === true && initialStatus.status === "queued";
+  const immediateProcessingLeaseUntil = admin.firestore.Timestamp.fromMillis(ts.toMillis() + 60 * 1000);
+  const immediateDispatchQueueItems: Array<{
+    ref: admin.firestore.DocumentReference;
+    data: Record<string, unknown>;
+  }> = [];
   if (params.force) {
     batch.set(dedupeRef, { ...dedupePayload, forcedAt: ts }, { merge: true });
   }
 
   allowedRecipients.forEach((recipient) => {
     const queueRef = db.collection(`centers/${centerId}/smsQueue`).doc();
-    batch.set(queueRef, {
+    const queuePayload = {
       centerId,
       studentId,
       studentName,
@@ -3129,15 +3136,17 @@ async function queueParentSmsNotification(
       eventType,
       dateKey: toDateKey(smsEventAt),
       eventAt: eventAtTs,
-      status: initialStatus.status,
-      providerStatus: initialStatus.providerStatus,
-      attemptCount: 0,
+      status: shouldDispatchImmediately ? "processing" : initialStatus.status,
+      providerStatus: shouldDispatchImmediately ? "processing" : initialStatus.providerStatus,
+      attemptCount: shouldDispatchImmediately ? 1 : 0,
       manualRetryCount: 0,
-      nextAttemptAt: initialStatus.status === "queued" ? ts : null,
+      nextAttemptAt: shouldDispatchImmediately ? null : initialStatus.status === "queued" ? ts : null,
       sentAt: null,
       failedAt: null,
       lastErrorCode: null,
       lastErrorMessage: null,
+      processingStartedAt: shouldDispatchImmediately ? ts : null,
+      processingLeaseUntil: shouldDispatchImmediately ? immediateProcessingLeaseUntil : null,
       createdAt: ts,
       updatedAt: ts,
       metadata: {
@@ -3148,7 +3157,11 @@ async function queueParentSmsNotification(
         expectedTime: expectedTime || null,
         sourceEventId: asTrimmedString(params.sourceEventId) || null,
       },
-    });
+    };
+    batch.set(queueRef, queuePayload);
+    if (shouldDispatchImmediately) {
+      immediateDispatchQueueItems.push({ ref: queueRef, data: queuePayload });
+    }
 
     const parentNotificationRef = db.collection(`centers/${centerId}/parentNotifications`).doc();
     batch.set(parentNotificationRef, {
@@ -3188,6 +3201,14 @@ async function queueParentSmsNotification(
       })
     )
   );
+
+  if (shouldDispatchImmediately && immediateDispatchQueueItems.length > 0) {
+    await Promise.allSettled(
+      immediateDispatchQueueItems.map((queueItem) =>
+        dispatchSmsQueueItem(db, centerId, queueItem.ref, queueItem.data, 1)
+      )
+    );
+  }
 
   return {
     queuedCount: allowedRecipients.length,
@@ -3467,6 +3488,7 @@ async function queueAttendanceEventSmsV2(
       useExactEventAt: true,
       dedupeKeyOverride: dedupeKey,
       sourceEventId: eventId,
+      dispatchImmediately: true,
     });
     const smsStatus = resolveAttendanceSmsPipelineStatus(queueResult);
 
