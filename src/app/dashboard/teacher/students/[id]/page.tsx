@@ -87,6 +87,21 @@ type StudentPointHistoryRow = {
   otherPoints: number;
   pointItems: StudentPointHistoryItem[];
 };
+type PointAdjustmentMode = 'add' | 'subtract';
+type AdjustStudentPointBalanceInput = {
+  centerId: string;
+  studentId: string;
+  dateKey: string;
+  deltaPoints: number;
+  reason: string;
+};
+type AdjustStudentPointBalanceResult = {
+  ok: boolean;
+  adjustmentId: string;
+  pointsBalance: number;
+  totalPointsEarned: number;
+  dailyPointAmount: number;
+};
 const STATUS_LABEL: Record<CounselingReservation['status'], string> = {
   requested: '요청',
   confirmed: '확정',
@@ -685,6 +700,11 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
   const [isReservationModalOpen, setIsReservationModalOpen] = useState(false);
   const [isPointHistoryModalOpen, setIsPointHistoryModalOpen] = useState(false);
   const [selectedPointHistoryDateKey, setSelectedPointHistoryDateKey] = useState<string | null>(null);
+  const [pointAdjustmentMode, setPointAdjustmentMode] = useState<PointAdjustmentMode>('subtract');
+  const [isPointAdjustmentModalOpen, setIsPointAdjustmentModalOpen] = useState(false);
+  const [pointAdjustmentAmountDraft, setPointAdjustmentAmountDraft] = useState('');
+  const [pointAdjustmentReasonDraft, setPointAdjustmentReasonDraft] = useState('');
+  const [isPointAdjustmentSaving, setIsPointAdjustmentSaving] = useState(false);
   const [mobileInsightDialog, setMobileInsightDialog] = useState<MobileInsightView | null>(null);
 
   const [logType, setLogType] = useState<'academic' | 'life' | 'career'>('academic');
@@ -1492,6 +1512,19 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
     if (pointHistoryRows.length === 0) return null;
     return pointHistoryRows.find((row) => row.dateKey === selectedPointHistoryDateKey) || pointHistoryRows[0];
   }, [pointHistoryRows, selectedPointHistoryDateKey]);
+  const resetPointAdjustmentModal = () => {
+    setIsPointAdjustmentModalOpen(false);
+    setPointAdjustmentMode('subtract');
+    setPointAdjustmentAmountDraft('');
+    setPointAdjustmentReasonDraft('');
+  };
+  const openPointAdjustmentModal = (mode: PointAdjustmentMode) => {
+    if (!canEditGrowthData || !selectedPointHistoryRow) return;
+    setPointAdjustmentMode(mode);
+    setPointAdjustmentAmountDraft('');
+    setPointAdjustmentReasonDraft('');
+    setIsPointAdjustmentModalOpen(true);
+  };
 
   const pastPlanGroups = useMemo(() => {
     const startDateKey = format(subDays(today, 6), 'yyyy-MM-dd');
@@ -1971,6 +2004,75 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
     ).length;
     return Math.round((presentDays / trackedDays.length) * 100);
   }, [operationsTimeline]);
+
+  const handleSubmitPointAdjustment = async () => {
+    if (!functions || !centerId || !studentId || !canEditGrowthData || !selectedPointHistoryRow) return;
+
+    const amount = Math.floor(Number(pointAdjustmentAmountDraft));
+    const reason = pointAdjustmentReasonDraft.trim();
+    if (!Number.isFinite(amount) || amount < 1 || amount > 100000) {
+      toast({
+        variant: 'destructive',
+        title: '포인트 확인 필요',
+        description: '수정 포인트는 1~100,000 사이로 입력해 주세요.',
+      });
+      return;
+    }
+    if (!reason) {
+      toast({
+        variant: 'destructive',
+        title: '수정 사유 필요',
+        description: '나중에 확인할 수 있도록 포인트 수정 사유를 입력해 주세요.',
+      });
+      return;
+    }
+
+    const deltaPoints = pointAdjustmentMode === 'add' ? amount : -amount;
+    if (deltaPoints < 0 && amount > currentPointBalance) {
+      toast({
+        variant: 'destructive',
+        title: '차감 불가',
+        description: '보유 포인트보다 크게 차감할 수 없습니다.',
+      });
+      return;
+    }
+    if (deltaPoints < 0 && amount > selectedPointHistoryRow.totalPoints) {
+      toast({
+        variant: 'destructive',
+        title: '차감 불가',
+        description: '선택한 날짜의 포인트보다 크게 차감할 수 없습니다.',
+      });
+      return;
+    }
+
+    setIsPointAdjustmentSaving(true);
+    try {
+      const adjustStudentPoints = httpsCallable<AdjustStudentPointBalanceInput, AdjustStudentPointBalanceResult>(
+        functions,
+        'adjustStudentPointBalanceSecure'
+      );
+      const result = await adjustStudentPoints({
+        centerId,
+        studentId,
+        dateKey: selectedPointHistoryRow.dateKey,
+        deltaPoints,
+        reason,
+      });
+      toast({
+        title: '포인트 수정 완료',
+        description: `${student?.name || '학생'} ${deltaPoints > 0 ? '+' : ''}${deltaPoints.toLocaleString()}P · 잔액 ${Number(result.data.pointsBalance || 0).toLocaleString()}P`,
+      });
+      resetPointAdjustmentModal();
+    } catch (error) {
+      toast({
+        variant: 'destructive',
+        title: '포인트 수정 실패',
+        description: resolveCallableErrorMessage(error, '잠시 후 다시 시도해 주세요.'),
+      });
+    } finally {
+      setIsPointAdjustmentSaving(false);
+    }
+  };
 
   const handleUpdateInfo = async () => {
     if (!functions || !centerId || !studentId || !canEditStudentInfo) return;
@@ -4553,9 +4655,35 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
                           {selectedPointHistoryRow.dateLabel}
                         </h3>
                       </div>
-                      <Badge className="rounded-full border border-[#ffe1c5] bg-[#fff8ef] px-3 py-1 text-sm font-black text-[#d86a11]">
-                        {formatPointAmount(selectedPointHistoryRow.totalPoints)}
-                      </Badge>
+                      <div className="flex flex-wrap items-center justify-end gap-2">
+                        <Badge className="rounded-full border border-[#ffe1c5] bg-[#fff8ef] px-3 py-1 text-sm font-black text-[#d86a11]">
+                          {formatPointAmount(selectedPointHistoryRow.totalPoints)}
+                        </Badge>
+                        {canEditGrowthData ? (
+                          <>
+                            <Button
+                              type="button"
+                              size="sm"
+                              variant="outline"
+                              className="h-8 rounded-full border-emerald-200 bg-emerald-50 px-3 text-[11px] font-black text-emerald-700 hover:bg-emerald-100"
+                              onClick={() => openPointAdjustmentModal('add')}
+                            >
+                              <PlusCircle className="mr-1 h-3.5 w-3.5" />
+                              추가
+                            </Button>
+                            <Button
+                              type="button"
+                              size="sm"
+                              variant="outline"
+                              className="h-8 rounded-full border-rose-200 bg-rose-50 px-3 text-[11px] font-black text-rose-700 hover:bg-rose-100"
+                              onClick={() => openPointAdjustmentModal('subtract')}
+                            >
+                              <Trash2 className="mr-1 h-3.5 w-3.5" />
+                              차감
+                            </Button>
+                          </>
+                        ) : null}
+                      </div>
                     </div>
 
                     <div className="mt-4 grid grid-cols-3 gap-2">
@@ -4624,6 +4752,132 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
               </DialogClose>
             </DialogFooter>
           </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={isPointAdjustmentModalOpen}
+        onOpenChange={(open) => {
+          if (!open && !isPointAdjustmentSaving) resetPointAdjustmentModal();
+        }}
+      >
+        <DialogContent className="overflow-hidden rounded-[2rem] border border-[#dbe7ff] p-0 shadow-2xl sm:max-w-md">
+          <div className={cn(
+            "px-6 py-5",
+            pointAdjustmentMode === 'subtract'
+              ? "bg-[linear-gradient(135deg,#881337_0%,#BE123C_100%)] text-white"
+              : "bg-[linear-gradient(135deg,#065F46_0%,#059669_100%)] text-white"
+          )}>
+            <DialogHeader className="text-left">
+              <Badge className="w-fit border border-white/14 bg-white/12 px-3 py-1 text-[10px] font-black text-white">
+                포인트 {pointAdjustmentMode === 'subtract' ? '차감' : '추가'}
+              </Badge>
+              <DialogTitle className="text-xl font-black tracking-tight">
+                {student?.name || '학생'} 포인트를 {pointAdjustmentMode === 'subtract' ? '차감합니다' : '추가합니다'}
+              </DialogTitle>
+              <DialogDescription className="text-sm font-semibold leading-5 text-white/76">
+                선택 날짜 기준으로 반영되고, 감사 로그와 포인트 내역에 사유가 남습니다.
+              </DialogDescription>
+            </DialogHeader>
+          </div>
+
+          {selectedPointHistoryRow ? (
+            <div className="grid gap-4 bg-[#f8fbff] px-5 py-5">
+              <div className="grid gap-2 rounded-[1.25rem] border border-[#dbe7ff] bg-white p-4">
+                <div className="flex items-center justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className="truncate text-sm font-black text-[#14295F]">{selectedPointHistoryRow.dateLabel}</p>
+                    <p className="mt-1 text-[11px] font-bold text-[#5c6e97]">
+                      현재 잔액 {formatPointAmount(currentPointBalance)}
+                    </p>
+                  </div>
+                  <Badge className="shrink-0 border-none bg-[#fff8ef] px-3 py-1 text-[11px] font-black text-[#d86a11]">
+                    일자 {formatPointAmount(selectedPointHistoryRow.totalPoints)}
+                  </Badge>
+                </div>
+              </div>
+
+              <div className="grid gap-2">
+                <Label className="text-xs font-black text-[#14295F]">수정 유형</Label>
+                <div className="grid grid-cols-2 gap-2 rounded-2xl border border-[#dbe7ff] bg-white p-1.5">
+                  {(['add', 'subtract'] as PointAdjustmentMode[]).map((mode) => {
+                    const isSelected = pointAdjustmentMode === mode;
+                    return (
+                      <Button
+                        key={mode}
+                        type="button"
+                        variant={isSelected ? 'default' : 'ghost'}
+                        className={cn(
+                          'h-10 rounded-xl font-black',
+                          isSelected
+                            ? mode === 'add'
+                              ? 'bg-emerald-600 text-white hover:bg-emerald-700'
+                              : 'bg-rose-600 text-white hover:bg-rose-700'
+                            : 'text-[#6E7EA3] hover:bg-[#F4F7FF]'
+                        )}
+                        onClick={() => setPointAdjustmentMode(mode)}
+                      >
+                        {mode === 'add' ? '추가' : '차감'}
+                      </Button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              <div className="grid gap-2">
+                <Label htmlFor="student-point-adjustment-amount" className="text-xs font-black text-[#14295F]">포인트</Label>
+                <Input
+                  id="student-point-adjustment-amount"
+                  type="number"
+                  min={1}
+                  max={100000}
+                  inputMode="numeric"
+                  value={pointAdjustmentAmountDraft}
+                  onChange={(event) => setPointAdjustmentAmountDraft(event.target.value)}
+                  placeholder={pointAdjustmentMode === 'subtract' ? '차감할 포인트' : '추가할 포인트'}
+                  className="h-11 rounded-xl border-[#dbe7ff] bg-white font-bold text-[#14295F]"
+                />
+              </div>
+
+              <div className="grid gap-2">
+                <Label htmlFor="student-point-adjustment-reason" className="text-xs font-black text-[#14295F]">수정 사유</Label>
+                <Textarea
+                  id="student-point-adjustment-reason"
+                  value={pointAdjustmentReasonDraft}
+                  onChange={(event) => setPointAdjustmentReasonDraft(event.target.value.slice(0, 160))}
+                  placeholder={pointAdjustmentMode === 'subtract' ? '예: 잘못 지급된 포인트 회수' : '예: 누락된 포인트 보정'}
+                  className="min-h-24 rounded-xl border-[#dbe7ff] bg-white text-sm font-bold text-[#14295F]"
+                />
+                <p className="text-[11px] font-bold text-[#5c6e97]">
+                  차감은 현재 잔액과 선택 날짜 포인트를 초과할 수 없습니다.
+                </p>
+              </div>
+            </div>
+          ) : null}
+
+          <DialogFooter className="border-t border-[#dbe7ff] bg-white px-5 py-4">
+            <Button
+              type="button"
+              variant="ghost"
+              className="h-11 rounded-xl px-5 font-black text-[#6E7EA3]"
+              disabled={isPointAdjustmentSaving}
+              onClick={resetPointAdjustmentModal}
+            >
+              취소
+            </Button>
+            <Button
+              type="button"
+              className={cn(
+                "h-11 rounded-xl px-5 font-black text-white",
+                pointAdjustmentMode === 'subtract' ? "bg-rose-600 hover:bg-rose-700" : "bg-emerald-600 hover:bg-emerald-700"
+              )}
+              disabled={isPointAdjustmentSaving}
+              onClick={() => void handleSubmitPointAdjustment()}
+            >
+              {isPointAdjustmentSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
+              저장
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
 
