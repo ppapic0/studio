@@ -1,15 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { eachDayOfInterval, startOfMonth, startOfWeek } from 'date-fns';
 
 import { noStoreJson } from '@/lib/api-security';
 import { shouldExcludeFromCompetitionTrack } from '@/lib/counseling-demo';
 import { adminAuth, adminDb, isMissingAdminCredentialsError } from '@/lib/firebase-admin';
 import { resolveSeatIdentity } from '@/lib/seat-layout';
 import {
+  eachKstDateOfInterval,
   getDailyRankCompetitionWindow,
   getDailyRankWindowOverlapMinutes,
   getDailyRankWindowState,
-  toKstDate,
+  startOfKstMonthDate,
+  startOfKstWeekDate,
   type DailyRankWindowState,
 } from '@/lib/student-ranking-policy';
 
@@ -358,21 +359,15 @@ export async function GET(request: NextRequest) {
 
     const now = new Date();
     const nowMs = now.getTime();
-    const nowKst = toKstDate(now);
     const dailyRankWindow = getDailyRankWindowState(now);
-    const previousDailyWindowReference = new Date(dailyRankWindow.competitionDate);
-    previousDailyWindowReference.setDate(previousDailyWindowReference.getDate() - 1);
-    previousDailyWindowReference.setHours(18, 0, 0, 0);
-    const previousDailyRankWindow = getDailyRankWindowState(previousDailyWindowReference);
+    const previousDailyRankWindow = getDailyRankCompetitionWindow(
+      new Date(dailyRankWindow.competitionDate.getTime() - 24 * 60 * 60 * 1000)
+    );
     const dailyDateKeys = dailyRankWindow.coveredDateKeys;
-    const weeklyRankWindows = eachDayOfInterval({
-      start: startOfWeek(nowKst, { weekStartsOn: 1 }),
-      end: nowKst,
-    }).map((date) => getDailyRankCompetitionWindow(date));
-    const monthlyRankWindows = eachDayOfInterval({
-      start: startOfMonth(nowKst),
-      end: nowKst,
-    }).map((date) => getDailyRankCompetitionWindow(date));
+    const weeklyRankWindows = eachKstDateOfInterval(startOfKstWeekDate(now), now)
+      .map((date) => getDailyRankCompetitionWindow(date));
+    const monthlyRankWindows = eachKstDateOfInterval(startOfKstMonthDate(now), now)
+      .map((date) => getDailyRankCompetitionWindow(date));
     const weeklyCoveredDateKeys = getCoveredDateKeysFromRankWindows(weeklyRankWindows);
     const monthlyCoveredDateKeys = getCoveredDateKeysFromRankWindows(monthlyRankWindows);
 

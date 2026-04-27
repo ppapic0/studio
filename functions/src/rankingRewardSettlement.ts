@@ -73,6 +73,7 @@ const MONTHLY_RANK_REWARD_FIRST_ELIGIBLE_PERIOD_KEY = "2026-05";
 const MONTHLY_RANK_REWARD_PRELAUNCH_SKIP_REASON = "monthly_rank_rewards_start_from_2026_05";
 const RANKING_ENGINE_VERSION = "v2";
 const DEFAULT_DAILY_RANK_REISSUE_DATE_KEY = "2026-04-26";
+const KST_OFFSET_HOURS = 9;
 
 const STUDENT_RANK_REWARD_TIERS: Record<StudentRankingRange, StudentRankRewardTier[]> = {
   daily: [{ rank: 1, points: 500 }],
@@ -93,37 +94,77 @@ const RANKING_RANGE_LABEL: Record<StudentRankingRange, string> = {
   monthly: "월간",
 };
 
-function toKstDate(baseDate: Date = new Date()) {
-  const formatted = baseDate.toLocaleString("en-US", { timeZone: "Asia/Seoul" });
-  return new Date(formatted);
-}
-
 function padNumber(value: number) {
   return String(value).padStart(2, "0");
 }
 
+function getKstDateParts(baseDate: Date = new Date()) {
+  const shifted = new Date(baseDate.getTime() + KST_OFFSET_HOURS * 60 * 60 * 1000);
+  return {
+    year: shifted.getUTCFullYear(),
+    month: shifted.getUTCMonth() + 1,
+    day: shifted.getUTCDate(),
+    dayOfWeek: shifted.getUTCDay(),
+    hour: shifted.getUTCHours(),
+    minute: shifted.getUTCMinutes(),
+    second: shifted.getUTCSeconds(),
+    millisecond: shifted.getUTCMilliseconds(),
+  };
+}
+
+function dateFromKstParts(
+  year: number,
+  month: number,
+  day: number,
+  hour = 0,
+  minute = 0,
+  second = 0,
+  millisecond = 0
+) {
+  return new Date(Date.UTC(year, month - 1, day, hour - KST_OFFSET_HOURS, minute, second, millisecond));
+}
+
+function shiftKstDateParts(parts: ReturnType<typeof getKstDateParts>, days: number) {
+  const shifted = new Date(Date.UTC(parts.year, parts.month - 1, parts.day + days));
+  return {
+    year: shifted.getUTCFullYear(),
+    month: shifted.getUTCMonth() + 1,
+    day: shifted.getUTCDate(),
+    dayOfWeek: shifted.getUTCDay(),
+  };
+}
+
+function toKstDate(baseDate: Date = new Date()) {
+  return new Date(baseDate.getTime());
+}
+
 function toDateKey(date: Date) {
-  return `${date.getFullYear()}-${padNumber(date.getMonth() + 1)}-${padNumber(date.getDate())}`;
+  const parts = getKstDateParts(date);
+  return `${parts.year}-${padNumber(parts.month)}-${padNumber(parts.day)}`;
 }
 
 function toMonthKey(date: Date) {
-  return `${date.getFullYear()}-${padNumber(date.getMonth() + 1)}`;
-}
-
-function cloneDate(date: Date) {
-  return new Date(date.getTime());
+  const parts = getKstDateParts(date);
+  return `${parts.year}-${padNumber(parts.month)}`;
 }
 
 function startOfKstDay(date: Date) {
-  const next = cloneDate(date);
-  next.setHours(0, 0, 0, 0);
-  return next;
+  const parts = getKstDateParts(date);
+  return dateFromKstParts(parts.year, parts.month, parts.day);
 }
 
 function shiftKstDate(date: Date, days: number) {
-  const next = cloneDate(date);
-  next.setDate(next.getDate() + days);
-  return next;
+  const parts = getKstDateParts(date);
+  const shifted = shiftKstDateParts(parts, days);
+  return dateFromKstParts(
+    shifted.year,
+    shifted.month,
+    shifted.day,
+    parts.hour,
+    parts.minute,
+    parts.second,
+    parts.millisecond
+  );
 }
 
 function addMinutes(date: Date, minutes: number) {
@@ -132,16 +173,24 @@ function addMinutes(date: Date, minutes: number) {
 
 function startOfKstWeek(date: Date) {
   const next = startOfKstDay(date);
-  const day = next.getDay();
+  const day = getKstDateParts(next).dayOfWeek;
   const diff = day === 0 ? -6 : 1 - day;
-  next.setDate(next.getDate() + diff);
-  return next;
+  return shiftKstDate(next, diff);
 }
 
 function startOfKstMonth(date: Date) {
-  const next = startOfKstDay(date);
-  next.setDate(1);
-  return next;
+  const parts = getKstDateParts(date);
+  return dateFromKstParts(parts.year, parts.month, 1);
+}
+
+function withKstTime(date: Date, hour: number, minute = 0, second = 0, millisecond = 0) {
+  const parts = getKstDateParts(date);
+  return dateFromKstParts(parts.year, parts.month, parts.day, hour, minute, second, millisecond);
+}
+
+function shiftKstMonthStart(date: Date, monthOffset: number) {
+  const parts = getKstDateParts(date);
+  return dateFromKstParts(parts.year, parts.month + monthOffset, 1);
 }
 
 function normalizeMembershipStatus(value: unknown) {
@@ -417,8 +466,8 @@ function shouldExcludeFromCompetitionRecord(value: unknown, studentId?: unknown)
 }
 
 function isWeekendCompetitionDate(date: Date) {
-  const day = date.getDay();
-  return day === 0 || day === 6;
+  const dayOfWeek = getKstDateParts(date).dayOfWeek;
+  return dayOfWeek === 0 || dayOfWeek === 6;
 }
 
 function getCompetitionStartHour(targetDate: Date) {
@@ -427,12 +476,8 @@ function getCompetitionStartHour(targetDate: Date) {
 
 function buildCompetitionWindow(targetDate: Date) {
   const competitionDate = startOfKstDay(targetDate);
-  const startsAt = cloneDate(competitionDate);
-  startsAt.setHours(getCompetitionStartHour(competitionDate), 0, 0, 0);
-
-  const endsAt = cloneDate(competitionDate);
-  endsAt.setDate(endsAt.getDate() + 1);
-  endsAt.setHours(DAILY_RANK_END_HOUR, 0, 0, 0);
+  const startsAt = withKstTime(competitionDate, getCompetitionStartHour(competitionDate));
+  const endsAt = withKstTime(shiftKstDate(competitionDate, 1), DAILY_RANK_END_HOUR);
 
   return {
     competitionDate,
@@ -453,12 +498,12 @@ function buildCompetitionWindowWithKeys(targetDate: Date) {
 
 function getDateKeysCoveredByWindow(startsAt: Date, endsAt: Date) {
   const keys: string[] = [];
-  const cursor = startOfKstDay(startsAt);
+  let cursor = startOfKstDay(startsAt);
   const lastIncludedDate = startOfKstDay(new Date(endsAt.getTime() - 1));
 
   while (cursor.getTime() <= lastIncludedDate.getTime()) {
     keys.push(toDateKey(cursor));
-    cursor.setDate(cursor.getDate() + 1);
+    cursor = shiftKstDate(cursor, 1);
   }
 
   return keys;
@@ -1296,9 +1341,7 @@ function getDailySettlementCandidates(nowKst: Date, lookbackDays = 7) {
 }
 
 function buildRankingRewardAwardTime(periodEndDate: Date) {
-  const awardAt = shiftKstDate(startOfKstDay(periodEndDate), 1);
-  awardAt.setHours(1, DAILY_RANK_REWARD_DELAY_MINUTES, 0, 0);
-  return awardAt;
+  return withKstTime(shiftKstDate(startOfKstDay(periodEndDate), 1), 1, DAILY_RANK_REWARD_DELAY_MINUTES);
 }
 
 function getWeeklySettlementCandidate(nowKst: Date) {
@@ -1320,9 +1363,7 @@ function getWeeklySettlementCandidate(nowKst: Date) {
 
 function getMonthlySettlementCandidate(nowKst: Date) {
   const currentMonthStart = startOfKstMonth(nowKst);
-  const previousMonthStart = cloneDate(currentMonthStart);
-  previousMonthStart.setMonth(previousMonthStart.getMonth() - 1, 1);
-  previousMonthStart.setHours(0, 0, 0, 0);
+  const previousMonthStart = shiftKstMonthStart(currentMonthStart, -1);
   const previousMonthEnd = shiftKstDate(currentMonthStart, -1);
   const awardsAt = buildRankingRewardAwardTime(previousMonthEnd);
   if (nowKst.getTime() < awardsAt.getTime()) {
@@ -1341,19 +1382,17 @@ function getMonthlySettlementCandidate(nowKst: Date) {
 function isValidDateKey(value: string) {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
   const [year, month, day] = value.split("-").map((part) => Number(part));
-  const date = new Date(year, month - 1, day);
+  const date = new Date(Date.UTC(year, month - 1, day));
   return (
-    date.getFullYear() === year
-    && date.getMonth() === month - 1
-    && date.getDate() === day
+    date.getUTCFullYear() === year
+    && date.getUTCMonth() === month - 1
+    && date.getUTCDate() === day
   );
 }
 
 function parseDateKeyAsKstDate(dateKey: string) {
   const [year, month, day] = dateKey.split("-").map((part) => Number(part));
-  const date = new Date(year, month - 1, day);
-  date.setHours(0, 0, 0, 0);
-  return date;
+  return dateFromKstParts(year, month, day);
 }
 
 function normalizeMembershipRoleValue(value: unknown): string {
