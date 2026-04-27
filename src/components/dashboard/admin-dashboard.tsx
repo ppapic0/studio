@@ -147,6 +147,7 @@ import {
 import { toStudyRoomTrackScheduleName } from '@/lib/study-room-class-schedule';
 import { createPointBoostEventSecure, cancelPointBoostEventSecure } from '@/lib/point-boost-actions';
 import { getDailyPointBreakdown } from '@/lib/student-rewards';
+import { getStudyDayDate } from '@/lib/study-day';
 
 const ADMIN_DASHBOARD_REFRESH_INTERVAL_MS = 60 * 1000;
 const MANUAL_PARENT_SMS_UID = '__manual_parent__';
@@ -906,7 +907,9 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
 
   useEffect(() => {
     setIsMounted(true);
-    setToday(new Date());
+    const currentMs = Date.now();
+    setNow(currentMs);
+    setToday(getStudyDayDate(new Date(currentMs)));
     
     const timer = setInterval(() => {
       setNow(Date.now());
@@ -917,7 +920,7 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
 
   useEffect(() => {
     if (!today) return;
-    const nextDate = new Date(now);
+    const nextDate = getStudyDayDate(new Date(now));
     if (format(today, 'yyyy-MM-dd') !== format(nextDate, 'yyyy-MM-dd')) {
       setToday(nextDate);
     }
