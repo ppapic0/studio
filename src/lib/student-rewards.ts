@@ -442,12 +442,18 @@ export function getOpenedStudyBoxes(dayStatus?: Record<string, any>): number[] {
 
 export function getDailyAwardedPointTotal(dayStatus?: Record<string, any>): number {
   const earnedPointTotal = getDailyStudyBoxAwardPoints(dayStatus) + getRankRewardPoints(dayStatus);
-  const total = Number(dayStatus?.dailyPointAmount ?? 0);
-  if (Number.isFinite(total)) {
-    if (hasManualPointAdjustment(dayStatus)) {
-      return Math.max(0, Math.floor(total));
-    }
-    return Math.max(0, Math.max(Math.floor(total), earnedPointTotal));
+  const hasStoredDailyPointAmount = Boolean(
+    dayStatus &&
+    typeof dayStatus === 'object' &&
+    Object.prototype.hasOwnProperty.call(dayStatus, 'dailyPointAmount')
+  );
+  const total = Number(dayStatus?.dailyPointAmount);
+  if (hasStoredDailyPointAmount && Number.isFinite(total)) {
+    return Math.max(0, Math.floor(total));
+  }
+
+  if (hasManualPointAdjustment(dayStatus)) {
+    return Math.max(0, earnedPointTotal + getManualPointAdjustmentDelta(dayStatus));
   }
 
   return earnedPointTotal;
@@ -464,6 +470,31 @@ function hasManualPointAdjustment(dayStatus?: Record<string, any>): boolean {
     const deltaPoints = Number(event.deltaPoints ?? 0);
     return source === 'manual_adjustment' && Number.isFinite(deltaPoints) && Math.round(deltaPoints) !== 0;
   });
+}
+
+function getManualPointAdjustmentDelta(dayStatus?: Record<string, any>): number {
+  if (!dayStatus || typeof dayStatus !== 'object') return 0;
+
+  const storedManualAdjustmentPoints = Number(dayStatus.manualAdjustmentPoints ?? 0);
+  if (Number.isFinite(storedManualAdjustmentPoints) && Math.round(storedManualAdjustmentPoints) !== 0) {
+    return Math.round(storedManualAdjustmentPoints);
+  }
+
+  const events = Array.isArray(dayStatus.pointEvents) ? dayStatus.pointEvents : [];
+  return events.reduce((sum, event) => {
+    if (!event || typeof event !== 'object') return sum;
+    const source = typeof event.source === 'string' ? event.source : '';
+    if (source !== 'manual_adjustment') return sum;
+
+    const deltaPoints = Number(event.deltaPoints ?? 0);
+    if (Number.isFinite(deltaPoints) && Math.round(deltaPoints) !== 0) {
+      return sum + Math.round(deltaPoints);
+    }
+
+    const points = getNormalizedRewardAmount((event as Record<string, any>).points);
+    if (points <= 0) return sum;
+    return (event as Record<string, any>).direction === 'subtract' ? sum - points : sum + points;
+  }, 0);
 }
 
 export function getDailyStudyBoxAwardPoints(dayStatus?: Record<string, any>): number {
