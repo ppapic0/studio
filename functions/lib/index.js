@@ -1782,7 +1782,7 @@ function getDefaultSmsEventToggles() {
         study_end: true,
         late_alert: true,
         weekly_report: true,
-        daily_report: true,
+        daily_report: false,
         payment_reminder: true,
     };
 }
@@ -1798,7 +1798,7 @@ function normalizeSmsEventToggles(value) {
         study_end: source.study_end !== false,
         late_alert: source.late_alert !== false,
         weekly_report: source.weekly_report !== false,
-        daily_report: source.daily_report !== false,
+        daily_report: false,
         payment_reminder: source.payment_reminder !== false,
     };
 }
@@ -6286,7 +6286,7 @@ exports.notifyAttendanceSms = functions.region(region).https.onCall(async (data,
     };
 });
 exports.notifyDailyReportReady = functions.region(region).https.onCall(async (data, context) => {
-    var _a, _b, _c;
+    var _a;
     const db = admin.firestore();
     if (!context.auth) {
         throw new functions.https.HttpsError("unauthenticated", "로그인이 필요합니다.");
@@ -6303,47 +6303,14 @@ exports.notifyDailyReportReady = functions.region(region).https.onCall(async (da
     if (!canNotify) {
         throw new functions.https.HttpsError("permission-denied", "교사 또는 관리자만 리포트 알림을 보낼 수 있습니다.");
     }
-    const reportRef = db.doc(`centers/${centerId}/dailyReports/${dateKey}_${studentId}`);
-    const [studentSnap, reportSnap] = await Promise.all([
-        db.doc(`centers/${centerId}/students/${studentId}`).get(),
-        reportRef.get(),
-    ]);
-    if (!studentSnap.exists) {
-        throw new functions.https.HttpsError("failed-precondition", "Student not found.");
-    }
-    if (reportSnap.exists && ((_b = reportSnap.data()) === null || _b === void 0 ? void 0 : _b.parentSmsNotifiedAt)) {
-        return { ok: true, queuedCount: 0, recipientCount: 0, skipped: true };
-    }
-    const studentName = asTrimmedString((_c = studentSnap.data()) === null || _c === void 0 ? void 0 : _c.name, "학생");
-    const nowKst = toKstDate();
-    const settings = await loadNotificationSettings(db, centerId);
-    const queueResult = await queueCustomParentSmsNotification(db, {
-        centerId,
-        studentId,
-        studentName,
-        eventType: "daily_report",
-        message: `[${TRACK_MANAGED_STUDY_CENTER_NAME}] ${studentName} 학생의 오늘자 학습 리포트가 도착했습니다. 앱에서 확인해 주세요.`,
-        date: nowKst,
-        settings,
-        dedupeKey: `${centerId}_${studentId}_daily_report_${dateKey}`,
-        notificationTitle: "일일 리포트 알림",
-        isImportant: true,
-        metadata: {
-            dateKey,
-            reportId: `${dateKey}_${studentId}`,
-        },
-    });
-    if (queueResult.queuedCount > 0 && reportSnap.exists) {
-        await reportRef.set({
-            parentSmsNotifiedAt: admin.firestore.FieldValue.serverTimestamp(),
-            updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-        }, { merge: true });
-    }
     return {
         ok: true,
-        queuedCount: queueResult.queuedCount,
-        recipientCount: queueResult.recipientCount,
-        provider: settings.smsProvider || "none",
+        queuedCount: 0,
+        recipientCount: 0,
+        skipped: true,
+        reason: "daily_report_sms_disabled",
+        dateKey,
+        studentId,
     };
 });
 exports.sendPaymentReminderBatch = functions.region(region).https.onCall(async (data, context) => {
