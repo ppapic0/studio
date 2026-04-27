@@ -3519,7 +3519,13 @@ async function queueAttendanceEventSmsV2(
       sourceEventId: eventId,
       dispatchImmediately: true,
     });
-    const smsStatus = resolveAttendanceSmsPipelineStatus(queueResult);
+    let smsStatus = resolveAttendanceSmsPipelineStatus(queueResult);
+    if (smsStatus === "deduped" && dedupeKey) {
+      const hasExistingQueue = await hasSmsQueueForDedupeKey(db, centerId, dedupeKey);
+      if (hasExistingQueue) {
+        smsStatus = "queued";
+      }
+    }
 
     await eventRef.set({
       smsStatus,
@@ -8793,6 +8799,19 @@ function resolveAttendanceTransitionEventType(
   return null;
 }
 
+function resolveExplicitAttendanceEventType(
+  prevStatus: AttendanceSeatStatus,
+  nextStatus: AttendanceSeatStatus
+): "check_in" | "away_start" | "away_end" | "check_out" {
+  if (nextStatus === "studying") {
+    return prevStatus === "away" || prevStatus === "break" ? "away_end" : "check_in";
+  }
+  if (nextStatus === "away" || nextStatus === "break") {
+    return "away_start";
+  }
+  return "check_out";
+}
+
 function buildAttendanceSeatPatch(params: {
   studentId: string;
   nextStatus: AttendanceSeatStatus;
@@ -9068,6 +9087,72 @@ async function applyAttendanceStatusTransition(
     }
 
     if (prevStatus === nextStatus) {
+      if (params.source === "kiosk") {
+        const repeatEventType = resolveExplicitAttendanceEventType(prevStatus, nextStatus);
+        const repeatEventRef = db.collection(`centers/${centerId}/attendanceEvents`).doc();
+        const repeatStatRef = db.doc(`centers/${centerId}/attendanceDailyStats/${attendanceDateKey}/students/${studentId}`);
+        const repeatStatSnap = await transaction.get(repeatStatRef);
+        const repeatStatData = repeatStatSnap.exists ? ((repeatStatSnap.data() || {}) as Record<string, unknown>) : {};
+        const existingCheckInAt = toTimestampOrNow(repeatStatData.checkInAt);
+        const repeatStatPatch: Record<string, unknown> = {
+          centerId,
+          studentId,
+          dateKey: attendanceDateKey,
+          attendanceStatus: nextStatus,
+          source: params.source,
+          updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        };
+
+        if (repeatEventType === "check_in") {
+          repeatStatPatch.checkInAt =
+            existingCheckInAt && existingCheckInAt.toMillis() <= nowMs
+              ? existingCheckInAt
+              : nowTs;
+        }
+        if (repeatEventType === "check_out") {
+          repeatStatPatch.checkOutAt = nowTs;
+          repeatStatPatch.hasCheckOutRecord = true;
+        }
+
+        transaction.set(repeatStatRef, repeatStatPatch, { merge: true });
+        transaction.set(seatDoc.ref, {
+          studentId,
+          status: nextStatus,
+          updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        }, { merge: true });
+        transaction.set(repeatEventRef, {
+          studentId,
+          dateKey: attendanceDateKey,
+          eventType: repeatEventType,
+          occurredAt: nowTs,
+          createdAt: admin.firestore.FieldValue.serverTimestamp(),
+          source: params.source,
+          seatId: seatDoc.id,
+          statusBefore: prevStatus,
+          statusAfter: nextStatus,
+          repeatAction: true,
+          ...(params.actorUid ? { actorUid: params.actorUid } : {}),
+        });
+
+        return {
+          ok: true,
+          noop: false,
+          previousStatus: prevStatus,
+          nextStatus,
+          seatId: seatDoc.id,
+          eventType: repeatEventType,
+          eventId: repeatEventRef.id,
+          eventAtMillis: nowMs,
+          duplicatedSession: finalized?.duplicatedSession ?? true,
+          sessionId: finalized?.sessionId ?? null,
+          sessionDateKey: finalized?.sessionDateKey ?? null,
+          sessionMinutes: finalized?.sessionMinutes ?? 0,
+          totalMinutesAfterSession: finalized?.totalMinutesAfterSession ?? 0,
+          attendanceAchieved: finalized?.attendanceAchieved ?? false,
+          bonus6hAchieved: finalized?.bonus6hAchieved ?? false,
+        };
+      }
+
       return {
         ok: true,
         noop: true,

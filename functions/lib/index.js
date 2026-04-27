@@ -2528,7 +2528,13 @@ async function queueAttendanceEventSmsV2(db, params) {
             sourceEventId: eventId,
             dispatchImmediately: true,
         });
-        const smsStatus = resolveAttendanceSmsPipelineStatus(queueResult);
+        let smsStatus = resolveAttendanceSmsPipelineStatus(queueResult);
+        if (smsStatus === "deduped" && dedupeKey) {
+            const hasExistingQueue = await hasSmsQueueForDedupeKey(db, centerId, dedupeKey);
+            if (hasExistingQueue) {
+                smsStatus = "queued";
+            }
+        }
         await eventRef.set({
             smsStatus,
             smsPipelineVersion: "v2",
@@ -7031,6 +7037,15 @@ function resolveAttendanceTransitionEventType(prevStatus, nextStatus) {
         return "check_out";
     return null;
 }
+function resolveExplicitAttendanceEventType(prevStatus, nextStatus) {
+    if (nextStatus === "studying") {
+        return prevStatus === "away" || prevStatus === "break" ? "away_end" : "check_in";
+    }
+    if (nextStatus === "away" || nextStatus === "break") {
+        return "away_start";
+    }
+    return "check_out";
+}
 function buildAttendanceSeatPatch(params) {
     var _a, _b, _c, _d, _e, _f, _g;
     const seatNo = Math.max(0, Math.round((_c = (_a = parseFiniteNumber(params.seatData.seatNo)) !== null && _a !== void 0 ? _a : parseFiniteNumber((_b = params.seatHint) === null || _b === void 0 ? void 0 : _b.seatNo)) !== null && _c !== void 0 ? _c : 0));
@@ -7208,7 +7223,7 @@ async function applyAttendanceStatusTransition(params) {
         });
     }
     return db.runTransaction(async (transaction) => {
-        var _a, _b, _c, _d, _e, _f, _g, _h, _j, _k, _l, _m, _o, _p, _q, _r, _s, _t, _u, _v, _w;
+        var _a, _b, _c, _d, _e, _f, _g, _h, _j, _k, _l, _m, _o, _p, _q, _r, _s, _t, _u, _v, _w, _x, _y, _z, _0, _1, _2, _3;
         const freshSeatSnap = await transaction.get(seatDoc.ref);
         const freshSeatData = freshSeatSnap.exists ? (freshSeatSnap.data() || {}) : initialSeatData;
         const freshStudentId = asTrimmedString(freshSeatData.studentId);
@@ -7251,6 +7266,56 @@ async function applyAttendanceStatusTransition(params) {
             });
         }
         if (prevStatus === nextStatus) {
+            if (params.source === "kiosk") {
+                const repeatEventType = resolveExplicitAttendanceEventType(prevStatus, nextStatus);
+                const repeatEventRef = db.collection(`centers/${centerId}/attendanceEvents`).doc();
+                const repeatStatRef = db.doc(`centers/${centerId}/attendanceDailyStats/${attendanceDateKey}/students/${studentId}`);
+                const repeatStatSnap = await transaction.get(repeatStatRef);
+                const repeatStatData = repeatStatSnap.exists ? (repeatStatSnap.data() || {}) : {};
+                const existingCheckInAt = toTimestampOrNow(repeatStatData.checkInAt);
+                const repeatStatPatch = {
+                    centerId,
+                    studentId,
+                    dateKey: attendanceDateKey,
+                    attendanceStatus: nextStatus,
+                    source: params.source,
+                    updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+                };
+                if (repeatEventType === "check_in") {
+                    repeatStatPatch.checkInAt =
+                        existingCheckInAt && existingCheckInAt.toMillis() <= nowMs
+                            ? existingCheckInAt
+                            : nowTs;
+                }
+                if (repeatEventType === "check_out") {
+                    repeatStatPatch.checkOutAt = nowTs;
+                    repeatStatPatch.hasCheckOutRecord = true;
+                }
+                transaction.set(repeatStatRef, repeatStatPatch, { merge: true });
+                transaction.set(seatDoc.ref, {
+                    studentId,
+                    status: nextStatus,
+                    updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+                }, { merge: true });
+                transaction.set(repeatEventRef, Object.assign({ studentId, dateKey: attendanceDateKey, eventType: repeatEventType, occurredAt: nowTs, createdAt: admin.firestore.FieldValue.serverTimestamp(), source: params.source, seatId: seatDoc.id, statusBefore: prevStatus, statusAfter: nextStatus, repeatAction: true }, (params.actorUid ? { actorUid: params.actorUid } : {})));
+                return {
+                    ok: true,
+                    noop: false,
+                    previousStatus: prevStatus,
+                    nextStatus,
+                    seatId: seatDoc.id,
+                    eventType: repeatEventType,
+                    eventId: repeatEventRef.id,
+                    eventAtMillis: nowMs,
+                    duplicatedSession: (_h = finalized === null || finalized === void 0 ? void 0 : finalized.duplicatedSession) !== null && _h !== void 0 ? _h : true,
+                    sessionId: (_j = finalized === null || finalized === void 0 ? void 0 : finalized.sessionId) !== null && _j !== void 0 ? _j : null,
+                    sessionDateKey: (_k = finalized === null || finalized === void 0 ? void 0 : finalized.sessionDateKey) !== null && _k !== void 0 ? _k : null,
+                    sessionMinutes: (_l = finalized === null || finalized === void 0 ? void 0 : finalized.sessionMinutes) !== null && _l !== void 0 ? _l : 0,
+                    totalMinutesAfterSession: (_m = finalized === null || finalized === void 0 ? void 0 : finalized.totalMinutesAfterSession) !== null && _m !== void 0 ? _m : 0,
+                    attendanceAchieved: (_o = finalized === null || finalized === void 0 ? void 0 : finalized.attendanceAchieved) !== null && _o !== void 0 ? _o : false,
+                    bonus6hAchieved: (_p = finalized === null || finalized === void 0 ? void 0 : finalized.bonus6hAchieved) !== null && _p !== void 0 ? _p : false,
+                };
+            }
             return {
                 ok: true,
                 noop: true,
@@ -7260,13 +7325,13 @@ async function applyAttendanceStatusTransition(params) {
                 eventType: null,
                 eventId: null,
                 eventAtMillis: null,
-                duplicatedSession: (_h = finalized === null || finalized === void 0 ? void 0 : finalized.duplicatedSession) !== null && _h !== void 0 ? _h : true,
-                sessionId: (_j = finalized === null || finalized === void 0 ? void 0 : finalized.sessionId) !== null && _j !== void 0 ? _j : null,
-                sessionDateKey: (_k = finalized === null || finalized === void 0 ? void 0 : finalized.sessionDateKey) !== null && _k !== void 0 ? _k : null,
-                sessionMinutes: (_l = finalized === null || finalized === void 0 ? void 0 : finalized.sessionMinutes) !== null && _l !== void 0 ? _l : 0,
-                totalMinutesAfterSession: (_m = finalized === null || finalized === void 0 ? void 0 : finalized.totalMinutesAfterSession) !== null && _m !== void 0 ? _m : 0,
-                attendanceAchieved: (_o = finalized === null || finalized === void 0 ? void 0 : finalized.attendanceAchieved) !== null && _o !== void 0 ? _o : false,
-                bonus6hAchieved: (_p = finalized === null || finalized === void 0 ? void 0 : finalized.bonus6hAchieved) !== null && _p !== void 0 ? _p : false,
+                duplicatedSession: (_q = finalized === null || finalized === void 0 ? void 0 : finalized.duplicatedSession) !== null && _q !== void 0 ? _q : true,
+                sessionId: (_r = finalized === null || finalized === void 0 ? void 0 : finalized.sessionId) !== null && _r !== void 0 ? _r : null,
+                sessionDateKey: (_s = finalized === null || finalized === void 0 ? void 0 : finalized.sessionDateKey) !== null && _s !== void 0 ? _s : null,
+                sessionMinutes: (_t = finalized === null || finalized === void 0 ? void 0 : finalized.sessionMinutes) !== null && _t !== void 0 ? _t : 0,
+                totalMinutesAfterSession: (_u = finalized === null || finalized === void 0 ? void 0 : finalized.totalMinutesAfterSession) !== null && _u !== void 0 ? _u : 0,
+                attendanceAchieved: (_v = finalized === null || finalized === void 0 ? void 0 : finalized.attendanceAchieved) !== null && _v !== void 0 ? _v : false,
+                bonus6hAchieved: (_w = finalized === null || finalized === void 0 ? void 0 : finalized.bonus6hAchieved) !== null && _w !== void 0 ? _w : false,
             };
         }
         const eventType = resolveAttendanceTransitionEventType(prevStatus, nextStatus);
@@ -7334,13 +7399,13 @@ async function applyAttendanceStatusTransition(params) {
             eventType,
             eventId: (eventRef === null || eventRef === void 0 ? void 0 : eventRef.id) || null,
             eventAtMillis: eventType ? nowMs : null,
-            duplicatedSession: (_q = finalized === null || finalized === void 0 ? void 0 : finalized.duplicatedSession) !== null && _q !== void 0 ? _q : false,
-            sessionId: (_r = finalized === null || finalized === void 0 ? void 0 : finalized.sessionId) !== null && _r !== void 0 ? _r : null,
-            sessionDateKey: (_s = finalized === null || finalized === void 0 ? void 0 : finalized.sessionDateKey) !== null && _s !== void 0 ? _s : null,
-            sessionMinutes: (_t = finalized === null || finalized === void 0 ? void 0 : finalized.sessionMinutes) !== null && _t !== void 0 ? _t : 0,
-            totalMinutesAfterSession: (_u = finalized === null || finalized === void 0 ? void 0 : finalized.totalMinutesAfterSession) !== null && _u !== void 0 ? _u : 0,
-            attendanceAchieved: (_v = finalized === null || finalized === void 0 ? void 0 : finalized.attendanceAchieved) !== null && _v !== void 0 ? _v : false,
-            bonus6hAchieved: (_w = finalized === null || finalized === void 0 ? void 0 : finalized.bonus6hAchieved) !== null && _w !== void 0 ? _w : false,
+            duplicatedSession: (_x = finalized === null || finalized === void 0 ? void 0 : finalized.duplicatedSession) !== null && _x !== void 0 ? _x : false,
+            sessionId: (_y = finalized === null || finalized === void 0 ? void 0 : finalized.sessionId) !== null && _y !== void 0 ? _y : null,
+            sessionDateKey: (_z = finalized === null || finalized === void 0 ? void 0 : finalized.sessionDateKey) !== null && _z !== void 0 ? _z : null,
+            sessionMinutes: (_0 = finalized === null || finalized === void 0 ? void 0 : finalized.sessionMinutes) !== null && _0 !== void 0 ? _0 : 0,
+            totalMinutesAfterSession: (_1 = finalized === null || finalized === void 0 ? void 0 : finalized.totalMinutesAfterSession) !== null && _1 !== void 0 ? _1 : 0,
+            attendanceAchieved: (_2 = finalized === null || finalized === void 0 ? void 0 : finalized.attendanceAchieved) !== null && _2 !== void 0 ? _2 : false,
+            bonus6hAchieved: (_3 = finalized === null || finalized === void 0 ? void 0 : finalized.bonus6hAchieved) !== null && _3 !== void 0 ? _3 : false,
         };
     });
 }
