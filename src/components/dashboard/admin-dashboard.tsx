@@ -830,6 +830,7 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
   const [isOperationsMemoOpen, setIsOperationsMemoOpen] = useState(false);
   const [isImmediateInterventionSheetOpen, setIsImmediateInterventionSheetOpen] = useState(false);
   const [isAttendancePriorityDialogOpen, setIsAttendancePriorityDialogOpen] = useState(false);
+  const [attendancePriorityDialogMode, setAttendancePriorityDialogMode] = useState<'all' | 'noShow' | 'late'>('all');
   const [isControlAlertsDialogOpen, setIsControlAlertsDialogOpen] = useState(false);
   const [isCounselTrackDialogOpen, setIsCounselTrackDialogOpen] = useState(false);
   const [counselTrackDialogTab, setCounselTrackDialogTab] = useState<DashboardCounselTrackTab>('reservations');
@@ -3883,16 +3884,26 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
       planned: 8,
       excused_absent: 9,
     };
+    const isLateSignal = (signal: CenterAdminAttendanceSeatSignal) =>
+      signal.attendanceDisplayStatus === 'confirmed_late'
+      || signal.boardStatus === 'late'
+      || signal.wasLateToday;
+
+    const getPriority = (signal: CenterAdminAttendanceSeatSignal) => {
+      if (signal.boardStatus === 'absent') return 0;
+      if (isLateSignal(signal)) return 1;
+      return priorityByStatus[signal.boardStatus] ?? 99;
+    };
 
     return attendanceSeatSignals
       .filter((signal) => {
         if (signal.boardStatus === 'absent' || signal.boardStatus === 'late') return true;
+        if (isLateSignal(signal)) return true;
         if (signal.boardStatus === 'routine_missing' || signal.boardStatus === 'present_missing_routine') return true;
         return false;
       })
       .sort((left, right) => {
-        const statusDelta =
-          (priorityByStatus[left.boardStatus] ?? 99) - (priorityByStatus[right.boardStatus] ?? 99);
+        const statusDelta = getPriority(left) - getPriority(right);
         if (statusDelta !== 0) return statusDelta;
         if (left.attendanceRiskLevel !== right.attendanceRiskLevel) {
           const getRiskWeight = (level: string) => {
@@ -3908,7 +3919,7 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
         const issueLabel =
           signal.boardStatus === 'absent'
             ? '미입실'
-            : signal.boardStatus === 'late'
+            : isLateSignal(signal)
               ? '지각'
               : signal.boardStatus === 'routine_missing' || signal.boardStatus === 'present_missing_routine'
                 ? '루틴누락'
@@ -3929,6 +3940,34 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
         };
       });
   }, [attendanceSeatSignals]);
+
+  const attendancePriorityDialogTargets = useMemo(() => {
+    if (attendancePriorityDialogMode === 'noShow') {
+      return todayAttendanceContactTargets.filter((target) => target.issueLabel === '미입실');
+    }
+    if (attendancePriorityDialogMode === 'late') {
+      return todayAttendanceContactTargets.filter((target) => target.issueLabel === '지각');
+    }
+    return todayAttendanceContactTargets;
+  }, [attendancePriorityDialogMode, todayAttendanceContactTargets]);
+
+  const attendancePriorityDialogCopy = {
+    all: {
+      badge: '출결 연락 우선',
+      title: '연락이 필요한 학생',
+      empty: '현재 바로 연락이 필요한 출결 대상이 없습니다.',
+    },
+    noShow: {
+      badge: '미입실 전체보기',
+      title: '오늘 미입실 학생',
+      empty: '현재 미입실 대상이 없습니다.',
+    },
+    late: {
+      badge: '지각 전체보기',
+      title: '오늘 지각한 학생',
+      empty: '오늘 지각 학생이 없습니다.',
+    },
+  }[attendancePriorityDialogMode];
 
   const lateOrAbsentAlertRows = useMemo(() => {
     return attendanceSeatSignals
@@ -5168,7 +5207,7 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
     }
 
     if (item.key === 'attendance') {
-      setIsAttendancePriorityDialogOpen(true);
+      openAttendancePriorityDialog('all');
       return;
     }
 
@@ -5182,6 +5221,10 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
       setIsParentTrustDialogOpen(true);
     }
   };
+  function openAttendancePriorityDialog(mode: 'all' | 'noShow' | 'late' = 'all') {
+    setAttendancePriorityDialogMode(mode);
+    setIsAttendancePriorityDialogOpen(true);
+  }
   const handleOpenAttendanceOverview = (roomId: 'all' | string = 'all') => {
     setSelectedRoomView(roomId);
     setIsAttendanceFullscreenOpen(true);
@@ -6770,7 +6813,7 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
             onClick: () => openAdminAttendanceSignal(signal),
           };
         }),
-        onOpenAll: adminNoShowSignals.length > 0 ? () => setIsAttendancePriorityDialogOpen(true) : undefined,
+        onOpenAll: adminNoShowSignals.length > 0 ? () => openAttendancePriorityDialog('noShow') : undefined,
       },
       {
         key: 'panel-late',
@@ -6792,7 +6835,7 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
             onClick: () => openAdminAttendanceSignal(signal),
           };
         }),
-        onOpenAll: adminLateSignals.length > 0 ? () => setIsAttendancePriorityDialogOpen(true) : undefined,
+        onOpenAll: adminLateSignals.length > 0 ? () => openAttendancePriorityDialog('late') : undefined,
       },
       {
         key: 'panel-attendance-request',
@@ -7083,7 +7126,7 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
         icon: Clock,
         tone: attendanceBoardSummary.lateOrAbsentCount > 0 ? 'orange' as const : 'default' as const,
         delta: null,
-        onClick: () => setIsAttendancePriorityDialogOpen(true),
+        onClick: () => openAttendancePriorityDialog('all'),
       },
       {
         key: 'urgent',
@@ -7459,7 +7502,7 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
                   </div>
                 </button>
 
-                <button type="button" onClick={() => setIsAttendancePriorityDialogOpen(true)} className="admin-card-lift w-full rounded-[1.45rem] border border-[#DCE7FF] bg-[#F7FAFF] px-4 py-3 text-left hover:bg-white">
+                <button type="button" onClick={() => openAttendancePriorityDialog('all')} className="admin-card-lift w-full rounded-[1.45rem] border border-[#DCE7FF] bg-[#F7FAFF] px-4 py-3 text-left hover:bg-white">
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0">
                       <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#5c6e97]">출결 연락</p>
@@ -8848,22 +8891,22 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
               <div className={studioDialogHeaderClassName}>
                 <DialogHeader className="text-left">
                   <div className="flex flex-wrap items-center gap-2">
-                    <Badge className="border-none bg-white/18 px-2.5 py-1 text-[10px] font-black text-white">출결 연락 우선</Badge>
+                    <Badge className="border-none bg-white/18 px-2.5 py-1 text-[10px] font-black text-white">{attendancePriorityDialogCopy.badge}</Badge>
                     <Badge className="border-none bg-white px-2.5 py-1 text-[10px] font-black text-[#14295F]">
-                      {todayAttendanceContactTargets.length}명
+                      {attendancePriorityDialogTargets.length}명
                     </Badge>
                   </div>
-                  <DialogTitle className="text-2xl font-black tracking-tight">연락이 필요한 학생</DialogTitle>
+                  <DialogTitle className="text-2xl font-black tracking-tight">{attendancePriorityDialogCopy.title}</DialogTitle>
                 </DialogHeader>
               </div>
               <div className="max-h-[68vh] overflow-y-auto bg-[linear-gradient(180deg,#F7FAFF_0%,#EEF4FF_100%)] px-5 py-5">
-                {todayAttendanceContactTargets.length === 0 ? (
+                {attendancePriorityDialogTargets.length === 0 ? (
                   <div className="rounded-[1.6rem] border border-dashed border-[#DCE7FF] bg-white px-6 py-10 text-center text-sm font-bold text-[#5c6e97]">
-                    현재 바로 연락이 필요한 출결 대상이 없습니다.
+                    {attendancePriorityDialogCopy.empty}
                   </div>
                 ) : (
                   <div className="space-y-3">
-                    {todayAttendanceContactTargets.map((target, index) => (
+                    {attendancePriorityDialogTargets.map((target, index) => (
                       <button
                         key={target.studentId}
                         type="button"
