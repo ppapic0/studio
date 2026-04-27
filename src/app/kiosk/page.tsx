@@ -1,7 +1,7 @@
 
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -35,6 +35,73 @@ import { useRouter } from 'next/navigation';
 import { syncAutoAttendanceRecord } from '@/lib/attendance-auto';
 import { resolveSeatIdentity } from '@/lib/seat-layout';
 import { setStudentAttendanceStatusSecure } from '@/lib/study-session-actions';
+import type { LucideIcon } from 'lucide-react';
+
+type KioskActionKey = 'checkIn' | 'return' | 'away' | 'checkOut';
+
+type KioskSuccessFeedback = {
+  actionKey: KioskActionKey;
+  title: string;
+  description: string;
+  badge: string;
+  Icon: LucideIcon;
+  panelClass: string;
+  iconClass: string;
+};
+
+const getKioskActionKey = (
+  prevStatus: AttendanceCurrent['status'] | undefined,
+  nextStatus: AttendanceCurrent['status']
+): KioskActionKey => {
+  if (nextStatus === 'studying' && (prevStatus === 'away' || prevStatus === 'break')) return 'return';
+  if (nextStatus === 'studying') return 'checkIn';
+  if (nextStatus === 'away' || nextStatus === 'break') return 'away';
+  return 'checkOut';
+};
+
+const getKioskSuccessFeedback = (
+  studentName: string,
+  prevStatus: AttendanceCurrent['status'] | undefined,
+  nextStatus: AttendanceCurrent['status']
+): KioskSuccessFeedback => {
+  const actionKey = getKioskActionKey(prevStatus, nextStatus);
+  const base = {
+    checkIn: {
+      title: '등원 처리 완료',
+      description: `${studentName} 학생 등원이 정상 처리되었습니다.`,
+      badge: '등원',
+      Icon: LogIn,
+      panelClass: 'border-blue-200 bg-blue-600 text-white shadow-blue-950/30',
+      iconClass: 'bg-white text-blue-600',
+    },
+    return: {
+      title: '복귀 처리 완료',
+      description: `${studentName} 학생 복귀가 정상 처리되었습니다.`,
+      badge: '복귀',
+      Icon: Undo2,
+      panelClass: 'border-emerald-200 bg-emerald-600 text-white shadow-emerald-950/30',
+      iconClass: 'bg-white text-emerald-600',
+    },
+    away: {
+      title: '외출 처리 완료',
+      description: `${studentName} 학생 외출이 정상 처리되었습니다.`,
+      badge: '외출',
+      Icon: Coffee,
+      panelClass: 'border-amber-200 bg-amber-500 text-white shadow-amber-950/30',
+      iconClass: 'bg-white text-amber-600',
+    },
+    checkOut: {
+      title: '퇴실 처리 완료',
+      description: `${studentName} 학생 퇴실이 정상 처리되었습니다.`,
+      badge: '퇴실',
+      Icon: LogOut,
+      panelClass: 'border-rose-200 bg-rose-600 text-white shadow-rose-950/30',
+      iconClass: 'bg-white text-rose-600',
+    },
+  } satisfies Record<KioskActionKey, Omit<KioskSuccessFeedback, 'actionKey'>>;
+
+  return { actionKey, ...base[actionKey] };
+};
 
 export default function KioskPage() {
   const firestore = useFirestore();
@@ -48,6 +115,13 @@ export default function KioskPage() {
   const [isSearching, setIsSearching] = useState(false);
   const [showResults, setShowResults] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
+  const [successFeedback, setSuccessFeedback] = useState<KioskSuccessFeedback | null>(null);
+
+  useEffect(() => {
+    if (!successFeedback) return;
+    const timer = window.setTimeout(() => setSuccessFeedback(null), 2400);
+    return () => window.clearTimeout(timer);
+  }, [successFeedback]);
 
   // 실시간 좌석 현황 조회
   const attendanceQuery = useMemoFirebase(() => {
@@ -191,15 +265,11 @@ export default function KioskPage() {
         });
       }
 
-      const statusLabels: Record<AttendanceCurrent['status'], string> = {
-        studying: '입실',
-        away: '외출/휴식',
-        break: '휴식',
-        absent: '퇴실',
-      };
+      const feedback = getKioskSuccessFeedback(student.name, prevStatus, nextStatus);
+      setSuccessFeedback(feedback);
       toast({ 
-        title: `${statusLabels[nextStatus]} 확인 ✨`,
-        description: `${student.name} 학생, 열공하세요!`
+        title: feedback.title,
+        description: feedback.description
       });
       
       resetKiosk();
@@ -232,6 +302,29 @@ export default function KioskPage() {
     <div className="min-h-screen bg-[#fafafa] flex flex-col items-center justify-center p-4 relative overflow-hidden">
       <div className="absolute -top-40 -right-40 w-[600px] h-[600px] bg-primary/5 rounded-full blur-3xl pointer-events-none" />
       <div className="absolute -bottom-40 -left-40 w-[600px] h-[600px] bg-accent/5 rounded-full blur-3xl pointer-events-none" />
+
+      {successFeedback && (
+        <div
+          className="fixed inset-0 z-[120] flex items-center justify-center bg-slate-950/45 p-6 backdrop-blur-md animate-in fade-in duration-200"
+          onClick={() => setSuccessFeedback(null)}
+        >
+          <div
+            className={cn(
+              "w-full max-w-xl rounded-[3rem] border-4 p-10 text-center shadow-[0_40px_90px_-24px] animate-in zoom-in-95 duration-200",
+              successFeedback.panelClass
+            )}
+          >
+            <div className={cn("mx-auto mb-6 flex h-24 w-24 items-center justify-center rounded-[2rem] shadow-2xl", successFeedback.iconClass)}>
+              <successFeedback.Icon className="h-12 w-12" />
+            </div>
+            <div className="mx-auto mb-4 w-fit rounded-full bg-white/20 px-5 py-2 text-sm font-black">
+              {successFeedback.badge}
+            </div>
+            <h2 className="text-5xl font-black tracking-tighter">{successFeedback.title}</h2>
+            <p className="mt-5 text-xl font-black text-white/90">{successFeedback.description}</p>
+          </div>
+        </div>
+      )}
 
       {canGoBack && !showResults && (
         <div className="fixed top-8 left-8 z-50">
@@ -309,6 +402,7 @@ export default function KioskPage() {
             {matchedStudents.map(student => {
               const seat = resolveSeatForStudent(student);
               const statusInfo = getStatusInfo(seat?.status);
+              const isReturnState = seat?.status === 'away' || seat?.status === 'break';
               
               return (
                 <Card key={student.id} className="rounded-[4rem] border-none shadow-[0_50px_100px_-20px_rgba(0,0,0,0.15)] bg-white overflow-hidden ring-1 ring-black/5 relative group transition-all duration-500">
@@ -333,13 +427,17 @@ export default function KioskPage() {
                         onClick={() => handleStatusUpdate(student, 'studying')}
                         className={cn(
                           "h-48 rounded-[2.5rem] font-black flex flex-col gap-4 shadow-xl transition-all active:scale-95",
-                          seat?.status === 'studying' ? "bg-muted text-muted-foreground opacity-40" : "bg-blue-600 hover:bg-blue-700 text-white shadow-blue-200"
+                          seat?.status === 'studying'
+                            ? "bg-muted text-muted-foreground opacity-40"
+                            : isReturnState
+                              ? "bg-emerald-600 hover:bg-emerald-700 text-white shadow-emerald-200"
+                              : "bg-blue-600 hover:bg-blue-700 text-white shadow-blue-200"
                         )}
                       >
-                        <LogIn className="h-12 w-12" />
+                        {isReturnState ? <Undo2 className="h-12 w-12" /> : <LogIn className="h-12 w-12" />}
                         <div className="grid">
-                          <span className="text-2xl">입실</span>
-                          <span className="text-[10px] opacity-60 uppercase tracking-widest">Start Study</span>
+                          <span className="text-2xl">{isReturnState ? '복귀' : '입실'}</span>
+                          <span className="text-[10px] opacity-60 uppercase tracking-widest">{isReturnState ? 'Return' : 'Start Study'}</span>
                         </div>
                       </Button>
 
