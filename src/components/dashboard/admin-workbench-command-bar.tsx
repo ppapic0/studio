@@ -85,7 +85,7 @@ export function AdminWorkbenchCommandBar({
         isTeacherWorkbench
           ? 'rounded-[2.15rem] border border-[#dbe7ff] bg-[linear-gradient(180deg,rgba(255,255,255,0.98)_0%,rgba(246,249,255,0.98)_100%)] p-5 shadow-[0_24px_56px_-42px_rgba(20,41,95,0.34)]'
           : isAdminStudio
-            ? 'rounded-[2rem] border border-[#1E3B82] bg-[linear-gradient(135deg,rgba(20,41,95,0.98)_0%,rgba(22,48,109,0.97)_52%,rgba(15,31,69,0.98)_100%)] p-4 text-white shadow-[0_28px_64px_-42px_rgba(20,41,95,0.72)]'
+            ? 'rounded-[2rem] border border-[#274DA3]/80 bg-[radial-gradient(ellipse_at_12%_0%,rgba(255,122,22,0.22),transparent_34%),radial-gradient(ellipse_at_88%_10%,rgba(24,167,181,0.22),transparent_38%),linear-gradient(135deg,rgba(16,31,75,0.99)_0%,rgba(24,59,134,0.98)_54%,rgba(13,26,61,0.99)_100%)] p-4 text-white shadow-[0_30px_70px_-42px_rgba(16,31,75,0.82)]'
             : 'rounded-[2rem] border border-slate-200/80 bg-white/88 p-4 shadow-[0_18px_48px_-38px_rgba(20,41,95,0.36)]',
         className
       )}
@@ -102,7 +102,7 @@ export function AdminWorkbenchCommandBar({
                 isTeacherWorkbench
                   ? 'border border-[#14295F] bg-[#14295F] text-white'
                   : isAdminStudio
-                    ? 'border border-white/12 bg-white/10 text-[#FFD7BA]'
+                    ? 'border border-[#FFD7BA]/28 bg-[#FF7A16]/16 text-[#FFE0C2]'
                     : 'border border-[#dbe7ff] bg-[#eef4ff] text-[#2554d4]'
               )}>
                 {eyebrow}
@@ -132,7 +132,7 @@ export function AdminWorkbenchCommandBar({
             <div
               className={cn(
                 isAdminStudio
-                  ? 'rounded-[1.35rem] border border-white/10 bg-white/10 p-1.5 lg:max-w-[620px]'
+                  ? 'rounded-[1.35rem] border border-white/12 bg-white/[0.09] p-1.5 shadow-[inset_0_1px_0_rgba(255,255,255,0.12)] lg:max-w-[620px]'
                   : 'flex flex-wrap gap-2'
               )}
             >
@@ -148,7 +148,7 @@ export function AdminWorkbenchCommandBar({
                         isTeacherWorkbench
                           ? 'border-[#dbe7ff] bg-white text-[#14295F] hover:bg-[#f4f7ff]'
                           : isAdminStudio
-                            ? 'h-9 rounded-[1rem] border border-transparent bg-white/10 px-3 text-white shadow-none transition-[transform,background-color,border-color,color] hover:-translate-y-0.5 hover:border-[#FF7A16]/60 hover:bg-[#FF7A16]/12 hover:text-[#FFD7BA]'
+                            ? 'h-9 rounded-[1rem] border border-transparent bg-white/10 px-3 text-white shadow-none transition-[transform,background-color,border-color,color] hover:-translate-y-0.5 hover:border-[#18A7B5]/45 hover:bg-[#18A7B5]/16 hover:text-[#DDFBFF]'
                             : 'border-slate-200 bg-white text-[#17306f]'
                       )}
                       onClick={action.onClick}
@@ -171,7 +171,7 @@ export function AdminWorkbenchCommandBar({
                           isTeacherWorkbench
                             ? 'border-[#dbe7ff] bg-white text-[#14295F] hover:bg-[#f4f7ff]'
                             : isAdminStudio
-                              ? 'h-9 rounded-[1rem] border border-transparent bg-white/10 px-3 text-white shadow-none transition-[transform,background-color,border-color,color] hover:-translate-y-0.5 hover:border-[#FF7A16]/60 hover:bg-[#FF7A16]/12 hover:text-[#FFD7BA]'
+                              ? 'h-9 rounded-[1rem] border border-transparent bg-white/10 px-3 text-white shadow-none transition-[transform,background-color,border-color,color] hover:-translate-y-0.5 hover:border-[#18A7B5]/45 hover:bg-[#18A7B5]/16 hover:text-[#DDFBFF]'
                               : 'border-slate-200 bg-white text-[#17306f]'
                         )}
                       >
@@ -194,7 +194,7 @@ export function AdminWorkbenchCommandBar({
           <div className={cn(
             'flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between',
             isAdminStudio &&
-              'rounded-[1.45rem] border border-white/10 bg-white/10 p-3'
+              'rounded-[1.45rem] border border-white/12 bg-white/[0.09] p-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.1)]'
           )}>
             <div className="flex flex-1 flex-col gap-3 lg:flex-row lg:items-center">
               {onPeriodChange ? (

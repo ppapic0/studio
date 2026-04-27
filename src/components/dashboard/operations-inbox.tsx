@@ -68,49 +68,49 @@ type OperationsInboxProps = {
 
 const toneClassMap: Record<OperationsInboxTone, { shell: string; badge: string; icon: string; accent: string }> = {
   navy: {
-    shell: 'border-[#D7DEFF] bg-[linear-gradient(180deg,#F4F7FF_0%,#FFFFFF_100%)]',
-    badge: 'bg-[#EEF4FF] text-[#2554D7]',
+    shell: 'border-[#CDD9FF] bg-[radial-gradient(circle_at_top_right,rgba(37,84,215,0.075),transparent_34%),linear-gradient(180deg,#F5F8FF_0%,#FFFFFF_100%)]',
+    badge: 'bg-[#EAF0FF] text-[#2554D7]',
     icon: 'text-[#2554D7]',
     accent: 'text-[#14295F]',
   },
   blue: {
-    shell: 'border-[#DCE7FF] bg-[linear-gradient(180deg,#F6FAFF_0%,#FFFFFF_100%)]',
+    shell: 'border-[#DCE7FF] bg-[radial-gradient(circle_at_top_right,rgba(24,167,181,0.06),transparent_34%),linear-gradient(180deg,#F7FBFF_0%,#FFFFFF_100%)]',
     badge: 'bg-[#EEF4FF] text-[#2554D7]',
     icon: 'text-[#2554D7]',
     accent: 'text-[#14295F]',
   },
   amber: {
-    shell: 'border-[#FFE1B7] bg-[linear-gradient(180deg,#FFF8ED_0%,#FFFFFF_100%)]',
+    shell: 'border-[#FFE1B7] bg-[radial-gradient(circle_at_top_right,rgba(255,122,22,0.09),transparent_34%),linear-gradient(180deg,#FFF8ED_0%,#FFFFFF_100%)]',
     badge: 'bg-[#FFF1D9] text-[#B76B10]',
     icon: 'text-[#C95A08]',
     accent: 'text-[#8D4C00]',
   },
   orange: {
-    shell: 'border-[#FFD7BA] bg-[linear-gradient(180deg,#FFF6EE_0%,#FFFFFF_100%)]',
+    shell: 'border-[#FFD7BA] bg-[radial-gradient(circle_at_top_right,rgba(255,122,22,0.1),transparent_34%),linear-gradient(180deg,#FFF6EE_0%,#FFFFFF_100%)]',
     badge: 'bg-[#FFF1E6] text-[#C95A08]',
     icon: 'text-[#FF7A16]',
     accent: 'text-[#8D4C00]',
   },
   rose: {
-    shell: 'border-rose-100 bg-[linear-gradient(180deg,#FFF4F5_0%,#FFFFFF_100%)]',
+    shell: 'border-rose-100 bg-[radial-gradient(circle_at_top_right,rgba(225,29,72,0.075),transparent_34%),linear-gradient(180deg,#FFF4F5_0%,#FFFFFF_100%)]',
     badge: 'bg-rose-100 text-rose-700',
     icon: 'text-rose-600',
     accent: 'text-rose-800',
   },
   teal: {
-    shell: 'border-[#CFE8EE] bg-[linear-gradient(180deg,#F3FBFD_0%,#FFFFFF_100%)]',
+    shell: 'border-[#CFE8EE] bg-[radial-gradient(circle_at_top_right,rgba(24,167,181,0.1),transparent_34%),linear-gradient(180deg,#F3FBFD_0%,#FFFFFF_100%)]',
     badge: 'bg-[#EAFBFF] text-[#1D6F84]',
     icon: 'text-[#1D6F84]',
     accent: 'text-[#135565]',
   },
   violet: {
-    shell: 'border-[#DDD8FF] bg-[linear-gradient(180deg,#F7F5FF_0%,#FFFFFF_100%)]',
+    shell: 'border-[#DDD8FF] bg-[radial-gradient(circle_at_top_right,rgba(75,87,192,0.075),transparent_34%),linear-gradient(180deg,#F7F5FF_0%,#FFFFFF_100%)]',
     badge: 'bg-[#EEF1FF] text-[#4B57C0]',
     icon: 'text-[#4B57C0]',
     accent: 'text-[#3944A2]',
   },
   emerald: {
-    shell: 'border-emerald-100 bg-[linear-gradient(180deg,#F3FCF7_0%,#FFFFFF_100%)]',
+    shell: 'border-emerald-100 bg-[radial-gradient(circle_at_top_right,rgba(16,185,129,0.075),transparent_34%),linear-gradient(180deg,#F3FCF7_0%,#FFFFFF_100%)]',
     badge: 'bg-emerald-100 text-emerald-700',
     icon: 'text-emerald-600',
     accent: 'text-emerald-800',
@@ -176,7 +176,7 @@ export function OperationsInbox({
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.45, ease: 'easeOut' }}
     >
-      <div className="overflow-hidden rounded-[2.25rem] border border-[#DCE7FF] bg-[linear-gradient(180deg,#FFFFFF_0%,#F6FAFF_100%)] shadow-[0_28px_60px_-42px_rgba(20,41,95,0.3)]">
+      <div className="overflow-hidden rounded-[2.25rem] border border-[#D8E5FF] bg-[radial-gradient(circle_at_8%_0%,rgba(255,122,22,0.055),transparent_34%),radial-gradient(circle_at_96%_4%,rgba(24,167,181,0.08),transparent_36%),linear-gradient(180deg,#FFFFFF_0%,#F4F8FF_100%)] shadow-[0_30px_68px_-42px_rgba(20,41,95,0.34)]">
         <div className="border-b border-[#E4ECFF] px-5 py-5 sm:px-6 sm:py-6">
           <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
             <div className="min-w-0 space-y-3">
@@ -249,7 +249,7 @@ export function OperationsInbox({
         </div>
 
         <div className="grid gap-4 px-5 py-5 sm:px-6 sm:py-6 xl:grid-cols-[minmax(0,0.92fr)_minmax(0,1.08fr)]">
-          <div className="rounded-[2rem] border border-[#DCE7FF] bg-white/92 p-4 shadow-[0_20px_42px_-32px_rgba(20,41,95,0.18)] sm:p-5">
+          <div className="rounded-[2rem] border border-[#D8E5FF] bg-white/94 p-4 shadow-[0_22px_46px_-32px_rgba(20,41,95,0.22)] sm:p-5">
             <div className="flex items-start justify-between gap-3 border-b border-[#EEF4FF] pb-4">
               <div>
                 <p className="text-[10px] font-black uppercase tracking-[0.22em] text-[#5C6E97]">우선순위 큐</p>

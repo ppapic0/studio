@@ -371,11 +371,12 @@
   .admin-card-lift {
     transition: transform 0.32s cubic-bezier(0.34, 1.56, 0.64, 1),
                 box-shadow 0.32s ease,
-                border-color 0.32s ease;
+                border-color 0.32s ease,
+                background-color 0.32s ease;
   }
   .admin-card-lift:hover {
-    transform: translateY(-4px);
-    box-shadow: 0 28px 52px -28px rgba(20, 41, 95, 0.22);
+    transform: translateY(-3px);
+    box-shadow: 0 30px 56px -30px rgba(20, 41, 95, 0.28);
   }
   .admin-card-lift:active {
     transform: translateY(-1px);
@@ -434,27 +435,37 @@
 
   /* ── Executive header gradient ── */
   .admin-exec-header {
-    background: radial-gradient(ellipse at top left, rgba(255, 122, 22, 0.12), transparent 40%),
-                linear-gradient(135deg, #14295F 0%, #1B3D89 56%, #2554D7 100%);
+    background:
+      radial-gradient(ellipse at 15% 0%, rgba(255, 122, 22, 0.22), transparent 36%),
+      radial-gradient(ellipse at 86% 16%, rgba(24, 167, 181, 0.22), transparent 38%),
+      linear-gradient(135deg, #101F4B 0%, #183B86 48%, #2554D7 100%);
   }
 
   /* ── Card surface tokens ── */
   .admin-surface-primary {
-    background: linear-gradient(180deg, #FFFFFF 0%, #F8FBFF 100%);
+    background:
+      radial-gradient(circle at top right, rgba(37, 84, 215, 0.055), transparent 32%),
+      linear-gradient(180deg, #FFFFFF 0%, #F7FAFF 100%);
     border-color: #DCE7FF;
   }
   .admin-surface-elevated {
-    background: linear-gradient(180deg, #FFFFFF 0%, #F3F7FF 100%);
+    background:
+      radial-gradient(circle at top left, rgba(255, 122, 22, 0.07), transparent 34%),
+      linear-gradient(180deg, #FFFFFF 0%, #F2F7FF 100%);
     border-color: #C8D8F8;
     box-shadow: 0 24px 48px -32px rgba(20, 41, 95, 0.24);
   }
   .admin-surface-dark {
-    background: radial-gradient(ellipse at top right, rgba(255, 122, 22, 0.18), transparent 30%),
-                linear-gradient(135deg, #14295F 0%, #1A3778 58%, #10224C 100%);
-    border-color: #1C3A82;
+    background:
+      radial-gradient(ellipse at top right, rgba(255, 122, 22, 0.2), transparent 32%),
+      radial-gradient(ellipse at bottom left, rgba(24, 167, 181, 0.18), transparent 38%),
+      linear-gradient(135deg, #101F4B 0%, #183B86 58%, #0D1A3D 100%);
+    border-color: #274DA3;
   }
   .admin-surface-alert {
-    background: linear-gradient(180deg, #FFF8F2 0%, #FFFFFF 100%);
+    background:
+      radial-gradient(circle at top right, rgba(255, 122, 22, 0.12), transparent 34%),
+      linear-gradient(180deg, #FFF8F2 0%, #FFFFFF 100%);
     border-color: #FFD7BA;
   }
 

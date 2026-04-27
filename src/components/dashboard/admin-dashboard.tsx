@@ -5123,21 +5123,21 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
     return `집중 흐름 ${row.score}점`;
   };
   const studioWhiteCardClassName =
-    'rounded-[2.1rem] border border-[#DCE7FF] bg-[linear-gradient(180deg,#FFFFFF_0%,#F8FBFF_100%)] shadow-[0_20px_48px_-38px_rgba(20,41,95,0.32)]';
+    'rounded-[2.1rem] border border-[#D8E5FF] bg-[radial-gradient(circle_at_top_right,rgba(24,167,181,0.055),transparent_34%),linear-gradient(180deg,#FFFFFF_0%,#F7FAFF_100%)] shadow-[0_22px_52px_-38px_rgba(20,41,95,0.34)]';
   const studioInsetCardClassName =
-    'rounded-[1.5rem] border border-[#DCE7FF] bg-white px-4 py-4 shadow-[0_18px_32px_-30px_rgba(20,41,95,0.2)]';
+    'rounded-[1.5rem] border border-[#D8E5FF] bg-white px-4 py-4 shadow-[0_18px_34px_-30px_rgba(20,41,95,0.22)]';
   const studioSoftPanelClassName =
-    'rounded-[1.55rem] border border-[#DCE7FF] bg-[#F7FAFF] px-4 py-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.88)]';
+    'rounded-[1.55rem] border border-[#D8E5FF] bg-[linear-gradient(180deg,#F8FBFF_0%,#F3F7FF_100%)] px-4 py-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.94)]';
   const studioGlassPanelClassName =
-    'rounded-[1.75rem] border border-white/12 bg-white/10 shadow-[inset_0_1px_0_rgba(255,255,255,0.16)]';
+    'rounded-[1.75rem] border border-white/14 bg-white/[0.11] shadow-[inset_0_1px_0_rgba(255,255,255,0.18)]';
   const studioDialogContentClassName =
     'overflow-hidden rounded-[2.2rem] border-none p-0 shadow-[0_28px_80px_-36px_rgba(20,41,95,0.42)]';
   const studioDialogHeaderClassName =
-    'bg-[radial-gradient(circle_at_top_left,rgba(255,122,22,0.16),transparent_28%),linear-gradient(135deg,#14295F_0%,#1B3D89_56%,#2554D7_100%)] px-6 py-6 text-white';
+    'bg-[radial-gradient(circle_at_top_left,rgba(255,122,22,0.2),transparent_30%),radial-gradient(circle_at_top_right,rgba(24,167,181,0.2),transparent_34%),linear-gradient(135deg,#101F4B_0%,#183B86_56%,#2554D7_100%)] px-6 py-6 text-white';
   const studioMetricCardClassName =
-    'rounded-[1.55rem] border border-[#DCE7FF] bg-white p-4 shadow-[0_18px_34px_-30px_rgba(20,41,95,0.18)]';
+    'rounded-[1.55rem] border border-[#D8E5FF] bg-white p-4 shadow-[0_18px_36px_-30px_rgba(20,41,95,0.2)]';
   const studioChartCardClassName =
-    'rounded-[1.7rem] border border-[#DCE7FF] bg-white p-4 shadow-[0_18px_36px_-32px_rgba(20,41,95,0.18)]';
+    'rounded-[1.7rem] border border-[#D8E5FF] bg-white p-4 shadow-[0_20px_40px_-32px_rgba(20,41,95,0.2)]';
   const studioSectionEyebrowClassName =
     'text-[10px] font-black uppercase tracking-[0.22em] text-[#5c6e97]';
   const heatmapGraphSection = (
@@ -7210,12 +7210,12 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
           {kpiCards.map((card, index) => {
             const KpiIcon = card.icon;
             const toneMap: Record<string, { card: string; label: string; value: string; iconBg: string; icon: string }> = {
-              navy: { card: 'border-[#C8D8F8] bg-[linear-gradient(180deg,#14295F_0%,#1B3D89_100%)] text-white', label: 'text-white/55', value: 'text-white', iconBg: 'bg-white/10', icon: 'text-white/70' },
-              orange: { card: 'border-[#FFD7BA] bg-[linear-gradient(180deg,#FFF6EE_0%,#FFFFFF_100%)] admin-glow-pulse', label: 'text-[#C95A08]', value: 'text-[#C95A08]', iconBg: 'bg-[#FF7A16]/10', icon: 'text-[#FF7A16]' },
-              emerald: { card: 'border-emerald-100 bg-[linear-gradient(180deg,#F0FDF4_0%,#FFFFFF_100%)]', label: 'text-emerald-700/70', value: 'text-emerald-800', iconBg: 'bg-emerald-50', icon: 'text-emerald-600' },
-              rose: { card: 'border-rose-100 bg-[linear-gradient(180deg,#FFF1F2_0%,#FFFFFF_100%)]', label: 'text-rose-700/70', value: 'text-rose-800', iconBg: 'bg-rose-50', icon: 'text-rose-600' },
-              blue: { card: 'border-[#DCE7FF] bg-[linear-gradient(180deg,#F0F5FF_0%,#FFFFFF_100%)]', label: 'text-[#5c6e97]', value: 'text-[#14295F]', iconBg: 'bg-[#EEF4FF]', icon: 'text-[#2554D7]' },
-              default: { card: 'border-[#DCE7FF] bg-[linear-gradient(180deg,#FFFFFF_0%,#F8FBFF_100%)]', label: 'text-[#5c6e97]', value: 'text-[#14295F]', iconBg: 'bg-[#F7FAFF]', icon: 'text-[#5c6e97]' },
+              navy: { card: 'border-[#274DA3] bg-[radial-gradient(circle_at_top_right,rgba(24,167,181,0.22),transparent_34%),linear-gradient(180deg,#101F4B_0%,#1B3D89_100%)] text-white', label: 'text-white/62', value: 'text-white', iconBg: 'bg-white/12', icon: 'text-[#DDFBFF]' },
+              orange: { card: 'border-[#FFD7BA] bg-[radial-gradient(circle_at_top_right,rgba(255,122,22,0.12),transparent_34%),linear-gradient(180deg,#FFF6EE_0%,#FFFFFF_100%)] admin-glow-pulse', label: 'text-[#C95A08]', value: 'text-[#B94D00]', iconBg: 'bg-[#FF7A16]/12', icon: 'text-[#FF7A16]' },
+              emerald: { card: 'border-emerald-100 bg-[radial-gradient(circle_at_top_right,rgba(16,185,129,0.08),transparent_34%),linear-gradient(180deg,#F0FDF4_0%,#FFFFFF_100%)]', label: 'text-emerald-700/70', value: 'text-emerald-800', iconBg: 'bg-emerald-50', icon: 'text-emerald-600' },
+              rose: { card: 'border-rose-100 bg-[radial-gradient(circle_at_top_right,rgba(225,29,72,0.08),transparent_34%),linear-gradient(180deg,#FFF1F2_0%,#FFFFFF_100%)]', label: 'text-rose-700/70', value: 'text-rose-800', iconBg: 'bg-rose-50', icon: 'text-rose-600' },
+              blue: { card: 'border-[#D8E5FF] bg-[radial-gradient(circle_at_top_right,rgba(37,84,215,0.075),transparent_34%),linear-gradient(180deg,#F3F7FF_0%,#FFFFFF_100%)]', label: 'text-[#5c6e97]', value: 'text-[#14295F]', iconBg: 'bg-[#EEF4FF]', icon: 'text-[#2554D7]' },
+              default: { card: 'border-[#D8E5FF] bg-[linear-gradient(180deg,#FFFFFF_0%,#F7FAFF_100%)]', label: 'text-[#5c6e97]', value: 'text-[#14295F]', iconBg: 'bg-[#F7FAFF]', icon: 'text-[#5c6e97]' },
             };
             const t = toneMap[card.tone] || toneMap.default;
             const isClickable = !!card.onClick;
