@@ -2400,59 +2400,88 @@ function normalizeAttendanceEventForParentSms(value) {
         return normalized;
     return null;
 }
-async function queueAttendanceTransitionSmsDirectly(db, params) {
-    const smsEventType = normalizeAttendanceEventForParentSms(params.eventType);
+function resolveAttendanceSmsPipelineStatus(queueResult) {
+    if (queueResult.deduped)
+        return "deduped";
+    if (queueResult.recipientCount === 0)
+        return "no_recipient";
+    if (queueResult.queuedCount > 0)
+        return "queued";
+    if (queueResult.suppressedCount > 0)
+        return "suppressed";
+    return "no_recipient";
+}
+async function queueAttendanceEventSmsV2(db, params) {
+    const centerId = asTrimmedString(params.centerId);
     const eventId = asTrimmedString(params.eventId);
-    const eventAtMillis = Math.max(0, Math.floor(params.eventAtMillis || 0));
-    if (!params.centerId || !params.studentId || !smsEventType || !eventId || eventAtMillis <= 0) {
-        return null;
-    }
-    const eventAt = toKstDate(new Date(eventAtMillis));
-    const eventRef = db.doc(`centers/${params.centerId}/attendanceEvents/${eventId}`);
+    const eventData = params.eventData || {};
+    const studentId = asTrimmedString(eventData.studentId);
+    const smsEventType = normalizeAttendanceEventForParentSms(eventData.eventType);
+    const eventRef = params.eventRef || db.doc(`centers/${centerId}/attendanceEvents/${eventId}`);
     try {
+        if (!centerId || !eventId || !studentId || !smsEventType) {
+            return {
+                status: "failed",
+                queuedCount: 0,
+                recipientCount: 0,
+                suppressedCount: 0,
+            };
+        }
+        const eventAt = toKstDateFromUnknownTimestamp(eventData.occurredAt)
+            || toKstDateFromUnknownTimestamp(eventData.createdAt)
+            || toKstDate();
+        const eventMeta = asRecord(eventData.meta);
         const [settings, studentSnap] = await Promise.all([
-            loadNotificationSettings(db, params.centerId),
-            db.doc(`centers/${params.centerId}/students/${params.studentId}`).get(),
+            loadNotificationSettings(db, centerId),
+            db.doc(`centers/${centerId}/students/${studentId}`).get(),
         ]);
         const studentData = studentSnap.exists ? studentSnap.data() || {} : {};
-        const studentName = asTrimmedString(studentData.name, "학생");
+        const studentName = asTrimmedString(studentData.name || (eventMeta === null || eventMeta === void 0 ? void 0 : eventMeta.studentName) || eventData.studentName, "학생");
+        const dedupeKey = buildAttendanceEventSmsDedupeKey({
+            centerId,
+            studentId,
+            eventType: smsEventType,
+            eventAt,
+            eventId,
+        });
         const queueResult = await queueParentSmsNotification(db, {
-            centerId: params.centerId,
-            studentId: params.studentId,
+            centerId,
+            studentId,
             studentName,
             eventType: smsEventType,
             eventAt,
             settings,
+            force: params.force === true,
             useExactEventAt: true,
-            dedupeKeyOverride: buildAttendanceEventSmsDedupeKey({
-                centerId: params.centerId,
-                studentId: params.studentId,
-                eventType: smsEventType,
-                eventAt,
-                eventId,
-            }),
+            dedupeKeyOverride: dedupeKey,
             sourceEventId: eventId,
         });
+        const smsStatus = resolveAttendanceSmsPipelineStatus(queueResult);
         await eventRef.set({
-            smsCallableQueuedAt: admin.firestore.FieldValue.serverTimestamp(),
-            smsCallableQueuedCount: queueResult.queuedCount,
-            smsCallableRecipientCount: queueResult.recipientCount,
-            smsCallableSuppressedCount: queueResult.suppressedCount,
-            smsCallableDeduped: queueResult.deduped === true,
-            smsCallableEventType: smsEventType,
-            smsCallableMessage: queueResult.message || null,
+            smsStatus,
+            smsPipelineVersion: "v2",
+            smsQueuedAt: admin.firestore.FieldValue.serverTimestamp(),
+            smsQueuedCount: queueResult.queuedCount,
+            smsRecipientCount: queueResult.recipientCount,
+            smsSuppressedCount: queueResult.suppressedCount,
+            smsError: null,
+            smsEventType,
+            smsMessage: queueResult.message || null,
+            smsDedupeKey: dedupeKey,
         }, { merge: true });
-        console.log("[attendance-sms-direct] queued", {
-            centerId: params.centerId,
-            studentId: params.studentId,
+        console.log("[attendance-sms-v2] queued", {
+            centerId,
+            studentId,
             eventId,
             eventType: smsEventType,
+            status: smsStatus,
             queuedCount: queueResult.queuedCount,
             recipientCount: queueResult.recipientCount,
             suppressedCount: queueResult.suppressedCount,
             deduped: queueResult.deduped === true,
         });
         return {
+            status: smsStatus,
             queuedCount: queueResult.queuedCount,
             recipientCount: queueResult.recipientCount,
             suppressedCount: queueResult.suppressedCount,
@@ -2461,26 +2490,36 @@ async function queueAttendanceTransitionSmsDirectly(db, params) {
     }
     catch (error) {
         const message = (error === null || error === void 0 ? void 0 : error.message) || String(error);
-        console.error("[attendance-sms-direct] failed", {
-            centerId: params.centerId,
-            studentId: params.studentId,
+        console.error("[attendance-sms-v2] failed", {
+            centerId,
+            studentId,
             eventId,
             eventType: smsEventType,
             message,
         });
         await eventRef.set({
-            smsCallableQueuedAt: admin.firestore.FieldValue.serverTimestamp(),
-            smsCallableError: message,
-            smsCallableEventType: smsEventType,
+            smsStatus: "failed",
+            smsPipelineVersion: "v2",
+            smsQueuedAt: admin.firestore.FieldValue.serverTimestamp(),
+            smsQueuedCount: 0,
+            smsRecipientCount: 0,
+            smsSuppressedCount: 0,
+            smsError: message,
+            smsEventType: smsEventType || null,
+            smsFailedAt: admin.firestore.FieldValue.serverTimestamp(),
         }, { merge: true });
-        return null;
+        return {
+            status: "failed",
+            queuedCount: 0,
+            recipientCount: 0,
+            suppressedCount: 0,
+        };
     }
 }
 exports.onAttendanceEventCreated = functions
     .region(region)
     .firestore.document("centers/{centerId}/attendanceEvents/{eventId}")
     .onCreate(async (snap, context) => {
-    var _a;
     const db = admin.firestore();
     const centerId = asTrimmedString(context.params.centerId);
     const eventId = asTrimmedString(context.params.eventId);
@@ -2490,65 +2529,12 @@ exports.onAttendanceEventCreated = functions
     if (!centerId || !studentId || !eventType) {
         return null;
     }
-    try {
-        const eventAt = toKstDateFromUnknownTimestamp(data.occurredAt)
-            || toKstDateFromUnknownTimestamp(data.createdAt)
-            || toKstDate();
-        const [settings, studentSnap] = await Promise.all([
-            loadNotificationSettings(db, centerId),
-            db.doc(`centers/${centerId}/students/${studentId}`).get(),
-        ]);
-        const studentData = studentSnap.exists ? studentSnap.data() || {} : {};
-        const studentName = asTrimmedString(studentData.name || ((_a = asRecord(data.meta)) === null || _a === void 0 ? void 0 : _a.studentName) || data.studentName, "학생");
-        const queueResult = await queueParentSmsNotification(db, {
-            centerId,
-            studentId,
-            studentName,
-            eventType,
-            eventAt,
-            settings,
-            useExactEventAt: true,
-            dedupeKeyOverride: buildAttendanceEventSmsDedupeKey({
-                centerId,
-                studentId,
-                eventType,
-                eventAt,
-                eventId,
-            }),
-            sourceEventId: eventId,
-        });
-        await snap.ref.set({
-            smsAutoQueuedAt: admin.firestore.FieldValue.serverTimestamp(),
-            smsAutoQueuedCount: queueResult.queuedCount,
-            smsAutoRecipientCount: queueResult.recipientCount,
-            smsAutoEventType: eventType,
-            smsAutoMessage: queueResult.message || null,
-        }, { merge: true });
-        console.log("[attendance-sms-auto] queued", {
-            centerId,
-            eventId,
-            studentId,
-            eventType,
-            queuedCount: queueResult.queuedCount,
-            recipientCount: queueResult.recipientCount,
-            suppressedCount: queueResult.suppressedCount,
-            deduped: queueResult.deduped === true,
-        });
-    }
-    catch (error) {
-        console.error("[attendance-sms-auto] failed", {
-            centerId,
-            eventId,
-            studentId,
-            eventType,
-            message: (error === null || error === void 0 ? void 0 : error.message) || String(error),
-        });
-        await snap.ref.set({
-            smsAutoQueuedAt: admin.firestore.FieldValue.serverTimestamp(),
-            smsAutoError: (error === null || error === void 0 ? void 0 : error.message) || String(error),
-            smsAutoEventType: eventType,
-        }, { merge: true });
-    }
+    await queueAttendanceEventSmsV2(db, {
+        centerId,
+        eventId,
+        eventData: data,
+        eventRef: snap.ref,
+    });
     return null;
 });
 async function loadExistingAttendanceSmsQueuesForDate(db, centerId, dateKey) {
@@ -2598,11 +2584,23 @@ function getExistingAttendanceSmsQueueState(existingQueues, params) {
     }
     return hasRetryableQueue ? "retryable" : "none";
 }
-async function repairAttendanceSmsQueueForCenter(db, centerId, dateKey) {
+function shouldRepairAttendanceSmsEvent(params) {
+    if (params.existingQueueState === "active_or_sent") {
+        return { shouldRepair: false, force: false };
+    }
+    if (params.smsStatus && params.smsStatus !== "failed") {
+        return { shouldRepair: false, force: false };
+    }
+    return {
+        shouldRepair: true,
+        force: params.smsStatus === "failed" || params.existingQueueState === "retryable",
+    };
+}
+async function repairAttendanceSmsQueueForCenter(db, centerId, dateKey, options = {}) {
     const eventsSnap = await db
         .collection(`centers/${centerId}/attendanceEvents`)
         .where("dateKey", "==", dateKey)
-        .limit(1500)
+        .limit(Math.max(1, Math.floor(options.limit || 1500)))
         .get();
     const targetEvents = eventsSnap.docs
         .map((eventDoc) => {
@@ -2621,14 +2619,15 @@ async function repairAttendanceSmsQueueForCenter(db, centerId, dateKey) {
                 || toKstDate(),
         };
     })
-        .filter((event) => Boolean(event))
+        .filter((event) => {
+        if (!event)
+            return false;
+        return !options.windowStartMs || event.eventAt.getTime() >= options.windowStartMs;
+    })
         .sort((left, right) => left.eventAt.getTime() - right.eventAt.getTime());
     const studentIds = Array.from(new Set(targetEvents.map((event) => event.studentId)));
     const studentRefs = studentIds.map((studentId) => db.doc(`centers/${centerId}/students/${studentId}`));
-    const [settings, studentSnaps] = await Promise.all([
-        loadNotificationSettings(db, centerId),
-        studentRefs.length > 0 ? db.getAll(...studentRefs) : Promise.resolve([]),
-    ]);
+    const studentSnaps = studentRefs.length > 0 ? await db.getAll(...studentRefs) : [];
     const studentNameById = new Map();
     studentSnaps.forEach((studentSnap) => {
         const studentData = studentSnap.exists ? studentSnap.data() || {} : {};
@@ -2639,8 +2638,11 @@ async function repairAttendanceSmsQueueForCenter(db, centerId, dateKey) {
     let suppressedCount = 0;
     let skippedCount = 0;
     let noRecipientCount = 0;
+    let failedCount = 0;
     for (const event of targetEvents) {
-        const studentName = studentNameById.get(event.studentId) || asTrimmedString(event.data.studentName, "학생");
+        const eventMeta = asRecord(event.data.meta);
+        const studentName = studentNameById.get(event.studentId)
+            || asTrimmedString((eventMeta === null || eventMeta === void 0 ? void 0 : eventMeta.studentName) || event.data.studentName, "학생");
         const dedupeKey = buildAttendanceEventSmsDedupeKey({
             centerId,
             studentId: event.studentId,
@@ -2655,27 +2657,29 @@ async function repairAttendanceSmsQueueForCenter(db, centerId, dateKey) {
             eventAt: event.eventAt,
             dedupeKey,
         });
-        if (existingQueueState === "active_or_sent") {
-            skippedCount += 1;
-            continue;
-        }
-        const queueResult = await queueParentSmsNotification(db, {
-            centerId,
-            studentId: event.studentId,
-            studentName,
-            eventType: event.eventType,
-            eventAt: event.eventAt,
-            settings,
-            force: existingQueueState === "retryable",
-            useExactEventAt: true,
-            dedupeKeyOverride: dedupeKey,
-            sourceEventId: event.eventId,
+        const repairDecision = shouldRepairAttendanceSmsEvent({
+            smsStatus: asTrimmedString(event.data.smsStatus),
+            existingQueueState,
         });
-        if (queueResult.deduped) {
+        if (!repairDecision.shouldRepair) {
             skippedCount += 1;
             continue;
         }
-        if (queueResult.recipientCount === 0) {
+        const queueResult = await queueAttendanceEventSmsV2(db, {
+            centerId,
+            eventId: event.eventId,
+            eventData: event.data,
+            force: repairDecision.force,
+        });
+        if (queueResult.status === "deduped") {
+            skippedCount += 1;
+            continue;
+        }
+        if (queueResult.status === "failed") {
+            failedCount += 1;
+            continue;
+        }
+        if (queueResult.status === "no_recipient") {
             noRecipientCount += 1;
             continue;
         }
@@ -2691,141 +2695,14 @@ async function repairAttendanceSmsQueueForCenter(db, centerId, dateKey) {
         suppressedCount,
         skippedCount,
         noRecipientCount,
+        failedCount,
     };
 }
 async function repairRecentAttendanceSmsQueueForCenter(db, centerId, dateKey, windowStartMs) {
-    const baseResult = {
-        centerId,
-        dateKey,
-        scannedCount: 0,
-        targetCount: 0,
-        queuedCount: 0,
-        suppressedCount: 0,
-        skippedCount: 0,
-        noRecipientCount: 0,
-    };
-    const eventsSnap = await db
-        .collection(`centers/${centerId}/attendanceEvents`)
-        .where("dateKey", "==", dateKey)
-        .limit(300)
-        .get();
-    const recentAttendanceEvents = eventsSnap.docs
-        .map((eventDoc) => {
-        const eventData = eventDoc.data() || {};
-        const eventType = normalizeAttendanceEventForParentSms(eventData.eventType);
-        const studentId = asTrimmedString(eventData.studentId);
-        const eventAt = toKstDateFromUnknownTimestamp(eventData.occurredAt)
-            || toKstDateFromUnknownTimestamp(eventData.createdAt);
-        if (!eventType || !studentId || !eventAt || eventAt.getTime() < windowStartMs)
-            return null;
-        return {
-            eventId: eventDoc.id,
-            data: eventData,
-            studentId,
-            eventType,
-            eventAt,
-        };
-    })
-        .filter((event) => Boolean(event))
-        .sort((left, right) => left.eventAt.getTime() - right.eventAt.getTime());
-    baseResult.scannedCount = eventsSnap.size;
-    let recentEvents = recentAttendanceEvents;
-    try {
-        const currentAwaySnap = await db
-            .collection(`centers/${centerId}/attendanceCurrent`)
-            .where("status", "in", ["away", "break"])
-            .limit(500)
-            .get();
-        const syntheticAwayEvents = currentAwaySnap.docs
-            .map((seatDoc) => {
-            const seatData = seatDoc.data() || {};
-            const studentId = asTrimmedString(seatData.studentId);
-            const eventAt = toKstDateFromUnknownTimestamp(seatData.updatedAt)
-                || toKstDateFromUnknownTimestamp(seatData.lastCheckInAt);
-            if (!studentId || !eventAt || eventAt.getTime() < windowStartMs)
-                return null;
-            const alreadyHasRecentAwayEvent = recentAttendanceEvents.some((event) => event.studentId === studentId &&
-                event.eventType === "away_start" &&
-                Math.abs(event.eventAt.getTime() - eventAt.getTime()) <= 10 * MINUTE_MS);
-            if (alreadyHasRecentAwayEvent)
-                return null;
-            return {
-                eventId: "",
-                data: seatData,
-                studentId,
-                eventType: "away_start",
-                eventAt,
-            };
-        })
-            .filter((event) => Boolean(event));
-        if (syntheticAwayEvents.length > 0) {
-            recentEvents = [...recentAttendanceEvents, ...syntheticAwayEvents]
-                .sort((left, right) => left.eventAt.getTime() - right.eventAt.getTime());
-            baseResult.scannedCount += currentAwaySnap.size;
-        }
-    }
-    catch (error) {
-        console.error("[sms-dispatcher] current away repair skipped", {
-            centerId,
-            message: (error === null || error === void 0 ? void 0 : error.message) || String(error),
-        });
-    }
-    baseResult.targetCount = recentEvents.length;
-    if (recentEvents.length === 0) {
-        return baseResult;
-    }
-    const studentIds = Array.from(new Set(recentEvents.map((event) => event.studentId)));
-    const studentRefs = studentIds.map((studentId) => db.doc(`centers/${centerId}/students/${studentId}`));
-    const [settings, studentSnaps] = await Promise.all([
-        loadNotificationSettings(db, centerId),
-        studentRefs.length > 0 ? db.getAll(...studentRefs) : Promise.resolve([]),
-    ]);
-    const studentNameById = new Map();
-    studentSnaps.forEach((studentSnap) => {
-        const studentData = studentSnap.exists ? studentSnap.data() || {} : {};
-        studentNameById.set(studentSnap.id, asTrimmedString(studentData.name, "학생"));
+    return repairAttendanceSmsQueueForCenter(db, centerId, dateKey, {
+        windowStartMs,
+        limit: 300,
     });
-    const existingQueues = await loadExistingAttendanceSmsQueuesForDate(db, centerId, dateKey);
-    for (const event of recentEvents) {
-        const studentName = studentNameById.get(event.studentId) || asTrimmedString(event.data.studentName, "학생");
-        const dedupeKey = event.eventId
-            ? buildAttendanceEventSmsDedupeKey({
-                centerId,
-                studentId: event.studentId,
-                eventType: event.eventType,
-                eventAt: event.eventAt,
-                eventId: event.eventId,
-            })
-            : buildSmsDedupeKey({
-                centerId,
-                studentId: event.studentId,
-                eventType: normalizeSmsEventType(event.eventType),
-                eventAt: event.eventAt,
-            });
-        const existingQueueState = getExistingAttendanceSmsQueueState(existingQueues, {
-            studentId: event.studentId,
-            studentName,
-            eventType: event.eventType,
-            eventAt: event.eventAt,
-            dedupeKey,
-        });
-        if (existingQueueState === "active_or_sent") {
-            baseResult.skippedCount += 1;
-            continue;
-        }
-        const queueResult = await queueParentSmsNotification(db, Object.assign({ centerId, studentId: event.studentId, studentName, eventType: event.eventType, eventAt: event.eventAt, settings, force: existingQueueState === "retryable", useExactEventAt: true, dedupeKeyOverride: dedupeKey }, (event.eventId ? { sourceEventId: event.eventId } : {})));
-        if (queueResult.deduped) {
-            baseResult.skippedCount += 1;
-            continue;
-        }
-        if (queueResult.recipientCount === 0) {
-            baseResult.noRecipientCount += 1;
-            continue;
-        }
-        baseResult.queuedCount += queueResult.queuedCount;
-        baseResult.suppressedCount += queueResult.suppressedCount;
-    }
-    return baseResult;
 }
 exports.repairTodayAttendanceSmsQueue = functions.region(region).https.onCall(async (data, context) => {
     var _a;
@@ -7274,16 +7151,6 @@ exports.setStudentAttendanceStatusSecure = functions.region(region).https.onCall
             roomSeatNo: parseFiniteNumber(seatHintRaw.roomSeatNo),
         },
     });
-    const smsDirectResult = await queueAttendanceTransitionSmsDirectly(db, {
-        centerId,
-        studentId: effectiveStudentId,
-        eventType: result.eventType,
-        eventId: result.eventId,
-        eventAtMillis: result.eventAtMillis,
-    });
-    if (smsDirectResult) {
-        return Object.assign(Object.assign({}, result), { smsDirectQueuedCount: smsDirectResult.queuedCount, smsDirectRecipientCount: smsDirectResult.recipientCount, smsDirectSuppressedCount: smsDirectResult.suppressedCount, smsDirectDeduped: smsDirectResult.deduped === true });
-    }
     return result;
 });
 async function assertManualStudySessionMutationAllowed(params) {
@@ -8977,7 +8844,7 @@ exports.scheduledStudyBoxCarryoverExpiry = functions
     return null;
 });
 exports.stopStudentStudySessionSecure = functions.region(region).https.onCall(async (data, context) => {
-    var _a, _b, _c, _d, _e;
+    var _a, _b;
     const db = admin.firestore();
     if (!((_a = context.auth) === null || _a === void 0 ? void 0 : _a.uid)) {
         throw new functions.https.HttpsError("unauthenticated", "로그인이 필요합니다.");
@@ -9012,13 +8879,6 @@ exports.stopStudentStudySessionSecure = functions.region(region).https.onCall(as
         actorUid: authUid,
         fallbackStartTimeMs,
     });
-    const smsDirectResult = await queueAttendanceTransitionSmsDirectly(db, {
-        centerId,
-        studentId,
-        eventType: result.eventType,
-        eventId: result.eventId,
-        eventAtMillis: result.eventAtMillis,
-    });
     return {
         ok: true,
         duplicatedSession: result.duplicatedSession,
@@ -9028,10 +8888,6 @@ exports.stopStudentStudySessionSecure = functions.region(region).https.onCall(as
         totalMinutesAfterSession: result.totalMinutesAfterSession,
         attendanceAchieved: result.attendanceAchieved,
         bonus6hAchieved: result.bonus6hAchieved,
-        smsDirectQueuedCount: (_c = smsDirectResult === null || smsDirectResult === void 0 ? void 0 : smsDirectResult.queuedCount) !== null && _c !== void 0 ? _c : 0,
-        smsDirectRecipientCount: (_d = smsDirectResult === null || smsDirectResult === void 0 ? void 0 : smsDirectResult.recipientCount) !== null && _d !== void 0 ? _d : 0,
-        smsDirectSuppressedCount: (_e = smsDirectResult === null || smsDirectResult === void 0 ? void 0 : smsDirectResult.suppressedCount) !== null && _e !== void 0 ? _e : 0,
-        smsDirectDeduped: (smsDirectResult === null || smsDirectResult === void 0 ? void 0 : smsDirectResult.deduped) === true,
     };
 });
 exports.refreshClassroomSignals = functions

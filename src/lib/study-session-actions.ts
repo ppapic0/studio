@@ -45,10 +45,6 @@ export type SetStudentAttendanceStatusSecureResult = {
   totalMinutesAfterSession?: number;
   attendanceAchieved?: boolean;
   bonus6hAchieved?: boolean;
-  smsDirectQueuedCount?: number;
-  smsDirectRecipientCount?: number;
-  smsDirectSuppressedCount?: number;
-  smsDirectDeduped?: boolean;
 };
 
 export type StopStudentStudySessionSecureResult = {
@@ -60,10 +56,6 @@ export type StopStudentStudySessionSecureResult = {
   totalMinutesAfterSession?: number;
   attendanceAchieved?: boolean;
   bonus6hAchieved?: boolean;
-  smsDirectQueuedCount?: number;
-  smsDirectRecipientCount?: number;
-  smsDirectSuppressedCount?: number;
-  smsDirectDeduped?: boolean;
 };
 
 export type RepairRecentStudySessionTotalsInput = {
