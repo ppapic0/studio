@@ -430,10 +430,16 @@ function toDateSafe(value?: { toDate?: () => Date } | Date | null) {
   return value?.toDate?.() || null;
 }
 
+function isLocalMidnight(date: Date) {
+  return date.getHours() === 0 && date.getMinutes() === 0 && date.getSeconds() === 0;
+}
+
 function pickDateByMode(values: Array<Date | null | undefined>, mode: 'earliest' | 'latest') {
   const dates = values.filter((value): value is Date => value instanceof Date && Number.isFinite(value.getTime()));
   if (dates.length === 0) return null;
-  return dates
+  const preciseDates = dates.filter((date) => !isLocalMidnight(date));
+  const candidates = preciseDates.length > 0 ? preciseDates : dates;
+  return candidates
     .slice()
     .sort((a, b) => mode === 'earliest' ? a.getTime() - b.getTime() : b.getTime() - a.getTime())[0] || null;
 }
@@ -456,12 +462,47 @@ function formatTimeLabelFromDate(date?: Date | null) {
   return `${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`;
 }
 
+function extractTimeLabelFromSmsMessage(message?: string | null) {
+  const match = String(message || '').match(/(?:^|[^\d])([01]?\d|2[0-3]):([0-5]\d)(?:[^\d]|$)/);
+  if (!match) return null;
+  return `${String(Number(match[1])).padStart(2, '0')}:${match[2]}`;
+}
+
+function mergeDateWithTimeLabel(date: Date, timeLabel: string) {
+  const [hoursRaw, minutesRaw] = timeLabel.split(':');
+  const hours = Number(hoursRaw);
+  const minutes = Number(minutesRaw);
+  if (!Number.isFinite(hours) || !Number.isFinite(minutes)) return date;
+  const next = new Date(date);
+  next.setHours(hours, minutes, 0, 0);
+  return next;
+}
+
+function dateFromDateKeyAndTimeLabel(dateKey: string | undefined, timeLabel: string, fallbackDate?: Date | null) {
+  const base = dateKey && /^\d{4}-\d{2}-\d{2}$/.test(dateKey)
+    ? new Date(`${dateKey}T00:00:00`)
+    : fallbackDate
+      ? new Date(fallbackDate)
+      : null;
+  if (!base || Number.isNaN(base.getTime())) return null;
+  return mergeDateWithTimeLabel(base, timeLabel);
+}
+
 function resolveSmsEventDisplayDate(
   explicitEventAt: { toDate?: () => Date } | undefined,
   attendanceAt: Date | null,
-  fallback?: { toDate?: () => Date }
+  fallback?: { toDate?: () => Date },
+  message?: string | null,
+  dateKey?: string
 ) {
-  return toDateSafe(explicitEventAt) || attendanceAt || toDateSafe(fallback);
+  const explicitDate = toDateSafe(explicitEventAt);
+  const fallbackDate = toDateSafe(fallback);
+  const resolvedDate = explicitDate || attendanceAt || fallbackDate;
+  const messageTimeLabel = extractTimeLabelFromSmsMessage(message);
+  if (messageTimeLabel && (!resolvedDate || isLocalMidnight(resolvedDate))) {
+    return dateFromDateKeyAndTimeLabel(dateKey, messageTimeLabel, resolvedDate || fallbackDate);
+  }
+  return resolvedDate;
 }
 
 function formatShortDateLabel(date: Date) {
@@ -972,7 +1013,13 @@ export default function NotificationSettingsPage() {
           const latestQueue = queueRowsForEvent[0];
           const attendanceTime = resolveAttendanceTime(item.value);
           const sentEventTime = latestSent
-            ? resolveSmsEventDisplayDate(latestSent.eventAt, attendanceTime, latestSent.sentAt || latestSent.createdAt)
+            ? resolveSmsEventDisplayDate(
+                latestSent.eventAt,
+                attendanceTime,
+                latestSent.sentAt || latestSent.createdAt,
+                latestSent.renderedMessage,
+                latestSent.dateKey || todayKey
+              )
             : attendanceTime;
 
           let summary: Omit<StudentSmsBoardEventSummary, 'attendanceAt'>;
@@ -2074,7 +2121,13 @@ export default function NotificationSettingsPage() {
                         statusLabel: getDeliveryStatusLabel(row.status),
                         statusTone: row.status === 'sent' ? 'bg-emerald-100 text-emerald-700' : row.status === 'failed' ? 'bg-rose-100 text-rose-700' : 'bg-amber-100 text-amber-700',
                         timeLabel: formatDateLabelFromDate(
-                          resolveSmsEventDisplayDate(row.eventAt, summary.attendanceAt, row.sentAt || row.failedAt || row.createdAt)
+                          resolveSmsEventDisplayDate(
+                            row.eventAt,
+                            summary.attendanceAt,
+                            row.sentAt || row.failedAt || row.createdAt,
+                            row.renderedMessage,
+                            row.dateKey || todayDateKey
+                          )
                         ),
                         errorMessage: row.errorMessage || row.suppressedReason || '',
                         queueId: null as string | null,
@@ -2091,7 +2144,13 @@ export default function NotificationSettingsPage() {
                           statusLabel: getQueueStatusLabel(row.status, row.providerStatus, row.nextAttemptAt, row.attemptCount),
                           statusTone: getStatusTone(row.status, row.providerStatus, row.nextAttemptAt, row.attemptCount),
                           timeLabel: formatDateLabelFromDate(
-                            resolveSmsEventDisplayDate(row.eventAt, summary.attendanceAt, row.nextAttemptAt || row.createdAt)
+                            resolveSmsEventDisplayDate(
+                              row.eventAt,
+                              summary.attendanceAt,
+                              row.nextAttemptAt || row.createdAt,
+                              row.renderedMessage || row.message,
+                              row.dateKey || todayDateKey
+                            )
                           ),
                           errorMessage: row.failedReason || row.lastErrorMessage || '',
                           queueId: row.id,

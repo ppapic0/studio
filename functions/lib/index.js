@@ -1684,7 +1684,9 @@ function toKstDateFromUnknownTimestamp(value) {
 function pickSmsEventDate(candidates, mode) {
     if (candidates.length === 0)
         return null;
-    return candidates
+    const preciseCandidates = candidates.filter((date) => date.getHours() !== 0 || date.getMinutes() !== 0 || date.getSeconds() !== 0);
+    const orderedCandidates = preciseCandidates.length > 0 ? preciseCandidates : candidates;
+    return orderedCandidates
         .slice()
         .sort((a, b) => mode === "earliest" ? a.getTime() - b.getTime() : b.getTime() - a.getTime())[0] || null;
 }
@@ -6162,6 +6164,7 @@ exports.notifyAttendanceSms = functions.region(region).https.onCall(async (data,
         settings,
         force: forceResend,
         dateKeyOverride: requestedDateKey || null,
+        useExactEventAt: !!requestedEventAt,
     });
     return {
         ok: true,
