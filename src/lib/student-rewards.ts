@@ -56,7 +56,12 @@ export type DailyPointBreakdownItem = {
   label: string;
   points: number;
   tone: DailyPointBreakdownItemTone;
+  source?: string;
+  reason?: string;
+  direction?: 'add' | 'subtract';
 };
+
+const PLANNER_COMPLETION_REWARD_POINTS = 5;
 
 function normalizeStoredStudyBoxReward(value: unknown): StudyBoxReward | null {
   const milestone = Number((value as StudyBoxReward | null | undefined)?.milestone);
@@ -172,6 +177,14 @@ function normalizeDailyPointEventItems(value: unknown, maxTotal: number): DailyP
     const source = typeof (event as Record<string, any>).source === 'string'
       ? (event as Record<string, any>).source
       : '';
+    const reason = typeof (event as Record<string, any>).reason === 'string'
+      ? (event as Record<string, any>).reason.trim()
+      : '';
+    const direction = (event as Record<string, any>).direction === 'subtract'
+      ? 'subtract'
+      : (event as Record<string, any>).direction === 'add'
+        ? 'add'
+        : undefined;
     const cappedPoints = Math.min(remaining, points);
     if (cappedPoints <= 0) return;
 
@@ -180,11 +193,36 @@ function normalizeDailyPointEventItems(value: unknown, maxTotal: number): DailyP
       label: getDailyPointEventLabel(event as Record<string, any>),
       points: cappedPoints,
       tone: getDailyPointEventTone(source),
+      source,
+      ...(reason ? { reason } : {}),
+      ...(direction ? { direction } : {}),
     });
     remaining -= cappedPoints;
   });
 
   return items;
+}
+
+function getPlanCompletionRewardCount(dayStatus?: Record<string, any>): number {
+  const storedCount = Number(dayStatus?.planCompletionRewardCount ?? 0);
+  if (Number.isFinite(storedCount) && storedCount > 0) {
+    return Math.max(0, Math.floor(storedCount));
+  }
+
+  if (Array.isArray(dayStatus?.planCompletionRewardTaskIds)) {
+    return dayStatus.planCompletionRewardTaskIds.length;
+  }
+
+  return 0;
+}
+
+function getPlanCompletionFallbackPoints(dayStatus?: Record<string, any>): number {
+  return getPlanCompletionRewardCount(dayStatus) * PLANNER_COMPLETION_REWARD_POINTS;
+}
+
+function getPlanCompletionFallbackLabel(dayStatus?: Record<string, any>): string {
+  const count = getPlanCompletionRewardCount(dayStatus);
+  return count > 1 ? `계획 완수 ${count}회` : '계획 완수';
 }
 
 function pushBreakdownItem(
@@ -453,7 +491,22 @@ export function getDailyPointBreakdown(dayStatus?: Record<string, any>) {
 
   if (pointItems.length > 0) {
     const eventTotal = pointItems.reduce((sum, item) => sum + item.points, 0);
-    const legacyPoints = Math.max(0, totalPoints - eventTotal);
+    const hasPlanCompletionEvent = pointItems.some((item) => item.tone === 'plan');
+    const inferredPlanPoints = hasPlanCompletionEvent
+      ? 0
+      : Math.min(Math.max(0, totalPoints - eventTotal), getPlanCompletionFallbackPoints(dayStatus));
+    if (inferredPlanPoints > 0) {
+      pushBreakdownItem(
+        pointItems,
+        'plan-completion-record',
+        getPlanCompletionFallbackLabel(dayStatus),
+        inferredPlanPoints,
+        'plan'
+      );
+    }
+
+    const enrichedEventTotal = eventTotal + inferredPlanPoints;
+    const legacyPoints = Math.max(0, totalPoints - enrichedEventTotal);
     if (legacyPoints > 0) {
       pushBreakdownItem(pointItems, 'legacy-point-record', '이전 포인트 기록', legacyPoints, 'legacy');
     }
@@ -473,14 +526,23 @@ export function getDailyPointBreakdown(dayStatus?: Record<string, any>) {
   pushBreakdownItem(fallbackItems, 'study-box-opened', '상자', studyBoxPoints, 'box');
   getRankRewardBreakdownItems(dayStatus, rankPoints).forEach((item) => fallbackItems.push(item));
 
+  const planCompletionPoints = Math.min(nonPrimaryPoints, getPlanCompletionFallbackPoints(dayStatus));
+  pushBreakdownItem(
+    fallbackItems,
+    'plan-completion-record',
+    getPlanCompletionFallbackLabel(dayStatus),
+    planCompletionPoints,
+    'plan'
+  );
+  const remainingNonPrimaryPoints = Math.max(0, nonPrimaryPoints - planCompletionPoints);
   const storedStudyBoxPoints = getStoredStudyBoxRewardTotal(dayStatus);
   const legacyStudyBoxPoints = Math.min(
-    nonPrimaryPoints,
+    remainingNonPrimaryPoints,
     Math.max(0, storedStudyBoxPoints - studyBoxPoints)
   );
   pushBreakdownItem(fallbackItems, 'legacy-study-box-record', '이전 상자 기록', legacyStudyBoxPoints, 'legacy');
 
-  const legacyPointRecordPoints = Math.max(0, nonPrimaryPoints - legacyStudyBoxPoints);
+  const legacyPointRecordPoints = Math.max(0, remainingNonPrimaryPoints - legacyStudyBoxPoints);
   pushBreakdownItem(fallbackItems, 'legacy-point-record', '이전 포인트 기록', legacyPointRecordPoints, 'legacy');
 
   return {

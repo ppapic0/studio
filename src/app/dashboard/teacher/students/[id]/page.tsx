@@ -9,12 +9,13 @@ import { ko } from 'date-fns/locale';
 import { addDoc, collection, doc, getDoc, getDocs, limit, orderBy, query, serverTimestamp, Timestamp, where, writeBatch } from 'firebase/firestore';
 import { httpsCallable } from 'firebase/functions';
 import { ResponsiveContainer, XAxis, YAxis, Tooltip, CartesianGrid, AreaChart, Area, BarChart, Bar, ComposedChart, Line, LineChart as RechartsLineChart } from 'recharts';
-import { Loader2, ArrowLeft, ArrowUpRight, Building2, Zap, Settings2, Activity, CheckCircle2, ShieldCheck, LayoutGrid, Save, Trash2, CalendarDays, BarChart3, MessageSquare, Clock3, PlusCircle, UserRound, AlertTriangle, Sparkles, ClipboardList, Timer, CalendarCheck2, TrendingUp, BookOpen, MessageSquareMore, PenTool } from 'lucide-react';
+import { Loader2, ArrowLeft, ArrowUpRight, Building2, Zap, Settings2, Activity, CheckCircle2, ShieldCheck, LayoutGrid, Save, Trash2, CalendarDays, BarChart3, MessageSquare, Clock3, PlusCircle, UserRound, AlertTriangle, Sparkles, ClipboardList, Timer, CalendarCheck2, TrendingUp, BookOpen, MessageSquareMore, PenTool, Coins } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { StudentProfile, StudyLogDay, GrowthProgress, CenterMembership, CounselingLog, CounselingReservation, StudyPlanItem, WithId, AttendanceCurrent, StudentNotification, DailyReport, AttendanceRequest, PenaltyLog, ParentActivityEvent, Invoice } from '@/lib/types';
 import { cn } from '@/lib/utils';
 import { formatSeatLabel } from '@/lib/seat-layout';
+import { getDailyPointBreakdown, type DailyPointBreakdownItemTone } from '@/lib/student-rewards';
 import { useToast } from '@/hooks/use-toast';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -68,12 +69,44 @@ type SmsDeliveryLogLite = {
 };
 type PlanBucket = { studyTotal: number; studyDone: number; routineCount: number; personalCount: number };
 type MobileInsightView = 'studyTrend' | 'completion' | 'rhythm' | 'coaching' | 'risk';
+type StudentPointHistoryItem = {
+  key: string;
+  label: string;
+  points: number;
+  tone: DailyPointBreakdownItemTone;
+  reason?: string;
+  direction?: 'add' | 'subtract';
+};
+type StudentPointHistoryRow = {
+  dateKey: string;
+  dateLabel: string;
+  totalPoints: number;
+  studyBoxPoints: number;
+  rankPoints: number;
+  otherPoints: number;
+  pointItems: StudentPointHistoryItem[];
+};
 const STATUS_LABEL: Record<CounselingReservation['status'], string> = {
   requested: '요청',
   confirmed: '확정',
   done: '완료',
   canceled: '취소',
 };
+const POINT_HISTORY_CHIP_CLASS: Record<DailyPointBreakdownItemTone, string> = {
+  box: 'bg-[#FFF3E2] text-[#915A1E]',
+  rank: 'bg-[#EAF1FF] text-[#3357A5]',
+  plan: 'bg-[#EAF8EF] text-[#1B7A52]',
+  legacy: 'bg-[#F0F3FA] text-[#44546F]',
+  adjustment: 'bg-[#F2F7EF] text-[#49733E]',
+};
+const POINT_HISTORY_TONE_LABEL: Record<DailyPointBreakdownItemTone, string> = {
+  box: '상자',
+  rank: '랭킹',
+  plan: '계획완수',
+  legacy: '기록',
+  adjustment: '조정',
+};
+const POINT_HISTORY_PLAN_REWARD_POINTS = 5;
 
 function minutesToLabel(minutes: number): string {
   const safe = Math.max(0, Math.round(minutes));
@@ -88,6 +121,127 @@ function signedMinutesToLabel(minutes: number): string {
   const rounded = Math.round(minutes);
   if (rounded === 0) return '0분';
   return `${rounded > 0 ? '+' : '-'}${minutesToLabel(Math.abs(rounded))}`;
+}
+
+function formatPointAmount(points: number): string {
+  return `${Math.max(0, Math.round(points || 0)).toLocaleString()}P`;
+}
+
+function formatPointHistoryDateLabel(dateKey: string): string {
+  const parsed = new Date(`${dateKey}T00:00:00`);
+  if (Number.isNaN(parsed.getTime())) return dateKey;
+  return format(parsed, 'M월 d일 (EEE)', { locale: ko });
+}
+
+function summarizePointHistoryItems(row: Pick<StudentPointHistoryRow, 'pointItems'>): string {
+  const labels = row.pointItems
+    .map((item) => item.label.trim())
+    .filter(Boolean);
+
+  if (labels.length > 0) {
+    return Array.from(new Set(labels)).slice(0, 3).join(' · ');
+  }
+
+  return '상세 기록 없음';
+}
+
+function getPointHistoryToneFromSource(source: string): DailyPointBreakdownItemTone {
+  if (source === 'study_box') return 'box';
+  if (source === 'plan_completion') return 'plan';
+  if (source.includes('rank')) return 'rank';
+  if (source.includes('adjustment')) return 'adjustment';
+  return 'legacy';
+}
+
+function getPointHistoryEventLabel(event: Record<string, any>): string {
+  const explicitLabel = typeof event.label === 'string' ? event.label.trim() : '';
+  if (explicitLabel) return explicitLabel;
+
+  const source = typeof event.source === 'string' ? event.source : '';
+  const hour = Math.max(0, Math.floor(Number(event.hour ?? event.milestone ?? 0)));
+  const rank = Math.max(0, Math.floor(Number(event.rank || 0)));
+
+  if (source === 'study_box' && hour > 0) return `${hour}시간 상자`;
+  if (source === 'plan_completion') return '계획 완수';
+  if (source === 'weekly_rank') return rank > 0 ? `주간 랭킹 ${rank}위` : '주간 랭킹';
+  if (source === 'monthly_rank') return rank > 0 ? `월간 랭킹 ${rank}위` : '월간 랭킹';
+  if (source === 'daily_rank') return rank > 0 ? `일간 랭킹 ${rank}위` : '일간 랭킹';
+  if (source.includes('adjustment')) return '포인트 조정';
+  return '이전 포인트 기록';
+}
+
+function getPlanCompletionPointHistoryCount(dayStatus: Record<string, any>): number {
+  const storedCount = Number(dayStatus.planCompletionRewardCount ?? 0);
+  if (Number.isFinite(storedCount) && storedCount > 0) return Math.floor(storedCount);
+  return Array.isArray(dayStatus.planCompletionRewardTaskIds) ? dayStatus.planCompletionRewardTaskIds.length : 0;
+}
+
+function buildPointHistoryItems(
+  dayStatus: Record<string, any>,
+  breakdown: ReturnType<typeof getDailyPointBreakdown>
+): StudentPointHistoryItem[] {
+  const rawEvents = Array.isArray(dayStatus.pointEvents) ? dayStatus.pointEvents : [];
+  const seenKeys = new Set<string>();
+  const eventItems = rawEvents
+    .map((event, index): StudentPointHistoryItem | null => {
+      if (!event || typeof event !== 'object') return null;
+      const eventRecord = event as Record<string, any>;
+      const source = typeof eventRecord.source === 'string' ? eventRecord.source : '';
+      const deltaPoints = Number(eventRecord.deltaPoints ?? 0);
+      const points = Math.max(
+        0,
+        Math.floor(
+          Number.isFinite(deltaPoints) && deltaPoints !== 0
+            ? Math.abs(deltaPoints)
+            : Number(eventRecord.points ?? 0)
+        )
+      );
+      if (points <= 0) return null;
+
+      const explicitDirection = eventRecord.direction === 'subtract'
+        ? 'subtract'
+        : eventRecord.direction === 'add'
+          ? 'add'
+          : undefined;
+      const direction = explicitDirection || (Number.isFinite(deltaPoints) && deltaPoints < 0 ? 'subtract' : 'add');
+      const keySource = typeof eventRecord.id === 'string' ? eventRecord.id.trim() : '';
+      const key = keySource || `point-event-${index}`;
+      if (seenKeys.has(key)) return null;
+      seenKeys.add(key);
+
+      const reason = typeof eventRecord.reason === 'string' ? eventRecord.reason.trim() : '';
+      return {
+        key,
+        label: getPointHistoryEventLabel(eventRecord),
+        points,
+        tone: getPointHistoryToneFromSource(source),
+        direction,
+        ...(reason ? { reason } : {}),
+      };
+    })
+    .filter((item): item is StudentPointHistoryItem => item !== null);
+
+  const hasPlanCompletionEvent = eventItems.some((item) => item.tone === 'plan');
+  const planCompletionCount = getPlanCompletionPointHistoryCount(dayStatus);
+  if (!hasPlanCompletionEvent && planCompletionCount > 0) {
+    eventItems.push({
+      key: 'plan-completion-record',
+      label: planCompletionCount > 1 ? `계획 완수 ${planCompletionCount}회` : '계획 완수',
+      points: planCompletionCount * POINT_HISTORY_PLAN_REWARD_POINTS,
+      tone: 'plan',
+      direction: 'add',
+    });
+  }
+
+  if (eventItems.length > 0) return eventItems;
+  return breakdown.pointItems.map((item) => ({
+    key: item.key,
+    label: item.label,
+    points: item.points,
+    tone: item.tone,
+    reason: item.reason,
+    direction: item.direction || 'add',
+  }));
 }
 
 function toFiniteRoundedMinutes(value: unknown) {
@@ -529,6 +683,8 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
   const [isLogModalOpen, setIsLogModalOpen] = useState(false);
   const [isQuickFeedbackModalOpen, setIsQuickFeedbackModalOpen] = useState(false);
   const [isReservationModalOpen, setIsReservationModalOpen] = useState(false);
+  const [isPointHistoryModalOpen, setIsPointHistoryModalOpen] = useState(false);
+  const [selectedPointHistoryDateKey, setSelectedPointHistoryDateKey] = useState<string | null>(null);
   const [mobileInsightDialog, setMobileInsightDialog] = useState<MobileInsightView | null>(null);
 
   const [logType, setLogType] = useState<'academic' | 'life' | 'career'>('academic');
@@ -1304,6 +1460,36 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
   }, [fullSeries, todayKey]);
 
   const todayPlanSummary = planByDate[todayKey] || { studyTotal: 0, studyDone: 0, routineCount: 0, personalCount: 0 };
+  const pointHistoryRows = useMemo<StudentPointHistoryRow[]>(() => {
+    const dailyPointStatus = progress?.dailyPointStatus || {};
+
+    return Object.entries(dailyPointStatus)
+      .filter(([dateKey, rawDayStatus]) => /^\d{4}-\d{2}-\d{2}$/.test(dateKey) && !!rawDayStatus && typeof rawDayStatus === 'object')
+      .map(([dateKey, rawDayStatus]) => {
+        const dayStatus = rawDayStatus as Record<string, any>;
+        const breakdown = getDailyPointBreakdown(dayStatus);
+        return {
+          dateKey,
+          dateLabel: formatPointHistoryDateLabel(dateKey),
+          totalPoints: breakdown.totalPoints,
+          studyBoxPoints: breakdown.studyBoxPoints,
+          rankPoints: breakdown.rankPoints,
+          otherPoints: breakdown.otherPoints,
+          pointItems: buildPointHistoryItems(dayStatus, breakdown),
+        };
+      })
+      .filter((row) => row.totalPoints > 0 || row.pointItems.length > 0)
+      .sort((a, b) => b.dateKey.localeCompare(a.dateKey))
+      .slice(0, 120);
+  }, [progress?.dailyPointStatus]);
+  const pointHistoryTotal = useMemo(
+    () => pointHistoryRows.reduce((sum, row) => sum + row.totalPoints, 0),
+    [pointHistoryRows]
+  );
+  const selectedPointHistoryRow = useMemo(() => {
+    if (pointHistoryRows.length === 0) return null;
+    return pointHistoryRows.find((row) => row.dateKey === selectedPointHistoryDateKey) || pointHistoryRows[0];
+  }, [pointHistoryRows, selectedPointHistoryDateKey]);
 
   const pastPlanGroups = useMemo(() => {
     const startDateKey = format(subDays(today, 6), 'yyyy-MM-dd');
@@ -1356,6 +1542,7 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
 
   useEffect(() => {
     setDailyGrowthWindowIndex(0);
+    setSelectedPointHistoryDateKey(null);
   }, [studentId]);
 
   useEffect(() => {
@@ -2497,6 +2684,10 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
     canEditStudentInfo ||
     canEditGrowthData ||
     canManageStudentAccounts;
+  const handleOpenPointHistory = () => {
+    setSelectedPointHistoryDateKey((current) => current || pointHistoryRows[0]?.dateKey || null);
+    setIsPointHistoryModalOpen(true);
+  };
 
   return (
     <div className={cn(
@@ -2532,6 +2723,11 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
                     <Link href={canOpenSettings ? '/dashboard/settings/notifications' : '/dashboard/appointments'}>
                       <MessageSquare className="h-4 w-4" /> {canOpenSettings ? '문자 보내기' : '상담/소통'}
                     </Link>
+                  </Button>
+                )}
+                {!isStudentSelfView && (
+                  <Button variant="outline" className={cn("h-12 justify-start rounded-[1.15rem] px-4 text-xs font-black gap-2", detailActionButtonClass)} onClick={handleOpenPointHistory}>
+                    <Coins className="h-4 w-4" /> 포인트 수급 확인
                   </Button>
                 )}
                 {canEditStudentInfo && <Button variant="outline" className={cn("h-12 justify-start rounded-[1.15rem] px-4 text-xs font-black gap-2", detailActionButtonClass)} onClick={() => setIsEditModalOpen(true)}><Settings2 className="h-4 w-4" /> 정보 수정</Button>}
@@ -2682,6 +2878,11 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
                   <Link href={canOpenSettings ? '/dashboard/settings/notifications' : '/dashboard/appointments'}>
                     <MessageSquare className="mr-2 h-4 w-4" /> {canOpenSettings ? '문자 보내기' : '상담/소통'}
                   </Link>
+                </Button>
+              ) : null}
+              {!isStudentSelfView ? (
+                <Button variant="outline" className="h-12 justify-start rounded-[1.1rem] border-[#dbe7ff] bg-white px-4 text-[#14295F] hover:bg-[#f4f7ff]" onClick={handleOpenPointHistory}>
+                  <Coins className="mr-2 h-4 w-4" /> 포인트 수급 확인
                 </Button>
               ) : null}
               {canEditStudentInfo ? (
@@ -4250,6 +4451,183 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
           </Card>
         </TabsContent>
       </Tabs>
+
+      <Dialog open={isPointHistoryModalOpen} onOpenChange={setIsPointHistoryModalOpen}>
+        <DialogContent className="flex max-h-[calc(100dvh-1rem)] w-[calc(100vw-1rem)] flex-col overflow-hidden rounded-[2.25rem] border-none p-0 shadow-2xl sm:max-w-4xl">
+          <div className={cn(
+            "shrink-0 px-6 py-5",
+            isAnalysisPresentation
+              ? "bg-[linear-gradient(135deg,#FFF8EE_0%,#FFE5C4_100%)] text-[#17326B]"
+              : "bg-[linear-gradient(135deg,#14295F_0%,#173D8B_58%,#2554D4_100%)] text-white"
+          )}>
+            <DialogHeader>
+              {!isAnalysisPresentation ? (
+                <div className="mb-3 flex flex-wrap items-center gap-2">
+                  <Badge className="border border-white/14 bg-white/8 px-3 py-1 text-[10px] font-black text-white">
+                    {student?.name || '학생'}
+                  </Badge>
+                  <Badge className="border border-white/14 bg-white/8 px-3 py-1 text-[10px] font-black text-white/80">
+                    {formatSeatLabel(student)}
+                  </Badge>
+                  <Badge className="border border-white/14 bg-white/8 px-3 py-1 text-[10px] font-black text-white/80">
+                    포인트 수급
+                  </Badge>
+                </div>
+              ) : null}
+              <DialogTitle className="flex items-center gap-2 text-2xl font-black tracking-tight">
+                <Coins className="h-5 w-5" />
+                일자별 포인트 수급
+              </DialogTitle>
+              <DialogDescription className={cn("font-semibold", isAnalysisPresentation ? "text-[#5F7299]" : "text-white/80")}>
+                날짜를 누르면 상자, 랭킹, 계획 완수, 조정 내역까지 어떤 이유로 포인트가 잡혔는지 확인합니다.
+              </DialogDescription>
+            </DialogHeader>
+          </div>
+
+          <div className={cn(
+            "min-h-0 flex-1 overflow-y-auto overscroll-contain bg-white px-5 py-5 [-webkit-overflow-scrolling:touch]",
+            isMobile && "px-4 pb-[calc(1rem+env(safe-area-inset-bottom))]"
+          )}>
+            <div className={cn("grid gap-4", isMobile ? "grid-cols-1" : "md:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)]")}>
+              <div className="min-h-0 space-y-3">
+                <div className="grid grid-cols-2 gap-2.5">
+                  <div className="rounded-[1.2rem] border border-[#dbe7ff] bg-[#f8fbff] px-4 py-3">
+                    <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#5c6e97]">현재 잔액</p>
+                    <p className="mt-2 text-xl font-black tracking-tight text-[#14295F]">
+                      {formatPointAmount(Number(progress?.pointsBalance || 0))}
+                    </p>
+                  </div>
+                  <div className="rounded-[1.2rem] border border-[#ffe1c5] bg-[#fff8ef] px-4 py-3">
+                    <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#d86a11]">표시 합계</p>
+                    <p className="mt-2 text-xl font-black tracking-tight text-[#14295F]">
+                      {formatPointAmount(pointHistoryTotal)}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="rounded-[1.45rem] border border-[#dbe7ff] bg-[#f8fbff] p-2">
+                  <div className="max-h-[min(52vh,34rem)] space-y-2 overflow-y-auto pr-1">
+                    {pointHistoryRows.length === 0 ? (
+                      <div className="rounded-[1.2rem] border border-dashed border-[#dbe7ff] bg-white px-4 py-8 text-center text-sm font-bold text-[#5c6e97]">
+                        아직 표시할 포인트 수급 내역이 없습니다.
+                      </div>
+                    ) : (
+                      pointHistoryRows.map((row) => {
+                        const isSelected = selectedPointHistoryRow?.dateKey === row.dateKey;
+                        return (
+                          <button
+                            key={`student-point-history-${row.dateKey}`}
+                            type="button"
+                            className={cn(
+                              "w-full rounded-[1.15rem] border px-4 py-3 text-left transition",
+                              isSelected
+                                ? "border-[#14295F] bg-white shadow-[0_18px_34px_-28px_rgba(20,41,95,0.48)]"
+                                : "border-white bg-white/78 hover:border-[#c9d8f3] hover:bg-white"
+                            )}
+                            onClick={() => setSelectedPointHistoryDateKey(row.dateKey)}
+                          >
+                            <div className="flex items-start justify-between gap-3">
+                              <div className="min-w-0">
+                                <p className="text-sm font-black text-[#14295F]">{row.dateLabel}</p>
+                                <p className="mt-1 truncate text-[11px] font-bold text-[#5c6e97]">
+                                  {summarizePointHistoryItems(row)}
+                                </p>
+                              </div>
+                              <p className="shrink-0 text-base font-black tracking-tight text-[#FF7A16]">
+                                {formatPointAmount(row.totalPoints)}
+                              </p>
+                            </div>
+                          </button>
+                        );
+                      })
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              <div className="min-h-0 rounded-[1.6rem] border border-[#dbe7ff] bg-white p-4 shadow-[0_24px_56px_-44px_rgba(20,41,95,0.24)]">
+                {selectedPointHistoryRow ? (
+                  <div className="flex h-full min-h-0 flex-col">
+                    <div className="flex flex-wrap items-start justify-between gap-3">
+                      <div>
+                        <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#5c6e97]">선택 날짜</p>
+                        <h3 className="mt-2 text-xl font-black tracking-tight text-[#14295F]">
+                          {selectedPointHistoryRow.dateLabel}
+                        </h3>
+                      </div>
+                      <Badge className="rounded-full border border-[#ffe1c5] bg-[#fff8ef] px-3 py-1 text-sm font-black text-[#d86a11]">
+                        {formatPointAmount(selectedPointHistoryRow.totalPoints)}
+                      </Badge>
+                    </div>
+
+                    <div className="mt-4 grid grid-cols-3 gap-2">
+                      <div className="rounded-[1rem] border border-[#ffe1c5] bg-[#fff8ef] px-3 py-2.5">
+                        <p className="text-[10px] font-black text-[#d86a11]">상자</p>
+                        <p className="mt-1 text-sm font-black text-[#14295F]">{formatPointAmount(selectedPointHistoryRow.studyBoxPoints)}</p>
+                      </div>
+                      <div className="rounded-[1rem] border border-[#dbe7ff] bg-[#f8fbff] px-3 py-2.5">
+                        <p className="text-[10px] font-black text-[#2554d4]">랭킹</p>
+                        <p className="mt-1 text-sm font-black text-[#14295F]">{formatPointAmount(selectedPointHistoryRow.rankPoints)}</p>
+                      </div>
+                      <div className="rounded-[1rem] border border-emerald-100 bg-emerald-50/70 px-3 py-2.5">
+                        <p className="text-[10px] font-black text-emerald-700">기타</p>
+                        <p className="mt-1 text-sm font-black text-[#14295F]">{formatPointAmount(selectedPointHistoryRow.otherPoints)}</p>
+                      </div>
+                    </div>
+
+                    <div className="mt-4 min-h-0 flex-1 overflow-y-auto pr-1">
+                      {selectedPointHistoryRow.pointItems.length > 0 ? (
+                        <div className="space-y-2.5">
+                          {selectedPointHistoryRow.pointItems.map((item) => (
+                            <div
+                              key={`${selectedPointHistoryRow.dateKey}-${item.key}`}
+                              className="rounded-[1.15rem] border border-[#dbe7ff] bg-[#f8fbff] px-4 py-3"
+                            >
+                              <div className="flex items-start justify-between gap-3">
+                                <div className="min-w-0">
+                                  <Badge className={cn("rounded-full border-none px-2.5 py-1 text-[10px] font-black", POINT_HISTORY_CHIP_CLASS[item.tone])}>
+                                    {POINT_HISTORY_TONE_LABEL[item.tone]}
+                                  </Badge>
+                                  <p className="mt-2 break-keep text-sm font-black text-[#14295F]">{item.label}</p>
+                                  {item.reason ? (
+                                    <p className="mt-1 text-[11px] font-semibold leading-5 text-[#5c6e97]">
+                                      사유: {item.reason}
+                                    </p>
+                                  ) : null}
+                                </div>
+                                <p className={cn(
+                                  "shrink-0 text-base font-black tracking-tight",
+                                  item.direction === 'subtract' ? "text-rose-600" : "text-[#FF7A16]"
+                                )}>
+                                  {item.direction === 'subtract' ? '-' : '+'}{formatPointAmount(item.points)}
+                                </p>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <div className="rounded-[1.2rem] border border-dashed border-[#dbe7ff] bg-[#f8fbff] px-4 py-8 text-center text-sm font-bold text-[#5c6e97]">
+                          이 날짜의 세부 포인트 항목이 아직 없습니다.
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                ) : (
+                  <div className="flex min-h-[18rem] items-center justify-center rounded-[1.2rem] border border-dashed border-[#dbe7ff] bg-[#f8fbff] px-4 text-center text-sm font-bold text-[#5c6e97]">
+                    왼쪽에서 날짜를 선택하면 포인트 출처가 표시됩니다.
+                  </div>
+                )}
+              </div>
+            </div>
+
+            <DialogFooter className="mt-5">
+              <DialogClose asChild>
+                <Button className="rounded-xl bg-[#14295F] font-black text-white hover:bg-[#173D8B]">확인</Button>
+              </DialogClose>
+            </DialogFooter>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       <Dialog open={isAvgStudyModalOpen} onOpenChange={setIsAvgStudyModalOpen}>
         <DialogContent className="rounded-[2rem] border-none shadow-2xl p-0 overflow-hidden sm:max-w-xl">
