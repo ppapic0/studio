@@ -2597,53 +2597,19 @@ export default function StudyPlanPage() {
       if (category === 'schedule' && !title.includes('등원하지 않습니다')) {
         data.title = `${title.trim()}: 09:00 ~ 10:00`;
       } else if (category === 'study') {
-        const studyMode = taskBlueprint?.studyPlanMode || recentStudy?.studyModeValue || newStudyMode;
-        const studyMinutes = taskBlueprint?.targetMinutes
-          ? String(taskBlueprint.targetMinutes)
-          : (recentStudy?.minuteValue ?? newStudyMinutes);
-        const studyAmount = taskBlueprint?.targetAmount
-          ? String(taskBlueprint.targetAmount)
-          : (recentStudy?.amountValue ?? newStudyTargetAmount);
-        const studyAmountUnit = taskBlueprint?.amountUnit || recentStudy?.amountUnitValue || newStudyAmountUnit;
-        const customUnitLabel = (taskBlueprint?.amountUnitLabel ?? recentStudy?.customAmountUnitValue ?? newStudyCustomAmountUnit).trim();
         const subjectValue = taskBlueprint?.subject || recentStudy?.subjectValue || newStudySubject;
         const customSubjectLabel = taskBlueprint?.subjectLabel?.trim()
           || (recentStudy?.subjectValue === 'etc' ? recentStudy.subjectLabel.trim() : '')
           || (subjectValue === 'etc' ? normalizeCustomSubjectLabel(newStudyCustomSubject) : '');
-        const shouldKeepMinutes = taskBlueprint
-          ? Boolean(taskBlueprint.targetMinutes && studyMode === 'volume')
-          : recentStudy ? recentStudy.enableVolumeMinutes : enableVolumeStudyMinutes;
 
         data.subject = subjectValue;
         data.subjectLabel = subjectValue === 'etc' ? normalizeCustomSubjectLabel(customSubjectLabel) : null;
-        data.studyPlanMode = studyMode;
-
-        if (studyMode === 'time') {
-          data.targetMinutes = Number(studyMinutes) || 0;
-          if (!data.startTime && Number(studyMinutes) > 0) {
-            const nextWindow = getNextAutoWindow(studyTasks, Number(studyMinutes) || 0, PLAN_DEFAULT_START_TIME);
-            data.startTime = nextWindow.startTime;
-            data.endTime = nextWindow.endTime;
-          }
-        } else {
-          const targetAmount = Math.max(0, Number(studyAmount) || 0);
-          if (targetAmount > 0) {
-            data.targetAmount = targetAmount;
-            data.actualAmount = 0;
-            data.amountUnit = studyAmountUnit;
-            if (studyAmountUnit === '직접입력') {
-              data.amountUnitLabel = customUnitLabel || '단위';
-            }
-          }
-          if (shouldKeepMinutes && Number(studyMinutes) > 0) {
-            data.targetMinutes = Number(studyMinutes) || 0;
-            if (!data.startTime) {
-              const nextWindow = getNextAutoWindow(studyTasks, Number(studyMinutes) || 0, PLAN_DEFAULT_START_TIME);
-              data.startTime = nextWindow.startTime;
-              data.endTime = nextWindow.endTime;
-            }
-          }
-        }
+        data.studyPlanMode = 'volume';
+        data.targetMinutes = 0;
+        data.targetAmount = 0;
+        data.actualAmount = 0;
+        data.amountUnit = null;
+        data.amountUnitLabel = null;
       }
 
       await addDoc(itemsCollectionRef, data);
@@ -2697,7 +2663,7 @@ export default function StudyPlanPage() {
       setIsRecentStudySheetOpen(false);
       toast({
         title: '최근 계획을 그대로 추가했어요.',
-        description: '제목과 목표는 유지하고, 완료 상태는 새로 시작하도록 초기화했어요.',
+        description: '실시할 내용과 과목만 가져오고, 완료 상태는 새로 시작하도록 초기화했어요.',
       });
     }
   };

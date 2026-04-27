@@ -127,38 +127,8 @@ function resolveStudyPlanMode(
   return typeof task.targetAmount === 'number' && task.targetAmount > 0 ? 'volume' : 'time';
 }
 
-function resolveAmountUnitLabel(task: Pick<StudyPlanItem, 'amountUnit' | 'amountUnitLabel'>) {
-  if (task.amountUnit === '직접입력') return task.amountUnitLabel?.trim() || '단위';
-  return task.amountUnit || '문제';
-}
-
 function resolveEditAmountUnit(unit: StudyPlanItem['amountUnit'] | null | undefined): StudyAmountUnit {
   return STUDY_AMOUNT_UNIT_OPTIONS.some((item) => item.value === unit) ? unit as StudyAmountUnit : '문제';
-}
-
-function toPositiveIntegerDraft(value: string) {
-  const parsed = Number(value);
-  if (!Number.isFinite(parsed)) return 0;
-  return Math.max(0, Math.round(parsed));
-}
-
-function buildStudyTaskMeta(
-  task: Pick<
-    StudyPlanItem,
-    'studyPlanMode' | 'targetMinutes' | 'targetAmount' | 'actualAmount' | 'amountUnit' | 'amountUnitLabel'
-  >
-) {
-  if (resolveStudyPlanMode(task) === 'volume') {
-    const unitLabel = resolveAmountUnitLabel(task);
-    const targetAmount = Math.max(0, task.targetAmount || 0);
-    const actualAmount = Math.max(0, task.actualAmount || 0);
-    if (targetAmount <= 0) {
-      return '자율 계획';
-    }
-    const progressRate = targetAmount > 0 ? Math.round((actualAmount / targetAmount) * 100) : 0;
-    return `목표 ${targetAmount}${unitLabel} · 실제 ${actualAmount}${unitLabel} · ${progressRate}%`;
-  }
-  return task.targetMinutes ? `${task.targetMinutes}분 목표` : '시간 자유';
 }
 
 export function StudyPlanSheet({
@@ -198,7 +168,6 @@ export function StudyPlanSheet({
   studyTasks,
   onToggleTask,
   onDeleteTask,
-  onCommitActual,
   onUpdateStudyTask,
   personalTasks = [],
   personalTaskValue = '',
@@ -275,9 +244,6 @@ export function StudyPlanSheet({
       if (editDraft.kind === 'study') {
         const task = studyTasks.find((item) => item.id === editDraft.id);
         if (!task || !onUpdateStudyTask) return;
-        const isVolumeMode = editDraft.studyPlanMode === 'volume';
-        const targetMinutes = toPositiveIntegerDraft(editDraft.targetMinutes);
-        const targetAmount = toPositiveIntegerDraft(editDraft.targetAmount);
         const subjectLabel = editDraft.subject === 'etc'
           ? editDraft.subjectLabel.trim() || fallbackCustomSubjectLabel
           : null;
@@ -286,15 +252,11 @@ export function StudyPlanSheet({
           title: trimmedTitle,
           subject: editDraft.subject || 'etc',
           subjectLabel,
-          studyPlanMode: editDraft.studyPlanMode,
-          targetMinutes: isVolumeMode
-            ? editDraft.enableVolumeMinutes ? targetMinutes : 0
-            : targetMinutes,
-          targetAmount: isVolumeMode ? targetAmount : 0,
-          amountUnit: isVolumeMode && targetAmount > 0 ? editDraft.amountUnit : null,
-          amountUnitLabel: isVolumeMode && targetAmount > 0 && editDraft.amountUnit === '직접입력'
-            ? editDraft.amountUnitLabel.trim() || '단위'
-            : null,
+          studyPlanMode: 'volume',
+          targetMinutes: 0,
+          targetAmount: 0,
+          amountUnit: null,
+          amountUnitLabel: null,
         });
       } else {
         const task = personalTasks.find((item) => item.id === editDraft.id);
@@ -315,46 +277,18 @@ export function StudyPlanSheet({
 
   const renderStudyEditPanel = (task: WithId<StudyPlanItem>) => {
     if (editDraft?.kind !== 'study' || editDraft.id !== task.id) return null;
-    const isVolumeMode = editDraft.studyPlanMode === 'volume';
     const needsCustomSubject = editDraft.subject === 'etc';
-    const needsCustomUnit = isVolumeMode && editDraft.amountUnit === '직접입력';
 
     return (
       <div className="rounded-[1.2rem] border border-[#FFB347]/24 bg-[#FF7A16]/10 p-3">
-        <div className={cn('gap-3', isMobile ? 'space-y-3' : 'grid grid-cols-[minmax(0,1fr)_10rem]')}>
-          <div className="space-y-1.5">
-            <p className="text-[10px] font-black text-[#FFD4AA]">실시할 내용</p>
-            <Input
-              value={editDraft.title}
-              onChange={(event) => updateStudyEditDraft({ title: event.target.value })}
-              disabled={isEditSaving}
-              className="h-10 rounded-xl border-white/12 bg-white/[0.1] text-sm font-black text-white placeholder:text-white/55"
-            />
-          </div>
-          <div className="space-y-1.5">
-            <p className="text-[10px] font-black text-[#FFD4AA]">계획 유형</p>
-            <div className="grid grid-cols-2 gap-1.5">
-              {STUDY_PLAN_MODE_OPTIONS.map((option) => (
-                <button
-                  key={option.value}
-                  type="button"
-                  disabled={isEditSaving}
-                  onClick={() => updateStudyEditDraft({
-                    studyPlanMode: option.value,
-                    enableVolumeMinutes: option.value === 'volume' ? editDraft.enableVolumeMinutes : true,
-                  })}
-                  className={cn(
-                    'h-10 rounded-xl border text-[11px] font-black transition-all',
-                    editDraft.studyPlanMode === option.value
-                      ? 'border-[#FFB347]/50 bg-[#FF7A16]/28 text-white'
-                      : 'border-white/12 bg-white/[0.08] text-[var(--text-on-dark-soft)] hover:bg-white/[0.12]'
-                  )}
-                >
-                  {option.label}
-                </button>
-              ))}
-            </div>
-          </div>
+        <div className="space-y-1.5">
+          <p className="text-[10px] font-black text-[#FFD4AA]">실시할 내용</p>
+          <Input
+            value={editDraft.title}
+            onChange={(event) => updateStudyEditDraft({ title: event.target.value })}
+            disabled={isEditSaving}
+            className="h-10 rounded-xl border-white/12 bg-white/[0.1] text-sm font-black text-white placeholder:text-white/55"
+          />
         </div>
 
         <div className="mt-3 space-y-2">
@@ -390,93 +324,6 @@ export function StudyPlanSheet({
             />
           ) : null}
         </div>
-
-        {isVolumeMode ? (
-          <div className="mt-3 space-y-3">
-            <div className={cn('gap-3', isMobile ? 'space-y-3' : 'grid grid-cols-[8rem_minmax(0,1fr)]')}>
-              <div className="space-y-1.5">
-                <p className="text-[10px] font-black text-[#FFD4AA]">목표 분량</p>
-                <Input
-                  type="number"
-                  min={0}
-                  value={editDraft.targetAmount}
-                  onChange={(event) => updateStudyEditDraft({ targetAmount: event.target.value })}
-                  disabled={isEditSaving}
-                  placeholder="예: 30"
-                  className="h-10 rounded-xl border-white/12 bg-white/[0.1] text-center text-sm font-black text-white placeholder:text-white/55"
-                />
-              </div>
-              <div className="space-y-1.5">
-                <p className="text-[10px] font-black text-[#FFD4AA]">단위</p>
-                <div className="flex flex-wrap gap-1.5">
-                  {STUDY_AMOUNT_UNIT_OPTIONS.map((unit) => (
-                    <button
-                      key={unit.value}
-                      type="button"
-                      disabled={isEditSaving}
-                      onClick={() => updateStudyEditDraft({ amountUnit: unit.value })}
-                      className={cn(
-                        'rounded-full border px-2.5 py-1.5 text-[10px] font-black transition-all',
-                        editDraft.amountUnit === unit.value
-                          ? 'border-[#FFB347]/50 bg-[#FF7A16]/28 text-white'
-                          : 'border-white/12 bg-white/[0.08] text-[var(--text-on-dark-soft)] hover:bg-white/[0.12]'
-                      )}
-                    >
-                      {unit.label}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            </div>
-            {needsCustomUnit ? (
-              <Input
-                value={editDraft.amountUnitLabel}
-                onChange={(event) => updateStudyEditDraft({ amountUnitLabel: event.target.value })}
-                disabled={isEditSaving}
-                placeholder="직접 입력 단위"
-                className="h-10 rounded-xl border-white/12 bg-white/[0.1] text-sm font-black text-white placeholder:text-white/55"
-              />
-            ) : null}
-            <button
-              type="button"
-              disabled={isEditSaving}
-              onClick={() => updateStudyEditDraft({ enableVolumeMinutes: !editDraft.enableVolumeMinutes })}
-              className="text-[10px] font-black text-[#FFD4AA] transition hover:text-white"
-            >
-              {editDraft.enableVolumeMinutes ? '예상 시간 빼기' : '예상 시간 추가'}
-            </button>
-            {editDraft.enableVolumeMinutes ? (
-              <div className="flex items-center gap-2">
-                <Input
-                  type="number"
-                  min={0}
-                  value={editDraft.targetMinutes}
-                  onChange={(event) => updateStudyEditDraft({ targetMinutes: event.target.value })}
-                  disabled={isEditSaving}
-                  placeholder="예: 60"
-                  className="h-10 max-w-[7rem] rounded-xl border-white/12 bg-white/[0.1] text-center text-sm font-black text-white placeholder:text-white/55"
-                />
-                <span className="text-[10px] font-black text-[var(--text-on-dark-soft)]">분 정도</span>
-              </div>
-            ) : null}
-          </div>
-        ) : (
-          <div className="mt-3 space-y-1.5">
-            <p className="text-[10px] font-black text-[#FFD4AA]">목표 시간</p>
-            <div className="flex items-center gap-2">
-              <Input
-                type="number"
-                min={0}
-                value={editDraft.targetMinutes}
-                onChange={(event) => updateStudyEditDraft({ targetMinutes: event.target.value })}
-                disabled={isEditSaving}
-                placeholder="예: 60"
-                className="h-10 max-w-[7rem] rounded-xl border-white/12 bg-white/[0.1] text-center text-sm font-black text-white placeholder:text-white/55"
-              />
-              <span className="text-[10px] font-black text-[var(--text-on-dark-soft)]">분 목표</span>
-            </div>
-          </div>
-        )}
 
         <div className="mt-4 flex justify-end gap-2">
           <Button
@@ -641,10 +488,6 @@ export function StudyPlanSheet({
                   <div className="space-y-3">
                     {studyTasks.map((task) => {
                       const subject = subjectOptions.find((item) => item.id === (task.subject || 'etc'));
-                      const isVolumeTask = resolveStudyPlanMode(task) === 'volume';
-                      const targetAmount = Math.max(0, task.targetAmount || 0);
-                      const unitLabel = resolveAmountUnitLabel(task);
-
                       return (
                         <div key={task.id} className="space-y-2">
                           <PlanItemCard
@@ -660,18 +503,8 @@ export function StudyPlanSheet({
                             isMobile={isMobile}
                             tone="emerald"
                             badgeLabel={task.subject === 'etc' ? task.subjectLabel?.trim() || subject?.label || '직접 입력' : subject?.label || '직접 입력'}
-                            metaLabel={buildStudyTaskMeta(task)}
-                            volumeMeta={
-                              isVolumeTask && targetAmount > 0
-                                ? {
-                                    targetAmount,
-                                    actualAmount: Math.max(0, task.actualAmount || 0),
-                                    unitLabel,
-                                    onCommitActual: (value) => onCommitActual(task, value),
-                                    onRequestCompletion: () => onToggleTask(task),
-                                  }
-                                : null
-                            }
+                            metaLabel={null}
+                            volumeMeta={null}
                           />
                           {renderStudyEditPanel(task)}
                         </div>

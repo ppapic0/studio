@@ -1,6 +1,5 @@
 'use client';
 
-import { useEffect, useState } from 'react';
 import { History, Loader2, Target } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
@@ -12,7 +11,6 @@ import {
   type RecentStudyOption,
   type StudyAmountUnit,
   type StudyPlanMode,
-  STUDY_PLAN_MODE_OPTIONS,
 } from './planner-constants';
 
 type SubjectOption = {
@@ -68,14 +66,8 @@ export function StudyComposerCard({
   onSubjectChange,
   customSubjectValue = '',
   onCustomSubjectChange,
-  minuteValue,
-  onMinuteChange,
   taskValue,
   onTaskChange,
-  studyModeValue,
-  onStudyModeChange,
-  enableVolumeMinutes,
-  onEnableVolumeMinutesChange,
   onSubmit,
   isSubmitting,
   isMobile,
@@ -87,29 +79,7 @@ export function StudyComposerCard({
   compact = false,
   disabled = false,
   submitLabel = '계획 추가',
-  modeOptions = STUDY_PLAN_MODE_OPTIONS,
 }: StudyComposerCardProps) {
-  const hasSingleMode = modeOptions.length === 1;
-  const effectiveStudyMode = hasSingleMode ? modeOptions[0].value : studyModeValue;
-  const isVolumeMode = effectiveStudyMode === 'volume';
-  const [showOptionalMinutes, setShowOptionalMinutes] = useState(enableVolumeMinutes || !isVolumeMode);
-
-  useEffect(() => {
-    if (hasSingleMode && studyModeValue !== modeOptions[0].value) {
-      onStudyModeChange(modeOptions[0].value);
-    }
-  }, [hasSingleMode, modeOptions, onStudyModeChange, studyModeValue]);
-
-  useEffect(() => {
-    if (!isVolumeMode) {
-      setShowOptionalMinutes(true);
-      return;
-    }
-    if (enableVolumeMinutes) {
-      setShowOptionalMinutes(true);
-    }
-  }, [enableVolumeMinutes, isVolumeMode]);
-
   const activeSubjectLabel =
     subjectOptions.find((subject) => subject.id === subjectValue)?.label || '과목 선택';
   const needsCustomSubject = subjectValue === 'etc';
@@ -222,80 +192,17 @@ export function StudyComposerCard({
             </div>
           ) : null}
 
-          {isVolumeMode ? (
-            <>
-              <div className="mt-3 space-y-1.5">
-                <p className="text-[11px] font-black text-[#5C73A0]">실시할 내용</p>
-                <Input
-                  value={taskValue}
-                  onChange={(event) => onTaskChange(event.target.value)}
-                  placeholder="예: 국어 문학 1강 듣고 기출 10문제 풀기"
-                  disabled={disabled || isSubmitting}
-                  className="h-12 rounded-[1rem] border-[#D7E1F2] bg-white text-sm font-black text-[#14295F] shadow-none placeholder:text-[#7E93BB]"
-                />
-              </div>
-
-              <div className="mt-3">
-                <button
-                  type="button"
-                  disabled={disabled || isSubmitting}
-                  onClick={() => {
-                    const nextValue = !showOptionalMinutes;
-                    setShowOptionalMinutes(nextValue);
-                    onEnableVolumeMinutesChange(nextValue);
-                  }}
-                  className={cn(
-                    'text-[11px] font-black transition-colors',
-                    showOptionalMinutes ? 'text-[#14295F]' : 'text-[#5C73A0]',
-                    !disabled && !isSubmitting && 'hover:text-[#14295F]'
-                  )}
-                >
-                  {showOptionalMinutes ? '예상 시간 숨기기' : '예상 시간 추가'}
-                </button>
-                {showOptionalMinutes ? (
-                  <div className="mt-2 flex items-center gap-2">
-                    <Input
-                      type="number"
-                      min={0}
-                      value={minuteValue}
-                      onChange={(event) => onMinuteChange(event.target.value)}
-                      disabled={disabled || isSubmitting}
-                      placeholder="예: 60"
-                      className="h-10 max-w-[7rem] rounded-full border-[#D7E1F2] bg-white text-center text-sm font-black text-[#14295F] shadow-none placeholder:text-[#7E93BB]"
-                    />
-                    <span className="text-[11px] font-black text-[#6E83AB]">분 정도</span>
-                  </div>
-                ) : null}
-              </div>
-            </>
-          ) : (
-            <div className="mt-3 space-y-1.5">
-              <p className="text-[11px] font-black text-[#5C73A0]">예상 시간</p>
+          <div className={cn('mt-3 gap-2', isMobile ? 'space-y-2' : 'grid grid-cols-[minmax(0,1fr)_8.5rem]')}>
+            <div className="space-y-1.5">
+              <p className="text-[11px] font-black text-[#5C73A0]">실시할 내용</p>
               <Input
-                type="number"
-                min={0}
-                value={minuteValue}
-                onChange={(event) => onMinuteChange(event.target.value)}
+                value={taskValue}
+                onChange={(event) => onTaskChange(event.target.value)}
+                placeholder="예: 국어 문학 1강 듣고 기출 10문제 풀기"
                 disabled={disabled || isSubmitting}
-                placeholder="예: 60"
-                className="h-11 rounded-[1rem] border-[#D7E1F2] bg-white text-center text-sm font-black text-[#14295F] shadow-none placeholder:text-[#7E93BB]"
+                className="h-12 rounded-[1rem] border-[#D7E1F2] bg-white text-sm font-black text-[#14295F] shadow-none placeholder:text-[#7E93BB]"
               />
             </div>
-          )}
-
-          <div className={cn('mt-3 gap-2', isMobile || isVolumeMode ? 'space-y-2' : 'grid grid-cols-[minmax(0,1fr)_8.5rem]')}>
-            {!isVolumeMode ? (
-              <div className="space-y-1.5">
-                <p className="text-[11px] font-black text-[#5C73A0]">실시할 내용</p>
-                <Input
-                  value={taskValue}
-                  onChange={(event) => onTaskChange(event.target.value)}
-                  placeholder="예: 국어 문학 1강 듣고 기출 10문제 풀기"
-                  disabled={disabled || isSubmitting}
-                  className="h-12 rounded-[1rem] border-[#D7E1F2] bg-white text-sm font-black text-[#14295F] shadow-none placeholder:text-[#7E93BB]"
-                />
-              </div>
-            ) : null}
             <Button
               type="button"
               onClick={onSubmit}
