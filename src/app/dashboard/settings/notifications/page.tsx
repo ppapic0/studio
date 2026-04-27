@@ -24,6 +24,7 @@ import { useAppContext } from '@/contexts/app-context';
 import { useToast } from '@/hooks/use-toast';
 import { shouldExcludeFromSmsQueries } from '@/lib/counseling-demo';
 import { canManageSettings } from '@/lib/dashboard-access';
+import { getStudyDayDate, getStudyDayKey } from '@/lib/study-day';
 import type { AttendanceCurrent, NotificationSettings } from '@/lib/types';
 import { cn } from '@/lib/utils';
 import { AdminWorkbenchCommandBar } from '@/components/dashboard/admin-workbench-command-bar';
@@ -391,7 +392,7 @@ function getStudentIdFromDatedAttendanceRow(row: { id: string; studentId?: strin
 
 function toDateKeyFromValue(value?: { toDate?: () => Date }) {
   const date = value?.toDate?.();
-  return date ? toDateInputValue(date) : '';
+  return date ? getStudyDayKey(date) : '';
 }
 
 function formatDateLabel(value?: { toDate?: () => Date }) {
@@ -487,7 +488,19 @@ function dateFromDateKeyAndTimeLabel(dateKey: string | undefined, timeLabel: str
       ? new Date(fallbackDate)
       : null;
   if (!base || Number.isNaN(base.getTime())) return null;
-  return mergeDateWithTimeLabel(base, timeLabel);
+  const merged = mergeDateWithTimeLabel(base, timeLabel);
+  const hour = Number(timeLabel.split(':')[0]);
+  if (
+    dateKey &&
+    Number.isFinite(hour) &&
+    hour < 1 &&
+    fallbackDate &&
+    getStudyDayKey(fallbackDate) === dateKey &&
+    toDateInputValue(fallbackDate) !== dateKey
+  ) {
+    merged.setDate(merged.getDate() + 1);
+  }
+  return merged;
 }
 
 function resolveSmsEventDisplayDate(
@@ -670,7 +683,7 @@ export default function NotificationSettingsPage() {
   const [historyEventFilter, setHistoryEventFilter] = useState<'all' | SmsConsoleEventType>('all');
   const [historyStatusFilter, setHistoryStatusFilter] = useState<'all' | 'sent' | 'failed' | 'suppressed_opt_out'>('all');
   const [historyTab, setHistoryTab] = useState<'by-date' | 'by-student'>('by-date');
-  const [selectedHistoryDate, setSelectedHistoryDate] = useState(toDateInputValue(new Date()));
+  const [selectedHistoryDate, setSelectedHistoryDate] = useState(() => getStudyDayKey(new Date()));
   const [selectedHistoryStudentId, setSelectedHistoryStudentId] = useState<string>('all');
   const [selectedBoardStudentId, setSelectedBoardStudentId] = useState<string | null>(null);
   const [isStudentDialogOpen, setIsStudentDialogOpen] = useState(false);
@@ -727,7 +740,8 @@ export default function NotificationSettingsPage() {
   }, [firestore, centerId, isAdmin]);
   const { data: preferencesRaw } = useCollection<SmsRecipientPreferenceDoc>(preferencesQuery, { enabled: isAdmin });
 
-  const todayDateKey = useMemo(() => toDateInputValue(new Date()), []);
+  const operationalToday = useMemo(() => getStudyDayDate(new Date()), []);
+  const todayDateKey = useMemo(() => getStudyDayKey(operationalToday), [operationalToday]);
 
   const attendanceRecordsTodayQuery = useMemoFirebase(() => {
     if (!firestore || !centerId || !isAdmin) return null;
@@ -873,8 +887,7 @@ export default function NotificationSettingsPage() {
 
   const smsTrendSummary = useMemo(() => {
     const range = Array.from({ length: 7 }, (_, index) => {
-      const date = new Date();
-      date.setHours(0, 0, 0, 0);
+      const date = new Date(operationalToday);
       date.setDate(date.getDate() - (6 - index));
       return {
         key: toDateInputValue(date),
@@ -911,7 +924,7 @@ export default function NotificationSettingsPage() {
       totalIssue: range.reduce((sum, item) => sum + item.issue, 0),
       pendingTodayCount,
     };
-  }, [smsDeliveryLogsFinalRows, smsQueueRaw]);
+  }, [operationalToday, smsDeliveryLogsFinalRows, smsQueueRaw]);
 
   const smsTrendChart = useMemo(() => {
     const width = 640;
@@ -1032,7 +1045,7 @@ export default function NotificationSettingsPage() {
           liveAttendance &&
           ['studying', 'away', 'break'].includes(liveAttendance.status) &&
           liveCheckInAt &&
-          toDateInputValue(liveCheckInAt) === todayKey
+          getStudyDayKey(liveCheckInAt) === todayKey
             ? liveCheckInAt
             : null;
         const resolveAttendanceTime = (eventType: TodayBoardEventType) => {

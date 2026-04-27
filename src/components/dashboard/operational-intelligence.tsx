@@ -39,6 +39,7 @@ import {
   YAxis,
 } from 'recharts';
 import { eachDayOfInterval, format, subDays } from 'date-fns';
+import { getStudyDayDate } from '@/lib/study-day';
 
 type TimestampLike = { toDate?: () => Date } | Date | string | null | undefined;
 type LeadRecord = { createdAt?: TimestampLike; linkedLeadId?: string | null };
@@ -191,7 +192,7 @@ export function OperationalIntelligence() {
     const loadStudyAnalytics = async () => {
       setAnalyticsLoading(true);
       try {
-        const now = new Date();
+        const now = getStudyDayDate(new Date());
         const todayKey = format(now, 'yyyy-MM-dd');
         const from30DaysKey = format(subDays(now, 29), 'yyyy-MM-dd');
         const trendDateKeys = eachDayOfInterval({

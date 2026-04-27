@@ -1722,13 +1722,13 @@ async function resolveAttendanceSmsEventAt(db, params) {
     const eventType = normalizeSmsEventType(params.eventType);
     if (eventType === "late_alert")
         return params.fallbackEventAt;
-    const dateKey = asTrimmedString(params.dateKeyOverride) || toDateKey(params.fallbackEventAt);
+    const dateKey = asTrimmedString(params.dateKeyOverride) || toStudyDayKey(params.fallbackEventAt);
     const candidates = [];
     const addCandidate = (value) => {
         const candidate = toKstDateFromUnknownTimestamp(value);
         if (!candidate)
             return;
-        if (toDateKey(candidate) !== dateKey)
+        if (toStudyDayKey(candidate) !== dateKey)
             return;
         candidates.push(candidate);
     };
@@ -1950,7 +1950,7 @@ function resolveTemplateByEvent(settings, eventType) {
     return settings.smsTemplateLateAlert || DEFAULT_SMS_TEMPLATES.late_alert;
 }
 function buildSmsDedupeKey(params) {
-    const dateKey = toDateKey(params.eventAt);
+    const dateKey = toStudyDayKey(params.eventAt);
     if (params.eventType === "late_alert") {
         return `${params.centerId}_${params.studentId}_${params.eventType}_${dateKey}`;
     }
@@ -1958,7 +1958,7 @@ function buildSmsDedupeKey(params) {
 }
 function buildAttendanceEventSmsDedupeKey(params) {
     const normalizedEventType = normalizeSmsEventType(params.eventType);
-    const dateKey = toDateKey(params.eventAt);
+    const dateKey = toStudyDayKey(params.eventAt);
     const eventId = asTrimmedString(params.eventId).replace(/[^A-Za-z0-9_-]/g, "_").slice(0, 120);
     return `${params.centerId}_${params.studentId}_${normalizedEventType}_${dateKey}_event_${eventId}`;
 }
@@ -1995,7 +1995,7 @@ async function appendSmsDeliveryLog(db, params) {
         provider: params.provider || null,
         attemptNo: params.attemptNo || 0,
         status: params.status,
-        dateKey: toDateKey((eventAt || createdAt).toDate()),
+        dateKey: toStudyDayKey((eventAt || createdAt).toDate()),
         eventAt,
         createdAt,
         sentAt: params.sentAt || null,
@@ -2252,7 +2252,7 @@ async function queueParentSmsNotification(db, params) {
             messageBytes,
             dedupeKey,
             eventType,
-            dateKey: toDateKey(smsEventAt),
+            dateKey: toStudyDayKey(smsEventAt),
             eventAt: eventAtTs,
             status: shouldDispatchImmediately ? "processing" : initialStatus.status,
             providerStatus: shouldDispatchImmediately ? "processing" : initialStatus.providerStatus,
@@ -2394,7 +2394,7 @@ async function queueCustomParentSmsNotification(db, params) {
             messageBytes,
             dedupeKey: params.dedupeKey || null,
             eventType: params.eventType,
-            dateKey: toDateKey(params.date),
+            dateKey: toStudyDayKey(params.date),
             status: initialStatus.status,
             providerStatus: initialStatus.providerStatus,
             attemptCount: 0,
@@ -2854,7 +2854,7 @@ exports.repairTodayAttendanceSmsQueue = smsDispatcherFunctions.https.onCall(asyn
     if (!isAdminRole(callerRole)) {
         throw new functions.https.HttpsError("permission-denied", "센터 관리자만 문자 접수 복구를 실행할 수 있습니다.");
     }
-    const todayKey = toDateKey(toKstDate());
+    const todayKey = toStudyDayKey(toKstDate());
     const requestedDateKey = asTrimmedString(data === null || data === void 0 ? void 0 : data.dateKey, todayKey);
     if (requestedDateKey !== todayKey) {
         throw new functions.https.HttpsError("invalid-argument", "오늘 날짜의 문자 접수만 복구할 수 있습니다.");
@@ -2870,7 +2870,7 @@ async function runLateArrivalCheckForCenter(db, centerId, nowKst, attendanceSnap
         ? Math.max(0, Number(settings.lateAlertGraceMinutes))
         : 20;
     const nowMinutes = nowKst.getHours() * 60 + nowKst.getMinutes();
-    const dateKey = toDateKey(nowKst);
+    const dateKey = toStudyDayKey(nowKst);
     const membersSnap = await db
         .collection(`centers/${centerId}/members`)
         .where("role", "==", "student")
@@ -3436,7 +3436,7 @@ async function buildClassroomSignalsForCenter(db, centerId, nowKst, dateKey) {
         ? Math.max(0, Number(settings.lateAlertGraceMinutes))
         : 20;
     const nowMinutes = nowKst.getHours() * 60 + nowKst.getMinutes();
-    const weekAgoKey = toDateKey(new Date(nowKst.getTime() - 6 * 24 * 60 * 60 * 1000));
+    const weekAgoKey = toStudyDayKey(new Date(nowKst.getTime() - 6 * 24 * 60 * 60 * 1000));
     const penaltyCutoff = admin.firestore.Timestamp.fromMillis(nowKst.getTime() - 30 * 24 * 60 * 60 * 1000);
     const startOfTodayKst = new Date(nowKst);
     startOfTodayKst.setHours(0, 0, 0, 0);
@@ -3751,7 +3751,7 @@ async function buildClassroomSignalsForCenter(db, centerId, nowKst, dateKey) {
     };
 }
 async function refreshClassroomSignalsForCenter(db, centerId, nowKst) {
-    const dateKey = toDateKey(nowKst);
+    const dateKey = toStudyDayKey(nowKst);
     const payload = await buildClassroomSignalsForCenter(db, centerId, nowKst, dateKey);
     await db.doc(`centers/${centerId}/classroomSignals/${dateKey}`).set(Object.assign(Object.assign({}, payload), { updatedAt: admin.firestore.FieldValue.serverTimestamp() }));
     return payload;
@@ -5877,7 +5877,7 @@ exports.retrySmsQueueItem = functions.region(region).https.onCall(async (data, c
             retryPayload.message = message;
             retryPayload.renderedMessage = message;
             retryPayload.messageBytes = calculateSmsBytes(message);
-            retryPayload.dateKey = toDateKey(smsEventAt);
+            retryPayload.dateKey = toStudyDayKey(smsEventAt);
             retryPayload.metadata = {
                 studentName,
                 centerName,
@@ -6079,7 +6079,7 @@ exports.scheduledSmsQueueDispatcher = smsDispatcherFunctions
     .onRun(async () => {
     const db = admin.firestore();
     const now = new Date();
-    const todayKey = toDateKey(toKstDate(now));
+    const todayKey = toStudyDayKey(toKstDate(now));
     const repairWindowStartMs = toKstDate(new Date(now.getTime() - 2 * 60 * 60 * 1000)).getTime();
     const nowTs = admin.firestore.Timestamp.fromDate(now);
     const processingLeaseUntil = admin.firestore.Timestamp.fromDate(new Date(now.getTime() + 60 * 1000));
@@ -6249,7 +6249,7 @@ exports.notifyAttendanceSms = functions.region(region).https.onCall(async (data,
     const studentNameRaw = (_b = studentSnap.data()) === null || _b === void 0 ? void 0 : _b.name;
     const studentName = typeof studentNameRaw === "string" && studentNameRaw.trim() ? studentNameRaw.trim() : "학생";
     if (isStudentSelfCaller) {
-        const todayKey = toDateKey(nowKst);
+        const todayKey = toStudyDayKey(nowKst);
         const [todayStatSnap, attendanceSnap] = await Promise.all([
             db.doc(`centers/${centerId}/dailyStudentStats/${todayKey}/students/${effectiveStudentId}`).get(),
             db.collection(`centers/${centerId}/attendanceCurrent`).where("studentId", "==", effectiveStudentId).limit(3).get(),
@@ -6613,7 +6613,7 @@ exports.scheduledWeeklyReport = functions
                     renderedMessage: message,
                     messageBytes: calculateSmsBytes(message),
                     eventType: "weekly_report",
-                    dateKey: toDateKey(nowKst),
+                    dateKey: toStudyDayKey(nowKst),
                     status: initialStatus.status,
                     providerStatus: initialStatus.providerStatus,
                     attemptCount: 0,
@@ -7094,7 +7094,7 @@ async function applyAttendanceStatusTransition(params) {
     const nextStatus = params.nextStatus;
     const nowMs = Math.max(0, Math.floor((_a = params.nowMs) !== null && _a !== void 0 ? _a : Date.now()));
     const nowTs = admin.firestore.Timestamp.fromMillis(nowMs);
-    const attendanceDateKey = toDateKey(toKstDate(new Date(nowMs)));
+    const attendanceDateKey = toStudyDayKey(new Date(nowMs));
     const seatDoc = await resolveAttendanceSeatDocForTransition({
         db,
         centerId,
@@ -7961,12 +7961,12 @@ exports.scheduledDailyRiskAlert = functions
     var _a;
     const db = admin.firestore();
     const nowKst = toKstDate();
-    const todayKey = toDateKey(nowKst);
+    const todayKey = toStudyDayKey(nowKst);
     const dateKeys = [];
     for (let i = 0; i < 14; i++) {
         const d = new Date(nowKst);
         d.setDate(d.getDate() - i);
-        dateKeys.push(toDateKey(d));
+        dateKeys.push(toStudyDayKey(d));
     }
     const centersSnap = await db.collection("centers").get();
     let totalAtRisk = 0;
@@ -8047,6 +8047,7 @@ exports.scheduledDailyRiskAlert = functions
                         renderedMessage: message,
                         messageBytes: calculateSmsBytes(message),
                         eventType: "risk_alert",
+                        dateKey: todayKey,
                         status: "queued",
                         providerStatus: "queued",
                         attemptCount: 0,
@@ -8095,7 +8096,7 @@ exports.scheduledClassroomSignalsRefresh = functions
     console.log("[classroom-signals] scheduled refresh complete", {
         centerCount: centersSnap.size,
         refreshed,
-        dateKey: toDateKey(nowKst),
+        dateKey: toStudyDayKey(nowKst),
     });
     return null;
 });

@@ -31,6 +31,7 @@ import { useAppContext } from '@/contexts/app-context';
 import { useMemoFirebase } from '@/hooks/use-memo-firebase';
 import type { BillingProfile, CenterMembership, DailyStudentStat, GrowthProgress, Invoice, PaymentRecord } from '@/lib/types';
 import { cn } from '@/lib/utils';
+import { getStudyDayDate, getStudyDayKey } from '@/lib/study-day';
 import {
   analyzeStudentRisk,
   buildExecutiveRiskSummary,
@@ -171,8 +172,8 @@ function formatWon(value: number): string {
   return `₩${Math.round(value || 0).toLocaleString('ko-KR')}`;
 }
 
-function buildDateKeys(days: number): string[] {
-  return Array.from({ length: days }, (_, index) => format(subDays(new Date(), index), 'yyyy-MM-dd'));
+function buildDateKeys(days: number, referenceDate: Date): string[] {
+  return Array.from({ length: days }, (_, index) => format(subDays(referenceDate, index), 'yyyy-MM-dd'));
 }
 
 function summarizePayment30d(payments: PaymentRecord[] | undefined) {
@@ -670,7 +671,8 @@ export function RiskIntelligence() {
   const centerId = activeMembership?.id;
   const role = activeMembership?.role;
   const isExecutiveViewer = role === 'centerAdmin' || role === 'owner';
-  const todayKey = format(new Date(), 'yyyy-MM-dd');
+  const operationalToday = useMemo(() => getStudyDayDate(new Date()), []);
+  const todayKey = getStudyDayKey(operationalToday);
 
   const [selectedStudent, setSelectedStudent] = useState<StudentRiskAnalysis | null>(null);
   const [recentStudyByStudent, setRecentStudyByStudent] = useState<Record<string, Record<string, number>>>({});
@@ -726,7 +728,7 @@ export function RiskIntelligence() {
     const load = async () => {
       setStudyLogsLoading(true);
       try {
-        const fromKey = format(subDays(new Date(), 13), 'yyyy-MM-dd');
+        const fromKey = format(subDays(operationalToday, 13), 'yyyy-MM-dd');
         const buckets: Record<string, Record<string, number>> = {};
 
         await Promise.all(
@@ -769,8 +771,8 @@ export function RiskIntelligence() {
 
   const riskAnalyses = useMemo(() => {
     if (!members) return [];
-    const keys7 = buildDateKeys(7);
-    const keys14 = buildDateKeys(14);
+    const keys7 = buildDateKeys(7, operationalToday);
+    const keys14 = buildDateKeys(14, operationalToday);
 
     return members
       .map((member) => {
@@ -795,7 +797,7 @@ export function RiskIntelligence() {
         const lowPerformanceThreshold = Math.max(150, avg7 * 0.75);
 
         for (let index = 0; index < observedDays; index += 1) {
-          const key = format(subDays(new Date(), index), 'yyyy-MM-dd');
+          const key = format(subDays(operationalToday, index), 'yyyy-MM-dd');
           const minutes = Number(key === todayKey ? todayMinutes : dayMap[key] || 0);
           if (minutes > 0 && lastActivityDaysAgo === observedDays) lastActivityDaysAgo = index;
           if (minutes < 180) lowStudyStreak += 1;
@@ -803,7 +805,7 @@ export function RiskIntelligence() {
         }
 
         for (let index = 0; index < observedDays; index += 1) {
-          const key = format(subDays(new Date(), index), 'yyyy-MM-dd');
+          const key = format(subDays(operationalToday, index), 'yyyy-MM-dd');
           const minutes = Number(key === todayKey ? todayMinutes : dayMap[key] || 0);
           if (minutes < lowPerformanceThreshold) consecutiveLowPerformanceDays += 1;
           else break;
@@ -847,7 +849,7 @@ export function RiskIntelligence() {
         );
       })
       .sort((a, b) => b.dimensions.overall - a.dimensions.overall);
-  }, [billingProfilesByStudent, invoiceSummaryByStudent, isExecutiveViewer, members, progressList, recentStudyByStudent, todayKey, todayStats]);
+  }, [billingProfilesByStudent, invoiceSummaryByStudent, isExecutiveViewer, members, operationalToday, progressList, recentStudyByStudent, todayKey, todayStats]);
 
   const summary = useMemo(() => buildExecutiveRiskSummary(riskAnalyses), [riskAnalyses]);
 

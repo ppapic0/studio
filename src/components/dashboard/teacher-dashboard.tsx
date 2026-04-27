@@ -137,6 +137,7 @@ import {
   toDateSafe as toDateSafeAttendance,
 } from '@/lib/attendance-auto';
 import { setStudentAttendanceStatusSecure } from '@/lib/study-session-actions';
+import { getStudyDayDate } from '@/lib/study-day';
 import {
   PRIMARY_ROOM_ID,
   buildSeatId,
@@ -616,8 +617,9 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
   const canManageManualSeatOccupancy =
     activeMembership?.role === 'centerAdmin' ||
     activeMembership?.role === 'owner';
-  const todayKey = format(new Date(), 'yyyy-MM-dd');
-  const thirtyDaysAgoKey = format(subDays(new Date(), 30), 'yyyy-MM-dd');
+  const operationalToday = useMemo(() => getStudyDayDate(new Date(now || Date.now())), [now]);
+  const todayKey = format(operationalToday, 'yyyy-MM-dd');
+  const thirtyDaysAgoKey = format(subDays(operationalToday, 30), 'yyyy-MM-dd');
   const { signals: classroomSignals } = useTeacherClassroomSignals(centerId, todayKey);
 
   const centerRef = useMemoFirebase(() => {

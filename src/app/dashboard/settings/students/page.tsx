@@ -64,8 +64,8 @@ import {
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
 import { Slider } from '@/components/ui/slider';
-import { format } from 'date-fns';
 import { canManageStaff } from '@/lib/dashboard-access';
+import { getStudyDayKey } from '@/lib/study-day';
 
 function resolveCallableErrorMessage(error: any, fallback: string): string {
   const detailMessage =
@@ -202,7 +202,7 @@ export default function StudentAccountManagementPage() {
   const isMobile = viewMode === 'mobile';
   const centerId = activeMembership?.id;
   const isAdmin = canManageStaff(activeMembership?.role);
-  const todayKey = format(new Date(), 'yyyy-MM-dd');
+  const todayKey = getStudyDayKey(new Date());
 
   // 1. 센터 모든 학생 멤버 조회
   const membersQuery = useMemoFirebase(() => {

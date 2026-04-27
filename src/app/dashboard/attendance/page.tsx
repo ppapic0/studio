@@ -85,6 +85,7 @@ import {
   resolveMembershipByRole,
 } from '@/lib/dashboard-access';
 import { AdminWorkbenchCommandBar } from '@/components/dashboard/admin-workbench-command-bar';
+import { getStudyDayDate, getStudyDayKey } from '@/lib/study-day';
 
 type AttendanceRecord = {
   id: string;
@@ -240,7 +241,7 @@ export default function AttendancePage() {
   ]);
 
   useEffect(() => {
-    setSelectedDate(new Date());
+    setSelectedDate(getStudyDayDate(new Date()));
   }, []);
 
   useEffect(() => {
@@ -483,7 +484,7 @@ export default function AttendancePage() {
   const isExcursionInProgress = (routine?: TodayScheduleInfo | null) => {
     if (!routine?.hasExcursion || !routine.excursionStartAt || !routine.excursionEndAt || !dateKey) return false;
     const now = new Date();
-    const todayKey = format(now, 'yyyy-MM-dd');
+    const todayKey = getStudyDayKey(now);
     if (todayKey !== dateKey) return false;
     const currentMinutes = now.getHours() * 60 + now.getMinutes();
     const startMinutes = Number(routine.excursionStartAt.slice(0, 2)) * 60 + Number(routine.excursionStartAt.slice(3, 5));
@@ -760,7 +761,7 @@ export default function AttendancePage() {
     const mapped = new Map<string, { status: DisplayAttendanceStatus; checkedAt: Date | null }>();
     if (!selectedDate) return mapped;
 
-    const todayDateKey = format(new Date(), 'yyyy-MM-dd');
+    const todayDateKey = getStudyDayKey(new Date());
     const isTodaySelected = dateKey === todayDateKey;
     const nowMs = Date.now();
 
@@ -831,7 +832,7 @@ export default function AttendancePage() {
     return mapped;
   }, [attendanceRoutineMap, students, todayScheduleMap]);
 
-  const todayDateKey = useMemo(() => format(new Date(), 'yyyy-MM-dd'), []);
+  const todayDateKey = useMemo(() => getStudyDayKey(new Date()), []);
 
   const sortedStudents = useMemo(() => {
     return [...(students || [])].sort((a, b) => {

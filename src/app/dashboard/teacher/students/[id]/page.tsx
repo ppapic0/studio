@@ -16,6 +16,7 @@ import { StudentProfile, StudyLogDay, GrowthProgress, CenterMembership, Counseli
 import { cn } from '@/lib/utils';
 import { formatSeatLabel } from '@/lib/seat-layout';
 import { getDailyPointBreakdown, type DailyPointBreakdownItemTone } from '@/lib/student-rewards';
+import { getStudyDayDate } from '@/lib/study-day';
 import { useToast } from '@/hooks/use-toast';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -658,7 +659,7 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
   const isMobile = viewMode === 'mobile';
   const prefersReducedMotion = useReducedMotion();
   const centerId = activeMembership?.id;
-  const today = new Date();
+  const today = getStudyDayDate(new Date());
   const todayKey = format(today, 'yyyy-MM-dd');
 
   const isStudentSelfView = activeMembership?.role === 'student';

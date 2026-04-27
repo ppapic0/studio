@@ -49,6 +49,7 @@ import { cn } from '@/lib/utils';
 import { generateDailyReport } from '@/ai/flows/generate-daily-report';
 import { sendKakaoNotification } from '@/lib/kakao-service';
 import { parseDateInputValue } from '@/lib/dashboard-access';
+import { getStudyDayKey } from '@/lib/study-day';
 import { buildAttendanceRoutineInfo, deriveAttendanceDisplayState, toDateSafe } from '@/lib/attendance-auto';
 import { deriveDailyReportSignals, normalizeDailyReportContentFingerprint } from '@/lib/daily-report-ai';
 import { VisualReportViewer } from '@/components/dashboard/visual-report-viewer';
@@ -361,7 +362,7 @@ export default function DailyReportsPage() {
     setAiLoading(true);
     try {
       const existingReport = dailyReports?.find((report) => report.studentId === selectedStudent.id) || null;
-      const todayKey = format(new Date(), 'yyyy-MM-dd');
+      const todayKey = getStudyDayKey(new Date());
       const isTodayTarget = dateKey === todayKey;
       const targetDate = selectedDate ?? parseDateInputValue(dateKey) ?? new Date();
 
