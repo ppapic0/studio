@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { ChevronDown, Trash2, X } from 'lucide-react';
+import { ChevronDown, PencilLine, Trash2, X } from 'lucide-react';
 
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -16,6 +16,8 @@ type PlanItemCardProps = {
   checked: boolean;
   onToggle: () => void;
   onDelete: () => void;
+  onEdit?: () => void;
+  isEditing?: boolean;
   disabled?: boolean;
   isMobile: boolean;
   tone: 'emerald' | 'amber' | 'slate';
@@ -55,6 +57,8 @@ export function PlanItemCard({
   checked,
   onToggle,
   onDelete,
+  onEdit,
+  isEditing = false,
   disabled = false,
   isMobile,
   tone,
@@ -147,6 +151,24 @@ export function PlanItemCard({
             </div>
 
             <div className="flex shrink-0 items-center gap-1">
+              {onEdit && !disabled ? (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  onClick={onEdit}
+                  aria-label={`${title} 수정`}
+                  className={cn(
+                    'h-8 rounded-full border text-[10px] font-black transition-all',
+                    isMobile ? 'w-8 px-0' : 'px-3',
+                    isEditing
+                      ? 'border-[#FFB347]/40 bg-[#FF7A16]/18 text-[#FFD4AA]'
+                      : 'border-white/10 bg-white/[0.05] text-white hover:bg-white/[0.1]'
+                  )}
+                >
+                  <PencilLine className={cn('h-3.5 w-3.5', !isMobile && 'mr-1.5')} />
+                  {isMobile ? <span className="sr-only">수정</span> : '수정'}
+                </Button>
+              ) : null}
               {volumeMeta && !disabled ? (
                 <Button
                   type="button"

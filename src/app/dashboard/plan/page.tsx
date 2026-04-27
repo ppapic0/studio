@@ -215,6 +215,17 @@ type ScheduleSaveFeedback = InlineMessage & {
   variant: 'success' | 'warning';
 };
 
+type StudyTaskDetailPatch = {
+  title: string;
+  subject: string;
+  subjectLabel: string | null;
+  studyPlanMode: StudyPlanMode;
+  targetMinutes: number;
+  targetAmount: number;
+  amountUnit: StudyAmountUnit | null;
+  amountUnitLabel: string | null;
+};
+
 type PersistStudentScheduleResult = {
   legacySyncWarning: boolean;
 };
@@ -335,7 +346,7 @@ const SUBJECTS = [
   { id: 'etc', label: '직접 입력', color: 'bg-slate-400', light: 'bg-slate-50', text: 'text-slate-500' },
 ];
 const DEFAULT_CUSTOM_SUBJECT_LABEL = '직접 입력';
-const QUICK_ADD_MAX_ITEMS = 6;
+const QUICK_ADD_MAX_ITEMS = 10;
 const QUICK_ADD_TITLE_MAX_LENGTH = 16;
 const QUICK_ADD_TAG_MAX_LENGTH = 12;
 
@@ -3777,6 +3788,92 @@ export default function StudyPlanPage() {
     });
   };
 
+  const handleUpdateStudyTaskDetails = async (item: WithId<StudyPlanItem>, patch: StudyTaskDetailPatch) => {
+    if (isPast || !firestore || !user || !activeMembership || !studentUid || !isStudent || !weekKey) return;
+    const title = patch.title.trim();
+    if (!title) {
+      toast({
+        variant: 'destructive',
+        title: '계획 내용을 적어주세요',
+        description: '비어 있는 계획은 저장할 수 없어요.',
+      });
+      return;
+    }
+
+    const isVolumeMode = patch.studyPlanMode === 'volume';
+    const targetMinutes = Math.max(0, Math.round(Number(patch.targetMinutes) || 0));
+    const targetAmount = isVolumeMode ? Math.max(0, Math.round(Number(patch.targetAmount) || 0)) : 0;
+    const previousActualAmount = Math.max(0, Math.round(Number(item.actualAmount || 0)));
+    const nextActualAmount = isVolumeMode && targetAmount > 0
+      ? item.done ? targetAmount : Math.min(previousActualAmount, targetAmount)
+      : 0;
+    const completionPercent = isVolumeMode && targetAmount > 0
+      ? clampPercent(Math.round((nextActualAmount / targetAmount) * 100))
+      : item.done ? 100 : null;
+
+    try {
+      const itemRef = doc(firestore, 'centers', activeMembership.id, 'plans', studentUid, 'weeks', weekKey, 'items', item.id);
+      await updateDoc(itemRef, {
+        title,
+        subject: patch.subject || 'etc',
+        subjectLabel: patch.subject === 'etc' ? patch.subjectLabel || DEFAULT_CUSTOM_SUBJECT_LABEL : null,
+        studyPlanMode: patch.studyPlanMode,
+        targetMinutes,
+        targetAmount,
+        actualAmount: nextActualAmount,
+        amountUnit: isVolumeMode && targetAmount > 0 ? patch.amountUnit || '문제' : null,
+        amountUnitLabel: isVolumeMode && targetAmount > 0 && patch.amountUnit === '직접입력'
+          ? patch.amountUnitLabel || '단위'
+          : null,
+        completionPercent,
+        updatedAt: serverTimestamp(),
+      });
+      toast({
+        title: '계획을 수정했어요',
+        description: '오늘 계획 목록에 바로 반영했습니다.',
+      });
+    } catch (error: any) {
+      toast({
+        variant: 'destructive',
+        title: '계획 수정 실패',
+        description: getSafeErrorMessage(error, '계획을 저장하지 못했습니다.'),
+      });
+      throw error;
+    }
+  };
+
+  const handleUpdatePersonalTaskDetails = async (item: WithId<StudyPlanItem>, titleValue: string) => {
+    if (isPast || !firestore || !user || !activeMembership || !studentUid || !isStudent || !weekKey) return;
+    const title = titleValue.trim();
+    if (!title) {
+      toast({
+        variant: 'destructive',
+        title: '일정 내용을 적어주세요',
+        description: '비어 있는 일정은 저장할 수 없어요.',
+      });
+      return;
+    }
+
+    try {
+      const itemRef = doc(firestore, 'centers', activeMembership.id, 'plans', studentUid, 'weeks', weekKey, 'items', item.id);
+      await updateDoc(itemRef, {
+        title,
+        updatedAt: serverTimestamp(),
+      });
+      toast({
+        title: '일정을 수정했어요',
+        description: '오늘 기타 일정에 바로 반영했습니다.',
+      });
+    } catch (error: any) {
+      toast({
+        variant: 'destructive',
+        title: '일정 수정 실패',
+        description: getSafeErrorMessage(error, '일정을 저장하지 못했습니다.'),
+      });
+      throw error;
+    }
+  };
+
   const handleUpdateStudyWindow = async (item: WithId<StudyPlanItem>, startTime: string, endTime: string) => {
     if (isPast || !firestore || !user || !activeMembership || !studentUid || !weekKey) return;
     const itemRef = doc(firestore, 'centers', activeMembership.id, 'plans', studentUid, 'weeks', weekKey, 'items', item.id);
@@ -4927,12 +5024,14 @@ export default function StudyPlanPage() {
         onToggleTask={(task) => void handleToggleTask(task)}
         onDeleteTask={(task) => void handleDeleteTask(task)}
         onCommitActual={(task, value) => void handleCommitStudyActualAmount(task, value)}
+        onUpdateStudyTask={(task, patch) => void handleUpdateStudyTaskDetails(task, patch)}
         personalTasks={personalTasks as Array<WithId<StudyPlanItem>>}
         personalTaskValue={newPersonalTask}
         onPersonalTaskChange={setNewPersonalTask}
         onAddPersonalTask={() => void handleAddTask(newPersonalTask, 'personal')}
         onTogglePersonalTask={(task) => void handleToggleTask(task)}
         onDeletePersonalTask={(task) => void handleDeleteTask(task)}
+        onUpdatePersonalTask={(task, title) => void handleUpdatePersonalTaskDetails(task, title)}
         modeOptions={STUDY_PLAN_MODE_OPTIONS.filter((option) => option.value === 'volume')}
       />
 

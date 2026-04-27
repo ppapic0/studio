@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { BookOpen, ChevronDown } from 'lucide-react';
+import { BookOpen, ChevronDown, Loader2 } from 'lucide-react';
 
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -24,6 +24,7 @@ import { cn } from '@/lib/utils';
 import { PlanItemCard } from './plan-item-card';
 import {
   type RecentStudyOption,
+  STUDY_AMOUNT_UNIT_OPTIONS,
   STUDY_PLAN_MODE_OPTIONS,
   type StudyAmountUnit,
   type StudyPlanMode,
@@ -75,14 +76,48 @@ type StudyPlanSheetProps = {
   onToggleTask: (task: WithId<StudyPlanItem>) => void;
   onDeleteTask: (task: WithId<StudyPlanItem>) => void;
   onCommitActual: (task: WithId<StudyPlanItem>, value: number) => void;
+  onUpdateStudyTask?: (
+    task: WithId<StudyPlanItem>,
+    patch: {
+      title: string;
+      subject: string;
+      subjectLabel: string | null;
+      studyPlanMode: StudyPlanMode;
+      targetMinutes: number;
+      targetAmount: number;
+      amountUnit: StudyAmountUnit | null;
+      amountUnitLabel: string | null;
+    }
+  ) => void | Promise<void>;
   personalTasks?: Array<WithId<StudyPlanItem>>;
   personalTaskValue?: string;
   onPersonalTaskChange?: (value: string) => void;
   onAddPersonalTask?: () => void;
   onTogglePersonalTask?: (task: WithId<StudyPlanItem>) => void;
   onDeletePersonalTask?: (task: WithId<StudyPlanItem>) => void;
+  onUpdatePersonalTask?: (task: WithId<StudyPlanItem>, title: string) => void | Promise<void>;
   modeOptions?: Array<{ value: StudyPlanMode; label: string; description: string }>;
 };
+
+type TaskEditDraft =
+  | {
+      kind: 'study';
+      id: string;
+      title: string;
+      subject: string;
+      subjectLabel: string;
+      studyPlanMode: StudyPlanMode;
+      targetMinutes: string;
+      targetAmount: string;
+      amountUnit: StudyAmountUnit;
+      amountUnitLabel: string;
+      enableVolumeMinutes: boolean;
+    }
+  | {
+      kind: 'personal';
+      id: string;
+      title: string;
+    };
 
 function resolveStudyPlanMode(
   task: Pick<StudyPlanItem, 'studyPlanMode' | 'targetAmount' | 'targetMinutes'>
@@ -94,6 +129,16 @@ function resolveStudyPlanMode(
 function resolveAmountUnitLabel(task: Pick<StudyPlanItem, 'amountUnit' | 'amountUnitLabel'>) {
   if (task.amountUnit === '직접입력') return task.amountUnitLabel?.trim() || '단위';
   return task.amountUnit || '문제';
+}
+
+function resolveEditAmountUnit(unit: StudyPlanItem['amountUnit'] | null | undefined): StudyAmountUnit {
+  return STUDY_AMOUNT_UNIT_OPTIONS.some((item) => item.value === unit) ? unit as StudyAmountUnit : '문제';
+}
+
+function toPositiveIntegerDraft(value: string) {
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed)) return 0;
+  return Math.max(0, Math.round(parsed));
 }
 
 function buildStudyTaskMeta(
@@ -152,24 +197,342 @@ export function StudyPlanSheet({
   onToggleTask,
   onDeleteTask,
   onCommitActual,
+  onUpdateStudyTask,
   personalTasks = [],
   personalTaskValue = '',
   onPersonalTaskChange,
   onAddPersonalTask,
   onTogglePersonalTask,
   onDeletePersonalTask,
+  onUpdatePersonalTask,
   modeOptions = STUDY_PLAN_MODE_OPTIONS,
 }: StudyPlanSheetProps) {
   const [isStudySectionOpen, setIsStudySectionOpen] = useState(false);
   const [isPersonalSectionOpen, setIsPersonalSectionOpen] = useState(false);
+  const [editDraft, setEditDraft] = useState<TaskEditDraft | null>(null);
+  const [isEditSaving, setIsEditSaving] = useState(false);
   const completedPersonalCount = personalTasks.filter((task) => task.done).length;
+  const fallbackCustomSubjectLabel = subjectOptions.find((item) => item.id === 'etc')?.label || '기타';
 
   useEffect(() => {
     if (open) {
       setIsStudySectionOpen(false);
       setIsPersonalSectionOpen(false);
+      setEditDraft(null);
     }
   }, [open]);
+
+  useEffect(() => {
+    if (isPast) {
+      setEditDraft(null);
+    }
+  }, [isPast]);
+
+  const openStudyTaskEdit = (task: WithId<StudyPlanItem>) => {
+    const studyPlanMode = resolveStudyPlanMode(task);
+    const targetMinutes = Math.max(0, Number(task.targetMinutes || 0));
+    const targetAmount = Math.max(0, Number(task.targetAmount || 0));
+    setEditDraft({
+      kind: 'study',
+      id: task.id,
+      title: task.title || '',
+      subject: task.subject || 'etc',
+      subjectLabel: task.subject === 'etc' ? task.subjectLabel?.trim() || fallbackCustomSubjectLabel : '',
+      studyPlanMode,
+      targetMinutes: targetMinutes > 0 ? String(targetMinutes) : '',
+      targetAmount: targetAmount > 0 ? String(targetAmount) : '',
+      amountUnit: resolveEditAmountUnit(task.amountUnit),
+      amountUnitLabel: task.amountUnitLabel?.trim() || '',
+      enableVolumeMinutes: studyPlanMode === 'volume' && targetMinutes > 0,
+    });
+  };
+
+  const openPersonalTaskEdit = (task: WithId<StudyPlanItem>) => {
+    setEditDraft({
+      kind: 'personal',
+      id: task.id,
+      title: task.title || '',
+    });
+  };
+
+  const updateStudyEditDraft = (patch: Partial<Extract<TaskEditDraft, { kind: 'study' }>>) => {
+    setEditDraft((previous) => previous?.kind === 'study' ? { ...previous, ...patch } : previous);
+  };
+
+  const updatePersonalEditDraft = (patch: Partial<Extract<TaskEditDraft, { kind: 'personal' }>>) => {
+    setEditDraft((previous) => previous?.kind === 'personal' ? { ...previous, ...patch } : previous);
+  };
+
+  const saveEditDraft = async () => {
+    if (!editDraft || isPast || isEditSaving) return;
+    const trimmedTitle = editDraft.title.trim();
+    if (!trimmedTitle) return;
+
+    setIsEditSaving(true);
+    try {
+      if (editDraft.kind === 'study') {
+        const task = studyTasks.find((item) => item.id === editDraft.id);
+        if (!task || !onUpdateStudyTask) return;
+        const isVolumeMode = editDraft.studyPlanMode === 'volume';
+        const targetMinutes = toPositiveIntegerDraft(editDraft.targetMinutes);
+        const targetAmount = toPositiveIntegerDraft(editDraft.targetAmount);
+        const subjectLabel = editDraft.subject === 'etc'
+          ? editDraft.subjectLabel.trim() || fallbackCustomSubjectLabel
+          : null;
+
+        await onUpdateStudyTask(task, {
+          title: trimmedTitle,
+          subject: editDraft.subject || 'etc',
+          subjectLabel,
+          studyPlanMode: editDraft.studyPlanMode,
+          targetMinutes: isVolumeMode
+            ? editDraft.enableVolumeMinutes ? targetMinutes : 0
+            : targetMinutes,
+          targetAmount: isVolumeMode ? targetAmount : 0,
+          amountUnit: isVolumeMode && targetAmount > 0 ? editDraft.amountUnit : null,
+          amountUnitLabel: isVolumeMode && targetAmount > 0 && editDraft.amountUnit === '직접입력'
+            ? editDraft.amountUnitLabel.trim() || '단위'
+            : null,
+        });
+      } else {
+        const task = personalTasks.find((item) => item.id === editDraft.id);
+        if (!task || !onUpdatePersonalTask) return;
+        await onUpdatePersonalTask(task, trimmedTitle);
+      }
+      setEditDraft(null);
+    } finally {
+      setIsEditSaving(false);
+    }
+  };
+
+  const isSaveEditDisabled =
+    !editDraft ||
+    isEditSaving ||
+    !editDraft.title.trim() ||
+    (editDraft.kind === 'study' ? !onUpdateStudyTask : !onUpdatePersonalTask);
+
+  const renderStudyEditPanel = (task: WithId<StudyPlanItem>) => {
+    if (editDraft?.kind !== 'study' || editDraft.id !== task.id) return null;
+    const isVolumeMode = editDraft.studyPlanMode === 'volume';
+    const needsCustomSubject = editDraft.subject === 'etc';
+    const needsCustomUnit = isVolumeMode && editDraft.amountUnit === '직접입력';
+
+    return (
+      <div className="rounded-[1.2rem] border border-[#FFB347]/24 bg-[#FF7A16]/10 p-3">
+        <div className={cn('gap-3', isMobile ? 'space-y-3' : 'grid grid-cols-[minmax(0,1fr)_10rem]')}>
+          <div className="space-y-1.5">
+            <p className="text-[10px] font-black text-[#FFD4AA]">실시할 내용</p>
+            <Input
+              value={editDraft.title}
+              onChange={(event) => updateStudyEditDraft({ title: event.target.value })}
+              disabled={isEditSaving}
+              className="h-10 rounded-xl border-white/12 bg-white/[0.1] text-sm font-black text-white placeholder:text-white/55"
+            />
+          </div>
+          <div className="space-y-1.5">
+            <p className="text-[10px] font-black text-[#FFD4AA]">계획 유형</p>
+            <div className="grid grid-cols-2 gap-1.5">
+              {STUDY_PLAN_MODE_OPTIONS.map((option) => (
+                <button
+                  key={option.value}
+                  type="button"
+                  disabled={isEditSaving}
+                  onClick={() => updateStudyEditDraft({
+                    studyPlanMode: option.value,
+                    enableVolumeMinutes: option.value === 'volume' ? editDraft.enableVolumeMinutes : true,
+                  })}
+                  className={cn(
+                    'h-10 rounded-xl border text-[11px] font-black transition-all',
+                    editDraft.studyPlanMode === option.value
+                      ? 'border-[#FFB347]/50 bg-[#FF7A16]/28 text-white'
+                      : 'border-white/12 bg-white/[0.08] text-[var(--text-on-dark-soft)] hover:bg-white/[0.12]'
+                  )}
+                >
+                  {option.label}
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        <div className="mt-3 space-y-2">
+          <p className="text-[10px] font-black text-[#FFD4AA]">과목</p>
+          <div className="flex flex-wrap gap-1.5">
+            {subjectOptions.map((subject) => (
+              <button
+                key={subject.id}
+                type="button"
+                disabled={isEditSaving}
+                onClick={() => updateStudyEditDraft({
+                  subject: subject.id,
+                  subjectLabel: subject.id === 'etc' ? editDraft.subjectLabel || fallbackCustomSubjectLabel : '',
+                })}
+                className={cn(
+                  'rounded-full border px-3 py-1.5 text-[10px] font-black transition-all',
+                  editDraft.subject === subject.id
+                    ? 'border-[#FFB347]/50 bg-[#FF7A16]/28 text-white'
+                    : 'border-white/12 bg-white/[0.08] text-[var(--text-on-dark-soft)] hover:bg-white/[0.12]'
+                )}
+              >
+                {subject.label}
+              </button>
+            ))}
+          </div>
+          {needsCustomSubject ? (
+            <Input
+              value={editDraft.subjectLabel}
+              onChange={(event) => updateStudyEditDraft({ subjectLabel: event.target.value })}
+              disabled={isEditSaving}
+              placeholder="과목 이름"
+              className="h-10 rounded-xl border-white/12 bg-white/[0.1] text-sm font-black text-white placeholder:text-white/55"
+            />
+          ) : null}
+        </div>
+
+        {isVolumeMode ? (
+          <div className="mt-3 space-y-3">
+            <div className={cn('gap-3', isMobile ? 'space-y-3' : 'grid grid-cols-[8rem_minmax(0,1fr)]')}>
+              <div className="space-y-1.5">
+                <p className="text-[10px] font-black text-[#FFD4AA]">목표 분량</p>
+                <Input
+                  type="number"
+                  min={0}
+                  value={editDraft.targetAmount}
+                  onChange={(event) => updateStudyEditDraft({ targetAmount: event.target.value })}
+                  disabled={isEditSaving}
+                  placeholder="예: 30"
+                  className="h-10 rounded-xl border-white/12 bg-white/[0.1] text-center text-sm font-black text-white placeholder:text-white/55"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <p className="text-[10px] font-black text-[#FFD4AA]">단위</p>
+                <div className="flex flex-wrap gap-1.5">
+                  {STUDY_AMOUNT_UNIT_OPTIONS.map((unit) => (
+                    <button
+                      key={unit.value}
+                      type="button"
+                      disabled={isEditSaving}
+                      onClick={() => updateStudyEditDraft({ amountUnit: unit.value })}
+                      className={cn(
+                        'rounded-full border px-2.5 py-1.5 text-[10px] font-black transition-all',
+                        editDraft.amountUnit === unit.value
+                          ? 'border-[#FFB347]/50 bg-[#FF7A16]/28 text-white'
+                          : 'border-white/12 bg-white/[0.08] text-[var(--text-on-dark-soft)] hover:bg-white/[0.12]'
+                      )}
+                    >
+                      {unit.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+            {needsCustomUnit ? (
+              <Input
+                value={editDraft.amountUnitLabel}
+                onChange={(event) => updateStudyEditDraft({ amountUnitLabel: event.target.value })}
+                disabled={isEditSaving}
+                placeholder="직접 입력 단위"
+                className="h-10 rounded-xl border-white/12 bg-white/[0.1] text-sm font-black text-white placeholder:text-white/55"
+              />
+            ) : null}
+            <button
+              type="button"
+              disabled={isEditSaving}
+              onClick={() => updateStudyEditDraft({ enableVolumeMinutes: !editDraft.enableVolumeMinutes })}
+              className="text-[10px] font-black text-[#FFD4AA] transition hover:text-white"
+            >
+              {editDraft.enableVolumeMinutes ? '예상 시간 빼기' : '예상 시간 추가'}
+            </button>
+            {editDraft.enableVolumeMinutes ? (
+              <div className="flex items-center gap-2">
+                <Input
+                  type="number"
+                  min={0}
+                  value={editDraft.targetMinutes}
+                  onChange={(event) => updateStudyEditDraft({ targetMinutes: event.target.value })}
+                  disabled={isEditSaving}
+                  placeholder="예: 60"
+                  className="h-10 max-w-[7rem] rounded-xl border-white/12 bg-white/[0.1] text-center text-sm font-black text-white placeholder:text-white/55"
+                />
+                <span className="text-[10px] font-black text-[var(--text-on-dark-soft)]">분 정도</span>
+              </div>
+            ) : null}
+          </div>
+        ) : (
+          <div className="mt-3 space-y-1.5">
+            <p className="text-[10px] font-black text-[#FFD4AA]">목표 시간</p>
+            <div className="flex items-center gap-2">
+              <Input
+                type="number"
+                min={0}
+                value={editDraft.targetMinutes}
+                onChange={(event) => updateStudyEditDraft({ targetMinutes: event.target.value })}
+                disabled={isEditSaving}
+                placeholder="예: 60"
+                className="h-10 max-w-[7rem] rounded-xl border-white/12 bg-white/[0.1] text-center text-sm font-black text-white placeholder:text-white/55"
+              />
+              <span className="text-[10px] font-black text-[var(--text-on-dark-soft)]">분 목표</span>
+            </div>
+          </div>
+        )}
+
+        <div className="mt-4 flex justify-end gap-2">
+          <Button
+            type="button"
+            variant="ghost"
+            onClick={() => setEditDraft(null)}
+            disabled={isEditSaving}
+            className="h-9 rounded-full border border-white/12 bg-white/[0.06] px-4 text-[11px] font-black text-white hover:bg-white/[0.12]"
+          >
+            취소
+          </Button>
+          <Button
+            type="button"
+            onClick={() => void saveEditDraft()}
+            disabled={isSaveEditDisabled}
+            className="h-9 rounded-full bg-[#FF7A16] px-4 text-[11px] font-black text-white hover:bg-[#FF8C32]"
+          >
+            {isEditSaving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : '수정 저장'}
+          </Button>
+        </div>
+      </div>
+    );
+  };
+
+  const renderPersonalEditPanel = (task: WithId<StudyPlanItem>) => {
+    if (editDraft?.kind !== 'personal' || editDraft.id !== task.id) return null;
+
+    return (
+      <div className="rounded-[1.2rem] border border-[#FFB347]/24 bg-[#FF7A16]/10 p-3">
+        <p className="text-[10px] font-black text-[#FFD4AA]">기타 일정 내용</p>
+        <Input
+          value={editDraft.title}
+          onChange={(event) => updatePersonalEditDraft({ title: event.target.value })}
+          disabled={isEditSaving}
+          className="mt-2 h-10 rounded-xl border-white/12 bg-white/[0.1] text-sm font-black text-white placeholder:text-white/55"
+        />
+        <div className="mt-4 flex justify-end gap-2">
+          <Button
+            type="button"
+            variant="ghost"
+            onClick={() => setEditDraft(null)}
+            disabled={isEditSaving}
+            className="h-9 rounded-full border border-white/12 bg-white/[0.06] px-4 text-[11px] font-black text-white hover:bg-white/[0.12]"
+          >
+            취소
+          </Button>
+          <Button
+            type="button"
+            onClick={() => void saveEditDraft()}
+            disabled={isSaveEditDisabled}
+            className="h-9 rounded-full bg-[#FF7A16] px-4 text-[11px] font-black text-white hover:bg-[#FF8C32]"
+          >
+            {isEditSaving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : '수정 저장'}
+          </Button>
+        </div>
+      </div>
+    );
+  };
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -281,30 +644,34 @@ export function StudyPlanSheet({
                       const unitLabel = resolveAmountUnitLabel(task);
 
                       return (
-                        <PlanItemCard
-                          key={task.id}
-                          id={task.id}
-                          title={task.title}
-                          checked={task.done}
-                          onToggle={() => onToggleTask(task)}
-                          onDelete={() => onDeleteTask(task)}
-                          disabled={isPast}
-                          isMobile={isMobile}
-                          tone="emerald"
-                          badgeLabel={task.subject === 'etc' ? task.subjectLabel?.trim() || subject?.label || '직접 입력' : subject?.label || '직접 입력'}
-                          metaLabel={buildStudyTaskMeta(task)}
-                          volumeMeta={
-                            isVolumeTask && targetAmount > 0
-                              ? {
-                                  targetAmount,
-                                  actualAmount: Math.max(0, task.actualAmount || 0),
-                                  unitLabel,
-                                  onCommitActual: (value) => onCommitActual(task, value),
-                                  onRequestCompletion: () => onToggleTask(task),
-                                }
-                              : null
-                          }
-                        />
+                        <div key={task.id} className="space-y-2">
+                          <PlanItemCard
+                            id={task.id}
+                            title={task.title}
+                            checked={task.done}
+                            onToggle={() => onToggleTask(task)}
+                            onDelete={() => onDeleteTask(task)}
+                            onEdit={onUpdateStudyTask ? () => openStudyTaskEdit(task) : undefined}
+                            isEditing={editDraft?.kind === 'study' && editDraft.id === task.id}
+                            disabled={isPast}
+                            isMobile={isMobile}
+                            tone="emerald"
+                            badgeLabel={task.subject === 'etc' ? task.subjectLabel?.trim() || subject?.label || '직접 입력' : subject?.label || '직접 입력'}
+                            metaLabel={buildStudyTaskMeta(task)}
+                            volumeMeta={
+                              isVolumeTask && targetAmount > 0
+                                ? {
+                                    targetAmount,
+                                    actualAmount: Math.max(0, task.actualAmount || 0),
+                                    unitLabel,
+                                    onCommitActual: (value) => onCommitActual(task, value),
+                                    onRequestCompletion: () => onToggleTask(task),
+                                  }
+                                : null
+                            }
+                          />
+                          {renderStudyEditPanel(task)}
+                        </div>
                       );
                     })}
                   </div>
@@ -372,19 +739,23 @@ export function StudyPlanSheet({
                     ) : (
                       <div className="space-y-3">
                         {personalTasks.map((task) => (
-                          <PlanItemCard
-                            key={task.id}
-                            id={task.id}
-                            title={task.title}
-                            checked={task.done}
-                            onToggle={() => onTogglePersonalTask(task)}
-                            onDelete={() => onDeletePersonalTask(task)}
-                            disabled={isPast}
-                            isMobile={isMobile}
-                            tone="amber"
-                            badgeLabel="기타 일정"
-                            compact
-                          />
+                          <div key={task.id} className="space-y-2">
+                            <PlanItemCard
+                              id={task.id}
+                              title={task.title}
+                              checked={task.done}
+                              onToggle={() => onTogglePersonalTask(task)}
+                              onDelete={() => onDeletePersonalTask(task)}
+                              onEdit={onUpdatePersonalTask ? () => openPersonalTaskEdit(task) : undefined}
+                              isEditing={editDraft?.kind === 'personal' && editDraft.id === task.id}
+                              disabled={isPast}
+                              isMobile={isMobile}
+                              tone="amber"
+                              badgeLabel="기타 일정"
+                              compact
+                            />
+                            {renderPersonalEditPanel(task)}
+                          </div>
                         ))}
                       </div>
                     )}
