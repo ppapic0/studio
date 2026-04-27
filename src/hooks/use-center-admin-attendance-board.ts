@@ -82,6 +82,7 @@ type AttendanceRoutineInfoWithMovement = AttendanceRoutineInfo & ScheduleMovemen
 type TodayStudyLogMinutesEntry = {
   minutes: number;
   hasSessions: boolean;
+  firstSessionStartAtMs?: number | null;
 };
 
 type UseCenterAdminAttendanceBoardOptions = {
@@ -126,6 +127,20 @@ function pickAttendanceEventTime(
   );
 }
 
+function pickAttendanceEventTimeByTypes(
+  events: AttendanceBoardEvent[],
+  eventTypes: string[],
+  mode: 'earliest' | 'latest'
+) {
+  const eventTypeSet = new Set(eventTypes);
+  return pickDateByMode(
+    events
+      .filter((event) => eventTypeSet.has(getAttendanceBoardEventType(event)))
+      .map((event) => getAttendanceEventDate(event)),
+    mode
+  );
+}
+
 function pickAttendanceEventTimeAfter(
   events: AttendanceBoardEvent[],
   eventType: string,
@@ -151,6 +166,15 @@ function getAttendanceEventDate(event: AttendanceBoardEvent) {
   return toDateSafe(event.occurredAt) || toDateSafe(event.eventAt) || toDateSafe(event.createdAt);
 }
 
+function getStudySessionStartDate(session: Record<string, unknown>) {
+  return (
+    toDateSafe(session.startTime) ||
+    toDateSafe(session.startedAt) ||
+    toDateSafe(session.startAt) ||
+    toDateSafe(session.createdAt)
+  );
+}
+
 function calculateClosedStudyMinutesFromAttendanceEvents(events: AttendanceBoardEvent[]) {
   const sortedEvents = events
     .map((event) => ({ event, occurredAt: getAttendanceEventDate(event) }))
@@ -162,11 +186,11 @@ function calculateClosedStudyMinutesFromAttendanceEvents(events: AttendanceBoard
 
   sortedEvents.forEach(({ event, occurredAt }) => {
     const eventType = getAttendanceBoardEventType(event);
-    if (eventType === 'check_in' || eventType === 'away_end') {
+    if (eventType === 'check_in' || eventType === 'study_start' || eventType === 'away_end') {
       activeStartAt = occurredAt;
       return;
     }
-    if ((eventType === 'away_start' || eventType === 'check_out') && activeStartAt) {
+    if ((eventType === 'away_start' || eventType === 'check_out' || eventType === 'study_end') && activeStartAt) {
       const diffMinutes = Math.ceil((occurredAt.getTime() - activeStartAt.getTime()) / 60000);
       if (diffMinutes > 0) {
         totalMinutes += Math.min(360, diffMinutes);
@@ -579,16 +603,32 @@ export function useCenterAdminAttendanceBoard({
               );
 
               const sessionsSnap = await getDocs(collection(firestore, 'centers', centerId, 'studyLogs', studentId, 'days', todayKey, 'sessions'));
+              let firstSessionStartAtMs: number | null = null;
               const sessionTotal = sessionsSnap.docs.reduce((sum, sessionDoc) => {
-                return sum + getStudySessionDurationMinutes(sessionDoc.data() as Record<string, unknown>);
+                const sessionData = sessionDoc.data() as Record<string, unknown>;
+                const sessionStartAt = getStudySessionStartDate(sessionData);
+                if (sessionStartAt) {
+                  const sessionStartMs = sessionStartAt.getTime();
+                  if (firstSessionStartAtMs === null || sessionStartMs < firstSessionStartAtMs) {
+                    firstSessionStartAtMs = sessionStartMs;
+                  }
+                }
+                return sum + getStudySessionDurationMinutes(sessionData);
               }, 0);
               const adjustedSessionTotal = Math.round(sessionTotal + (Number.isFinite(dayAdjustmentMinutes) ? dayAdjustmentMinutes : 0));
               const effectiveTotal = sessionsSnap.empty ? dayTotal : adjustedSessionTotal;
 
-              return [studentId, { minutes: Math.max(0, effectiveTotal), hasSessions: !sessionsSnap.empty }] as const;
+              return [
+                studentId,
+                {
+                  minutes: Math.max(0, effectiveTotal),
+                  hasSessions: !sessionsSnap.empty,
+                  firstSessionStartAtMs,
+                },
+              ] as const;
             } catch (error) {
               logHandledClientIssue('[center-admin-attendance-board] today study log load failed', error);
-              return [studentId, { minutes: 0, hasSessions: false }] as const;
+              return [studentId, { minutes: 0, hasSessions: false, firstSessionStartAtMs: null }] as const;
             }
           })
         );
@@ -685,7 +725,21 @@ export function useCenterAdminAttendanceBoard({
             : null;
         const todayStatCheckInAt = toDateSafe(todayStat?.checkInAt);
         const todayRecordCheckInAt = toDateSafe(todayRecord?.checkInAt);
-        const firstCheckInEventAt = pickAttendanceEventTime(todayEventsForStudent, 'check_in', 'earliest');
+        const fallbackStudyLogEntry = todayStudyLogMinutesByStudentId[studentId];
+        const fallbackStudyLogFirstSessionStartAt =
+          typeof fallbackStudyLogEntry?.firstSessionStartAtMs === 'number' && Number.isFinite(fallbackStudyLogEntry.firstSessionStartAtMs)
+            ? new Date(fallbackStudyLogEntry.firstSessionStartAtMs)
+            : null;
+        const firstCheckInEventAt = pickAttendanceEventTimeByTypes(
+          todayEventsForStudent,
+          ['check_in', 'study_start'],
+          'earliest'
+        );
+        const firstStudyStartEventAt = pickAttendanceEventTimeByTypes(
+          todayEventsForStudent,
+          ['check_in', 'study_start', 'away_end'],
+          'earliest'
+        );
         const latestAwayStartAt = pickAttendanceEventTime(todayEventsForStudent, 'away_start', 'latest');
         const latestAwayEndAt = pickAttendanceEventTimeAfter(
           todayEventsForStudent,
@@ -695,7 +749,14 @@ export function useCenterAdminAttendanceBoard({
         );
         const latestCheckOutEventAt = pickAttendanceEventTime(todayEventsForStudent, 'check_out', 'latest');
         const firstCheckInAt = pickDateByMode(
-          [firstCheckInEventAt, todayStatCheckInAt, todayRecordCheckInAt, sameDayLiveCheckInAt],
+          [
+            firstCheckInEventAt,
+            firstStudyStartEventAt,
+            todayStatCheckInAt,
+            todayRecordCheckInAt,
+            fallbackStudyLogFirstSessionStartAt,
+            sameDayLiveCheckInAt,
+          ],
           'earliest'
         );
         const lastCheckOutAt = pickDateByMode(
@@ -714,7 +775,6 @@ export function useCenterAdminAttendanceBoard({
           (Number.isFinite(storedBaseMinutes) ? storedBaseMinutes : 0) +
           (Number.isFinite(storedAdjustmentMinutes) ? storedAdjustmentMinutes : 0)
         );
-        const fallbackStudyLogEntry = todayStudyLogMinutesByStudentId[studentId];
         const fallbackStudyLogMinutes = Math.round(Number(fallbackStudyLogEntry?.minutes || 0));
         const eventClosedStudyMinutes = calculateClosedStudyMinutesFromAttendanceEvents(todayEventsForStudent);
         const recordedStudyMinutes = fallbackStudyLogEntry?.hasSessions
@@ -826,7 +886,7 @@ export function useCenterAdminAttendanceBoard({
           scheduleMovementSummary: scheduleMovementInfo.scheduleMovementSummary,
           scheduleMovementCount: scheduleMovementInfo.scheduleMovementCount,
           checkedAtLabel: formatAttendanceBoardClockLabel(derived.checkedAt),
-          firstCheckInLabel: formatAttendanceBoardClockLabel(firstCheckInEventAt || firstCheckInAt),
+          firstCheckInLabel: formatAttendanceBoardClockLabel(firstCheckInAt),
           latestAwayStartLabel: formatAttendanceBoardClockLabel(latestAwayStartAt),
           latestAwayEndLabel: formatAttendanceBoardClockLabel(latestAwayEndAt),
           lastCheckOutLabel: formatAttendanceBoardClockLabel(latestCheckOutEventAt || lastCheckOutAt),

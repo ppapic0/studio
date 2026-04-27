@@ -3181,7 +3181,7 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
       currentStatusLabel: getAdminAttendanceStatusLabel(seat?.status || signal?.seatStatus || 'absent'),
       seatId: seat?.id || signal?.seatId || '',
       plannedArrival: signal?.routineExpectedArrivalTime || student?.expectedArrivalTime || '-',
-      firstCheckInLabel: signal?.firstCheckInLabel || signal?.checkedAtLabel || '-',
+      firstCheckInLabel: signal?.firstCheckInLabel || '-',
       plannedDeparture: signal?.plannedDepartureTime || '-',
       outingLabel,
       scheduleLabel: [classScheduleLabel, signal?.scheduleMovementSummary].filter(Boolean).join(' · ') || classScheduleLabel || '등록된 일정 없음',
