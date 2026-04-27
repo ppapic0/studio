@@ -2863,11 +2863,12 @@ async function collectParentRecipients(
 
   const parentUidsRaw = studentData.parentUids;
   const parentUids = Array.isArray(parentUidsRaw)
-    ? parentUidsRaw.filter((uid): uid is string => typeof uid === "string" && uid.trim().length > 0)
+    ? Array.from(new Set(parentUidsRaw
+      .map((uid) => (typeof uid === "string" ? uid.trim() : ""))
+      .filter((uid): uid is string => uid.length > 0)))
     : [];
 
   const recipients: SmsRecipient[] = [];
-  const usedPhones = new Set<string>();
 
   const manualParentPrefSnap = await db
     .doc(`centers/${centerId}/smsRecipientPreferences/${buildSmsRecipientPreferenceId(studentId, MANUAL_PARENT_SMS_UID)}`)
@@ -2881,7 +2882,6 @@ async function collectParentRecipients(
         parentName: asTrimmedString(manualPref.parentName, "보호자"),
         phoneNumber,
       });
-      usedPhones.add(phoneNumber);
     }
   }
 
@@ -2899,14 +2899,13 @@ async function collectParentRecipients(
       continue;
     }
     const phoneNumber = normalizePhoneNumber(userData?.phoneNumber || memberData?.phoneNumber || prefData?.phoneNumber);
-    if (!phoneNumber || usedPhones.has(phoneNumber)) continue;
+    if (!phoneNumber) continue;
 
     recipients.push({
       parentUid,
       parentName: (memberData?.displayName as string | null) || (userData?.displayName as string | null) || null,
       phoneNumber,
     });
-    usedPhones.add(phoneNumber);
   }
 
   return recipients;
@@ -2987,7 +2986,28 @@ async function splitRecipientsBySmsPreference(
     }
   }
 
-  return { allowedRecipients, suppressedRecipients };
+  const dedupedAllowedRecipients: SmsRecipient[] = [];
+  const allowedPhoneNumbers = new Set<string>();
+  allowedRecipients.forEach((recipient) => {
+    const phoneNumber = normalizePhoneNumber(recipient.phoneNumber);
+    if (!phoneNumber) return;
+    if (allowedPhoneNumbers.has(phoneNumber)) {
+      suppressedRecipients.push({
+        ...recipient,
+        phoneNumber,
+        suppressedReason: "duplicate_phone",
+      });
+      return;
+    }
+
+    allowedPhoneNumbers.add(phoneNumber);
+    dedupedAllowedRecipients.push({
+      ...recipient,
+      phoneNumber,
+    });
+  });
+
+  return { allowedRecipients: dedupedAllowedRecipients, suppressedRecipients };
 }
 
 async function queueParentSmsNotification(

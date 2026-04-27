@@ -2032,10 +2032,11 @@ async function collectParentRecipients(db, centerId, studentId) {
         return [];
     const parentUidsRaw = studentData.parentUids;
     const parentUids = Array.isArray(parentUidsRaw)
-        ? parentUidsRaw.filter((uid) => typeof uid === "string" && uid.trim().length > 0)
+        ? Array.from(new Set(parentUidsRaw
+            .map((uid) => (typeof uid === "string" ? uid.trim() : ""))
+            .filter((uid) => uid.length > 0)))
         : [];
     const recipients = [];
-    const usedPhones = new Set();
     const manualParentPrefSnap = await db
         .doc(`centers/${centerId}/smsRecipientPreferences/${buildSmsRecipientPreferenceId(studentId, MANUAL_PARENT_SMS_UID)}`)
         .get();
@@ -2048,7 +2049,6 @@ async function collectParentRecipients(db, centerId, studentId) {
                 parentName: asTrimmedString(manualPref.parentName, "보호자"),
                 phoneNumber,
             });
-            usedPhones.add(phoneNumber);
         }
     }
     for (const parentUid of parentUids) {
@@ -2064,14 +2064,13 @@ async function collectParentRecipients(db, centerId, studentId) {
             continue;
         }
         const phoneNumber = normalizePhoneNumber((userData === null || userData === void 0 ? void 0 : userData.phoneNumber) || (memberData === null || memberData === void 0 ? void 0 : memberData.phoneNumber) || (prefData === null || prefData === void 0 ? void 0 : prefData.phoneNumber));
-        if (!phoneNumber || usedPhones.has(phoneNumber))
+        if (!phoneNumber)
             continue;
         recipients.push({
             parentUid,
             parentName: (memberData === null || memberData === void 0 ? void 0 : memberData.displayName) || (userData === null || userData === void 0 ? void 0 : userData.displayName) || null,
             phoneNumber,
         });
-        usedPhones.add(phoneNumber);
     }
     return recipients;
 }
@@ -2121,7 +2120,20 @@ async function splitRecipientsBySmsPreference(db, centerId, studentId, studentNa
             }, { merge: true });
         }
     }
-    return { allowedRecipients, suppressedRecipients };
+    const dedupedAllowedRecipients = [];
+    const allowedPhoneNumbers = new Set();
+    allowedRecipients.forEach((recipient) => {
+        const phoneNumber = normalizePhoneNumber(recipient.phoneNumber);
+        if (!phoneNumber)
+            return;
+        if (allowedPhoneNumbers.has(phoneNumber)) {
+            suppressedRecipients.push(Object.assign(Object.assign({}, recipient), { phoneNumber, suppressedReason: "duplicate_phone" }));
+            return;
+        }
+        allowedPhoneNumbers.add(phoneNumber);
+        dedupedAllowedRecipients.push(Object.assign(Object.assign({}, recipient), { phoneNumber }));
+    });
+    return { allowedRecipients: dedupedAllowedRecipients, suppressedRecipients };
 }
 async function queueParentSmsNotification(db, params) {
     const { centerId, studentId, studentName, eventType: rawEventType, eventAt, expectedTime, } = params;
