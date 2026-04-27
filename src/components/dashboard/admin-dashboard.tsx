@@ -4534,31 +4534,6 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
                   별도 실시간 교실 메뉴로 이동하지 않고, 오늘 착석 흐름과 호실 배치를 같은 운영실 화면에서 바로 확인합니다.
                 </p>
               </div>
-              <div className="flex flex-wrap items-center gap-2">
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => handleOpenAttendanceOverview(selectedRoomView)}
-                  className="h-10 rounded-xl border-2 border-[#DCE7FF] bg-white px-3 text-xs font-black text-[#14295F]"
-                >
-                  <LayoutGrid className="mr-1.5 h-4 w-4" />
-                  전체보기
-                </Button>
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={handleToggleClassroomEditMode}
-                  className={cn(
-                    'h-10 rounded-xl border-2 px-3 text-xs font-black',
-                    isClassroomEditMode
-                      ? 'border-[#FFB36D] bg-[#FFF2E8] text-[#C95A08]'
-                      : 'border-[#DCE7FF] bg-white text-[#14295F]'
-                  )}
-                >
-                  <Settings2 className="mr-1.5 h-4 w-4" />
-                  {isClassroomEditMode ? '편집 닫기' : '배치 수정'}
-                </Button>
-              </div>
             </div>
           </div>
 
@@ -4715,6 +4690,33 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
               showHeader={true}
               isLayoutEditMode={isClassroomEditMode}
               selectedSeatId={selectedLayoutSeat?.id || null}
+              focusedRoomHeaderActions={
+                <>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => handleOpenAttendanceOverview(selectedRoomView)}
+                    className="h-11 rounded-xl border-2 border-[#DCE7FF] bg-white px-3 text-xs font-black text-[#14295F]"
+                  >
+                    <LayoutGrid className="mr-1.5 h-4 w-4" />
+                    전체보기
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={handleToggleClassroomEditMode}
+                    className={cn(
+                      'h-11 rounded-xl border-2 px-3 text-xs font-black',
+                      isClassroomEditMode
+                        ? 'border-[#FFB36D] bg-[#FFF2E8] text-[#C95A08]'
+                        : 'border-[#DCE7FF] bg-white text-[#14295F]'
+                    )}
+                  >
+                    <Settings2 className="mr-1.5 h-4 w-4" />
+                    {isClassroomEditMode ? '편집 닫기' : '배치 수정'}
+                  </Button>
+                </>
+              }
               isLoading={attendanceBoardLoading}
               summary={attendanceBoardSummary}
               seatSignalsBySeatId={attendanceSeatSignalsBySeatId}

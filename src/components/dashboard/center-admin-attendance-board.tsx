@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo } from 'react';
+import { type ReactNode, useMemo } from 'react';
 import Link from 'next/link';
 import { ClipboardCheck, Loader2 } from 'lucide-react';
 
@@ -34,6 +34,7 @@ type CenterAdminAttendanceBoardProps = {
   showHeader?: boolean;
   isLayoutEditMode?: boolean;
   selectedSeatId?: string | null;
+  focusedRoomHeaderActions?: ReactNode;
   isLoading: boolean;
   summary: CenterAdminAttendanceBoardSummary;
   seatSignalsBySeatId: Map<string, CenterAdminAttendanceSeatSignal>;
@@ -118,6 +119,7 @@ export function CenterAdminAttendanceBoard({
   showHeader = true,
   isLayoutEditMode = false,
   selectedSeatId = null,
+  focusedRoomHeaderActions,
   isLoading,
   summary,
   seatSignalsBySeatId,
@@ -932,22 +934,29 @@ export function CenterAdminAttendanceBoard({
                 현재 호실에서 공부중, 미입실, 휴식 흐름만 먼저 읽고 필요한 학생만 바로 선택합니다.
               </p>
             </div>
-            <div className={cn('grid gap-2', isMobile ? 'grid-cols-2' : 'grid-cols-3')}>
-              <div className="rounded-[1.2rem] border border-[#DCE7FF] bg-white px-3.5 py-3">
-                <p className="text-[10px] font-black uppercase tracking-[0.16em] text-slate-500">관제 범위</p>
-                <p className="mt-1 text-sm font-black text-[#14295F]">{scopeLabel}</p>
-              </div>
-              <div className="rounded-[1.2rem] border border-[#DCE7FF] bg-white px-3.5 py-3">
-                <p className="text-[10px] font-black uppercase tracking-[0.16em] text-slate-500">좌석 수</p>
-                <p className="mt-1 text-sm font-black text-[#14295F]">
-                  {activeRoomSnapshot?.assignedCount ?? 0}/{activeRoomSnapshot?.totalSeats ?? selectedRoom.rows * selectedRoom.cols}
-                </p>
-              </div>
-              <div className="rounded-[1.2rem] border border-[#DCE7FF] bg-white px-3.5 py-3">
-                <p className="text-[10px] font-black uppercase tracking-[0.16em] text-slate-500">배치</p>
-                <p className="mt-1 text-sm font-black text-[#14295F]">
-                  {selectedRoom.cols} x {selectedRoom.rows}
-                </p>
+            <div className={cn('flex flex-wrap items-stretch gap-2', isMobile ? 'justify-start' : 'justify-end')}>
+              {focusedRoomHeaderActions ? (
+                <div className="flex flex-wrap items-center gap-2">
+                  {focusedRoomHeaderActions}
+                </div>
+              ) : null}
+              <div className={cn('grid gap-2', isMobile ? 'grid-cols-2' : 'grid-cols-3')}>
+                <div className="rounded-[1.2rem] border border-[#DCE7FF] bg-white px-3.5 py-3">
+                  <p className="text-[10px] font-black uppercase tracking-[0.16em] text-slate-500">관제 범위</p>
+                  <p className="mt-1 text-sm font-black text-[#14295F]">{scopeLabel}</p>
+                </div>
+                <div className="rounded-[1.2rem] border border-[#DCE7FF] bg-white px-3.5 py-3">
+                  <p className="text-[10px] font-black uppercase tracking-[0.16em] text-slate-500">좌석 수</p>
+                  <p className="mt-1 text-sm font-black text-[#14295F]">
+                    {activeRoomSnapshot?.assignedCount ?? 0}/{activeRoomSnapshot?.totalSeats ?? selectedRoom.rows * selectedRoom.cols}
+                  </p>
+                </div>
+                <div className="rounded-[1.2rem] border border-[#DCE7FF] bg-white px-3.5 py-3">
+                  <p className="text-[10px] font-black uppercase tracking-[0.16em] text-slate-500">배치</p>
+                  <p className="mt-1 text-sm font-black text-[#14295F]">
+                    {selectedRoom.cols} x {selectedRoom.rows}
+                  </p>
+                </div>
               </div>
             </div>
           </div>
