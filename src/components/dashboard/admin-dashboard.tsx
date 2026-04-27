@@ -3878,7 +3878,7 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
       .filter((signal) => {
         if (signal.boardStatus === 'absent' || signal.boardStatus === 'late') return true;
         if (signal.boardStatus === 'routine_missing' || signal.boardStatus === 'present_missing_routine') return true;
-        return signal.attendanceRiskLevel !== 'stable';
+        return false;
       })
       .sort((left, right) => {
         const statusDelta =
