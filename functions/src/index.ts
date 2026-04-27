@@ -8103,9 +8103,8 @@ export const runLateArrivalCheck = functions.region(region).https.onCall(async (
 
 /**
  * 10분마다 실행되는 통합 출석 점검 함수.
- * 센터별로 attendanceCurrent를 한 번만 읽어 두 가지 작업을 처리합니다:
- * 1. 지각 알림 발송 (sendScheduledLateArrivalAlerts 로직)
- * 2. 6시간 초과 세션 자동 종료 (autoCloseStuckStudySessions 로직)
+ * 센터별로 활동 중인 좌석을 읽어 지각 알림만 처리합니다.
+ * 학생 퇴실은 키오스크/관리자/학생 직접 액션으로만 처리합니다.
  */
 export const scheduledAttendanceCheck = functions
   .region(region)
@@ -8114,13 +8113,9 @@ export const scheduledAttendanceCheck = functions
   .onRun(async () => {
     const db = admin.firestore();
     const nowKst = toKstDate();
-    const cutoffTimestamp = admin.firestore.Timestamp.fromMillis(
-      Date.now() - MAX_STUDY_SESSION_MINUTES * MINUTE_MS
-    );
 
     const centersSnap = await db.collection("centers").get();
     let totalLateAlerts = 0;
-    let totalClosed = 0;
     let totalActiveSeatsScanned = 0;
 
     for (const centerDoc of centersSnap.docs) {
@@ -8135,53 +8130,12 @@ export const scheduledAttendanceCheck = functions
 
       // ── 1. 지각 알림 ──────────────────────────────────────
       totalLateAlerts += await runLateArrivalCheckForCenter(db, centerId, nowKst, attendanceSnap);
-
-      // ── 2. 6시간 초과 세션 자동 종료 ──────────────────────
-      for (const seatDoc of attendanceSnap.docs) {
-        const seat = seatDoc.data();
-        if (seat.status !== "studying") continue;
-
-        const lastCheckInAt = seat.lastCheckInAt as admin.firestore.Timestamp | undefined;
-        if (!lastCheckInAt || lastCheckInAt > cutoffTimestamp) continue;
-
-        const studentId = seat.studentId as string | undefined;
-        if (!studentId) continue;
-
-        const autoEndTimeMs = lastCheckInAt.toMillis() + MAX_STUDY_SESSION_MINUTES * MINUTE_MS;
-        const result = await finalizeStudySession({
-          db,
-          centerId,
-          studentId,
-          startMs: lastCheckInAt.toMillis(),
-          endMs: autoEndTimeMs,
-          closeSeatRef: seatDoc.ref,
-          shouldCloseSeat: true,
-          progressExtra: {
-            seasonLp: admin.firestore.FieldValue.increment(MAX_STUDY_SESSION_MINUTES),
-            "stats.focus": admin.firestore.FieldValue.increment(0.1),
-          },
-          sessionMetadata: {
-            autoClosedAt: admin.firestore.FieldValue.serverTimestamp(),
-            closedReason: "auto_6h_limit",
-          },
-        });
-        totalClosed++;
-
-        console.log("[auto-close-session] 6시간 초과 세션 자동 종료", {
-          centerId,
-          studentId,
-          sessionDateKey: result.sessionDateKey,
-          lastCheckInAt: lastCheckInAt.toDate().toISOString(),
-          autoEndTime: new Date(autoEndTimeMs).toISOString(),
-        });
-      }
     }
 
     console.log("[attendance-check] run complete", {
       centerCount: centersSnap.size,
       totalActiveSeatsScanned,
       totalLateAlerts,
-      totalClosed,
       atKst: nowKst.toISOString(),
     });
     return null;
