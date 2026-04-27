@@ -3351,7 +3351,29 @@ type AttendanceEventSmsQueueResult = {
   recipientCount: number;
   suppressedCount: number;
   deduped?: boolean;
+  dedupeKey?: string;
 };
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+async function hasSmsQueueForDedupeKey(
+  db: admin.firestore.Firestore,
+  centerId: string,
+  dedupeKey: string
+): Promise<boolean> {
+  const normalizedCenterId = asTrimmedString(centerId);
+  const normalizedDedupeKey = asTrimmedString(dedupeKey);
+  if (!normalizedCenterId || !normalizedDedupeKey) return false;
+
+  const queueSnap = await db
+    .collection(`centers/${normalizedCenterId}/smsQueue`)
+    .where("dedupeKey", "==", normalizedDedupeKey)
+    .limit(1)
+    .get();
+  return !queueSnap.empty;
+}
 
 function resolveAttendanceSmsPipelineStatus(queueResult: {
   queuedCount: number;
@@ -3459,6 +3481,7 @@ async function queueAttendanceEventSmsV2(
       recipientCount: queueResult.recipientCount,
       suppressedCount: queueResult.suppressedCount,
       deduped: queueResult.deduped,
+      dedupeKey,
     };
   } catch (error: any) {
     const message = error?.message || String(error);
@@ -3537,12 +3560,32 @@ async function queueAttendanceTransitionSmsAfterCommit(
       return;
     }
 
-    await queueAttendanceEventSmsV2(db, {
+    const firstQueueResult = await queueAttendanceEventSmsV2(db, {
       centerId,
       eventId,
       eventData: eventSnap.data() || {},
       eventRef,
     });
+
+    if (firstQueueResult.status === "deduped" && firstQueueResult.dedupeKey) {
+      await sleep(3000);
+      const hasExistingQueue = await hasSmsQueueForDedupeKey(db, centerId, firstQueueResult.dedupeKey);
+      if (!hasExistingQueue) {
+        console.warn("[attendance-sms-v2] dedupe without queue; forcing attendance sms queue", {
+          centerId,
+          eventId,
+          eventType: params.result.eventType,
+          dedupeKey: firstQueueResult.dedupeKey,
+        });
+        await queueAttendanceEventSmsV2(db, {
+          centerId,
+          eventId,
+          eventData: eventSnap.data() || {},
+          eventRef,
+          force: true,
+        });
+      }
+    }
   } catch (error) {
     console.error("[attendance-sms-v2] direct fallback failed", {
       centerId,
@@ -3653,6 +3696,9 @@ function shouldRepairAttendanceSmsEvent(params: {
   }
 
   if (params.smsStatus && params.smsStatus !== "failed") {
+    if (params.smsStatus === "deduped" && params.existingQueueState === "none") {
+      return { shouldRepair: true, force: true };
+    }
     return { shouldRepair: false, force: false };
   }
 

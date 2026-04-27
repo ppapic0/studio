@@ -2402,6 +2402,21 @@ function normalizeAttendanceEventForParentSms(value) {
         return normalized;
     return null;
 }
+function sleep(ms) {
+    return new Promise((resolve) => setTimeout(resolve, ms));
+}
+async function hasSmsQueueForDedupeKey(db, centerId, dedupeKey) {
+    const normalizedCenterId = asTrimmedString(centerId);
+    const normalizedDedupeKey = asTrimmedString(dedupeKey);
+    if (!normalizedCenterId || !normalizedDedupeKey)
+        return false;
+    const queueSnap = await db
+        .collection(`centers/${normalizedCenterId}/smsQueue`)
+        .where("dedupeKey", "==", normalizedDedupeKey)
+        .limit(1)
+        .get();
+    return !queueSnap.empty;
+}
 function resolveAttendanceSmsPipelineStatus(queueResult) {
     if (queueResult.deduped)
         return "deduped";
@@ -2488,6 +2503,7 @@ async function queueAttendanceEventSmsV2(db, params) {
             recipientCount: queueResult.recipientCount,
             suppressedCount: queueResult.suppressedCount,
             deduped: queueResult.deduped,
+            dedupeKey,
         };
     }
     catch (error) {
@@ -2555,12 +2571,31 @@ async function queueAttendanceTransitionSmsAfterCommit(db, params) {
             });
             return;
         }
-        await queueAttendanceEventSmsV2(db, {
+        const firstQueueResult = await queueAttendanceEventSmsV2(db, {
             centerId,
             eventId,
             eventData: eventSnap.data() || {},
             eventRef,
         });
+        if (firstQueueResult.status === "deduped" && firstQueueResult.dedupeKey) {
+            await sleep(3000);
+            const hasExistingQueue = await hasSmsQueueForDedupeKey(db, centerId, firstQueueResult.dedupeKey);
+            if (!hasExistingQueue) {
+                console.warn("[attendance-sms-v2] dedupe without queue; forcing attendance sms queue", {
+                    centerId,
+                    eventId,
+                    eventType: params.result.eventType,
+                    dedupeKey: firstQueueResult.dedupeKey,
+                });
+                await queueAttendanceEventSmsV2(db, {
+                    centerId,
+                    eventId,
+                    eventData: eventSnap.data() || {},
+                    eventRef,
+                    force: true,
+                });
+            }
+        }
     }
     catch (error) {
         console.error("[attendance-sms-v2] direct fallback failed", {
@@ -2623,6 +2658,9 @@ function shouldRepairAttendanceSmsEvent(params) {
         return { shouldRepair: false, force: false };
     }
     if (params.smsStatus && params.smsStatus !== "failed") {
+        if (params.smsStatus === "deduped" && params.existingQueueState === "none") {
+            return { shouldRepair: true, force: true };
+        }
         return { shouldRepair: false, force: false };
     }
     return {
