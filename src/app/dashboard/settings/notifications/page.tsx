@@ -499,10 +499,11 @@ function resolveSmsEventDisplayDate(
 ) {
   const explicitDate = toDateSafe(explicitEventAt);
   const fallbackDate = toDateSafe(fallback);
-  const resolvedDate = attendanceAt || explicitDate || fallbackDate;
+  const resolvedDate = explicitDate || attendanceAt || fallbackDate;
   const messageTimeLabel = extractTimeLabelFromSmsMessage(message);
-  if (messageTimeLabel && (!resolvedDate || isLocalMidnight(resolvedDate))) {
-    return dateFromDateKeyAndTimeLabel(dateKey, messageTimeLabel, resolvedDate || fallbackDate);
+  if (messageTimeLabel) {
+    const messageDate = dateFromDateKeyAndTimeLabel(dateKey, messageTimeLabel, resolvedDate || fallbackDate);
+    if (messageDate) return messageDate;
   }
   return resolvedDate;
 }
