@@ -1,7 +1,7 @@
 
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useCollection, useFirestore, useUser } from '@/firebase';
 import { useAppContext } from '@/contexts/app-context';
 import { useMemoFirebase } from '@/hooks/use-memo-firebase';
@@ -51,10 +51,12 @@ import { sendKakaoNotification } from '@/lib/kakao-service';
 import { parseDateInputValue } from '@/lib/dashboard-access';
 import { buildAttendanceRoutineInfo, deriveAttendanceDisplayState, toDateSafe } from '@/lib/attendance-auto';
 import { deriveDailyReportSignals, normalizeDailyReportContentFingerprint } from '@/lib/daily-report-ai';
+import { VisualReportViewer } from '@/components/dashboard/visual-report-viewer';
 
 type StudyLogDayDoc = StudyLogDay & {
   updatedAt?: unknown;
   createdAt?: unknown;
+  totalStudyMinutes?: number;
 };
 
 type DailyStudentStatDoc = {
@@ -72,6 +74,11 @@ type AttendanceRecordDoc = {
 
 const MAX_RECENT_REPORT_HISTORY = 7;
 const REPORT_SECTION_HEADINGS = new Set(['오늘 관찰', '교육학적 해석', '내일 코칭', '가정 연계 팁']);
+
+type ReportStudyLogSummary = {
+  hasStudyRecord: boolean;
+  minutes: number;
+};
 
 function uniqueStrings(items: Array<string | null | undefined>) {
   return Array.from(
@@ -117,6 +124,32 @@ function buildRecentReportAvoidExpressions(params: {
   ]).slice(0, 12);
 }
 
+function getEffectiveStudyLogMinutes(log?: Partial<StudyLogDayDoc> | null) {
+  if (!log) return 0;
+  const baseMinutes = Number(log.totalMinutes ?? log.totalStudyMinutes ?? 0);
+  const manualAdjustmentMinutes = Number(log.manualAdjustmentMinutes ?? 0);
+  return Math.max(
+    0,
+    Math.round(
+      (Number.isFinite(baseMinutes) ? baseMinutes : 0) +
+      (Number.isFinite(manualAdjustmentMinutes) ? manualAdjustmentMinutes : 0)
+    )
+  );
+}
+
+function hasReportStudyRecord(log?: Partial<StudyLogDayDoc> | null) {
+  return getEffectiveStudyLogMinutes(log) > 0;
+}
+
+function formatReportStudyMinutes(minutes: number) {
+  const safeMinutes = Math.max(0, Math.round(Number(minutes || 0)));
+  const hours = Math.floor(safeMinutes / 60);
+  const mins = safeMinutes % 60;
+  if (hours <= 0) return `${mins}분`;
+  if (mins <= 0) return `${hours}시간`;
+  return `${hours}시간 ${mins}분`;
+}
+
 export default function DailyReportsPage() {
   const { user } = useUser();
   const firestore = useFirestore();
@@ -158,6 +191,61 @@ export default function DailyReportsPage() {
   }, [firestore, centerId]);
   const { data: studentMembers, isLoading: membersLoading } = useCollection<CenterMembership>(studentsQuery);
 
+  const activeStudentIds = useMemo(
+    () => (studentMembers || []).map((student) => student.id).filter(Boolean),
+    [studentMembers]
+  );
+  const [studyLogSummaryByStudentId, setStudyLogSummaryByStudentId] = useState<Record<string, ReportStudyLogSummary>>({});
+  const [studyLogSummaryLoading, setStudyLogSummaryLoading] = useState(false);
+
+  useEffect(() => {
+    if (!firestore || !centerId || !dateKey || activeStudentIds.length === 0) {
+      setStudyLogSummaryByStudentId({});
+      setStudyLogSummaryLoading(false);
+      return;
+    }
+
+    let cancelled = false;
+    const loadStudyLogSummaries = async () => {
+      setStudyLogSummaryLoading(true);
+      try {
+        const entries = await Promise.all(
+          activeStudentIds.map(async (studentId) => {
+            const logRef = doc(firestore, 'centers', centerId, 'studyLogs', studentId, 'days', dateKey);
+            const logSnap = await getDoc(logRef);
+            const log = logSnap.exists() ? (logSnap.data() as StudyLogDayDoc) : null;
+            const minutes = getEffectiveStudyLogMinutes(log);
+            return [
+              studentId,
+              {
+                hasStudyRecord: minutes > 0,
+                minutes,
+              },
+            ] as const;
+          })
+        );
+
+        if (!cancelled) {
+          setStudyLogSummaryByStudentId(Object.fromEntries(entries));
+        }
+      } catch (error) {
+        console.error('[daily-report] study log summary load failed', error);
+        if (!cancelled) {
+          setStudyLogSummaryByStudentId({});
+        }
+      } finally {
+        if (!cancelled) {
+          setStudyLogSummaryLoading(false);
+        }
+      }
+    };
+
+    void loadStudyLogSummaries();
+    return () => {
+      cancelled = true;
+    };
+  }, [activeStudentIds, centerId, dateKey, firestore]);
+
   const reportsQuery = useMemoFirebase(() => {
     if (!firestore || !centerId || !dateKey) return null;
     return query(collection(firestore, 'centers', centerId, 'dailyReports'), where('dateKey', '==', dateKey));
@@ -194,9 +282,11 @@ export default function DailyReportsPage() {
     if (!studentMembers) return [];
 
     const normalizedSearchTerm = searchTerm.trim().toLowerCase();
-    const filtered = studentMembers.filter((student) =>
-      student.displayName?.toLowerCase().includes(normalizedSearchTerm)
-    );
+    const filtered = studentMembers
+      .filter((student) => studyLogSummaryByStudentId[student.id]?.hasStudyRecord)
+      .filter((student) =>
+        student.displayName?.toLowerCase().includes(normalizedSearchTerm)
+      );
 
     const reportStateRank = (studentId: string) => {
       const report = reportByStudentId.get(studentId);
@@ -227,7 +317,7 @@ export default function DailyReportsPage() {
       if (rightReadCount !== leftReadCount) return rightReadCount - leftReadCount;
       return leftName.localeCompare(rightName);
     });
-  }, [studentMembers, searchTerm, reportByStudentId, reportReadCount30dByStudentId, sortMode]);
+  }, [studentMembers, searchTerm, reportByStudentId, reportReadCount30dByStudentId, sortMode, studyLogSummaryByStudentId]);
 
   const studentRows = useMemo(
     () =>
@@ -235,11 +325,21 @@ export default function DailyReportsPage() {
         student,
         report: reportByStudentId.get(student.id),
         reportReadCount30d: reportReadCount30dByStudentId.get(student.id) || 0,
+        studyMinutes: studyLogSummaryByStudentId[student.id]?.minutes || 0,
       })),
-    [filteredStudents, reportByStudentId, reportReadCount30dByStudentId]
+    [filteredStudents, reportByStudentId, reportReadCount30dByStudentId, studyLogSummaryByStudentId]
   );
 
   const handleOpenWriteModal = async (studentId: string, studentName: string) => {
+    const studyLogSummary = studyLogSummaryByStudentId[studentId];
+    if (!studyLogSummary?.hasStudyRecord) {
+      toast({
+        variant: 'destructive',
+        title: '리포트 작성 대상이 아닙니다.',
+        description: '선택한 날짜에 공부 기록이 있는 학생에게만 리포트를 작성하거나 발송할 수 있습니다.',
+      });
+      return;
+    }
     setSelectedStudent({ id: studentId, name: studentName });
     const existing = dailyReports?.find(r => r.studentId === studentId);
     setReportContent(existing?.content || '');
@@ -250,6 +350,14 @@ export default function DailyReportsPage() {
 
   const handleGenerateAiReport = async () => {
     if (!selectedStudent || !firestore || !centerId || !dateKey) return;
+    if (!studyLogSummaryByStudentId[selectedStudent.id]?.hasStudyRecord) {
+      toast({
+        variant: 'destructive',
+        title: '공부 기록이 없습니다.',
+        description: '선택한 날짜에 공부 기록이 있는 학생에게만 리포트를 생성할 수 있습니다.',
+      });
+      return;
+    }
     setAiLoading(true);
     try {
       const existingReport = dailyReports?.find((report) => report.studentId === selectedStudent.id) || null;
@@ -321,7 +429,7 @@ export default function DailyReportsPage() {
       const recordCheckedAt = toDateSafe(attendanceRecord?.checkInAt || attendanceRecord?.updatedAt);
       const liveCheckedAt = toDateSafe(liveSeat?.lastCheckInAt || liveSeat?.updatedAt);
       const studyCheckedAt = toDateSafe(todayLog?.updatedAt || todayLog?.createdAt);
-      const studyMinutes = todayLog?.totalMinutes || 0;
+      const studyMinutes = getEffectiveStudyLogMinutes(todayLog);
       const hasAttendanceEvidence = Boolean(recordCheckedAt || liveCheckedAt || studyCheckedAt || studyMinutes > 0);
       const attendanceState = deriveAttendanceDisplayState({
         selectedDate: targetDate,
@@ -470,6 +578,14 @@ export default function DailyReportsPage() {
 
   const handleSaveReport = async (status: 'draft' | 'sent' = 'draft') => {
     if (!selectedStudent || !firestore || !centerId || !user || !dateKey) return;
+    if (status === 'sent' && !studyLogSummaryByStudentId[selectedStudent.id]?.hasStudyRecord) {
+      toast({
+        variant: 'destructive',
+        title: '발송할 수 없습니다.',
+        description: '선택한 날짜에 공부 기록이 있는 학생에게만 리포트를 발송할 수 있습니다.',
+      });
+      return;
+    }
     setIsSaving(true);
     try {
       const reportId = `${dateKey}_${selectedStudent.id}`;
@@ -509,11 +625,19 @@ export default function DailyReportsPage() {
     }
   };
 
-  const isFullLoading = membersLoading || reportsLoading;
+  const isFullLoading = membersLoading || reportsLoading || studyLogSummaryLoading;
+  const studentsWithStudyRecordCount = useMemo(
+    () => activeStudentIds.filter((studentId) => studyLogSummaryByStudentId[studentId]?.hasStudyRecord).length,
+    [activeStudentIds, studyLogSummaryByStudentId]
+  );
+  const excludedNoStudyRecordCount = Math.max(0, activeStudentIds.length - studentsWithStudyRecordCount);
   const unsentStudentCount = useMemo(
     () => studentRows.filter(({ report }) => report?.status !== 'sent').length,
     [studentRows]
   );
+  const selectedStudentCanSendReport = selectedStudent
+    ? Boolean(studyLogSummaryByStudentId[selectedStudent.id]?.hasStudyRecord)
+    : false;
 
   return (
     <div className={cn("flex flex-col gap-6 max-w-5xl mx-auto pb-20 px-1", isMobile ? "gap-4" : "gap-8")}>
@@ -557,7 +681,7 @@ export default function DailyReportsPage() {
                 />
               </div>
               <div className="flex flex-col gap-1 overflow-y-auto custom-scrollbar max-h-[500px] pr-1">
-                {studentRows.map(({ student, reportReadCount30d }) => (
+                {studentRows.map(({ student, reportReadCount30d, studyMinutes }) => (
                   <div 
                     key={student.id} 
                     className="p-3 rounded-2xl border-2 border-transparent hover:border-primary/10 hover:bg-primary/5 cursor-pointer flex items-center gap-3 transition-all active:scale-95"
@@ -568,6 +692,7 @@ export default function DailyReportsPage() {
                     </Avatar>
                     <div className="min-w-0 flex-1">
                       <p className="text-sm font-black truncate">{student.displayName}</p>
+                      <p className="mt-0.5 text-[10px] font-bold text-blue-600">공부 {formatReportStudyMinutes(studyMinutes)}</p>
                       {sortMode === 'parentReads' && reportReadCount30d > 0 && (
                         <p className="mt-0.5 text-[10px] font-bold text-emerald-600">최근 30일 열람 {reportReadCount30d}회</p>
                       )}
@@ -599,6 +724,14 @@ export default function DailyReportsPage() {
                 <Badge className="rounded-full border-none bg-primary/10 px-3 py-1 text-[10px] font-black text-primary">
                   미발송 {unsentStudentCount}명
                 </Badge>
+                <Badge className="rounded-full border-none bg-blue-50 px-3 py-1 text-[10px] font-black text-blue-700">
+                  공부기록 {studentsWithStudyRecordCount}명
+                </Badge>
+                {excludedNoStudyRecordCount > 0 && (
+                  <Badge className="rounded-full border-none bg-slate-100 px-3 py-1 text-[10px] font-black text-slate-600">
+                    기록없음 제외 {excludedNoStudyRecordCount}명
+                  </Badge>
+                )}
                 <Badge className="rounded-full border-none bg-emerald-50 px-3 py-1 text-[10px] font-black text-emerald-700">
                   기본 정렬 {sortMode === 'unsent' ? '미작성 우선' : sortMode === 'parentReads' ? '열람 많은 순' : '이름순'}
                 </Badge>
@@ -658,10 +791,10 @@ export default function DailyReportsPage() {
                 <Search className="h-16 w-16 text-muted-foreground opacity-10" />
                 <div className="space-y-1">
                   <p className="text-xl font-black text-muted-foreground/40">학생을 찾을 수 없습니다.</p>
-                  <p className="text-sm font-bold text-muted-foreground/20 uppercase whitespace-nowrap">다른 이름으로 검색해 보세요</p>
+                  <p className="text-sm font-bold text-muted-foreground/20 uppercase whitespace-nowrap">선택 날짜에 공부 기록이 있는 학생만 표시됩니다</p>
                 </div>
               </div>
-            ) : studentRows.map(({ student, report, reportReadCount30d }) => {
+            ) : studentRows.map(({ student, report, reportReadCount30d, studyMinutes }) => {
               const isSent = report?.status === 'sent';
               
               return (
@@ -693,6 +826,9 @@ export default function DailyReportsPage() {
                                 최근30일 열람 {reportReadCount30d}회
                               </Badge>
                             )}
+                            <Badge className="bg-blue-50 text-blue-700 font-black px-2 py-0.5 rounded-full border-none text-[9px] whitespace-nowrap">
+                              공부 {formatReportStudyMinutes(studyMinutes)}
+                            </Badge>
                             {report?.viewedAt && (
                               <Badge className="bg-blue-500/10 text-blue-600 font-black px-2 py-0.5 rounded-full border-none text-[9px] uppercase tracking-tighter whitespace-nowrap">읽음 확인</Badge>
                             )}
@@ -872,6 +1008,29 @@ export default function DailyReportsPage() {
                   )}
                 </div>
               </div>
+
+              {reportContent.trim() && (
+                <div className="flex flex-col gap-3">
+                  <Label className="text-[10px] font-black uppercase text-primary/70 tracking-widest ml-2 flex items-center gap-2">
+                    <Sparkles className="h-4 w-4" /> 학부모·학생 화면 미리보기
+                  </Label>
+                  <div className="rounded-[2.5rem] border border-slate-100 bg-white p-4 shadow-xl sm:p-6">
+                    {aiReportMeta ? (
+                      <VisualReportViewer
+                        content={reportContent}
+                        aiMeta={aiReportMeta}
+                        dateKey={dateKey}
+                        studentName={selectedStudent?.name}
+                        compactMode
+                      />
+                    ) : (
+                      <div className="rounded-[1.75rem] border border-dashed border-amber-200 bg-amber-50/70 p-6 text-sm font-bold leading-6 text-amber-800">
+                        그래프 미리보기는 AI 분석을 생성하거나 기존 분석값이 저장된 리포트에서 표시됩니다. 발송 전에는 여기에서 학부모와 학생이 보는 리포트 화면을 먼저 확인할 수 있습니다.
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
             </div>
           </div>
 
@@ -884,7 +1043,7 @@ export default function DailyReportsPage() {
             )}
             <div className={cn("flex gap-3", isMobile ? "w-full" : "")}>
               <Button variant="outline" className="rounded-2xl h-14 px-8 font-black flex-1 sm:flex-none border-2 shadow-sm" onClick={() => handleSaveReport('draft')} disabled={isSaving}>임시 저장</Button>
-              <Button className="rounded-2xl h-14 px-12 font-black gap-3 shadow-xl flex-1 sm:flex-none active:scale-95 transition-all" onClick={() => handleSaveReport('sent')} disabled={isSaving || !reportContent.trim()}>
+              <Button className="rounded-2xl h-14 px-12 font-black gap-3 shadow-xl flex-1 sm:flex-none active:scale-95 transition-all" onClick={() => handleSaveReport('sent')} disabled={isSaving || !reportContent.trim() || !selectedStudentCanSendReport}>
                 <Send className="h-5 w-5" /> 발송
               </Button>
             </div>
