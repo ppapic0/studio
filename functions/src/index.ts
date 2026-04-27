@@ -8905,25 +8905,46 @@ async function applyAttendanceStatusTransition(
   }
 
   const initialSeatData = (seatDoc.data() || {}) as Record<string, unknown>;
-  const initialStatus = normalizeAttendanceSeatStatus(initialSeatData.status);
-  const initialStartMs = initialStatus === "studying" && nextStatus !== "studying"
+  const preflightSeatSnap = await seatDoc.ref.get();
+  const preflightSeatData = preflightSeatSnap.exists ? ((preflightSeatSnap.data() || {}) as Record<string, unknown>) : initialSeatData;
+  const preflightStudentId = asTrimmedString(preflightSeatData.studentId);
+  if (preflightStudentId && preflightStudentId !== studentId) {
+    throw new functions.https.HttpsError("failed-precondition", "Seat belongs to another student.", {
+      userMessage: "선택한 좌석이 다른 학생에게 배정되어 있습니다.",
+    });
+  }
+
+  const preflightStatus = normalizeAttendanceSeatStatus(preflightSeatData.status);
+  const preflightStartMs = preflightStatus === "studying" && nextStatus !== "studying"
     ? await resolveOpenStudyStartMsFromAttendanceEvidence({
         db,
         centerId,
         studentId,
         dateKey: attendanceDateKey,
         nowMs,
-        seatData: initialSeatData,
+        seatData: preflightSeatData,
       })
-    : toMillisSafe(initialSeatData.lastCheckInAt);
+    : toMillisSafe(preflightSeatData.lastCheckInAt);
   let finalized: FinalizeStudySessionResult | null = null;
 
-  if (initialStatus === "studying" && nextStatus !== "studying" && initialStartMs > 0 && nowMs > initialStartMs) {
+  if (preflightStatus === "studying" && nextStatus !== "studying" && preflightStartMs <= 0) {
+    throw new functions.https.HttpsError("failed-precondition", "Open study session start is missing.", {
+      userMessage: "공부 시작 시간을 찾지 못해 외출 처리할 수 없습니다. 관리자에게 세션 보정을 요청해 주세요.",
+    });
+  }
+
+  if (preflightStatus === "studying" && nextStatus !== "studying" && nowMs <= preflightStartMs) {
+    throw new functions.https.HttpsError("failed-precondition", "Open study session start is not before transition time.", {
+      userMessage: "공부 시작 시간이 현재 시간보다 늦어 외출 처리할 수 없습니다. 잠시 후 다시 시도해 주세요.",
+    });
+  }
+
+  if (preflightStatus === "studying" && nextStatus !== "studying") {
     finalized = await finalizeStudySession({
       db,
       centerId,
       studentId,
-      startMs: initialStartMs,
+      startMs: preflightStartMs,
       endMs: nowMs,
       sessionMetadata: {
         closedReason: nextStatus === "absent" ? "check_out" : "away_start",
@@ -8944,6 +8965,32 @@ async function applyAttendanceStatusTransition(
     }
 
     const prevStatus = normalizeAttendanceSeatStatus(freshSeatData.status);
+    if (preflightStatus === "studying" && nextStatus !== "studying" && prevStatus !== "studying") {
+      return {
+        ok: true,
+        noop: true,
+        previousStatus: prevStatus,
+        nextStatus,
+        seatId: seatDoc.id,
+        eventType: null,
+        eventId: null,
+        eventAtMillis: null,
+        duplicatedSession: finalized?.duplicatedSession ?? true,
+        sessionId: finalized?.sessionId ?? null,
+        sessionDateKey: finalized?.sessionDateKey ?? null,
+        sessionMinutes: finalized?.sessionMinutes ?? 0,
+        totalMinutesAfterSession: finalized?.totalMinutesAfterSession ?? 0,
+        attendanceAchieved: finalized?.attendanceAchieved ?? false,
+        bonus6hAchieved: finalized?.bonus6hAchieved ?? false,
+      };
+    }
+
+    if (prevStatus === "studying" && nextStatus !== "studying" && !finalized) {
+      throw new functions.https.HttpsError("failed-precondition", "Open study session was not finalized.", {
+        userMessage: "진행 중인 공부 세션을 먼저 저장하지 못해 외출 처리할 수 없습니다. 다시 시도해 주세요.",
+      });
+    }
+
     if (prevStatus === nextStatus) {
       return {
         ok: true,
@@ -9603,8 +9650,10 @@ async function repairMissingStudySessionsFromAttendanceEvents(params: {
   const { db, centerId, studentId, dateKey } = params;
   const dayRef = db.doc(`centers/${centerId}/studyLogs/${studentId}/days/${dateKey}`);
   const sessionsCol = dayRef.collection("sessions");
-  const existingSessionsSnap = await sessionsCol.limit(1).get();
-  if (!existingSessionsSnap.empty) return 0;
+  const existingSessionsSnap = await sessionsCol.get();
+  const existingSessionRanges: Array<{ startMs: number; endMs: number }> = existingSessionsSnap.docs
+    .map((sessionSnap) => getExistingStudySessionRangeMs((sessionSnap.data() || {}) as Record<string, unknown>, Date.now()))
+    .filter((range): range is { startMs: number; endMs: number } => Boolean(range));
 
   const bounds = getStudyDayWindowBounds(dateKey);
   const dayEvents = params.events
@@ -9625,6 +9674,14 @@ async function repairMissingStudySessionsFromAttendanceEvents(params: {
     if ((event.eventType === "away_start" || event.eventType === "check_out") && openStartMs !== null) {
       const endMs = Math.min(event.occurredAtMs, openStartMs + MAX_STUDY_SESSION_MINUTES * MINUTE_MS);
       if (endMs > openStartMs) {
+        const overlapsExistingSession = existingSessionRanges.some((range) =>
+          doTimeRangesOverlap(openStartMs as number, endMs, range.startMs, range.endMs)
+        );
+        if (overlapsExistingSession) {
+          openStartMs = null;
+          continue;
+        }
+
         const sessionSeconds = Math.max(1, Math.floor((endMs - openStartMs) / 1000));
         const sessionMinutes = Math.max(1, Math.ceil(sessionSeconds / 60));
         const sessionId = `repaired_${openStartMs}_${endMs}`;
@@ -9645,6 +9702,7 @@ async function repairMissingStudySessionsFromAttendanceEvents(params: {
             updatedAt: admin.firestore.FieldValue.serverTimestamp(),
           });
           sessionsCreated += 1;
+          existingSessionRanges.push({ startMs: openStartMs, endMs });
         }
       }
       openStartMs = null;
