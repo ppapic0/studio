@@ -52,8 +52,8 @@ const DEFAULT_DAILY_RANK_REISSUE_DATE_KEY = "2026-04-26";
 const STUDENT_RANK_REWARD_TIERS = {
     daily: [{ rank: 1, points: 500 }],
     weekly: [
-        { rank: 1, points: 3000 },
-        { rank: 2, points: 1500 },
+        { rank: 1, points: 2000 },
+        { rank: 2, points: 1000 },
     ],
     monthly: [
         { rank: 1, points: 10000 },
