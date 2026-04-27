@@ -823,6 +823,7 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
   const [isParentTrustDialogOpen, setIsParentTrustDialogOpen] = useState(false);
   const [parentTrustSearch, setParentTrustSearch] = useState('');
   const [selectedFocusStudentId, setSelectedFocusStudentId] = useState<string | null>(null);
+  const [selectedFocusPlanDetailDateKey, setSelectedFocusPlanDetailDateKey] = useState<string | null>(null);
   const [selectedAttendanceDetailSignal, setSelectedAttendanceDetailSignal] = useState<CenterAdminAttendanceSeatSignal | null>(null);
   const [isStudyingStudentsDialogOpen, setIsStudyingStudentsDialogOpen] = useState(false);
   const [isAttendanceFullscreenOpen, setIsAttendanceFullscreenOpen] = useState(false);
@@ -3052,6 +3053,7 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
           total: number;
           rate: number | null;
           previewPlans: StudyPlanItem[];
+          allPlans: StudyPlanItem[];
         }>,
       };
     }
@@ -3100,6 +3102,7 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
             total,
             rate: total > 0 ? Math.round((done / total) * 100) : null,
             previewPlans: (plans.some((plan) => !plan.done) ? plans.filter((plan) => !plan.done) : plans).slice(0, 2),
+            allPlans: plans,
           };
         }),
     };
@@ -3107,6 +3110,13 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
 
   const selectedFocusPlanLoading =
     selectedFocusCurrentWeekPlansLoading || selectedFocusPreviousWeekPlansLoading;
+  const selectedFocusPlanDetail = useMemo(
+    () =>
+      selectedFocusPlanDetailDateKey
+        ? selectedFocusPlanSummary.daySummaries.find((day) => day.dateKey === selectedFocusPlanDetailDateKey) || null
+        : null,
+    [selectedFocusPlanDetailDateKey, selectedFocusPlanSummary.daySummaries]
+  );
 
   const selectedFocusOperationsSummary = useMemo(() => {
     if (!selectedFocusStudentId) return null;
@@ -9361,7 +9371,15 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-      <Dialog open={!!selectedFocusStudentId} onOpenChange={(open) => !open && setSelectedFocusStudentId(null)}>
+      <Dialog
+        open={!!selectedFocusStudentId}
+        onOpenChange={(open) => {
+          if (!open) {
+            setSelectedFocusPlanDetailDateKey(null);
+            setSelectedFocusStudentId(null);
+          }
+        }}
+      >
         <DialogContent motionPreset="dashboard-premium" className={cn(studioDialogContentClassName, 'max-h-[92vh] flex flex-col sm:max-w-4xl')}>
 
           <div className={cn(studioDialogHeaderClassName, 'flex-shrink-0')}>
@@ -9697,7 +9715,12 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
                       </div>
                       <div className="mt-3 space-y-2">
                         {selectedFocusPlanSummary.daySummaries.map((day) => (
-                          <div key={day.dateKey} className="rounded-[1.1rem] border border-[#E4ECFA] bg-white px-3 py-2.5">
+                          <button
+                            key={day.dateKey}
+                            type="button"
+                            className="w-full rounded-[1.1rem] border border-[#E4ECFA] bg-white px-3 py-2.5 text-left transition hover:border-[#2554D7] hover:bg-[#F7FAFF] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#2554D7]/30"
+                            onClick={() => setSelectedFocusPlanDetailDateKey(day.dateKey)}
+                          >
                             <div className="flex items-center justify-between gap-3">
                               <div className="min-w-0">
                                 <p className="text-[11px] font-black text-[#14295F]">{day.dateLabel}</p>
@@ -9729,7 +9752,7 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
                                 ))}
                               </div>
                             ) : null}
-                          </div>
+                          </button>
                         ))}
                       </div>
                     </div>
@@ -10240,6 +10263,101 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
 
           {/* ── FOOTER ── */}
           <DialogFooter className="border-t border-[#DCE7FF] bg-white p-4 flex-shrink-0">
+            <DialogClose asChild>
+              <Button type="button" className="h-10 rounded-xl bg-[#14295F] px-5 font-black text-white hover:bg-[#10224C]">닫기</Button>
+            </DialogClose>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={!!selectedFocusPlanDetail}
+        onOpenChange={(open) => {
+          if (!open) setSelectedFocusPlanDetailDateKey(null);
+        }}
+      >
+        <DialogContent motionPreset="dashboard-premium" className={cn(studioDialogContentClassName, 'max-h-[86vh] overflow-hidden sm:max-w-2xl')}>
+          <div className={studioDialogHeaderClassName}>
+            <DialogHeader className="text-left">
+              <div className="flex flex-wrap items-center gap-2">
+                <Badge className="border border-white/14 bg-white/10 px-3 py-1 text-[10px] font-black text-white">
+                  계획 상세
+                </Badge>
+                {selectedFocusPlanDetail ? (
+                  <Badge className="border border-white/14 bg-white/10 px-3 py-1 text-[10px] font-black text-white">
+                    {selectedFocusPlanDetail.done}/{selectedFocusPlanDetail.total} 완료
+                  </Badge>
+                ) : null}
+              </div>
+              <DialogTitle className="mt-4 text-2xl font-black tracking-tight">
+                {selectedFocusPlanDetail?.dateLabel || '-'} 전체 계획
+              </DialogTitle>
+              <DialogDescription className="mt-2 text-sm font-semibold leading-6 text-white/82">
+                {selectedFocusStudent?.name || selectedFocusOperationsSummary?.student?.name || '학생'} 학생의 해당 일자 계획 전체를 확인합니다.
+              </DialogDescription>
+            </DialogHeader>
+          </div>
+
+          <div className="max-h-[62vh] overflow-y-auto bg-[linear-gradient(180deg,#F7FAFF_0%,#EEF4FF_100%)] p-5">
+            {selectedFocusPlanDetail && selectedFocusPlanDetail.allPlans.length > 0 ? (
+              <div className="space-y-2.5">
+                {selectedFocusPlanDetail.allPlans.map((plan, index) => {
+                  const metaLabel = getFocusPlanTaskMetaLabel(plan);
+                  return (
+                    <div key={plan.id || `${selectedFocusPlanDetail.dateKey}-${index}-${plan.title}`} className="rounded-[1.25rem] border border-[#DCE7FF] bg-white p-3 shadow-[0_14px_28px_-28px_rgba(20,41,95,0.18)]">
+                      <div className="flex items-start gap-2.5">
+                        <span
+                          className={cn(
+                            'mt-0.5 inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full border text-[11px] font-black',
+                            plan.done
+                              ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
+                              : 'border-[#FFD7BA] bg-[#FFF8F2] text-[#C95A08]'
+                          )}
+                        >
+                          {plan.done ? '✓' : index + 1}
+                        </span>
+                        <div className="min-w-0 flex-1">
+                          <div className="flex flex-wrap items-center gap-1.5">
+                            <Badge className="h-5 rounded-full border-none bg-[#EEF4FF] px-2 text-[9px] font-black text-[#2554D7]">
+                              {getFocusPlanCategoryLabel(plan.category)}
+                            </Badge>
+                            <Badge
+                              className={cn(
+                                'h-5 rounded-full border-none px-2 text-[9px] font-black',
+                                plan.done ? 'bg-emerald-50 text-emerald-700' : 'bg-[#FFF8F2] text-[#C95A08]'
+                              )}
+                            >
+                              {plan.done ? '완료' : '미완료'}
+                            </Badge>
+                            {plan.priority === 'high' ? (
+                              <Badge className="h-5 rounded-full border-none bg-rose-50 px-2 text-[9px] font-black text-rose-600">
+                                중요
+                              </Badge>
+                            ) : null}
+                          </div>
+                          <p className={cn('mt-1.5 text-sm font-black leading-5 text-[#14295F]', plan.done && 'text-[#6E7EA3] line-through')}>
+                            {plan.title || '제목 없는 계획'}
+                          </p>
+                          {metaLabel ? (
+                            <p className="mt-1 text-[11px] font-bold leading-5 text-[#6E7EA3]">{metaLabel}</p>
+                          ) : null}
+                          {plan.tag ? (
+                            <p className="mt-2 rounded-xl bg-[#F7FAFF] px-3 py-2 text-[11px] font-bold leading-5 text-[#5C6E97]">{plan.tag}</p>
+                          ) : null}
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            ) : (
+              <div className="rounded-[1.3rem] border border-dashed border-[#DCE7FF] bg-white px-4 py-10 text-center">
+                <p className="text-sm font-black text-[#14295F]">해당 날짜에 등록된 계획이 없습니다.</p>
+              </div>
+            )}
+          </div>
+
+          <DialogFooter className="border-t border-[#DCE7FF] bg-white px-5 py-4">
             <DialogClose asChild>
               <Button type="button" className="h-10 rounded-xl bg-[#14295F] px-5 font-black text-white hover:bg-[#10224C]">닫기</Button>
             </DialogClose>
