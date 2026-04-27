@@ -3510,6 +3510,45 @@ export const onAttendanceEventCreated = functions
     return null;
   });
 
+async function queueAttendanceTransitionSmsAfterCommit(
+  db: admin.firestore.Firestore,
+  params: {
+    centerId: string;
+    result: Pick<ApplyAttendanceStatusTransitionResult, "eventId" | "eventType" | "noop">;
+  }
+): Promise<void> {
+  const centerId = asTrimmedString(params.centerId);
+  const eventId = asTrimmedString(params.result.eventId);
+  if (!centerId || !eventId || params.result.noop || !params.result.eventType) return;
+
+  const eventRef = db.doc(`centers/${centerId}/attendanceEvents/${eventId}`);
+  try {
+    const eventSnap = await eventRef.get();
+    if (!eventSnap.exists) {
+      console.warn("[attendance-sms-v2] direct fallback skipped; event missing", {
+        centerId,
+        eventId,
+        eventType: params.result.eventType,
+      });
+      return;
+    }
+
+    await queueAttendanceEventSmsV2(db, {
+      centerId,
+      eventId,
+      eventData: eventSnap.data() || {},
+      eventRef,
+    });
+  } catch (error) {
+    console.error("[attendance-sms-v2] direct fallback failed", {
+      centerId,
+      eventId,
+      eventType: params.result.eventType,
+      message: error instanceof Error ? error.message : String(error),
+    });
+  }
+}
+
 type AttendanceSmsRepairResult = {
   centerId: string;
   dateKey: string;
@@ -8935,6 +8974,11 @@ export const setStudentAttendanceStatusSecure = functions.region(region).https.o
     },
   });
 
+  await queueAttendanceTransitionSmsAfterCommit(db, {
+    centerId,
+    result,
+  });
+
   return result;
 });
 
@@ -10991,6 +11035,11 @@ export const stopStudentStudySessionSecure = functions.region(region).https.onCa
     source: "student_dashboard",
     actorUid: authUid,
     fallbackStartTimeMs,
+  });
+
+  await queueAttendanceTransitionSmsAfterCommit(db, {
+    centerId,
+    result,
   });
 
   return {

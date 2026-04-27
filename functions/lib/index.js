@@ -2537,6 +2537,38 @@ exports.onAttendanceEventCreated = functions
     });
     return null;
 });
+async function queueAttendanceTransitionSmsAfterCommit(db, params) {
+    const centerId = asTrimmedString(params.centerId);
+    const eventId = asTrimmedString(params.result.eventId);
+    if (!centerId || !eventId || params.result.noop || !params.result.eventType)
+        return;
+    const eventRef = db.doc(`centers/${centerId}/attendanceEvents/${eventId}`);
+    try {
+        const eventSnap = await eventRef.get();
+        if (!eventSnap.exists) {
+            console.warn("[attendance-sms-v2] direct fallback skipped; event missing", {
+                centerId,
+                eventId,
+                eventType: params.result.eventType,
+            });
+            return;
+        }
+        await queueAttendanceEventSmsV2(db, {
+            centerId,
+            eventId,
+            eventData: eventSnap.data() || {},
+            eventRef,
+        });
+    }
+    catch (error) {
+        console.error("[attendance-sms-v2] direct fallback failed", {
+            centerId,
+            eventId,
+            eventType: params.result.eventType,
+            message: error instanceof Error ? error.message : String(error),
+        });
+    }
+}
 async function loadExistingAttendanceSmsQueuesForDate(db, centerId, dateKey) {
     const queueSnap = await db
         .collection(`centers/${centerId}/smsQueue`)
@@ -7151,6 +7183,10 @@ exports.setStudentAttendanceStatusSecure = functions.region(region).https.onCall
             roomSeatNo: parseFiniteNumber(seatHintRaw.roomSeatNo),
         },
     });
+    await queueAttendanceTransitionSmsAfterCommit(db, {
+        centerId,
+        result,
+    });
     return result;
 });
 async function assertManualStudySessionMutationAllowed(params) {
@@ -8878,6 +8914,10 @@ exports.stopStudentStudySessionSecure = functions.region(region).https.onCall(as
         source: "student_dashboard",
         actorUid: authUid,
         fallbackStartTimeMs,
+    });
+    await queueAttendanceTransitionSmsAfterCommit(db, {
+        centerId,
+        result,
     });
     return {
         ok: true,
