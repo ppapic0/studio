@@ -371,6 +371,18 @@ function clampDailyPointAward(dayStatus: Record<string, unknown>, requestedPoint
   };
 }
 
+function resolveRankingRewardAwardPoints(
+  range: StudentRankingRange,
+  dayStatus: Record<string, unknown>,
+  requestedPoints: number
+) {
+  if (range === "daily") {
+    return clampDailyPointAward(dayStatus, requestedPoints).awardedPoints;
+  }
+
+  return Math.max(0, Math.floor(requestedPoints));
+}
+
 function isSyntheticStudentId(studentId: unknown): boolean {
   if (typeof studentId !== "string") return true;
   const normalized = studentId.trim().toLowerCase();
@@ -1056,7 +1068,7 @@ async function applyAwardEntries(
       const currentDayStatus = isPlainObject(dailyPointStatus[target.awardDateKey])
         ? (dailyPointStatus[target.awardDateKey] as Record<string, unknown>)
         : {};
-      const awardedPoints = clampDailyPointAward(currentDayStatus, award.points).awardedPoints;
+      const awardedPoints = resolveRankingRewardAwardPoints(range, currentDayStatus, award.points);
       const pointStatusPayload: Record<string, unknown> = {
         ...currentDayStatus,
         dailyPointAmount: admin.firestore.FieldValue.increment(awardedPoints),
@@ -1162,39 +1174,46 @@ function getDailySettlementCandidates(nowKst: Date, lookbackDays = 7) {
   return candidates;
 }
 
+function buildRankingRewardAwardTime(periodEndDate: Date) {
+  const awardAt = shiftKstDate(startOfKstDay(periodEndDate), 1);
+  awardAt.setHours(1, DAILY_RANK_REWARD_DELAY_MINUTES, 0, 0);
+  return awardAt;
+}
+
 function getWeeklySettlementCandidate(nowKst: Date) {
   const currentWeekStart = startOfKstWeek(nowKst);
-  const releaseAt = cloneDate(currentWeekStart);
-  releaseAt.setHours(1, DAILY_RANK_REWARD_DELAY_MINUTES, 0, 0);
-  if (nowKst.getTime() < releaseAt.getTime()) {
-    return null;
-  }
-
   const startDate = shiftKstDate(currentWeekStart, -7);
   const endDate = shiftKstDate(currentWeekStart, -1);
+  const awardsAt = buildRankingRewardAwardTime(endDate);
+  if (nowKst.getTime() < awardsAt.getTime()) {
+    return null;
+  }
 
   return {
     periodKey: `${toDateKey(startDate)}_${toDateKey(endDate)}`,
     startDate,
     endDate,
+    awardsAt,
   };
 }
 
 function getMonthlySettlementCandidate(nowKst: Date) {
   const currentMonthStart = startOfKstMonth(nowKst);
-  const releaseAt = cloneDate(currentMonthStart);
-  releaseAt.setHours(1, DAILY_RANK_REWARD_DELAY_MINUTES, 0, 0);
-  if (nowKst.getTime() < releaseAt.getTime()) {
-    return null;
-  }
-
   const previousMonthStart = cloneDate(currentMonthStart);
   previousMonthStart.setMonth(previousMonthStart.getMonth() - 1, 1);
   previousMonthStart.setHours(0, 0, 0, 0);
+  const previousMonthEnd = shiftKstDate(currentMonthStart, -1);
+  const awardsAt = buildRankingRewardAwardTime(previousMonthEnd);
+  if (nowKst.getTime() < awardsAt.getTime()) {
+    return null;
+  }
 
   return {
     periodKey: toMonthKey(previousMonthStart),
     monthKey: toMonthKey(previousMonthStart),
+    startDate: previousMonthStart,
+    endDate: previousMonthEnd,
+    awardsAt,
   };
 }
 
@@ -1600,7 +1619,7 @@ export const scheduledRankingRewardSettlement = functions
 
       if (weeklyCandidate) {
         const settlementRef = db.doc(`centers/${centerId}/rankingRewardSettlements/weekly_${weeklyCandidate.periodKey}`);
-        const awardDateKey = settlementDateKey;
+        const awardDateKey = toDateKey(weeklyCandidate.endDate);
         const claimed = await claimSettlement(db, settlementRef, now, {
           centerId,
           range: "weekly",
@@ -1608,6 +1627,9 @@ export const scheduledRankingRewardSettlement = functions
           sourceStartDateKey: toDateKey(weeklyCandidate.startDate),
           sourceEndDateKey: toDateKey(weeklyCandidate.endDate),
           awardDateKey,
+          settlementDateKey,
+          rankingEngineVersion: RANKING_ENGINE_VERSION,
+          scheduledAwardAt: admin.firestore.Timestamp.fromDate(weeklyCandidate.awardsAt),
         });
 
         if (claimed) {
@@ -1625,6 +1647,9 @@ export const scheduledRankingRewardSettlement = functions
             }, awards);
             await completeSettlement(settlementRef, {
               awardDateKey,
+              settlementDateKey,
+              rankingEngineVersion: RANKING_ENGINE_VERSION,
+              scheduledAwardAt: admin.firestore.Timestamp.fromDate(weeklyCandidate.awardsAt),
               awardCount: appliedAwards.length,
               awards: appliedAwards.map((award) => ({
                 studentId: award.studentId,
@@ -1643,13 +1668,18 @@ export const scheduledRankingRewardSettlement = functions
 
       if (monthlyCandidate) {
         const settlementRef = db.doc(`centers/${centerId}/rankingRewardSettlements/monthly_${monthlyCandidate.periodKey}`);
-        const awardDateKey = settlementDateKey;
+        const awardDateKey = toDateKey(monthlyCandidate.endDate);
         const claimed = await claimSettlement(db, settlementRef, now, {
           centerId,
           range: "monthly",
           periodKey: monthlyCandidate.periodKey,
           sourceMonthKey: monthlyCandidate.monthKey,
+          sourceStartDateKey: toDateKey(monthlyCandidate.startDate),
+          sourceEndDateKey: toDateKey(monthlyCandidate.endDate),
           awardDateKey,
+          settlementDateKey,
+          rankingEngineVersion: RANKING_ENGINE_VERSION,
+          scheduledAwardAt: admin.firestore.Timestamp.fromDate(monthlyCandidate.awardsAt),
           firstEligiblePeriodKey: MONTHLY_RANK_REWARD_FIRST_ELIGIBLE_PERIOD_KEY,
         });
 
@@ -1667,6 +1697,9 @@ export const scheduledRankingRewardSettlement = functions
               : [];
             await completeSettlement(settlementRef, {
               awardDateKey,
+              settlementDateKey,
+              rankingEngineVersion: RANKING_ENGINE_VERSION,
+              scheduledAwardAt: admin.firestore.Timestamp.fromDate(monthlyCandidate.awardsAt),
               awardCount: appliedAwards.length,
               awards: appliedAwards.map((award) => ({
                 studentId: award.studentId,
