@@ -167,6 +167,21 @@ function getAttendanceEventDate(event: AttendanceBoardEvent) {
   return toDateSafe(event.occurredAt) || toDateSafe(event.eventAt) || toDateSafe(event.createdAt);
 }
 
+function isDateInStudyDay(date: Date | null | undefined, dateKey: string) {
+  return Boolean(date && getStudyDayKey(date) === dateKey);
+}
+
+function toStudyDayDateSafe(value: unknown, dateKey: string) {
+  const date = toDateSafe(value);
+  return isDateInStudyDay(date, dateKey) ? date : null;
+}
+
+function isAttendanceEventInStudyDay(event: AttendanceBoardEvent, dateKey: string) {
+  const occurredAt = getAttendanceEventDate(event);
+  if (occurredAt) return isDateInStudyDay(occurredAt, dateKey);
+  return event.dateKey === dateKey;
+}
+
 function getStudySessionStartDate(session: Record<string, unknown>) {
   return (
     toDateSafe(session.startTime) ||
@@ -595,19 +610,25 @@ export function useCenterAdminAttendanceBoard({
               const dayRef = doc(firestore, 'centers', centerId, 'studyLogs', studentId, 'days', todayKey);
               const daySnap = await getDoc(dayRef);
               const dayData = daySnap.exists() ? (daySnap.data() as Record<string, unknown>) : null;
+              const dayFirstSessionStartAt = toStudyDayDateSafe(dayData?.firstSessionStartAt, todayKey);
+              const rawDayFirstSessionStartAt = toDateSafe(dayData?.firstSessionStartAt);
+              const useDayTotals = !rawDayFirstSessionStartAt || Boolean(dayFirstSessionStartAt);
               const dayBaseMinutes = Number(dayData?.totalMinutes ?? dayData?.totalStudyMinutes ?? 0);
               const hasManualCorrection = Boolean(dayData?.correctedAt || dayData?.correctedByUserId);
               const dayAdjustmentMinutes = hasManualCorrection ? Number(dayData?.manualAdjustmentMinutes ?? 0) : 0;
-              const dayTotal = Math.round(
+              const dayTotal = useDayTotals ? Math.round(
                 (Number.isFinite(dayBaseMinutes) ? dayBaseMinutes : 0) +
                 (Number.isFinite(dayAdjustmentMinutes) ? dayAdjustmentMinutes : 0)
-              );
+              ) : 0;
 
               const sessionsSnap = await getDocs(collection(firestore, 'centers', centerId, 'studyLogs', studentId, 'days', todayKey, 'sessions'));
               let firstSessionStartAtMs: number | null = null;
               const sessionTotal = sessionsSnap.docs.reduce((sum, sessionDoc) => {
                 const sessionData = sessionDoc.data() as Record<string, unknown>;
                 const sessionStartAt = getStudySessionStartDate(sessionData);
+                if (sessionStartAt && !isDateInStudyDay(sessionStartAt, todayKey)) {
+                  return sum;
+                }
                 if (sessionStartAt) {
                   const sessionStartMs = sessionStartAt.getTime();
                   if (firstSessionStartAtMs === null || sessionStartMs < firstSessionStartAtMs) {
@@ -616,15 +637,20 @@ export function useCenterAdminAttendanceBoard({
                 }
                 return sum + getStudySessionDurationMinutes(sessionData);
               }, 0);
+              const hasStudyDaySessions =
+                sessionsSnap.docs.some((sessionDoc) => {
+                  const sessionStartAt = getStudySessionStartDate(sessionDoc.data() as Record<string, unknown>);
+                  return !sessionStartAt || isDateInStudyDay(sessionStartAt, todayKey);
+                });
               const adjustedSessionTotal = Math.round(sessionTotal + (Number.isFinite(dayAdjustmentMinutes) ? dayAdjustmentMinutes : 0));
-              const effectiveTotal = sessionsSnap.empty ? dayTotal : adjustedSessionTotal;
+              const effectiveTotal = sessionsSnap.empty ? dayTotal : hasStudyDaySessions ? adjustedSessionTotal : 0;
 
               return [
                 studentId,
                 {
                   minutes: Math.max(0, effectiveTotal),
-                  hasSessions: !sessionsSnap.empty,
-                  firstSessionStartAtMs,
+                  hasSessions: hasStudyDaySessions,
+                  firstSessionStartAtMs: firstSessionStartAtMs ?? dayFirstSessionStartAt?.getTime() ?? null,
                 },
               ] as const;
             } catch (error) {
@@ -663,14 +689,14 @@ export function useCenterAdminAttendanceBoard({
   );
   const todayEventsByStudentId = useMemo(() => {
     const mapped = new Map<string, AttendanceBoardEvent[]>();
-    (todayEvents || []).forEach((event) => {
+    (todayEvents || []).filter((event) => isAttendanceEventInStudyDay(event, todayKey)).forEach((event) => {
       if (!event.studentId) return;
       const bucket = mapped.get(event.studentId) || [];
       bucket.push(event);
       mapped.set(event.studentId, bucket);
     });
     return mapped;
-  }, [todayEvents]);
+  }, [todayEvents, todayKey]);
   const todayScheduleByStudentId = useMemo(() => {
     const mapped = new Map<string, StudentScheduleDoc>();
     (todaySchedules || []).forEach((schedule) => {
@@ -725,8 +751,23 @@ export function useCenterAdminAttendanceBoard({
           lastCheckInAt && liveStudyDayKey === todayKey
             ? lastCheckInAt
             : null;
-        const todayStatCheckInAt = toDateSafe(todayStat?.checkInAt);
-        const todayRecordCheckInAt = toDateSafe(todayRecord?.checkInAt);
+        const rawTodayStatCheckInAt = toDateSafe(todayStat?.checkInAt);
+        const rawTodayStatCheckOutAt = toDateSafe(todayStat?.checkOutAt);
+        const todayStatCheckInAt = toStudyDayDateSafe(todayStat?.checkInAt, todayKey);
+        const todayStatCheckOutAt = toStudyDayDateSafe(todayStat?.checkOutAt, todayKey);
+        const todayStatTimesBelongToStudyDay =
+          (!rawTodayStatCheckInAt || Boolean(todayStatCheckInAt)) &&
+          (!rawTodayStatCheckOutAt || Boolean(todayStatCheckOutAt));
+        const rawTodayRecordCheckInAt = toDateSafe(todayRecord?.checkInAt);
+        const todayRecordCheckInAt = toStudyDayDateSafe(todayRecord?.checkInAt, todayKey);
+        const todayRecordEvidenceBelongsToStudyDay =
+          !rawTodayRecordCheckInAt || Boolean(todayRecordCheckInAt);
+        const todayRecordStatus =
+          todayRecordEvidenceBelongsToStudyDay ? todayRecord?.status : undefined;
+        const todayRecordStatusSource =
+          todayRecordEvidenceBelongsToStudyDay ? todayRecord?.statusSource : undefined;
+        const todayRecordRoutineMissingAtCheckIn =
+          todayRecordEvidenceBelongsToStudyDay ? Boolean(todayRecord?.routineMissingAtCheckIn) : false;
         const fallbackStudyLogEntry = todayStudyLogMinutesByStudentId[studentId];
         const fallbackStudyLogFirstSessionStartAt =
           typeof fallbackStudyLogEntry?.firstSessionStartAtMs === 'number' && Number.isFinite(fallbackStudyLogEntry.firstSessionStartAtMs)
@@ -762,17 +803,17 @@ export function useCenterAdminAttendanceBoard({
           'earliest'
         );
         const lastCheckOutAt = pickDateByMode(
-          [latestCheckOutEventAt, toDateSafe(todayStat?.checkOutAt)],
+          [latestCheckOutEventAt, todayStatCheckOutAt],
           'latest'
         );
-        const hasCheckOutRecord = Boolean(todayStat?.hasCheckOutRecord || lastCheckOutAt);
+        const hasCheckOutRecord = Boolean(lastCheckOutAt);
         const liveSessionMinutes = getLiveStudySessionDurationMinutes({
           status: seat.status,
           lastCheckInAt: sameDayLiveCheckInAt,
           nowMs,
         });
-        const storedBaseMinutes = Number(todayStat?.totalStudyMinutes || 0);
-        const storedAdjustmentMinutes = Number(todayStat?.manualAdjustmentMinutes || 0);
+        const storedBaseMinutes = todayStatTimesBelongToStudyDay ? Number(todayStat?.totalStudyMinutes || 0) : 0;
+        const storedAdjustmentMinutes = todayStatTimesBelongToStudyDay ? Number(todayStat?.manualAdjustmentMinutes || 0) : 0;
         const storedStudyMinutes = Math.round(
           (Number.isFinite(storedBaseMinutes) ? storedBaseMinutes : 0) +
           (Number.isFinite(storedAdjustmentMinutes) ? storedAdjustmentMinutes : 0)
@@ -805,9 +846,9 @@ export function useCenterAdminAttendanceBoard({
           dateKey: todayKey,
           todayDateKey: todayKey,
           routine: routineInfo,
-          recordStatus: todayRecord?.status,
-          recordStatusSource: todayRecord?.statusSource,
-          recordRoutineMissingAtCheckIn: Boolean(todayRecord?.routineMissingAtCheckIn),
+          recordStatus: todayRecordStatus,
+          recordStatusSource: todayRecordStatusSource,
+          recordRoutineMissingAtCheckIn: todayRecordRoutineMissingAtCheckIn,
           recordCheckedAt: firstCheckInAt,
           liveCheckedAt: sameDayLiveCheckInAt,
           accessCheckedAt: sameDayLiveCheckInAt,
