@@ -48,7 +48,7 @@ import { canManageSettings } from '@/lib/dashboard-access';
 
 type InviteCode = {
   id: string;
-  intendedRole: 'student' | 'teacher' | 'parent' | 'centerAdmin';
+  intendedRole: 'student' | 'teacher' | 'parent' | 'centerAdmin' | 'kiosk';
   targetClassName?: string;
   maxUses: number;
   usedCount: number;
@@ -430,6 +430,7 @@ export default function InviteCodesPage() {
                   <SelectItem value="teacher" className="font-bold">선생님</SelectItem>
                   <SelectItem value="centerAdmin" className="font-bold">관리자</SelectItem>
                   <SelectItem value="parent" className="font-bold">학부모</SelectItem>
+                  <SelectItem value="kiosk" className="font-bold">키오스크</SelectItem>
                 </SelectContent>
               </Select>
             </div>

@@ -55,7 +55,7 @@ import { createServerAuthSession } from '@/lib/client-auth-session';
 import { getSafeErrorMessage } from '@/lib/exposed-error';
 import { logHandledClientIssue } from '@/lib/handled-client-log';
 
-const roleEnum = z.enum(['student', 'teacher', 'parent', 'centerAdmin']);
+const roleEnum = z.enum(['student', 'teacher', 'parent', 'centerAdmin', 'kiosk']);
 
 const formSchema = z
   .object({
@@ -134,6 +134,8 @@ export function SignupForm() {
   const signupConsentDescription =
     selectedRole === 'student' || selectedRole === 'parent'
       ? '학생·학부모 연동 정보, 학습기록, 상담·리포트, 운영 알림까지 포함한 처리 범위를 확인한 뒤 가입을 진행합니다.'
+      : selectedRole === 'kiosk'
+        ? '태블릿 출결 키오스크 운영에 필요한 계정 정보와 센터 소속 처리 범위를 확인한 뒤 가입을 진행합니다.'
       : '계정 생성, 센터 소속 처리, 학생 관리, 상담·리포트, 운영 알림에 필요한 처리 범위를 확인한 뒤 가입을 진행합니다.';
 
   const resolveSignupErrorMessage = (error: any): string => {
@@ -238,7 +240,10 @@ export function SignupForm() {
       }
     }
 
-    if ((values.role === 'teacher' || values.role === 'centerAdmin') && (!values.displayName || values.displayName.length < 2)) {
+    if (
+      (values.role === 'teacher' || values.role === 'centerAdmin' || values.role === 'kiosk') &&
+      (!values.displayName || values.displayName.length < 2)
+    ) {
       form.setError('displayName', { message: '이름을 입력해 주세요.' });
       return false;
     }
@@ -289,7 +294,7 @@ export function SignupForm() {
     if (typeof window !== 'undefined') {
       window.sessionStorage.setItem(AUTH_SESSION_SYNC_SKIP_STORAGE_KEY, '1');
     }
-    router.prefetch('/dashboard');
+    router.prefetch(values.role === 'kiosk' ? '/kiosk' : '/dashboard');
     let createdUser = false;
     let signupCompleted = false;
 
@@ -297,7 +302,7 @@ export function SignupForm() {
       const inviteCode = (values.inviteCode || '').trim();
       const trimmedEmail = values.email.trim();
       const fallbackName =
-        values.role === 'parent' ? '학부모' : values.role === 'student' ? '학생' : '사용자';
+        values.role === 'parent' ? '학부모' : values.role === 'student' ? '학생' : values.role === 'kiosk' ? '키오스크' : '사용자';
       const finalDisplayName = (values.displayName || '').trim() || fallbackName;
 
       setLoadingStatus('계정 생성 중...');
@@ -381,8 +386,9 @@ export function SignupForm() {
       });
 
       setConsentDialogOpen(false);
-      setLoadingStatus('대시보드로 이동 중...');
-      router.replace('/dashboard');
+      const postSignupPath = values.role === 'kiosk' ? '/kiosk' : '/dashboard';
+      setLoadingStatus(values.role === 'kiosk' ? '키오스크로 이동 중...' : '대시보드로 이동 중...');
+      router.replace(postSignupPath);
       router.refresh();
     } catch (error: any) {
       if (createdUser && !signupCompleted && auth.currentUser) {
@@ -455,6 +461,7 @@ export function SignupForm() {
                   <SelectItem value="teacher">선생님</SelectItem>
                   <SelectItem value="parent">학부모</SelectItem>
                   <SelectItem value="centerAdmin">센터 관리자</SelectItem>
+                  <SelectItem value="kiosk">키오스크</SelectItem>
                 </SelectContent>
               </Select>
               <FormMessage />
@@ -653,7 +660,7 @@ export function SignupForm() {
                 />
               </FormControl>
               <FormDescription className="rounded-lg bg-primary/5 p-2 text-[10px] font-black text-primary">
-                학생, 학부모, 선생님, 관리자 가입 시 모두 센터 초대 코드가 필요합니다.
+                학생, 학부모, 선생님, 관리자, 키오스크 가입 시 모두 센터 초대 코드가 필요합니다.
               </FormDescription>
               <FormMessage />
             </FormItem>

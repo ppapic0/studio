@@ -7,7 +7,7 @@ import { httpsCallable } from 'firebase/functions';
 
 export type CenterMembership = {
   id: string; // centerId
-  role: 'student' | 'teacher' | 'parent' | 'centerAdmin' | 'owner';
+  role: 'student' | 'teacher' | 'parent' | 'centerAdmin' | 'owner' | 'kiosk';
   status: 'active' | 'pending' | 'inactive' | 'onHold' | 'withdrawn';
   joinedAt: any;
   displayName?: string;
@@ -80,7 +80,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   const normalizeRole = (role: CenterMembership['role'] | string | undefined): CenterMembership['role'] => {
     if (role === 'owner' || role === 'centerManager' || role === 'admin') return 'centerAdmin';
-    if (role === 'student' || role === 'teacher' || role === 'parent' || role === 'centerAdmin') return role;
+    if (role === 'student' || role === 'teacher' || role === 'parent' || role === 'centerAdmin' || role === 'kiosk') return role;
     return 'student';
   };
 
@@ -125,7 +125,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
       if (normalizedRole === 'teacher') return 1;
       if (normalizedRole === 'parent' && hasLinkedStudents(membership)) return 2;
       if (normalizedRole === 'student') return 3;
-      return 4;
+      if (normalizedRole === 'kiosk') return 4;
+      return 5;
     };
 
     const pickActiveMembership = (items: CenterMembership[]): CenterMembership | null => {

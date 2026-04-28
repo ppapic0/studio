@@ -86,7 +86,7 @@ export interface Student {
 
 export interface CenterMembership {
   id: string; 
-  role: 'student' | 'teacher' | 'parent' | 'centerAdmin' | 'owner';
+  role: 'student' | 'teacher' | 'parent' | 'centerAdmin' | 'owner' | 'kiosk';
   status: 'active' | 'onHold' | 'withdrawn' | 'pending';
   joinedAt: Timestamp;
   displayName?: string;
@@ -1043,7 +1043,7 @@ export interface DailyReport {
 
 export interface InviteCode {
   id: string;
-  intendedRole: 'student' | 'teacher' | 'parent' | 'centerAdmin';
+  intendedRole: 'student' | 'teacher' | 'parent' | 'centerAdmin' | 'kiosk';
   centerId?: string;
   targetClassName?: string;
   maxUses: number;

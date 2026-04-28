@@ -18,6 +18,7 @@ function normalizeMembershipRole(role?: string | null) {
   if (normalized === 'teacher') return 'teacher';
   if (normalized === 'parent') return 'parent';
   if (normalized === 'student') return 'student';
+  if (normalized === 'kiosk') return 'kiosk';
   return '';
 }
 
@@ -34,8 +35,16 @@ export function isTeacherOrAdminRole(role?: string | null) {
   return normalizeMembershipRole(role) === 'teacher' || isAdminRole(role);
 }
 
+export function isKioskRole(role?: string | null) {
+  return normalizeMembershipRole(role) === 'kiosk';
+}
+
 export function canReadSharedOps(role?: string | null) {
   return isTeacherOrAdminRole(role);
+}
+
+export function canAccessKiosk(role?: string | null) {
+  return isKioskRole(role) || isTeacherOrAdminRole(role);
 }
 
 export function canReadLeadOps(role?: string | null) {

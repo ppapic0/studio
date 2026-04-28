@@ -58,6 +58,8 @@ const resetSchema = z.object({
   email: z.string().email('유효한 이메일 주소를 입력해주세요.'),
 });
 
+type MembershipRecord = { role?: string; status?: string };
+
 export function LoginForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -92,20 +94,20 @@ export function LoginForm() {
     if (normalized === 'owner' || normalized === 'admin' || normalized === 'centermanager' || normalized === 'centeradmin') {
       return 'centerAdmin';
     }
-    if (normalized === 'teacher' || normalized === 'parent' || normalized === 'student') {
+    if (normalized === 'teacher' || normalized === 'parent' || normalized === 'student' || normalized === 'kiosk') {
       return normalized;
     }
     return '';
   };
 
   const fetchMembershipRecords = async (uid: string) => {
-    if (!firestore) return [] as { role?: string; status?: string }[];
+    if (!firestore) return [] as MembershipRecord[];
 
     const centersSnap = await getDocs(collection(firestore, 'userCenters', uid, 'centers'));
-    return centersSnap.docs.map((docSnap) => docSnap.data() as { role?: string; status?: string });
+    return centersSnap.docs.map((docSnap) => docSnap.data() as MembershipRecord);
   };
 
-  const validateStudentMembershipStatus = (memberships: { role?: string; status?: string }[]) => {
+  const validateStudentMembershipStatus = (memberships: MembershipRecord[]) => {
     const studentMemberships = memberships.filter((membership) => normalizeMembershipRole(membership.role) === 'student');
 
     if (studentMemberships.length === 0) return { allowed: true as const };
@@ -133,16 +135,30 @@ export function LoginForm() {
     };
   };
 
-  const resolveDashboardEntryMotionKeys = (memberships: { role?: string; status?: string }[]) => {
+  const getActiveMembershipRoles = (memberships: MembershipRecord[]) => {
     const activeRoles = new Set(
       memberships
         .filter((membership) => {
           return isActiveMembershipStatusValue(membership.status);
         })
-        .map((membership) => membership.role)
-        .filter((role): role is string => typeof role === 'string')
+        .map((membership) => normalizeMembershipRole(membership.role))
+        .filter((role) => role.length > 0)
     );
 
+    return activeRoles;
+  };
+
+  const resolvePostLoginPath = (memberships: MembershipRecord[]) => {
+    const activeRoles = getActiveMembershipRoles(memberships);
+    if (activeRoles.size === 1 && activeRoles.has('kiosk')) {
+      return '/kiosk';
+    }
+
+    return postLoginPath;
+  };
+
+  const resolveDashboardEntryMotionKeys = (memberships: MembershipRecord[]) => {
+    const activeRoles = getActiveMembershipRoles(memberships);
     const storageKeys: string[] = [];
 
     if (activeRoles.has('student')) {
@@ -250,12 +266,13 @@ export function LoginForm() {
         setDashboardEntryMotionKeys(resolveDashboardEntryMotionKeys(memberships));
       }
       didStartPostLoginNavigation = true;
+      const resolvedPostLoginPath = resolvePostLoginPath(memberships);
       if (typeof window !== 'undefined') {
         window.sessionStorage.removeItem(AUTH_SESSION_SYNC_SKIP_STORAGE_KEY);
-        window.location.replace(postLoginPath);
+        window.location.replace(resolvedPostLoginPath);
         return;
       }
-      router.replace(postLoginPath);
+      router.replace(resolvedPostLoginPath);
       router.refresh();
     } catch (error: any) {
       if (hasServerSession) {

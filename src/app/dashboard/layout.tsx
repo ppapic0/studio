@@ -7,6 +7,7 @@ import { getVerifiedServerSession } from '@/lib/server-auth-session';
 import {
   canAccessDashboardPath,
   getServerDashboardMemberships,
+  resolveDefaultDashboardMembership,
 } from '@/lib/server-dashboard-access';
 
 export default async function DashboardLayout({
@@ -50,6 +51,11 @@ export default async function DashboardLayout({
 
   if (session && !skipServerPathGuard && !canAccessDashboardPath(pathname, memberships)) {
     redirect('/dashboard');
+  }
+
+  const defaultMembership = resolveDefaultDashboardMembership(memberships);
+  if (session && !skipServerPathGuard && defaultMembership?.role === 'kiosk') {
+    redirect('/kiosk');
   }
 
   return <DashboardShell>{children}</DashboardShell>;

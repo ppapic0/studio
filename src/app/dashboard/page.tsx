@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { StudentDashboard } from '@/components/dashboard/student-dashboard';
 import { TeacherDashboard } from '@/components/dashboard/teacher-dashboard';
 import { AdminDashboard } from '@/components/dashboard/admin-dashboard';
@@ -138,6 +139,7 @@ export default function DashboardPage() {
   const firestore = useFirestore();
   const functions = useFunctions();
   const { activeMembership, activeStudentId, membershipsLoading, viewMode } = useAppContext();
+  const router = useRouter();
   const { toast } = useToast();
   const [isInviteSubmitting, setIsInviteSubmitting] = useState(false);
   const [isParentLinkSubmitting, setIsParentLinkSubmitting] = useState(false);
@@ -158,6 +160,12 @@ export default function DashboardPage() {
   const isParentRole = activeMembership?.role === 'parent';
   const authUid = user?.uid || null;
   const studentDocId = activeStudentId || authUid || null;
+
+  useEffect(() => {
+    if (activeMembership?.role === 'kiosk') {
+      router.replace('/kiosk');
+    }
+  }, [activeMembership?.role, router]);
 
   const userProfileRef = useMemoFirebase(() => {
     if (!firestore || !user) return null;
@@ -697,6 +705,15 @@ export default function DashboardPage() {
 
   if (activeMembership) {
     const userRole = activeMembership.role;
+
+    if (userRole === 'kiosk') {
+      return (
+        <div className="flex h-[70vh] w-full flex-col items-center justify-center gap-4">
+          <Loader2 className="h-10 w-10 animate-spin text-primary opacity-20" />
+          <p className="font-black tracking-tighter text-primary">키오스크 전용 모드로 전환 중...</p>
+        </div>
+      );
+    }
 
     if (userRole === 'centerAdmin' || userRole === 'owner') {
       return (

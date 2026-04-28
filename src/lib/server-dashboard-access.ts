@@ -2,6 +2,7 @@ import 'server-only';
 
 import { adminDb } from '@/lib/firebase-admin';
 import {
+  canAccessKiosk,
   canManageSettings,
   canReadFinance,
   canReadLeadOps,
@@ -19,7 +20,7 @@ type DashboardMembership = {
   linkedStudentIds?: unknown;
 };
 
-type DashboardRouteAccess = 'any' | 'sharedOps' | 'leadOps' | 'finance' | 'settings';
+type DashboardRouteAccess = 'any' | 'kiosk' | 'sharedOps' | 'leadOps' | 'finance' | 'settings';
 
 const DASHBOARD_ACCESS_RULES: Array<{
   access: DashboardRouteAccess;
@@ -41,10 +42,13 @@ const DASHBOARD_ACCESS_RULES: Array<{
       pathname.startsWith('/dashboard/leads'),
   },
   {
+    access: 'kiosk',
+    matcher: (pathname) =>
+      pathname === '/kiosk' || pathname.startsWith('/dashboard/kiosk'),
+  },
+  {
     access: 'sharedOps',
     matcher: (pathname) =>
-      pathname === '/kiosk' ||
-      pathname.startsWith('/dashboard/kiosk') ||
       pathname.startsWith('/dashboard/teacher') ||
       pathname.startsWith('/dashboard/attendance') ||
       pathname.startsWith('/dashboard/analysis') ||
@@ -67,7 +71,8 @@ function getMembershipPriority(membership: DashboardMembership) {
   if (membership.role === 'teacher') return 1;
   if (membership.role === 'parent' && hasLinkedStudents(membership)) return 2;
   if (membership.role === 'student') return 3;
-  return 4;
+  if (membership.role === 'kiosk') return 4;
+  return 5;
 }
 
 export function getDashboardRouteAccess(pathname: string): DashboardRouteAccess {
@@ -126,6 +131,17 @@ export function canAccessDashboardPath(
         memberships,
         (membership) =>
           canManageSettings(membership.role) && isActiveMembershipStatus(membership.status)
+      )
+    );
+  }
+
+  if (access === 'kiosk') {
+    return Boolean(
+      resolveMembershipByRole(
+        defaultMembership,
+        memberships,
+        (membership) =>
+          canAccessKiosk(membership.role) && isActiveMembershipStatus(membership.status)
       )
     );
   }

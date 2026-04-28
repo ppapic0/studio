@@ -62,8 +62,16 @@ service cloud.firestore {
       return role == 'teacher' || isRoleCenterAdmin(role);
     }
 
+    function isRoleKiosk(role) {
+      return role == 'kiosk';
+    }
+
     function isTeacherOrAdmin(centerId) {
       return isActiveMember(centerId) && isRoleTeacherOrAdmin(getMemberRole(centerId));
+    }
+
+    function isKiosk(centerId) {
+      return isActiveMember(centerId) && isRoleKiosk(getMemberRole(centerId));
     }
 
     function isTeacher(centerId) {
@@ -307,6 +315,7 @@ service cloud.firestore {
 
       match /students/{studentId} {
         allow read: if isTeacherOrAdmin(centerId)
+          || isKiosk(centerId)
           || (isSignedIn() && request.auth.uid == studentId)
           || isLinkedParent(centerId, studentId);
         allow create, update: if isTeacherOrAdmin(centerId);
@@ -325,6 +334,7 @@ service cloud.firestore {
 
       match /attendanceCurrent/{seatId} {
         allow read: if isTeacherOrAdmin(centerId)
+          || isKiosk(centerId)
           || (isSignedIn()
               && resource.data.studentId != null
               && resource.data.studentId == request.auth.uid)

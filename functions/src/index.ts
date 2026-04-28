@@ -24,7 +24,7 @@ const smsDispatcherFunctions = functions.region(region).runWith({
 });
 const MANUAL_PARENT_SMS_UID = "__manual_parent__";
 const STUDENT_SMS_FALLBACK_UID = "__student__";
-const allowedRoles = ["student", "teacher", "parent", "centerAdmin"] as const;
+const allowedRoles = ["student", "teacher", "parent", "centerAdmin", "kiosk"] as const;
 const adminRoles = new Set(["centerAdmin", "owner", "admin", "centerManager"]);
 type AllowedRole = (typeof allowedRoles)[number];
 
@@ -1552,6 +1552,7 @@ function normalizeMembershipRoleValue(value: unknown): string {
   if (normalized === "teacher") return "teacher";
   if (normalized === "parent") return "parent";
   if (normalized === "student") return "student";
+  if (normalized === "kiosk") return "kiosk";
   return "";
 }
 
@@ -9265,8 +9266,15 @@ export const setStudentAttendanceStatusSecure = smsDispatcherFunctions.https.onC
       userMessage: "학생 대시보드에서만 본인 출결을 변경할 수 있습니다.",
     });
   }
+  if (membership.role === "kiosk" && source !== "kiosk") {
+    throw new functions.https.HttpsError("permission-denied", "Invalid kiosk attendance source.", {
+      userMessage: "키오스크 계정에서는 키오스크 화면에서만 출결을 변경할 수 있습니다.",
+    });
+  }
   if (membership.role === "teacher" || isAdminRole(membership.role)) {
     // Allowed.
+  } else if (membership.role === "kiosk") {
+    // Kiosk accounts can update attendance only through the kiosk source check above.
   } else if (membership.role !== "student") {
     throw new functions.https.HttpsError("permission-denied", "Unsupported attendance caller role.");
   }
