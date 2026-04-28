@@ -14,12 +14,25 @@ service cloud.firestore {
       return /databases/$(database)/documents/userCenters/$(request.auth.uid)/centers/$(centerId);
     }
 
+    function centerStudentPath(centerId, studentId) {
+      return /databases/$(database)/documents/centers/$(centerId)/students/$(studentId);
+    }
+
+    function centerMemberPath(centerId, memberId) {
+      return /databases/$(database)/documents/centers/$(centerId)/members/$(memberId);
+    }
+
     function hasMembership(centerId) {
       return isSignedIn() && exists(memberPath(centerId));
     }
 
     function hasUserCenter(centerId) {
       return isSignedIn() && exists(userCenterPath(centerId));
+    }
+
+    function centerHasStudent(centerId, studentId) {
+      return exists(centerStudentPath(centerId, studentId))
+        || exists(centerMemberPath(centerId, studentId));
     }
 
     function getMemberRole(centerId) {
@@ -254,11 +267,27 @@ service cloud.firestore {
       match /schedules/{dateKey} {
         allow read: if (isSignedIn() && request.auth.uid == userId)
           || (resource.data.centerId != null && isTeacherOrAdmin(resource.data.centerId));
-        allow create, update: if isSignedIn()
+        allow create: if (isSignedIn()
           && request.auth.uid == userId
           && request.resource.data.uid == request.auth.uid
-          && request.resource.data.dateKey == dateKey;
-        allow delete: if isSignedIn() && request.auth.uid == userId;
+          && request.resource.data.dateKey == dateKey)
+          || (request.resource.data.centerId != null
+            && isCenterAdmin(request.resource.data.centerId)
+            && centerHasStudent(request.resource.data.centerId, userId)
+            && request.resource.data.uid == userId
+            && request.resource.data.dateKey == dateKey);
+        allow update: if (isSignedIn()
+          && request.auth.uid == userId
+          && request.resource.data.uid == request.auth.uid
+          && request.resource.data.dateKey == dateKey)
+          || (request.resource.data.centerId != null
+            && (resource.data.centerId == null || request.resource.data.centerId == resource.data.centerId)
+            && isCenterAdmin(request.resource.data.centerId)
+            && centerHasStudent(request.resource.data.centerId, userId)
+            && request.resource.data.uid == userId
+            && request.resource.data.dateKey == dateKey);
+        allow delete: if (isSignedIn() && request.auth.uid == userId)
+          || (resource.data.centerId != null && isCenterAdmin(resource.data.centerId));
       }
 
       match /scheduleTemplates/{templateId} {

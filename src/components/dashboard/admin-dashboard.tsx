@@ -92,7 +92,7 @@ import { useAppContext } from '@/contexts/app-context';
 import { useMemoFirebase } from '@/hooks/use-memo-firebase';
 import { addDoc, collection, query, where, Timestamp, doc, limit, getDoc, getDocs, orderBy, serverTimestamp, documentId, writeBatch, deleteField, increment } from 'firebase/firestore';
 import { httpsCallable } from 'firebase/functions';
-import { AttendanceCurrent, AttendanceRequest, CounselingReservation, DailyStudentStat, DailyReport, CenterMembership, InviteCode, GrowthProgress, ParentActivityEvent, CounselingLog, LayoutRoomConfig, StudentProfile, StudyLogDay, OpenClawIntegrationDoc, OpenClawSnapshotRecordCounts, PointBoostEvent, StudyPlanItem, WebsiteSeatHoldRequest } from '@/lib/types';
+import { AttendanceCurrent, AttendanceRequest, CounselingReservation, DailyStudentStat, DailyReport, CenterMembership, InviteCode, GrowthProgress, ParentActivityEvent, CounselingLog, LayoutRoomConfig, StudentProfile, StudentScheduleDoc, StudyLogDay, OpenClawIntegrationDoc, OpenClawSnapshotRecordCounts, PointBoostEvent, StudyPlanItem, WebsiteSeatHoldRequest } from '@/lib/types';
 import { format, subDays } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { logHandledClientIssue } from '@/lib/handled-client-log';
@@ -112,6 +112,8 @@ import {
 } from '@/components/dashboard/operations-inbox';
 import { motion, useReducedMotion } from 'framer-motion';
 import { buildNoShowFlag } from '@/features/schedules/lib/buildNoShowFlag';
+import { normalizeOutings } from '@/features/schedules/lib/scheduleModel';
+import type { AttendanceScheduleDraft } from '@/components/dashboard/student-planner/planner-constants';
 import { useCenterAdminAttendanceBoard } from '@/hooks/use-center-admin-attendance-board';
 import { useCenterAdminHeatmap } from '@/hooks/use-center-admin-heatmap';
 import { getAttendanceRequestTypeLabel, getScheduleChangeReasonLabel } from '@/lib/attendance-request';
@@ -153,6 +155,9 @@ import { getStudyDayDate } from '@/lib/study-day';
 const ADMIN_DASHBOARD_REFRESH_INTERVAL_MS = 60 * 1000;
 const MANUAL_PARENT_SMS_UID = '__manual_parent__';
 const STUDENT_SMS_FALLBACK_UID = '__student__';
+const FOCUS_SCHEDULE_DEFAULT_ARRIVAL_TIME = '18:00';
+const FOCUS_SCHEDULE_DEFAULT_DEPARTURE_TIME = '23:30';
+const SCHEDULE_TIME_LABEL_PATTERN = /^([01]\d|2[0-3]):[0-5]\d$/;
 
 type AdminSmsRecipientPreference = {
   id: string;
@@ -264,6 +269,87 @@ const toTimestampDateSafe = (value: unknown): Date | null => {
     return Number.isNaN(date.getTime()) ? null : date;
   }
   return null;
+};
+
+const isScheduleTimeLabel = (value?: string | null): value is string => {
+  return SCHEDULE_TIME_LABEL_PATTERN.test(String(value || '').trim());
+};
+
+const toScheduleTimeDraft = (value: string | null | undefined, fallback = ''): string => {
+  const normalized = String(value || '').trim();
+  return isScheduleTimeLabel(normalized) ? normalized : fallback;
+};
+
+const scheduleTimeToMinutes = (value: string): number | null => {
+  if (!isScheduleTimeLabel(value)) return null;
+  const [hours, minutes] = value.split(':').map(Number);
+  return hours * 60 + minutes;
+};
+
+const toOperationalScheduleMinute = (
+  value: string,
+  arrivalMinutes: number,
+  departureMinutes: number
+): number | null => {
+  const minutes = scheduleTimeToMinutes(value);
+  if (minutes === null) return null;
+  return departureMinutes <= arrivalMinutes && minutes < arrivalMinutes ? minutes + 24 * 60 : minutes;
+};
+
+const validateFocusScheduleDraft = (draft: AttendanceScheduleDraft): string | null => {
+  if (!draft.inTime || !draft.outTime) {
+    return '등원 일정과 하원 일정을 모두 입력해 주세요.';
+  }
+
+  const arrivalMinutes = scheduleTimeToMinutes(draft.inTime);
+  const departureMinutes = scheduleTimeToMinutes(draft.outTime);
+  if (arrivalMinutes === null || departureMinutes === null) {
+    return '시간 형식이 올바르지 않아요.';
+  }
+
+  const adjustedDepartureMinutes =
+    departureMinutes <= arrivalMinutes ? departureMinutes + 24 * 60 : departureMinutes;
+  if (adjustedDepartureMinutes <= arrivalMinutes) {
+    return '하원 일정은 등원 일정 이후로 입력해 주세요.';
+  }
+
+  const hasAwayValue = Boolean(draft.awayStartTime || draft.awayEndTime || draft.awayReason.trim());
+  if (!hasAwayValue) return null;
+  if (!draft.awayStartTime || !draft.awayEndTime) {
+    return '외출 시작과 복귀 예정 시간을 모두 입력해 주세요.';
+  }
+
+  let awayStartMinutes = toOperationalScheduleMinute(draft.awayStartTime, arrivalMinutes, departureMinutes);
+  let awayEndMinutes = toOperationalScheduleMinute(draft.awayEndTime, arrivalMinutes, departureMinutes);
+  if (awayStartMinutes === null || awayEndMinutes === null) {
+    return '외출 시간 형식이 올바르지 않아요.';
+  }
+  if (awayEndMinutes <= awayStartMinutes) {
+    awayEndMinutes += 24 * 60;
+  }
+  if (awayStartMinutes < arrivalMinutes || awayEndMinutes > adjustedDepartureMinutes) {
+    return '외출 일정은 등원~하원 일정 안에서만 입력할 수 있어요.';
+  }
+  return null;
+};
+
+const getScheduleStatusFromFocusStatus = (
+  currentStatus?: AttendanceCurrent['status'] | string | null,
+  firstCheckInLabel?: string | null
+): StudentScheduleDoc['status'] => {
+  if (currentStatus === 'studying') return 'checked_in';
+  if (currentStatus === 'away' || currentStatus === 'break') return 'excursion';
+  if (currentStatus === 'absent' && firstCheckInLabel && firstCheckInLabel !== '-') return 'checked_out';
+  return 'scheduled';
+};
+
+const isRoutineMissingPenaltyForDate = (penaltyLog: Record<string, unknown>, dateKey: string): boolean => {
+  if (penaltyLog.source !== 'routine_missing') return false;
+  if (penaltyLog.penaltyDateKey === dateKey) return true;
+  if (penaltyLog.penaltyKey === `routine_missing:${dateKey}`) return true;
+
+  const createdAt = toTimestampDateSafe(penaltyLog.createdAt);
+  return createdAt ? format(createdAt, 'yyyy-MM-dd') === dateKey : false;
 };
 
 const formatFocusSessionDurationLabel = (minutes: number): string => {
@@ -876,6 +962,13 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
   const [pointBoostMultiplierDraft, setPointBoostMultiplierDraft] = useState('2');
   const [pointBoostMessageDraft, setPointBoostMessageDraft] = useState('');
   const [focusAttendanceActionSaving, setFocusAttendanceActionSaving] = useState<AttendanceCurrent['status'] | null>(null);
+  const [isFocusScheduleDialogOpen, setIsFocusScheduleDialogOpen] = useState(false);
+  const [focusScheduleArrivalDraft, setFocusScheduleArrivalDraft] = useState('');
+  const [focusScheduleDepartureDraft, setFocusScheduleDepartureDraft] = useState('');
+  const [focusScheduleAwayStartDraft, setFocusScheduleAwayStartDraft] = useState('');
+  const [focusScheduleAwayEndDraft, setFocusScheduleAwayEndDraft] = useState('');
+  const [focusScheduleAwayReasonDraft, setFocusScheduleAwayReasonDraft] = useState('');
+  const [isFocusScheduleSaving, setIsFocusScheduleSaving] = useState(false);
   const [focusStudyTotalsRepairing, setFocusStudyTotalsRepairing] = useState(false);
   const [isManualStudySessionDialogOpen, setIsManualStudySessionDialogOpen] = useState(false);
   const [manualStudySessionStartDraft, setManualStudySessionStartDraft] = useState('');
@@ -949,6 +1042,8 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
 
   const isMobile = viewMode === 'mobile';
   const centerId = activeMembership?.id;
+  const canEditFocusSchedule =
+    activeMembership?.role === 'centerAdmin' || activeMembership?.role === 'owner';
   const todayKey = today ? format(today, 'yyyy-MM-dd') : '';
   const yesterdayKey = today ? format(subDays(today, 1), 'yyyy-MM-dd') : '';
   const selectedFocusPlanWeekKeys = useMemo(() => {
@@ -1022,6 +1117,13 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
     setEditStudySessionNoteDraft('');
     setIsEditStudySessionSaving(false);
     setDeletingStudySessionId(null);
+    setIsFocusScheduleDialogOpen(false);
+    setFocusScheduleArrivalDraft('');
+    setFocusScheduleDepartureDraft('');
+    setFocusScheduleAwayStartDraft('');
+    setFocusScheduleAwayEndDraft('');
+    setFocusScheduleAwayReasonDraft('');
+    setIsFocusScheduleSaving(false);
   }, [selectedFocusStudentId, todayKey]);
 
   useEffect(() => {
@@ -4548,6 +4650,146 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
     );
   }
 
+  function renderFocusScheduleDialog() {
+    const studentName = selectedFocusStudent?.name || selectedFocusOperationsSummary?.student?.name || '학생';
+    const outingEnabled = Boolean(
+      focusScheduleAwayStartDraft || focusScheduleAwayEndDraft || focusScheduleAwayReasonDraft.trim()
+    );
+
+    return (
+      <Dialog
+        open={isFocusScheduleDialogOpen}
+        onOpenChange={(open) => {
+          if (!open && !isFocusScheduleSaving) {
+            resetFocusScheduleDialog();
+          }
+        }}
+      >
+        <DialogContent motionPreset="dashboard-premium" className={cn(studioDialogContentClassName, 'sm:max-w-2xl')}>
+          <div className={studioDialogHeaderClassName}>
+            <DialogHeader className="text-left">
+              <div className="flex flex-wrap items-center gap-2">
+                <Badge className="border-none bg-white/18 px-2.5 py-1 text-[10px] font-black text-white">일정 수정</Badge>
+                <Badge className="border-none bg-white px-2.5 py-1 text-[10px] font-black text-[#14295F]">
+                  {studentName}
+                </Badge>
+              </div>
+              <DialogTitle className="text-2xl font-black tracking-tight">오늘 등하원·외출 일정 수정</DialogTitle>
+              <DialogDescription className="text-sm font-medium text-white/76">
+                센터관리자가 직접 저장하는 당일 일정 수정은 출결 신청 벌점 흐름을 타지 않습니다.
+              </DialogDescription>
+            </DialogHeader>
+          </div>
+
+          <div className="bg-[linear-gradient(180deg,#F7FAFF_0%,#EEF4FF_100%)] px-5 py-5">
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div className="flex flex-col gap-2">
+                <Label className="text-[11px] font-black uppercase tracking-[0.14em] text-[#5c6e97]">등원 일정</Label>
+                <Input
+                  type="time"
+                  value={focusScheduleArrivalDraft}
+                  onChange={(event) => setFocusScheduleArrivalDraft(event.target.value)}
+                  className="h-11 rounded-xl border-[#DCE7FF] font-bold text-[#14295F]"
+                />
+              </div>
+              <div className="flex flex-col gap-2">
+                <Label className="text-[11px] font-black uppercase tracking-[0.14em] text-[#5c6e97]">하원 일정</Label>
+                <Input
+                  type="time"
+                  value={focusScheduleDepartureDraft}
+                  onChange={(event) => setFocusScheduleDepartureDraft(event.target.value)}
+                  className="h-11 rounded-xl border-[#DCE7FF] font-bold text-[#14295F]"
+                />
+              </div>
+            </div>
+
+            <div className={cn(
+              'mt-4 rounded-[1.25rem] border px-4 py-4',
+              outingEnabled ? 'border-[#FFD7BA] bg-[#FFF8F2]' : 'border-[#DCE7FF] bg-white'
+            )}>
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <div className="min-w-0">
+                  <p className="text-[10px] font-black uppercase tracking-[0.14em] text-[#C95A08]">외출 일정</p>
+                  <p className="mt-1 text-xs font-bold text-[#5c6e97]">외출 시작과 복귀 예정 시간을 같이 입력합니다.</p>
+                </div>
+                {outingEnabled ? (
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    className="h-8 rounded-xl border-[#FFD7BA] bg-white px-3 text-[10px] font-black text-[#C95A08]"
+                    onClick={() => {
+                      setFocusScheduleAwayStartDraft('');
+                      setFocusScheduleAwayEndDraft('');
+                      setFocusScheduleAwayReasonDraft('');
+                    }}
+                  >
+                    외출 비우기
+                  </Button>
+                ) : null}
+              </div>
+
+              <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                <div className="flex flex-col gap-2">
+                  <Label className="text-[11px] font-black uppercase tracking-[0.14em] text-[#5c6e97]">외출 시작</Label>
+                  <Input
+                    type="time"
+                    value={focusScheduleAwayStartDraft}
+                    onChange={(event) => setFocusScheduleAwayStartDraft(event.target.value)}
+                    className="h-11 rounded-xl border-[#FFD7BA] bg-white font-bold text-[#14295F]"
+                  />
+                </div>
+                <div className="flex flex-col gap-2">
+                  <Label className="text-[11px] font-black uppercase tracking-[0.14em] text-[#5c6e97]">복귀 예정</Label>
+                  <Input
+                    type="time"
+                    value={focusScheduleAwayEndDraft}
+                    onChange={(event) => setFocusScheduleAwayEndDraft(event.target.value)}
+                    className="h-11 rounded-xl border-[#FFD7BA] bg-white font-bold text-[#14295F]"
+                  />
+                </div>
+              </div>
+
+              <div className="mt-3 flex flex-col gap-2">
+                <Label className="text-[11px] font-black uppercase tracking-[0.14em] text-[#5c6e97]">외출 사유</Label>
+                <Input
+                  value={focusScheduleAwayReasonDraft}
+                  onChange={(event) => setFocusScheduleAwayReasonDraft(event.target.value)}
+                  placeholder="예: 학원, 병원, 개인 외출"
+                  className="h-11 rounded-xl border-[#FFD7BA] bg-white font-bold text-[#14295F] placeholder:text-[#7F91B3]"
+                />
+              </div>
+            </div>
+
+            <div className="mt-4 rounded-[1.25rem] border border-emerald-200 bg-emerald-50 px-4 py-3">
+              <p className="text-xs font-black text-emerald-800">당일 관리자 보정</p>
+              <p className="mt-1 text-[11px] font-bold leading-5 text-emerald-800">
+                저장 시 오늘 일정 문서를 직접 보정하고, 오늘 루틴 미작성 자동 벌점이 이미 잡혀 있으면 함께 정리합니다.
+              </p>
+            </div>
+          </div>
+
+          <DialogFooter className="border-t border-[#DCE7FF] bg-white px-5 py-4">
+            <DialogClose asChild>
+              <Button type="button" variant="outline" className="rounded-xl border-[#DCE7FF] font-black text-[#14295F]">
+                취소
+              </Button>
+            </DialogClose>
+            <Button
+              type="button"
+              onClick={() => void handleSaveFocusSchedule()}
+              disabled={isFocusScheduleSaving || !canEditFocusSchedule}
+              className="rounded-xl bg-[#14295F] font-black text-white hover:bg-[#10224C]"
+            >
+              {isFocusScheduleSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
+              일정 저장
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    );
+  }
+
   function renderManualStudySessionDialog() {
     const studentName = selectedFocusStudent?.name || selectedFocusOperationsSummary?.student?.name || '학생';
 
@@ -6542,6 +6784,214 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
     setFocusAdjustmentAmountDraft('');
     setFocusAdjustmentReasonDraft('');
   };
+  const resetFocusScheduleDialog = () => {
+    setIsFocusScheduleDialogOpen(false);
+    setFocusScheduleArrivalDraft('');
+    setFocusScheduleDepartureDraft('');
+    setFocusScheduleAwayStartDraft('');
+    setFocusScheduleAwayEndDraft('');
+    setFocusScheduleAwayReasonDraft('');
+  };
+  const openFocusScheduleDialog = () => {
+    if (!selectedFocusStudentId || !selectedFocusOperationsSummary) return;
+    if (!canEditFocusSchedule) {
+      toast({
+        variant: 'destructive',
+        title: '일정 수정 권한이 없습니다.',
+        description: '센터관리자 계정에서만 학생 당일 일정을 수정할 수 있습니다.',
+      });
+      return;
+    }
+
+    const signal = selectedFocusOperationsSummary.signal || attendanceSeatSignalsByStudentId.get(selectedFocusStudentId) || null;
+    setFocusScheduleArrivalDraft(
+      toScheduleTimeDraft(
+        signal?.routineExpectedArrivalTime || selectedFocusOperationsSummary.plannedArrival,
+        FOCUS_SCHEDULE_DEFAULT_ARRIVAL_TIME
+      )
+    );
+    setFocusScheduleDepartureDraft(
+      toScheduleTimeDraft(
+        signal?.plannedDepartureTime || selectedFocusOperationsSummary.plannedDeparture,
+        FOCUS_SCHEDULE_DEFAULT_DEPARTURE_TIME
+      )
+    );
+    setFocusScheduleAwayStartDraft(toScheduleTimeDraft(signal?.excursionStartAt || '', ''));
+    setFocusScheduleAwayEndDraft(toScheduleTimeDraft(signal?.excursionEndAt || '', ''));
+    setFocusScheduleAwayReasonDraft(signal?.excursionReason || '');
+    setIsFocusScheduleDialogOpen(true);
+  };
+  const handleSaveFocusSchedule = async () => {
+    if (!firestore || !centerId || !selectedFocusStudentId || !todayKey) return;
+    if (!canEditFocusSchedule) {
+      toast({
+        variant: 'destructive',
+        title: '일정 수정 권한이 없습니다.',
+        description: '센터관리자 계정에서만 학생 당일 일정을 수정할 수 있습니다.',
+      });
+      return;
+    }
+
+    const studentId = selectedFocusStudentId;
+    const studentName =
+      selectedFocusStudent?.name
+      || selectedFocusOperationsSummary?.student?.name
+      || studentsById.get(studentId)?.name
+      || studentMembersById.get(studentId)?.displayName
+      || '학생';
+    const draft: AttendanceScheduleDraft = {
+      inTime: focusScheduleArrivalDraft.trim(),
+      outTime: focusScheduleDepartureDraft.trim(),
+      academyName: '',
+      academyStartTime: '',
+      academyEndTime: '',
+      awayStartTime: focusScheduleAwayStartDraft.trim(),
+      awayEndTime: focusScheduleAwayEndDraft.trim(),
+      awayReason: focusScheduleAwayReasonDraft.trim(),
+      awaySlots: [],
+      isAbsent: false,
+      classScheduleId: null,
+      classScheduleName: null,
+    };
+    const validationMessage = validateFocusScheduleDraft(draft);
+    if (validationMessage) {
+      toast({
+        variant: 'destructive',
+        title: '일정 확인 필요',
+        description: validationMessage,
+      });
+      return;
+    }
+
+    const outings = normalizeOutings(draft);
+    const primaryOuting = outings[0] || null;
+    const savedAt = serverTimestamp();
+    const editorUid = user?.uid || null;
+    const editorName = user?.displayName || activeMembership?.displayName || '센터관리자';
+    const scheduleStatus = getScheduleStatusFromFocusStatus(
+      selectedFocusOperationsSummary?.currentStatus,
+      selectedFocusOperationsSummary?.firstCheckInLabel
+    );
+    const schedulePayload: Record<string, unknown> = {
+      uid: studentId,
+      studentName,
+      centerId,
+      dateKey: todayKey,
+      timezone: 'Asia/Seoul',
+      arrivalPlannedAt: draft.inTime,
+      departurePlannedAt: draft.outTime,
+      inTime: draft.inTime,
+      outTime: draft.outTime,
+      isAbsent: false,
+      status: scheduleStatus,
+      hasExcursion: outings.length > 0,
+      excursionStartAt: primaryOuting?.startTime || null,
+      excursionEndAt: primaryOuting?.endTime || null,
+      excursionReason: primaryOuting?.reason || null,
+      outings,
+      source: 'manual',
+      adminEdited: true,
+      adminEditedAt: savedAt,
+      adminEditedByUid: editorUid,
+      adminEditedByName: editorName,
+      sameDayAdminEditPenaltyWaived: true,
+      updatedAt: savedAt,
+    };
+
+    setIsFocusScheduleSaving(true);
+    try {
+      const routinePenaltySnapshot = await getDocs(
+        query(
+          collection(firestore, 'centers', centerId, 'penaltyLogs'),
+          where('studentId', '==', studentId),
+          where('source', '==', 'routine_missing'),
+          limit(20)
+        )
+      );
+      const batch = writeBatch(firestore);
+      batch.set(
+        doc(firestore, 'users', studentId, 'schedules', todayKey),
+        schedulePayload,
+        { merge: true }
+      );
+      batch.set(
+        doc(firestore, 'centers', centerId, 'attendanceRecords', todayKey, 'students', studentId),
+        {
+          centerId,
+          studentId,
+          studentName,
+          dateKey: todayKey,
+          scheduleEditedByAdminAt: savedAt,
+          scheduleEditedByAdminUid: editorUid,
+          scheduleEditPenaltyWaived: true,
+          routineMissingAtCheckIn: deleteField(),
+          routineMissingPenaltyApplied: deleteField(),
+          updatedAt: savedAt,
+        },
+        { merge: true }
+      );
+      batch.set(
+        doc(firestore, 'centers', centerId, 'dailyStudentStats', todayKey, 'students', studentId),
+        {
+          centerId,
+          studentId,
+          dateKey: todayKey,
+          expectedArrivalTime: draft.inTime,
+          plannedDepartureTime: draft.outTime,
+          hasExcursion: outings.length > 0,
+          excursionStartAt: primaryOuting?.startTime || null,
+          excursionEndAt: primaryOuting?.endTime || null,
+          excursionReason: primaryOuting?.reason || null,
+          scheduleEditedByAdminAt: savedAt,
+          scheduleEditedByAdminUid: editorUid,
+          scheduleEditPenaltyWaived: true,
+          updatedAt: savedAt,
+        },
+        { merge: true }
+      );
+
+      let waivedRoutinePenaltyPoints = 0;
+      routinePenaltySnapshot.docs.forEach((penaltyDoc) => {
+        const penaltyData = penaltyDoc.data() as Record<string, unknown>;
+        if (!isRoutineMissingPenaltyForDate(penaltyData, todayKey)) return;
+        const pointsDelta = Math.max(0, Math.round(Number(penaltyData.pointsDelta || 0)));
+        waivedRoutinePenaltyPoints += pointsDelta;
+        batch.delete(penaltyDoc.ref);
+      });
+      if (waivedRoutinePenaltyPoints > 0) {
+        batch.set(
+          doc(firestore, 'centers', centerId, 'growthProgress', studentId),
+          {
+            penaltyPoints: increment(-waivedRoutinePenaltyPoints),
+            routineMissingPenaltyWaivedAt: savedAt,
+            routineMissingPenaltyWaivedByUid: editorUid,
+            routineMissingPenaltyWaivedDateKey: todayKey,
+            updatedAt: savedAt,
+          },
+          { merge: true }
+        );
+      }
+
+      await batch.commit();
+      setLiveTickMs(Date.now());
+      resetFocusScheduleDialog();
+      toast({
+        title: '오늘 일정을 저장했습니다.',
+        description: waivedRoutinePenaltyPoints > 0
+          ? `${studentName} 학생 일정과 루틴 미작성 벌점 ${waivedRoutinePenaltyPoints}점을 함께 정리했습니다.`
+          : `${studentName} 학생의 등하원·외출 일정을 반영했습니다.`,
+      });
+    } catch (error) {
+      logHandledClientIssue('[admin-dashboard] focus schedule save failed', error);
+      toast({
+        variant: 'destructive',
+        title: '일정 저장 실패',
+        description: getCallableErrorMessage(error, '잠시 후 다시 시도해 주세요.'),
+      });
+    } finally {
+      setIsFocusScheduleSaving(false);
+    }
+  };
   const openFocusAdjustmentDialog = (kind: FocusAdjustmentKind, mode: PointAdjustmentMode = 'add') => {
     setFocusAdjustmentKind(kind);
     setFocusAdjustmentMode(mode);
@@ -8056,6 +8506,7 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
           {renderAttendanceDashboardSection()}
           {renderIntegratedClassroomSection()}
           {renderLayoutSeatActionDialog()}
+          {renderFocusScheduleDialog()}
           {renderManualStudySessionDialog()}
           {renderEditStudySessionDialog()}
           {renderFocusAdjustmentDialog()}
@@ -9720,9 +10171,26 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
                         </div>
                       </div>
                     </div>
-                    <Badge className="h-8 rounded-full border-none bg-[#14295F] px-3 text-[11px] font-black text-white">
-                      문자 {selectedFocusOperationsSummary.smsLogs.length}건
-                    </Badge>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <Badge className="h-8 rounded-full border-none bg-[#14295F] px-3 text-[11px] font-black text-white">
+                        문자 {selectedFocusOperationsSummary.smsLogs.length}건
+                      </Badge>
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        disabled={!canEditFocusSchedule || isFocusScheduleSaving}
+                        onClick={openFocusScheduleDialog}
+                        className="h-8 rounded-full border-[#DCE7FF] bg-white px-3 text-[11px] font-black text-[#14295F] hover:bg-[#EEF4FF]"
+                      >
+                        {isFocusScheduleSaving ? (
+                          <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
+                        ) : (
+                          <Settings2 className="mr-1.5 h-3.5 w-3.5" />
+                        )}
+                        일정 수정
+                      </Button>
+                    </div>
                   </div>
 
                   <div className="mt-4 rounded-2xl border border-[#DCE7FF] bg-[#F7FAFF] p-3">
