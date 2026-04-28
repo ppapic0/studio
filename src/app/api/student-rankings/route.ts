@@ -197,9 +197,15 @@ function normalizeRole(value: unknown) {
   return value.trim().toLowerCase().replace(/[\s_-]+/g, '');
 }
 
+const NON_STUDENT_MEMBER_ROLES = new Set(['teacher', 'centeradmin', 'admin', 'parent', 'staff', 'manager', 'owner']);
+
+function isNonStudentMemberRole(role: unknown) {
+  return NON_STUDENT_MEMBER_ROLES.has(normalizeRole(role));
+}
+
 function shouldTreatMemberAsStudent(role: unknown, hasStudentProfile: boolean) {
   const normalizedRole = normalizeRole(role);
-  if (['teacher', 'centeradmin', 'admin', 'parent', 'staff', 'manager', 'owner'].includes(normalizedRole)) {
+  if (NON_STUDENT_MEMBER_ROLES.has(normalizedRole)) {
     return false;
   }
   if (hasStudentProfile) return true;
@@ -470,12 +476,17 @@ export async function GET(request: NextRequest) {
     }>();
     const knownStudentMemberIds = new Set<string>();
     const activeStudentIds = new Set<string>();
+    const nonStudentMemberIds = new Set<string>();
 
     membersSnap.forEach((docSnap) => {
       const studentId = docSnap.id;
       if (isSyntheticStudentId(studentId)) return;
 
       const data = docSnap.data() as Record<string, unknown>;
+      if (isNonStudentMemberRole(data.role)) {
+        nonStudentMemberIds.add(studentId);
+        return;
+      }
       if (shouldExcludeFromCompetitionTrack(data, studentId)) {
         excludedStudentIds.add(studentId);
         return;
@@ -503,7 +514,7 @@ export async function GET(request: NextRequest) {
     });
 
     const shouldInclude = (studentId: string) => {
-      if (excludedStudentIds.has(studentId)) return false;
+      if (excludedStudentIds.has(studentId) || nonStudentMemberIds.has(studentId)) return false;
       if (activeStudentIds.has(studentId)) return true;
       if (!studentProfiles.has(studentId)) return activeStudentIds.size === 0;
       return !knownStudentMemberIds.has(studentId);

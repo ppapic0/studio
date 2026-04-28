@@ -153,8 +153,12 @@ function isRankRange(value: string | null): value is RankRange {
   return value === 'daily' || value === 'weekly' || value === 'monthly';
 }
 
+function normalizeRankingRole(role?: string | null) {
+  return role?.trim().toLowerCase().replace(/[\s_-]+/g, '') || '';
+}
+
 function canViewRankingHistory(role?: string | null) {
-  return role === 'centerAdmin' || role === 'owner' || role === 'teacher';
+  return ['centeradmin', 'centermanager', 'admin', 'owner', 'teacher', 'staff', 'manager'].includes(normalizeRankingRole(role));
 }
 
 function formatRankingDateLabel(dateKey: string) {
