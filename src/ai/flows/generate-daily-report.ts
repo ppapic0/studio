@@ -16,9 +16,9 @@ import {
 
 const StudyBandSchema = z.enum(['저학습', '기준학습', '고학습', '고집중']);
 const GrowthBandSchema = z.enum(['급하락', '하락', '유지', '상승', '급상승']);
-const CompletionBandSchema = z.enum(['낮음', '보통', '양호', '높음']);
+const CompletionBandSchema = z.enum(['기록없음', '낮음', '보통', '양호', '높음']);
 const VolatilityBandSchema = z.enum(['안정', '출렁임', '불안정']);
-const RoutineBandSchema = z.enum(['정상', '지각', '루틴누락', '미입실', '퇴실불안정']);
+const RoutineBandSchema = z.enum(['정상', '지각', '미입실', '퇴실불안정']);
 const ContinuityBandSchema = z.enum(['회복중', '유지중', '연속호조', '연속저하']);
 const PedagogyLensSchema = z.enum(['습관 형성', '자기조절', '집중 회복', '성장 가속']);
 const VariationStyleSchema = z.enum([
@@ -46,6 +46,8 @@ const DailyReportInputSchema = z.object({
   date: z.string().describe('리포트 날짜 (YYYY-MM-DD)'),
   totalStudyMinutes: z.number().describe('오늘 총 학습 시간(분)'),
   completionRate: z.number().describe('오늘 계획 완료율(0-100)'),
+  hasPlanRecords: z.boolean().default(true).describe('오늘 러닝시스템 계획 기록 존재 여부'),
+  completionLabel: z.string().default('').describe('리포트에 표시할 계획 완료율 라벨'),
   plans: z.array(z.object({
     title: z.string(),
     done: z.boolean(),
@@ -132,6 +134,12 @@ function formatSignedMinutes(value: number) {
 function formatSignedPercent(value: number) {
   const rounded = Math.round(value * 10) / 10;
   return `${rounded >= 0 ? '+' : ''}${rounded}%`;
+}
+
+function formatCompletionForReport(input: DailyReportInput) {
+  if (!input.hasPlanRecords) return '러닝시스템 계획 기록 X';
+  const label = input.completionLabel?.trim();
+  return label || `${Math.round(input.completionRate)}%`;
 }
 
 function normalizeWhitespace(text?: string | null) {
@@ -226,8 +234,8 @@ function buildStrengthFallback(input: DailyReportInput) {
   if (input.growthBand === '상승' || input.growthBand === '급상승') {
     strengths.push(`평균보다 학습시간이 ${formatSignedPercent(input.metrics.growthRate)} 늘었습니다.`);
   }
-  if (input.completionBand === '양호' || input.completionBand === '높음') {
-    strengths.push(`완료율 ${Math.round(input.completionRate)}%로 마무리가 안정적이었습니다.`);
+  if (input.hasPlanRecords && (input.completionBand === '양호' || input.completionBand === '높음')) {
+    strengths.push(`완료율 ${formatCompletionForReport(input)}로 마무리가 안정적이었습니다.`);
   }
   if (input.metrics.isNewRecord) {
     strengths.push('최근 최고 학습시간을 기록했습니다.');
@@ -251,13 +259,10 @@ function buildImprovementFallback(input: DailyReportInput) {
   if (input.routineBand === '지각') {
     improvements.push('첫 과제 시작 시간을 더 고정해 주세요.');
   }
-  if (input.routineBand === '루틴누락') {
-    improvements.push('루틴 기록을 함께 남겨 주세요.');
-  }
   if (input.routineBand === '미입실' || input.routineBand === '퇴실불안정') {
     improvements.push('출결 리듬부터 다시 안정화해 주세요.');
   }
-  if (input.completionBand === '낮음' || input.completionBand === '보통') {
+  if (input.hasPlanRecords && (input.completionBand === '낮음' || input.completionBand === '보통')) {
     improvements.push('과제 수를 줄여 완료율을 올려 주세요.');
   }
   if (input.volatilityBand !== '안정') {
@@ -277,7 +282,7 @@ const OBSERVATION_VARIANTS = [
   (input: DailyReportInput) =>
     `오늘은 ${input.stageFocus}이 먼저 보인 하루였습니다.`,
   (input: DailyReportInput) =>
-    `학습시간 ${formatDailyReportStudyTime(input.totalStudyMinutes)}와 완료율 ${Math.round(input.completionRate)}%에서 ${input.stageFocus}이 드러났습니다.`,
+    `학습시간 ${formatDailyReportStudyTime(input.totalStudyMinutes)}와 계획 기록 ${formatCompletionForReport(input)}에서 ${input.stageFocus}이 드러났습니다.`,
   (input: DailyReportInput) =>
     `평균 대비 ${formatSignedMinutes(input.metrics.deltaMinutesFromAvg)} 변화보다 ${input.stageFocus} 관리가 더 중요했습니다.`,
   (input: DailyReportInput) =>
@@ -385,11 +390,12 @@ function buildFallbackHomeConnection(input: DailyReportInput) {
 }
 
 function buildFallbackTeacherOneLiner(input: DailyReportInput) {
+  const completionLabel = formatCompletionForReport(input);
   const variants = [
-    `${input.studentName} 학생은 오늘 ${formatDailyReportStudyTime(input.totalStudyMinutes)}, 완료율 ${Math.round(input.completionRate)}%, 평균 대비 ${formatSignedMinutes(input.metrics.deltaMinutesFromAvg)} 흐름이었습니다.`,
-    `${input.studentName} 학생은 오늘 ${formatDailyReportStudyTime(input.totalStudyMinutes)} 학습했고 완료율은 ${Math.round(input.completionRate)}%로, 최근 7일 대비 ${formatSignedPercent(input.metrics.growthRate)} 변화였습니다.`,
-    `${input.studentName} 학생은 오늘 ${formatDailyReportStudyTime(input.totalStudyMinutes)}, 완료율 ${Math.round(input.completionRate)}%, 핵심 포인트는 ${input.stageFocus}입니다.`,
-    `${input.studentName} 학생은 오늘 ${formatDailyReportStudyTime(input.totalStudyMinutes)}을 확보했고 평균 대비 ${formatSignedMinutes(input.metrics.deltaMinutesFromAvg)}, 완료율 ${Math.round(input.completionRate)}%를 기록했습니다.`,
+    `${input.studentName} 학생은 오늘 ${formatDailyReportStudyTime(input.totalStudyMinutes)}, 계획 기록 ${completionLabel}, 평균 대비 ${formatSignedMinutes(input.metrics.deltaMinutesFromAvg)} 흐름이었습니다.`,
+    `${input.studentName} 학생은 오늘 ${formatDailyReportStudyTime(input.totalStudyMinutes)} 학습했고 계획 기록은 ${completionLabel}, 최근 7일 대비 ${formatSignedPercent(input.metrics.growthRate)} 변화였습니다.`,
+    `${input.studentName} 학생은 오늘 ${formatDailyReportStudyTime(input.totalStudyMinutes)}, 계획 기록 ${completionLabel}, 핵심 포인트는 ${input.stageFocus}입니다.`,
+    `${input.studentName} 학생은 오늘 ${formatDailyReportStudyTime(input.totalStudyMinutes)}을 확보했고 평균 대비 ${formatSignedMinutes(input.metrics.deltaMinutesFromAvg)}, 계획 기록은 ${completionLabel}입니다.`,
   ];
   const phraseIndexes = resolvePhraseIndexes(input);
   return variants[phraseIndexes.observation];
@@ -398,8 +404,9 @@ function buildFallbackTeacherOneLiner(input: DailyReportInput) {
 function composeReportContent(input: DailyReportInput, draft: DailyReportDraft) {
   const compactCoachingFocus = sanitizeCompactLabel(input.coachingFocus, 46) || input.coachingFocus;
   const teacherReportNote = normalizeTeacherReportNote(input.teacherNote);
+  const completionLabel = formatCompletionForReport(input);
   const numericObservation = [
-    `${input.studentName} 학생은 오늘 ${formatDailyReportStudyTime(input.totalStudyMinutes)}, 완료율 ${Math.round(input.completionRate)}%, 평균 대비 ${formatSignedMinutes(input.metrics.deltaMinutesFromAvg)} 흐름이었습니다.`,
+    `${input.studentName} 학생은 오늘 ${formatDailyReportStudyTime(input.totalStudyMinutes)}, 계획 기록 ${completionLabel}, 평균 대비 ${formatSignedMinutes(input.metrics.deltaMinutesFromAvg)} 흐름이었습니다.`,
     `출결은 ${input.attendanceLabel}입니다.`,
   ]
     .filter(Boolean)
@@ -436,7 +443,7 @@ function buildDeterministicDailyReport(input: DailyReportInput): DailyReportOutp
   ]);
   const teacherOneLiner = ensureCompactSentence(
     buildFallbackTeacherOneLiner(input),
-    `${input.studentName} 학생은 오늘 ${formatDailyReportStudyTime(input.totalStudyMinutes)}, 완료율 ${Math.round(input.completionRate)}%였습니다.`,
+    `${input.studentName} 학생은 오늘 ${formatDailyReportStudyTime(input.totalStudyMinutes)}, 계획 기록 ${formatCompletionForReport(input)}였습니다.`,
     90
   );
 
@@ -484,7 +491,8 @@ const dailyReportPrompt = ai.definePrompt({
 - 학생명: {{{studentName}}}
 - 날짜: {{{date}}}
 - 오늘 총 학습시간: {{{totalStudyMinutes}}}분
-- 계획 완료율: {{{completionRate}}}%
+- 계획 완료율/기록: {{{completionLabel}}}
+- 러닝시스템 계획 기록 여부: {{#if hasPlanRecords}}있음{{else}}없음{{/if}}
 - 최근 7일 평균 학습시간: {{{metrics.avg7StudyMinutes}}}분
 - 최근 7일 평균 대비 증감: {{{metrics.deltaMinutesFromAvg}}}분 / {{{metrics.growthRate}}}%
 - 출결 흐름: {{{attendanceLabel}}}
@@ -528,19 +536,21 @@ const dailyReportPrompt = ai.definePrompt({
 1. 학생을 평가하거나 단정하지 말고, 관찰 가능한 학습행동과 루틴 관점으로 해석하세요.
 2. "공부를 못했다" 같은 표현 대신 자기조절학습, 습관 형성, 집중 리듬, 과제 난이도-성취 균형 관점으로 설명하세요.
 3. observation, interpretation, coaching, homeConnection은 각각 정확히 1문장으로 작성하세요.
-4. teacherOneLiner는 정확히 1문장으로 쓰고, 학습시간/완료율/평균 대비 변화 중 최소 2개의 수치를 포함하세요.
+4. teacherOneLiner는 정확히 1문장으로 쓰고, 학습시간/계획 기록/평균 대비 변화 중 최소 2개 근거를 포함하세요.
 5. strengths와 improvements는 각각 2개 이내의 짧은 항목으로 작성하고, 가능하면 명사구나 짧은 행동 구문으로 마무리하세요.
 6. 문체는 부드럽지만 실무적으로, 과장 칭찬 없이 관찰 -> 해석 -> 행동 흐름을 유지하세요.
 7. 전체 텍스트는 "길게 설명"보다 "짧게 판독"에 가깝게 쓰세요.
 8. 오늘 상태가 좋더라도 매일 같은 표현을 반복하지 말고, 제공된 문체 변주 스타일과 지침을 반영하세요.
 9. avoidExpressions에 담긴 표현과 문장 뼈대는 그대로 재사용하지 마세요.
-10. 루틴누락/지각/미입실/퇴실불안정이면 반드시 생활리듬이나 시작 루틴 관점을 한 번 이상 포함하세요.
+10. 지각/미입실/퇴실불안정이면 반드시 등원·하원 흐름이나 생활리듬 관점을 한 번 이상 포함하세요.
 11. homeConnection은 압박형 지시 대신 질문형, 인정형, 관계형 피드백으로 작성하세요.
 12. 내부 스테이지는 절대 학생/학부모에게 직접 드러내지 말고, 코칭 깊이를 조절하는 참고 정보로만 사용하세요.
 13. 계획 목록이나 생활 루틴에 구체적인 단서가 있으면 observation, coaching, homeConnection 중 최소 한 곳에는 실제 과제/루틴 요소를 한 번 반영하세요.
 14. homeConnection은 학부모가 오늘 바로 써볼 수 있는 자연스러운 말투로 작성하세요.
 15. 선생님 메모가 있으면 리포트 화면에서 원문을 별도 한 줄로 표시합니다. AI 문장에는 원문을 따옴표처럼 그대로 반복하지 말고, 필요한 맥락만 참고하세요.
-16. JSON만 반환하세요.`,
+16. hasPlanRecords가 false이면 숫자 퍼센트나 낮은 완료율이라고 쓰지 말고 반드시 "러닝시스템 계획 기록 X" 또는 "계획 기록 없음"으로 표현하세요.
+17. 일정이 없다는 이유로 누락 평가를 하지 말고, 출결은 등원 정시성, 하원 정시성, 외출 시간 기준으로 설명하세요.
+18. JSON만 반환하세요.`,
   config: {
     temperature: 0.8,
     safetySettings: [

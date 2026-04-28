@@ -3,9 +3,9 @@ import type { AttendanceCurrent } from '@/lib/types';
 
 export type StudyBand = '저학습' | '기준학습' | '고학습' | '고집중';
 export type GrowthBand = '급하락' | '하락' | '유지' | '상승' | '급상승';
-export type CompletionBand = '낮음' | '보통' | '양호' | '높음';
+export type CompletionBand = '기록없음' | '낮음' | '보통' | '양호' | '높음';
 export type VolatilityBand = '안정' | '출렁임' | '불안정';
-export type RoutineBand = '정상' | '지각' | '루틴누락' | '미입실' | '퇴실불안정';
+export type RoutineBand = '정상' | '지각' | '미입실' | '퇴실불안정';
 export type ContinuityBand = '회복중' | '유지중' | '연속호조' | '연속저하';
 export type PedagogyLens = '습관 형성' | '자기조절' | '집중 회복' | '성장 가속';
 export type DailyReportVariationStyle =
@@ -75,9 +75,11 @@ type DeriveDailyReportSignalsInput = {
   dateKey: string;
   totalStudyMinutes: number;
   completionRate: number;
+  hasPlanRecords?: boolean;
   history7Days: Array<{ date: string; minutes: number }>;
   growthRateOverridePercent?: number | null;
   attendanceDisplayStatus?: DisplayAttendanceStatus | 'checked_out' | 'planned' | null;
+  attendanceSummaryLabel?: string | null;
   currentSeatStatus?: AttendanceCurrent['status'];
   isTodayTarget?: boolean;
   hasAttendanceEvidence?: boolean;
@@ -430,7 +432,8 @@ function resolveGrowthBand(growthRate: number): GrowthBand {
   return '급상승';
 }
 
-function resolveCompletionBand(completionRate: number): CompletionBand {
+function resolveCompletionBand(completionRate: number, hasPlanRecords: boolean): CompletionBand {
+  if (!hasPlanRecords) return '기록없음';
   if (completionRate < 60) return '낮음';
   if (completionRate < 75) return '보통';
   if (completionRate < 90) return '양호';
@@ -461,12 +464,6 @@ function resolveRoutineBand(params: {
   const { attendanceDisplayStatus, currentSeatStatus, isTodayTarget, hasAttendanceEvidence } = params;
 
   if (attendanceDisplayStatus === 'confirmed_late') return '지각';
-  if (
-    attendanceDisplayStatus === 'missing_routine' ||
-    attendanceDisplayStatus === 'confirmed_present_missing_routine'
-  ) {
-    return '루틴누락';
-  }
   if (attendanceDisplayStatus === 'confirmed_absent') return '미입실';
   if (isTodayTarget && currentSeatStatus === 'absent' && hasAttendanceEvidence) {
     return '퇴실불안정';
@@ -476,16 +473,18 @@ function resolveRoutineBand(params: {
 
 function resolveAttendanceLabel(params: {
   attendanceDisplayStatus?: DisplayAttendanceStatus | 'checked_out' | 'planned' | null;
+  attendanceSummaryLabel?: string | null;
   currentSeatStatus?: AttendanceCurrent['status'];
   isTodayTarget: boolean;
   hasAttendanceEvidence: boolean;
 }): string {
-  const { attendanceDisplayStatus, currentSeatStatus, isTodayTarget, hasAttendanceEvidence } = params;
+  const { attendanceDisplayStatus, attendanceSummaryLabel, currentSeatStatus, isTodayTarget, hasAttendanceEvidence } = params;
 
+  if (attendanceSummaryLabel?.trim()) return attendanceSummaryLabel.trim();
   if (currentSeatStatus === 'away' || currentSeatStatus === 'break') return '외출 또는 휴식 흐름';
   if (attendanceDisplayStatus === 'confirmed_late') return '지각 후 입실';
-  if (attendanceDisplayStatus === 'missing_routine') return '루틴 기록 누락';
-  if (attendanceDisplayStatus === 'confirmed_present_missing_routine') return '입실은 했지만 루틴 기록 누락';
+  if (attendanceDisplayStatus === 'missing_routine') return '출결 기준 확인 중';
+  if (attendanceDisplayStatus === 'confirmed_present_missing_routine') return '입실 기록 확인';
   if (attendanceDisplayStatus === 'confirmed_absent') return '미입실';
   if (isTodayTarget && currentSeatStatus === 'absent' && hasAttendanceEvidence) {
     return '퇴실 후 흐름 점검 필요';
@@ -539,7 +538,7 @@ function resolvePedagogyLens(params: {
 
   let secondaryLens: PedagogyLens = '자기조절';
   if (pedagogyLens === '습관 형성') {
-    secondaryLens = completionBand === '높음' ? '자기조절' : '집중 회복';
+    secondaryLens = completionBand === '낮음' || completionBand === '보통' ? '집중 회복' : '자기조절';
   } else if (pedagogyLens === '집중 회복') {
     secondaryLens = routineBand !== '정상' ? '습관 형성' : '자기조절';
   } else if (pedagogyLens === '성장 가속') {
@@ -690,9 +689,11 @@ export function deriveDailyReportSignals({
   dateKey,
   totalStudyMinutes,
   completionRate,
+  hasPlanRecords,
   history7Days,
   growthRateOverridePercent,
   attendanceDisplayStatus,
+  attendanceSummaryLabel,
   currentSeatStatus,
   isTodayTarget = false,
   hasAttendanceEvidence = false,
@@ -702,6 +703,8 @@ export function deriveDailyReportSignals({
 }: DeriveDailyReportSignalsInput): DailyReportAiSignals {
   const safeMinutes = clampMinutes(totalStudyMinutes);
   const safeCompletionRate = Math.max(0, Math.min(100, Math.round(completionRate)));
+  const hasLearningPlanRecords = typeof hasPlanRecords === 'boolean' ? hasPlanRecords : safeCompletionRate > 0;
+  const completionRateForStage = hasLearningPlanRecords ? safeCompletionRate : 100;
   const sortedHistory = [...history7Days]
     .map((item) => ({
       date: item.date,
@@ -724,7 +727,7 @@ export function deriveDailyReportSignals({
 
   const studyBand = resolveStudyBand(safeMinutes);
   const growthBand = resolveGrowthBand(growthRate);
-  const completionBand = resolveCompletionBand(safeCompletionRate);
+  const completionBand = resolveCompletionBand(safeCompletionRate, hasLearningPlanRecords);
   const volatilityBand = resolveVolatilityBand(historyMinutes, safeMinutes);
   const routineBand = resolveRoutineBand({
     attendanceDisplayStatus,
@@ -741,7 +744,7 @@ export function deriveDailyReportSignals({
     routineBand,
     continuityBand,
   });
-  const { internalStage, stageProfile } = resolveDailyReportLevel(safeMinutes, safeCompletionRate);
+  const { internalStage, stageProfile } = resolveDailyReportLevel(safeMinutes, completionRateForStage);
 
   const stateBucket = [
     studyBand,
@@ -765,6 +768,7 @@ export function deriveDailyReportSignals({
   return {
     attendanceLabel: resolveAttendanceLabel({
       attendanceDisplayStatus,
+      attendanceSummaryLabel,
       currentSeatStatus,
       isTodayTarget,
       hasAttendanceEvidence,

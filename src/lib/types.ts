@@ -1005,6 +1005,8 @@ export interface DailyReport {
     attendanceLabel?: string;
     totalStudyMinutes?: number;
     completionRate?: number;
+    hasPlanRecords?: boolean;
+    completionLabel?: string;
     history7Days?: Array<{
       date: string;
       minutes: number;
@@ -1019,7 +1021,7 @@ export interface DailyReport {
     homeTip?: string;
     studyBand?: '저학습' | '기준학습' | '고학습' | '고집중';
     growthBand?: '급하락' | '하락' | '유지' | '상승' | '급상승';
-    completionBand?: '낮음' | '보통' | '양호' | '높음';
+    completionBand?: '기록없음' | '낮음' | '보통' | '양호' | '높음';
     routineBand?: '정상' | '지각' | '루틴누락' | '미입실' | '퇴실불안정';
     volatilityBand?: '안정' | '출렁임' | '불안정';
     continuityBand?: '회복중' | '유지중' | '연속호조' | '연속저하';

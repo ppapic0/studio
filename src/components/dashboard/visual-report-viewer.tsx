@@ -47,6 +47,10 @@ function readNumber(value: unknown) {
   return Number.isFinite(parsed) ? parsed : 0;
 }
 
+function readBoolean(value: unknown) {
+  return typeof value === 'boolean' ? value : undefined;
+}
+
 function readStringList(value: unknown) {
   if (!Array.isArray(value)) return [];
   return value
@@ -74,6 +78,9 @@ function normalizeAiMeta(aiMeta?: DailyReport['aiMeta'] | null): DailyReportAiMe
 
   const rawMetrics: Record<string, unknown> = isRecord(aiMeta.metrics) ? aiMeta.metrics : {};
   const rawHistory = Array.isArray(aiMeta.history7Days) ? aiMeta.history7Days : [];
+  const completionRate = readNumber(aiMeta.completionRate);
+  const hasPlanRecords = readBoolean(aiMeta.hasPlanRecords) ?? completionRate > 0;
+  const completionLabel = readString(aiMeta.completionLabel) || (hasPlanRecords ? `${Math.round(completionRate)}%` : '러닝시스템 계획 기록 X');
 
   return {
     teacherOneLiner: readString(aiMeta.teacherOneLiner),
@@ -85,7 +92,9 @@ function normalizeAiMeta(aiMeta?: DailyReport['aiMeta'] | null): DailyReportAiMe
     generationAttempt: readNumber(aiMeta.generationAttempt) || undefined,
     attendanceLabel: readString(aiMeta.attendanceLabel) || undefined,
     totalStudyMinutes: readNumber(aiMeta.totalStudyMinutes),
-    completionRate: readNumber(aiMeta.completionRate),
+    completionRate,
+    hasPlanRecords,
+    completionLabel,
     history7Days: rawHistory
       .map((entry) => {
         if (!isRecord(entry)) return null;
@@ -143,6 +152,24 @@ function formatSignedMinutes(value?: number | null) {
   return `${safe >= 0 ? '+' : ''}${safe}분`;
 }
 
+function hasPlanRecord(aiMeta: DailyReportAiMeta) {
+  return aiMeta.hasPlanRecords ?? Math.round(aiMeta.completionRate || 0) > 0;
+}
+
+function getCompletionLabel(aiMeta: DailyReportAiMeta, compact = false) {
+  if (!hasPlanRecord(aiMeta)) return compact ? '계획 기록 X' : '러닝시스템 계획 기록 X';
+  return aiMeta.completionLabel?.trim() || `${Math.round(aiMeta.completionRate || 0)}%`;
+}
+
+function getCompletionDetail(aiMeta: DailyReportAiMeta) {
+  if (!hasPlanRecord(aiMeta)) return '계획 기록 없음';
+  return aiMeta.completionBand || '실행 밀도';
+}
+
+function getRoutineDisplayLabel(routineBand?: DailyReportAiMeta['routineBand']) {
+  return routineBand === '루틴누락' ? '출결 확인' : routineBand;
+}
+
 function formatTrendDateLabel(date: string, isToday: boolean) {
   if (isToday) return '오늘';
 
@@ -193,13 +220,13 @@ function toSummaryTone(aiMeta?: DailyReportAiMeta | null) {
   if (aiMeta.growthBand === '급상승' || aiMeta.growthBand === '상승') {
     return aiMeta.routineBand === '정상'
       ? '좋은 흐름이 안정적으로 이어지고 있습니다.'
-      : '학습량은 좋지만 생활 루틴 보정이 같이 필요합니다.';
+      : '학습량은 좋지만 출결 흐름 점검이 같이 필요합니다.';
   }
   if (aiMeta.growthBand === '급하락' || aiMeta.growthBand === '하락') {
     return '회복형 코칭이 필요한 구간입니다.';
   }
   if (aiMeta.routineBand && aiMeta.routineBand !== '정상') {
-    return '학습량보다 먼저 리듬을 바로잡는 것이 중요합니다.';
+    return '학습량과 함께 등원·하원 흐름을 확인하는 것이 중요합니다.';
   }
   return '안정적인 흐름을 조금 더 끌어올릴 수 있는 상태입니다.';
 }
@@ -326,7 +353,7 @@ function buildOverallSummary({
 function buildInterpretationCopy(aiMeta: DailyReportAiMeta) {
   const bandSummary = [
     aiMeta.growthBand ? `흐름 ${aiMeta.growthBand}` : null,
-    aiMeta.completionBand ? `실행 ${aiMeta.completionBand}` : null,
+    aiMeta.completionBand ? `실행 ${getCompletionDetail(aiMeta)}` : null,
   ]
     .map((item) => item?.trim())
     .filter((item): item is string => Boolean(item))
@@ -336,7 +363,7 @@ function buildInterpretationCopy(aiMeta: DailyReportAiMeta) {
     toCompactCopy(aiMeta.metrics?.trendSummary, 84),
     bandSummary || null,
     aiMeta.routineBand && aiMeta.routineBand !== '정상'
-      ? `루틴 ${aiMeta.routineBand}`
+      ? `출결 ${getRoutineDisplayLabel(aiMeta.routineBand)}`
       : aiMeta.attendanceLabel || null,
   ]
     .map((item) => item?.trim())
@@ -349,7 +376,7 @@ function buildFamilyQuestion(aiMeta: DailyReportAiMeta, studentName?: string) {
   const subject = studentName ? `${studentName} 학생에게` : '학생에게';
 
   if (aiMeta.routineBand && aiMeta.routineBand !== '정상') {
-    return `${subject} 내일 시작을 더 편하게 만들려면 무엇이 필요할지 가볍게 물어봐 주세요.`;
+    return `${subject} 내일 등원·하원 흐름을 더 편하게 만들려면 무엇이 필요할지 가볍게 물어봐 주세요.`;
   }
 
   if (aiMeta.coachingFocus) {
@@ -365,8 +392,8 @@ function buildCompactInsightCopy(aiMeta: DailyReportAiMeta) {
 
   const parts = [
     aiMeta.growthBand ? `성장 ${aiMeta.growthBand}` : null,
-    aiMeta.completionBand ? `실행 ${aiMeta.completionBand}` : null,
-    aiMeta.routineBand ? `루틴 ${aiMeta.routineBand}` : null,
+    aiMeta.completionBand ? `실행 ${getCompletionDetail(aiMeta)}` : null,
+    aiMeta.routineBand ? `출결 ${getRoutineDisplayLabel(aiMeta.routineBand)}` : null,
   ]
     .map((item) => item?.trim())
     .filter((item): item is string => Boolean(item));
@@ -395,8 +422,8 @@ function SummaryHeroMetrics({
     },
     {
       label: compactMode ? '완료' : '계획 완료',
-      value: `${Math.round(aiMeta.completionRate || 0)}%`,
-      detail: aiMeta.completionBand || '실행 밀도',
+      value: getCompletionLabel(aiMeta, compactMode),
+      detail: getCompletionDetail(aiMeta),
     },
     {
       label: compactMode ? '평균대비' : '평균 대비',
@@ -457,7 +484,7 @@ function ReportInsightBoard({
     const strengthLead = buildCompactSignalCopy(aiMeta.strengths?.[0], aiMeta.growthBand ? `${aiMeta.growthBand} 흐름 유지` : '오늘 강점을 유지해 주세요.');
     const improvementLead = buildCompactSignalCopy(
       aiMeta.improvements?.[0],
-      aiMeta.coachingFocus || (aiMeta.routineBand ? `${aiMeta.routineBand} 루틴 보정` : '먼저 루틴을 가볍게 보정해 주세요.')
+      aiMeta.coachingFocus || (aiMeta.routineBand ? `${getRoutineDisplayLabel(aiMeta.routineBand)} 출결 흐름 점검` : '먼저 등원·하원 흐름을 가볍게 확인해 주세요.')
     );
 
     return (
@@ -482,7 +509,7 @@ function ReportInsightBoard({
         <div className="mt-4 grid gap-3 sm:grid-cols-2">
           <div className="rounded-2xl border border-slate-100 bg-slate-50/80 px-4 py-3">
             <p className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">출결</p>
-            <p className="mt-2 text-sm font-black text-slate-900">{aiMeta.routineBand || '확인 중'}</p>
+            <p className="mt-2 text-sm font-black text-slate-900">{getRoutineDisplayLabel(aiMeta.routineBand) || '확인 중'}</p>
             <p className="mt-1 text-xs font-bold leading-relaxed text-slate-600 break-keep">
               {aiMeta.attendanceLabel || '오늘 출결 흐름 기준으로 분석했습니다.'}
             </p>
@@ -496,9 +523,9 @@ function ReportInsightBoard({
           </div>
           <div className="rounded-2xl border border-slate-100 bg-slate-50/80 px-4 py-3 sm:col-span-2">
             <p className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">실행</p>
-            <p className="mt-2 text-sm font-black text-slate-900">{Math.round(aiMeta.completionRate || 0)}%</p>
+            <p className="mt-2 text-sm font-black text-slate-900">{getCompletionLabel(aiMeta)}</p>
             <p className="mt-1 text-xs font-bold leading-relaxed text-slate-600 break-keep">
-              {aiMeta.completionBand || '실행 밀도'}
+              {getCompletionDetail(aiMeta)}
             </p>
           </div>
         </div>
@@ -550,9 +577,9 @@ function ReportInsightBoard({
       </div>
 
       <div className="mt-4 grid gap-3 sm:grid-cols-2">
-        <div className="rounded-2xl border border-slate-100 bg-slate-50/80 px-4 py-3">
-          <p className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">출결 리듬</p>
-          <p className="mt-2 text-sm font-black text-slate-900">{aiMeta.routineBand || '확인 중'}</p>
+          <div className="rounded-2xl border border-slate-100 bg-slate-50/80 px-4 py-3">
+            <p className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">출결 리듬</p>
+            <p className="mt-2 text-sm font-black text-slate-900">{getRoutineDisplayLabel(aiMeta.routineBand) || '확인 중'}</p>
           <p className={cn('mt-1 text-xs font-bold leading-relaxed text-slate-600 break-keep', compactMode && 'whitespace-normal')}>
             {aiMeta.attendanceLabel || '오늘 출결 흐름 기준으로 분석했습니다.'}
           </p>
@@ -860,9 +887,9 @@ function SignalRadarCard({
 
   const series = [
     { label: '학습', value: toStudyScore(aiMeta.totalStudyMinutes, aiMeta.metrics?.avg7StudyMinutes), angle: -90 },
-    { label: '완료', value: Math.max(10, Math.min(100, Math.round(aiMeta.completionRate || 0))), angle: 0 },
+    { label: '계획', value: hasPlanRecord(aiMeta) ? Math.max(10, Math.min(100, Math.round(aiMeta.completionRate || 0))) : 55, angle: 0 },
     { label: '성장', value: toGrowthScore(aiMeta.metrics?.growthRate), angle: 90 },
-    { label: '루틴', value: toRoutineScore(aiMeta.routineBand), angle: 180 },
+    { label: '출결', value: toRoutineScore(aiMeta.routineBand), angle: 180 },
   ];
   const center = 72;
   const radius = 54;
@@ -876,7 +903,7 @@ function SignalRadarCard({
       <div className="flex items-center justify-between gap-3">
         <div>
           <p className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">핵심 상태 그래프</p>
-          <p className={cn('mt-1 text-sm font-black tracking-tight text-slate-900', displayHeadingsOnly && 'font-aggro-display')}>학습 · 완료 · 성장 · 루틴</p>
+          <p className={cn('mt-1 text-sm font-black tracking-tight text-slate-900', displayHeadingsOnly && 'font-aggro-display')}>학습 · 계획 · 성장 · 출결</p>
         </div>
         <Badge className="border-none bg-indigo-50 text-indigo-700 font-black">
           {aiMeta.pedagogyLens || '학습 해석'}
@@ -936,7 +963,8 @@ function KpiGraphGrid({
 }) {
   if (!aiMeta) return null;
 
-  const completionWidth = Math.max(6, Math.min(100, Math.round(aiMeta.completionRate || 0)));
+  const hasCompletionRecord = hasPlanRecord(aiMeta);
+  const completionWidth = hasCompletionRecord ? Math.max(6, Math.min(100, Math.round(aiMeta.completionRate || 0))) : 0;
   const todayMinutes = Math.max(0, Math.round(aiMeta.totalStudyMinutes || 0));
   const avgMinutes = Math.max(1, Math.round(aiMeta.metrics?.avg7StudyMinutes || 0));
   const studyRatio = Math.max(8, Math.min(100, Math.round((todayMinutes / Math.max(todayMinutes, avgMinutes)) * 100)));
@@ -955,7 +983,7 @@ function KpiGraphGrid({
           )}
           {aiMeta.routineBand && (
             <Badge className={cn('font-black border', getRoutineTone(aiMeta.routineBand))}>
-              {aiMeta.routineBand}
+              {getRoutineDisplayLabel(aiMeta.routineBand)}
             </Badge>
           )}
         </div>
@@ -993,7 +1021,7 @@ function KpiGraphGrid({
 
       <div className="rounded-[1.5rem] border border-slate-100 bg-white p-4 shadow-sm">
         <div className="flex items-center justify-between">
-          <p className={cn('text-[10px] font-black uppercase tracking-[0.2em] text-slate-400', displayHeadingsOnly && 'font-aggro-display')}>완료율 · 성장률</p>
+          <p className={cn('text-[10px] font-black uppercase tracking-[0.2em] text-slate-400', displayHeadingsOnly && 'font-aggro-display')}>계획 기록 · 성장률</p>
           <span className={cn('text-xs font-black', growthPositive ? 'text-emerald-600' : 'text-rose-600')}>
             {formatSignedPercent(aiMeta.metrics?.growthRate)}
           </span>
@@ -1001,17 +1029,21 @@ function KpiGraphGrid({
         <div className="mt-4">
           <div className="mb-1 flex items-center justify-between text-xs font-bold text-slate-600">
             <span>계획 완료율</span>
-            <span>{Math.round(aiMeta.completionRate || 0)}%</span>
+            <span>{getCompletionLabel(aiMeta)}</span>
           </div>
-          <div className="h-3 rounded-full bg-slate-100">
-            <div
-              className={cn(
-                'h-3 rounded-full',
-                completionWidth >= 80 ? 'bg-emerald-500' : completionWidth >= 60 ? 'bg-amber-500' : 'bg-rose-500'
-              )}
-              style={{ width: `${completionWidth}%` }}
-            />
-          </div>
+          {hasCompletionRecord ? (
+            <div className="h-3 rounded-full bg-slate-100">
+              <div
+                className={cn(
+                  'h-3 rounded-full',
+                  completionWidth >= 80 ? 'bg-emerald-500' : completionWidth >= 60 ? 'bg-amber-500' : 'bg-rose-500'
+                )}
+                style={{ width: `${completionWidth}%` }}
+              />
+            </div>
+          ) : (
+            <div className="h-3 rounded-full border border-dashed border-slate-200 bg-slate-50" />
+          )}
           <p className={cn('mt-3 text-xs font-bold leading-relaxed text-slate-600 break-keep', compactMode && 'whitespace-normal')}>
             {aiMeta.metrics?.trendSummary || '최근 흐름 요약이 없습니다.'}
           </p>
@@ -1186,8 +1218,8 @@ export function VisualReportViewer({
               <div className="mt-4 flex flex-wrap gap-2">
                 {[
                   normalizedAiMeta.growthBand ? `성장 ${normalizedAiMeta.growthBand}` : null,
-                  normalizedAiMeta.completionBand ? `완료 ${normalizedAiMeta.completionBand}` : null,
-                  normalizedAiMeta.routineBand ? `루틴 ${normalizedAiMeta.routineBand}` : null,
+                  normalizedAiMeta.completionBand ? `계획 ${getCompletionDetail(normalizedAiMeta)}` : null,
+                  normalizedAiMeta.routineBand ? `출결 ${getRoutineDisplayLabel(normalizedAiMeta.routineBand)}` : null,
                 ]
                   .filter(Boolean)
                   .map((item) => (

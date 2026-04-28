@@ -64,6 +64,15 @@ type DailyStudentStatDoc = {
   studyTimeGrowthRate?: number;
 };
 
+type AttendanceDailyStatDoc = {
+  checkInAt?: unknown;
+  checkOutAt?: unknown;
+  awayMinutes?: number;
+  lateMinutes?: number | null;
+  expectedArrivalTime?: string | null;
+  plannedDepartureTime?: string | null;
+};
+
 type AttendanceRecordDoc = {
   status?: 'requested' | 'confirmed_present' | 'confirmed_late' | 'confirmed_absent' | 'excused_absent';
   statusSource?: 'auto' | 'manual' | string;
@@ -101,6 +110,72 @@ function getReportContentHighlights(content?: string | null) {
     .filter(Boolean)
     .filter((line) => !REPORT_SECTION_HEADINGS.has(line))
     .slice(0, 3);
+}
+
+function formatReportClock(value?: Date | null) {
+  return value ? format(value, 'HH:mm') : '기록 없음';
+}
+
+function parseClockMinutes(value?: string | null) {
+  const match = value?.trim().match(/^(\d{1,2}):(\d{2})$/u);
+  if (!match) return null;
+  const hour = Number(match[1]);
+  const minute = Number(match[2]);
+  if (!Number.isFinite(hour) || !Number.isFinite(minute) || hour < 0 || hour > 23 || minute < 0 || minute > 59) {
+    return null;
+  }
+  return hour * 60 + minute;
+}
+
+function getDateClockMinutes(value?: Date | null) {
+  if (!value) return null;
+  return value.getHours() * 60 + value.getMinutes();
+}
+
+function formatTimingStatus(params: {
+  actualAt?: Date | null;
+  plannedTime?: string | null;
+  direction: 'arrival' | 'departure';
+}) {
+  const plannedMinutes = parseClockMinutes(params.plannedTime);
+  const actualMinutes = getDateClockMinutes(params.actualAt);
+  if (plannedMinutes === null || actualMinutes === null) return '';
+
+  const diff = actualMinutes - plannedMinutes;
+  if (Math.abs(diff) <= 5) return '제시간';
+  if (params.direction === 'arrival') {
+    return diff > 0 ? `${diff}분 늦음` : `${Math.abs(diff)}분 빠름`;
+  }
+  return diff > 0 ? `${diff}분 늦게 하원` : `${Math.abs(diff)}분 일찍 하원`;
+}
+
+function buildDailyReportAttendanceSummary(params: {
+  checkInAt?: Date | null;
+  checkOutAt?: Date | null;
+  awayMinutes?: number | null;
+  expectedArrivalTime?: string | null;
+  plannedDepartureTime?: string | null;
+}) {
+  const awayMinutes = Math.max(0, Math.round(Number(params.awayMinutes || 0)));
+  const arrivalStatus = formatTimingStatus({
+    actualAt: params.checkInAt,
+    plannedTime: params.expectedArrivalTime,
+    direction: 'arrival',
+  });
+  const departureStatus = formatTimingStatus({
+    actualAt: params.checkOutAt,
+    plannedTime: params.plannedDepartureTime,
+    direction: 'departure',
+  });
+
+  const arrivalLabel = arrivalStatus
+    ? `등원 ${formatReportClock(params.checkInAt)}(${arrivalStatus})`
+    : `등원 ${formatReportClock(params.checkInAt)}`;
+  const departureLabel = departureStatus
+    ? `하원 ${formatReportClock(params.checkOutAt)}(${departureStatus})`
+    : `하원 ${formatReportClock(params.checkOutAt)}`;
+
+  return `${arrivalLabel} · ${departureLabel} · 외출 ${awayMinutes}분`;
 }
 
 function buildRecentReportAvoidExpressions(params: {
@@ -369,6 +444,7 @@ export default function DailyReportsPage() {
       const logRef = doc(firestore, 'centers', centerId, 'studyLogs', selectedStudent.id, 'days', dateKey);
       const lastLogsRef = collection(firestore, 'centers', centerId, 'studyLogs', selectedStudent.id, 'days');
       const dailyStatRef = doc(firestore, 'centers', centerId, 'dailyStudentStats', dateKey, 'students', selectedStudent.id);
+      const attendanceDailyStatRef = doc(firestore, 'centers', centerId, 'attendanceDailyStats', dateKey, 'students', selectedStudent.id);
       const attendanceRecordRef = doc(firestore, 'centers', centerId, 'attendanceRecords', dateKey, 'students', selectedStudent.id);
       const liveSeatQuery = query(
         collection(firestore, 'centers', centerId, 'attendanceCurrent'),
@@ -386,6 +462,7 @@ export default function DailyReportsPage() {
         logSnap,
         historySnap,
         dailyStatSnap,
+        attendanceDailyStatSnap,
         attendanceRecordSnap,
         liveSeatSnap,
         recentReportsSnap,
@@ -394,6 +471,7 @@ export default function DailyReportsPage() {
         getDoc(logRef),
         getDocs(query(lastLogsRef, orderBy('dateKey', 'desc'), limit(14))),
         getDoc(dailyStatRef),
+        getDoc(attendanceDailyStatRef),
         getDoc(attendanceRecordRef),
         isTodayTarget ? getDocs(liveSeatQuery) : Promise.resolve(null),
         getDocs(recentReportsQuery),
@@ -402,6 +480,7 @@ export default function DailyReportsPage() {
       const plans = plansSnap.docs.map(d => d.data() as StudyPlanItem);
       const todayLog = logSnap.exists() ? (logSnap.data() as StudyLogDayDoc) : null;
       const dailyStat = dailyStatSnap.exists() ? (dailyStatSnap.data() as DailyStudentStatDoc) : null;
+      const attendanceDailyStat = attendanceDailyStatSnap.exists() ? (attendanceDailyStatSnap.data() as AttendanceDailyStatDoc) : null;
       const attendanceRecord = attendanceRecordSnap.exists() ? (attendanceRecordSnap.data() as AttendanceRecordDoc) : null;
       const liveSeatDoc = liveSeatSnap?.docs?.[0];
       const liveSeat = liveSeatDoc
@@ -420,17 +499,30 @@ export default function DailyReportsPage() {
       const completionFromPlans = studyTasks.length > 0
         ? Math.round((studyTasks.filter(t => t.done).length / studyTasks.length) * 100)
         : 0;
-      const completionRate = typeof dailyStat?.todayPlanCompletionRate === 'number'
+      const hasPlanRecords =
+        studyTasks.length > 0 ||
+        (typeof dailyStat?.todayPlanCompletionRate === 'number' && dailyStat.todayPlanCompletionRate > 0);
+      const completionRate = hasPlanRecords && typeof dailyStat?.todayPlanCompletionRate === 'number'
         ? Math.round(dailyStat.todayPlanCompletionRate)
         : completionFromPlans;
+      const completionLabel = hasPlanRecords ? `${completionRate}%` : '러닝시스템 계획 기록 X';
       const scheduleItems = plans.filter(p => p.category === 'schedule');
       const routineInfo = buildAttendanceRoutineInfo(scheduleItems.map((item) => item.title));
 
+      const attendanceStatCheckInAt = toDateSafe(attendanceDailyStat?.checkInAt);
+      const attendanceStatCheckOutAt = toDateSafe(attendanceDailyStat?.checkOutAt);
       const recordCheckedAt = toDateSafe(attendanceRecord?.checkInAt || attendanceRecord?.updatedAt);
       const liveCheckedAt = toDateSafe(liveSeat?.lastCheckInAt || liveSeat?.updatedAt);
       const studyCheckedAt = toDateSafe(todayLog?.updatedAt || todayLog?.createdAt);
       const studyMinutes = getEffectiveStudyLogMinutes(todayLog);
-      const hasAttendanceEvidence = Boolean(recordCheckedAt || liveCheckedAt || studyCheckedAt || studyMinutes > 0);
+      const hasAttendanceEvidence = Boolean(attendanceStatCheckInAt || attendanceStatCheckOutAt || recordCheckedAt || liveCheckedAt || studyCheckedAt || studyMinutes > 0);
+      const attendanceSummaryLabel = buildDailyReportAttendanceSummary({
+        checkInAt: attendanceStatCheckInAt || recordCheckedAt || liveCheckedAt || studyCheckedAt,
+        checkOutAt: attendanceStatCheckOutAt,
+        awayMinutes: attendanceDailyStat?.awayMinutes,
+        expectedArrivalTime: attendanceDailyStat?.expectedArrivalTime || routineInfo.expectedArrivalTime,
+        plannedDepartureTime: attendanceDailyStat?.plannedDepartureTime || routineInfo.plannedDepartureTime,
+      });
       const attendanceState = deriveAttendanceDisplayState({
         selectedDate: targetDate,
         dateKey,
@@ -476,12 +568,14 @@ export default function DailyReportsPage() {
         dateKey,
         totalStudyMinutes: studyMinutes,
         completionRate,
+        hasPlanRecords,
         history7Days,
         growthRateOverridePercent:
           typeof dailyStat?.studyTimeGrowthRate === 'number'
             ? dailyStat.studyTimeGrowthRate * 100
             : null,
         attendanceDisplayStatus: attendanceState.status,
+        attendanceSummaryLabel,
         currentSeatStatus: liveSeat?.status,
         isTodayTarget,
         hasAttendanceEvidence,
@@ -501,6 +595,8 @@ export default function DailyReportsPage() {
         date: dateKey,
         totalStudyMinutes: studyMinutes,
         completionRate,
+        hasPlanRecords,
+        completionLabel,
         plans: studyTasks.map(p => ({ title: p.title, done: p.done })),
         schedule: scheduleItems.map(p => {
             const parts = p.title.split(': ');
@@ -545,6 +641,8 @@ export default function DailyReportsPage() {
         attendanceLabel: signals.attendanceLabel,
         totalStudyMinutes: studyMinutes,
         completionRate,
+        hasPlanRecords,
+        completionLabel,
         history7Days,
         pedagogyLens: result.pedagogyLens,
         secondaryLens: result.secondaryLens,
