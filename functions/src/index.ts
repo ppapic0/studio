@@ -6512,9 +6512,10 @@ export const registerStudent = functions.region(region).https.onCall(async (data
   const db = admin.firestore();
   const auth = admin.auth();
   const { email, password, displayName, schoolName, grade, centerId, phoneNumber } = data;
+  const normalizedEmail = asTrimmedString(email).toLowerCase();
 
   if (!context.auth) throw new functions.https.HttpsError("unauthenticated", "인증 필요");
-  if (!email || !password || !displayName || !centerId) {
+  if (!normalizedEmail || !password || !displayName || !centerId) {
     throw new functions.https.HttpsError("invalid-argument", "필수값 누락");
   }
   const normalizedPhoneNumber = normalizePhoneNumber(phoneNumber);
@@ -6530,16 +6531,16 @@ export const registerStudent = functions.region(region).https.onCall(async (data
   }
 
   try {
-    const userRecord = await auth.createUser({ email, password, displayName });
+    const userRecord = await auth.createUser({ email: normalizedEmail, password, displayName });
     const uid = userRecord.uid;
     const timestamp = admin.firestore.Timestamp.now();
 
     await db.runTransaction(async (t) => {
       const phonePayload = normalizedPhoneNumber ? { phoneNumber: normalizedPhoneNumber } : {};
-      t.set(db.doc(`users/${uid}`), { id: uid, email, displayName, schoolName, ...phonePayload, createdAt: timestamp, updatedAt: timestamp });
-      t.set(db.doc(`centers/${centerId}/members/${uid}`), { id: uid, centerId, role: "student", status: "active", joinedAt: timestamp, displayName, ...phonePayload });
+      t.set(db.doc(`users/${uid}`), { id: uid, email: normalizedEmail, displayName, schoolName, ...phonePayload, createdAt: timestamp, updatedAt: timestamp });
+      t.set(db.doc(`centers/${centerId}/members/${uid}`), { id: uid, centerId, role: "student", status: "active", joinedAt: timestamp, displayName, email: normalizedEmail, ...phonePayload });
       t.set(db.doc(`userCenters/${uid}/centers/${centerId}`), { id: centerId, centerId, role: "student", status: "active", joinedAt: timestamp, ...phonePayload });
-      t.set(db.doc(`centers/${centerId}/students/${uid}`), { id: uid, name: displayName, schoolName, grade, phoneNumber: normalizedPhoneNumber || null, createdAt: timestamp, updatedAt: timestamp });
+      t.set(db.doc(`centers/${centerId}/students/${uid}`), { id: uid, name: displayName, email: normalizedEmail, schoolName, grade, phoneNumber: normalizedPhoneNumber || null, createdAt: timestamp, updatedAt: timestamp });
       t.set(db.doc(`centers/${centerId}/growthProgress/${uid}`), {
         seasonLp: 0,
         penaltyPoints: 0,
@@ -6557,6 +6558,111 @@ export const registerStudent = functions.region(region).https.onCall(async (data
       userMessage: toSafeUserMessage(e, "학생 계정 생성 중 오류가 발생했습니다. 잠시 후 다시 시도해 주세요."),
     });
   }
+});
+
+async function resolveStudentEmailFromAuthOrUserDoc(params: {
+  auth: admin.auth.Auth;
+  db: admin.firestore.Firestore;
+  uid: string;
+}): Promise<string | null> {
+  const { auth, db, uid } = params;
+
+  try {
+    const authUser = await auth.getUser(uid);
+    const authEmail = asTrimmedString(authUser.email).toLowerCase();
+    if (authEmail) return authEmail;
+  } catch (error: any) {
+    const authCode = getAuthErrorCode(error);
+    if (!authCode.includes("user-not-found")) {
+      console.warn("[syncStudentEmailsForCenter] auth lookup skipped", {
+        uid,
+        code: authCode || null,
+        message: error?.message || error,
+      });
+    }
+  }
+
+  const userSnap = await db.doc(`users/${uid}`).get();
+  const userEmail = asTrimmedString(userSnap.data()?.email).toLowerCase();
+  return userEmail || null;
+}
+
+export const syncStudentEmailsForCenter = functions.region(region).runWith({
+  timeoutSeconds: 540,
+  memory: "1GB",
+}).https.onCall(async (data, context) => {
+  const db = admin.firestore();
+  const auth = admin.auth();
+  const centerId = asTrimmedString(data?.centerId);
+
+  if (!context.auth) {
+    throw new functions.https.HttpsError("unauthenticated", "인증 필요");
+  }
+  if (!centerId) {
+    throw new functions.https.HttpsError("invalid-argument", "센터 정보가 필요합니다.");
+  }
+
+  const callerMembership = await resolveCenterMembershipRole(db, centerId, context.auth.uid);
+  if (
+    !callerMembership.role ||
+    !isAdminRole(callerMembership.role) ||
+    !isActiveMembershipStatus(callerMembership.status)
+  ) {
+    throw new functions.https.HttpsError("permission-denied", "센터 관리자만 학생 이메일을 동기화할 수 있습니다.");
+  }
+
+  const membersSnap = await db.collection(`centers/${centerId}/members`).where("role", "==", "student").get();
+  const timestamp = admin.firestore.Timestamp.now();
+  let batch = db.batch();
+  let batchOps = 0;
+  let checkedCount = 0;
+  let syncedCount = 0;
+  let missingCount = 0;
+
+  const commitBatchIfNeeded = async (force = false) => {
+    if (batchOps === 0) return;
+    if (!force && batchOps < 440) return;
+    await batch.commit();
+    batch = db.batch();
+    batchOps = 0;
+  };
+
+  for (const memberDoc of membersSnap.docs) {
+    const memberData = memberDoc.data() as Record<string, unknown>;
+    const studentId = asTrimmedString(memberData.id) || memberDoc.id;
+    if (!studentId) {
+      missingCount += 1;
+      continue;
+    }
+
+    checkedCount += 1;
+    const resolvedEmail = await resolveStudentEmailFromAuthOrUserDoc({ auth, db, uid: studentId });
+    if (!resolvedEmail) {
+      missingCount += 1;
+      continue;
+    }
+
+    const syncPayload = {
+      email: resolvedEmail,
+      emailSyncedAt: timestamp,
+      updatedAt: timestamp,
+    };
+
+    batch.set(memberDoc.ref, syncPayload, { merge: true });
+    batch.set(db.doc(`centers/${centerId}/students/${studentId}`), syncPayload, { merge: true });
+    batchOps += 2;
+    syncedCount += 1;
+    await commitBatchIfNeeded();
+  }
+
+  await commitBatchIfNeeded(true);
+
+  return {
+    ok: true,
+    checkedCount,
+    syncedCount,
+    missingCount,
+  };
 });
 
 export const createCounselingDemoBundle = functions.region(region).https.onCall(async (data, context) => {

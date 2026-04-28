@@ -90,6 +90,7 @@ export interface CenterMembership {
   status: 'active' | 'onHold' | 'withdrawn' | 'pending';
   joinedAt: Timestamp;
   displayName?: string;
+  email?: string | null;
   className?: string;
   phoneNumber?: string;
   isCounselingDemo?: boolean;
@@ -217,6 +218,7 @@ export interface KpiDaily {
 export interface StudentProfile {
   id: string;
   name: string;
+  email?: string | null;
   grade: string;
   schoolName: string;
   phoneNumber?: string | null;

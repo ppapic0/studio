@@ -2,7 +2,7 @@
 'use client';
 
 import Link from 'next/link';
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo, useEffect, useRef } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -27,6 +27,7 @@ import {
   AlertTriangle,
   Megaphone,
   TrendingUp,
+  Mail,
 } from 'lucide-react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { StudentProfile, AttendanceCurrent, CenterMembership } from '@/lib/types';
@@ -148,6 +149,21 @@ type CounselingDemoSeedResult = {
 type StudentAccountStatus = Extract<CenterMembership['status'], 'active' | 'onHold' | 'withdrawn'>;
 type StudentQuickAction = 'attendance' | 'counseling' | 'sms' | 'account';
 
+type SyncStudentEmailsResult = {
+  ok: boolean;
+  checkedCount?: number;
+  syncedCount: number;
+  missingCount: number;
+};
+
+function normalizeStudentEmail(value: unknown): string {
+  return typeof value === 'string' ? value.trim() : '';
+}
+
+function resolveStudentEmail(member?: Partial<CenterMembership> | null, profile?: Partial<StudentProfile> | null): string {
+  return normalizeStudentEmail(profile?.email) || normalizeStudentEmail(member?.email);
+}
+
 const STUDENT_ACCOUNT_STATUS_OPTIONS: Array<{
   value: StudentAccountStatus;
   label: string;
@@ -203,6 +219,7 @@ export default function StudentListPage() {
   const [counselingActionSaving, setCounselingActionSaving] = useState(false);
   const [manualSmsSending, setManualSmsSending] = useState(false);
   const [accountStatusSaving, setAccountStatusSaving] = useState<StudentAccountStatus | null>(null);
+  const emailSyncAttemptedCenterRef = useRef<string | null>(null);
   const [counselingType, setCounselingType] = useState<'academic' | 'life' | 'career'>('academic');
   const [counselingContent, setCounselingContent] = useState('');
   const [counselingImprovement, setCounselingImprovement] = useState('');
@@ -266,6 +283,26 @@ export default function StudentListPage() {
   
   const { data: attendanceList } = useCollection<AttendanceCurrent>(attendanceQuery, { enabled: isTeacherOrAdmin });
 
+  useEffect(() => {
+    if (!functions || !centerId || !canManageStudentAccounts) return;
+    if (emailSyncAttemptedCenterRef.current === centerId) return;
+
+    emailSyncAttemptedCenterRef.current = centerId;
+    const syncStudentEmailsForCenter = httpsCallable<{ centerId: string }, SyncStudentEmailsResult>(
+      functions,
+      'syncStudentEmailsForCenter',
+      { timeout: 600000 }
+    );
+
+    syncStudentEmailsForCenter({ centerId }).catch((error: any) => {
+      toast({
+        variant: 'destructive',
+        title: '학생 이메일 동기화 실패',
+        description: resolveCallableErrorMessage(error, '일부 학생 이메일이 미등록으로 보일 수 있습니다.'),
+      });
+    });
+  }, [functions, centerId, canManageStudentAccounts, toast]);
+
   const availableClasses = useMemo(() => {
     const classes = Array.from(
       new Set(
@@ -303,16 +340,18 @@ export default function StudentListPage() {
         // 검색어 필터링
         const seatLabel = formatSeatLabel(profile);
         const seatIdentity = resolveSeatIdentity(profile || {});
+        const studentEmail = canManageStudentAccounts ? resolveStudentEmail(member, profile).toLowerCase() : '';
         return (
           member.displayName?.toLowerCase().includes(search) || 
           profile?.schoolName?.toLowerCase().includes(search) ||
+          studentEmail.includes(search) ||
           seatLabel.toLowerCase().includes(search) ||
           profile?.seatNo?.toString().includes(search) ||
           (seatIdentity.roomSeatNo > 0 && seatIdentity.roomSeatNo.toString().includes(search))
         );
       })
       .sort((a, b) => (a.displayName || '').localeCompare(b.displayName || ''));
-  }, [studentMembers, studentsProfiles, attendanceList, searchTerm, statusTab, classFilter, liveStatusFilter]);
+  }, [studentMembers, studentsProfiles, attendanceList, searchTerm, statusTab, classFilter, liveStatusFilter, canManageStudentAccounts]);
 
   const selectedStudentPreview = useMemo(() => {
     if (!selectedStudentId) return null;
@@ -345,10 +384,11 @@ export default function StudentListPage() {
       seatIdentity,
       seatDocId: attendance?.id || profile?.seatId || null,
       seatLabel,
+      email: canManageStudentAccounts ? resolveStudentEmail(member, profile) : '',
       attendanceLabel,
       attendanceTone,
     };
-  }, [selectedStudentId, studentMembers, studentsProfiles, attendanceList]);
+  }, [selectedStudentId, studentMembers, studentsProfiles, attendanceList, canManageStudentAccounts]);
 
   useEffect(() => {
     if (!selectedStudentPreview) return;
@@ -1020,7 +1060,7 @@ export default function StudentListPage() {
         description="같은 필터와 같은 빠른 실행으로 학생 관리, 상담, 문자, 출결 흐름을 빠르게 묶고 바로 학생 360으로 이어집니다."
         searchValue={searchTerm}
         onSearchChange={setSearchTerm}
-        searchPlaceholder="이름, 학교 또는 좌석 번호 검색"
+        searchPlaceholder={canManageStudentAccounts ? '이름, 이메일, 학교 또는 좌석 번호 검색' : '이름, 학교 또는 좌석 번호 검색'}
         selectValue={classFilter}
         onSelectChange={setClassFilter}
         selectOptions={[
@@ -1069,6 +1109,7 @@ export default function StudentListPage() {
               const profile = studentsProfiles?.find(p => p.id === member.id);
               const attendance = attendanceList?.find(a => a.studentId === member.id);
               const seatLabel = formatSeatLabel(profile);
+              const studentEmail = canManageStudentAccounts ? resolveStudentEmail(member, profile) : '';
               const attendanceLabel = attendance?.status === 'studying'
                 ? '공부중'
                 : attendance?.status === 'away' || attendance?.status === 'break'
@@ -1115,6 +1156,12 @@ export default function StudentListPage() {
                                 {seatLabel}
                               </Badge>
                             </div>
+                            {canManageStudentAccounts ? (
+                              <p className="flex min-w-0 items-center gap-1.5 text-[11px] font-bold text-[#5c6e97]">
+                                <Mail className="h-3.5 w-3.5 shrink-0 text-[#9aa9c7]" />
+                                <span className="truncate">이메일: {studentEmail || '이메일 미등록'}</span>
+                              </p>
+                            ) : null}
                             <div className="grid gap-2 text-[11px] font-bold text-[#5c6e97] sm:grid-cols-3">
                               <div className="rounded-xl border border-[#dbe7ff] bg-[#f8fbff] px-3 py-2">
                                 <p className="text-[9px] font-black uppercase tracking-[0.18em] text-[#9aa9c7]">현재 상태</p>
@@ -1234,6 +1281,12 @@ export default function StudentListPage() {
                   <SheetDescription className="text-sm font-bold text-white/80">
                     학생 360으로 들어가기 전에 현재 상태와 바로 처리할 운영 액션을 한 번에 확인합니다.
                   </SheetDescription>
+                  {canManageStudentAccounts ? (
+                    <p className="flex min-w-0 items-center gap-1.5 text-xs font-semibold text-white/80">
+                      <Mail className="h-3.5 w-3.5 shrink-0 opacity-80" />
+                      <span className="truncate">{selectedStudentPreview.email || '이메일 미등록'}</span>
+                    </p>
+                  ) : null}
                 </SheetHeader>
                 <div className="mt-4 grid gap-3 sm:grid-cols-3">
                   <div className="rounded-[1.2rem] border border-white/14 bg-white/8 px-4 py-3">
@@ -1476,6 +1529,12 @@ export default function StudentListPage() {
                           <p className="mt-1 text-xs font-bold text-[#5c6e97]">
                             {selectedStudentPreview.profile?.schoolName || '학교 미등록'} · {selectedStudentPreview.profile?.grade || '학년 미등록'}
                           </p>
+                          {canManageStudentAccounts ? (
+                            <p className="mt-1 flex min-w-0 items-center gap-1.5 text-xs font-bold text-[#5c6e97]">
+                              <Mail className="h-3.5 w-3.5 shrink-0 text-[#9aa9c7]" />
+                              <span className="truncate">{selectedStudentPreview.email || '이메일 미등록'}</span>
+                            </p>
+                          ) : null}
                         </div>
                         <div className="rounded-[1rem] bg-white/90 px-3.5 py-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.96)]">
                           <p className="text-[11px] font-black text-[#7b8db3]">현재 상태</p>

@@ -1,7 +1,7 @@
 
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect, useRef } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -31,7 +31,8 @@ import {
   RefreshCw,
   CheckCircle2,
   ShieldCheck,
-  ChevronRight
+  ChevronRight,
+  Mail
 } from 'lucide-react';
 import { StudentProfile, CenterMembership, InviteCode, GrowthProgress } from '@/lib/types';
 import { cn } from '@/lib/utils';
@@ -128,6 +129,21 @@ function isValidKoreanMobilePhone(value: string): boolean {
 
 type StudentMembershipStatus = 'active' | 'onHold' | 'withdrawn';
 
+type SyncStudentEmailsResult = {
+  ok: boolean;
+  checkedCount?: number;
+  syncedCount: number;
+  missingCount: number;
+};
+
+function normalizeStudentEmail(value: unknown): string {
+  return typeof value === 'string' ? value.trim() : '';
+}
+
+function resolveStudentEmail(member?: Partial<CenterMembership> | null, profile?: Partial<StudentProfile> | null): string {
+  return normalizeStudentEmail(profile?.email) || normalizeStudentEmail(member?.email);
+}
+
 function normalizeStudentMembershipStatus(value: unknown): StudentMembershipStatus {
   if (typeof value !== 'string') return 'active';
   const normalized = value.trim().toLowerCase();
@@ -182,8 +198,10 @@ export default function StudentAccountManagementPage() {
   const [statusFilter, setStatusFilter] = useState<'all' | StudentMembershipStatus>('all');
   const [isDeleting, setIsDeleting] = useState<string | null>(null);
   const [isUpdating, setIsUpdating] = useState<string | null>(null);
+  const [isEmailSyncing, setIsEmailSyncing] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [selectedStudentForEdit, setSelectedStudentForEdit] = useState<any>(null);
+  const emailSyncAttemptedCenterRef = useRef<string | null>(null);
   
   const [editForm, setEditForm] = useState({
     displayName: '',
@@ -228,6 +246,30 @@ export default function StudentAccountManagementPage() {
   }, [firestore, centerId, isAdmin]);
   const { data: studentsProfiles } = useCollection<StudentProfile>(studentsQuery, { enabled: isAdmin });
 
+  useEffect(() => {
+    if (!functions || !centerId || !isAdmin) return;
+    if (emailSyncAttemptedCenterRef.current === centerId) return;
+
+    emailSyncAttemptedCenterRef.current = centerId;
+    setIsEmailSyncing(true);
+
+    const syncStudentEmailsForCenter = httpsCallable<{ centerId: string }, SyncStudentEmailsResult>(
+      functions,
+      'syncStudentEmailsForCenter',
+      { timeout: 600000 }
+    );
+
+    syncStudentEmailsForCenter({ centerId }).catch((error: any) => {
+      toast({
+        variant: 'destructive',
+        title: '학생 이메일 동기화 실패',
+        description: resolveCallableErrorMessage(error, '학생 목록은 계속 사용할 수 있지만, 일부 이메일이 미등록으로 보일 수 있습니다.'),
+      });
+    }).finally(() => {
+      setIsEmailSyncing(false);
+    });
+  }, [functions, centerId, isAdmin, toast]);
+
   const availableClasses = useMemo(() => {
     const classes = new Set<string>();
     studentMembers?.forEach(m => { if (m.className) classes.add(m.className); });
@@ -241,15 +283,18 @@ export default function StudentAccountManagementPage() {
     const search = searchTerm.toLowerCase();
     return studentMembers
       .filter((m) => {
+        const profile = studentsProfiles?.find((p) => p.id === m.id);
+        const email = resolveStudentEmail(m, profile).toLowerCase();
         const normalizedStatus = normalizeStudentMembershipStatus(m.status);
         const matchesStatus = statusFilter === 'all' || normalizedStatus === statusFilter;
         const matchesSearch =
           m.displayName?.toLowerCase().includes(search) ||
-          m.id.toLowerCase().includes(search);
+          m.id.toLowerCase().includes(search) ||
+          email.includes(search);
         return matchesStatus && matchesSearch;
       })
       .sort((a, b) => (a.displayName || '').localeCompare(b.displayName || ''));
-  }, [studentMembers, searchTerm, statusFilter]);
+  }, [studentMembers, studentsProfiles, searchTerm, statusFilter]);
 
   const statusCounts = useMemo(() => {
     const initial = { all: 0, active: 0, onHold: 0, withdrawn: 0 };
@@ -390,7 +435,7 @@ export default function StudentAccountManagementPage() {
       <div className="relative group">
         <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground/40 group-focus-within:text-primary transition-colors" />
         <Input 
-          placeholder="학생 이름 또는 사용자번호 검색..." 
+          placeholder="학생 이름, 이메일 또는 사용자번호 검색..." 
           className="rounded-2xl border-2 pl-12 h-16 text-lg focus-visible:ring-primary/10 shadow-sm transition-all bg-white"
           value={searchTerm}
           onChange={(e) => setSearchTerm(e.target.value)}
@@ -441,7 +486,9 @@ export default function StudentAccountManagementPage() {
           <CardTitle className="text-xl font-black flex items-center gap-2">
             <Users className="h-5 w-5 opacity-40" /> 학생 관리 센터 (재학생·휴학생·퇴원생)
           </CardTitle>
-          <CardDescription className="font-bold text-sm">모든 학생의 계정 정보와 성장 지표를 정밀하게 조작하거나 영구히 삭제할 수 있습니다.</CardDescription>
+          <CardDescription className="font-bold text-sm">
+            {isEmailSyncing ? '기존 학생 이메일을 확인하는 중입니다.' : '모든 학생의 계정 정보와 성장 지표를 정밀하게 조작하거나 영구히 삭제할 수 있습니다.'}
+          </CardDescription>
         </CardHeader>
         <CardContent className="p-0">
           {membersLoading ? (
@@ -459,6 +506,7 @@ export default function StudentAccountManagementPage() {
                 const profile = studentsProfiles?.find(p => p.id === member.id);
                 const normalizedStatus = normalizeStudentMembershipStatus(member.status);
                 const phoneNumber = normalizePhoneNumber(profile?.phoneNumber || member.phoneNumber || '');
+                const email = resolveStudentEmail(member, profile);
                 return (
                   <div key={member.id} className="p-8 flex flex-col sm:flex-row sm:items-center justify-between hover:bg-muted/5 transition-all group gap-6">
                     <div className="flex items-center gap-4 min-w-0 flex-1">
@@ -478,6 +526,10 @@ export default function StudentAccountManagementPage() {
                           )}>{studentStatusLabel(normalizedStatus)}</Badge>
                         </div>
                         <p className="text-[10px] font-bold text-muted-foreground truncate">{profile?.schoolName || '학교 정보 없음'} · {profile?.grade}</p>
+                        <p className="flex min-w-0 items-center gap-1.5 text-[10px] font-bold text-muted-foreground">
+                          <Mail className="h-3 w-3 shrink-0 opacity-50" />
+                          <span className="truncate">이메일: {email || '이메일 미등록'}</span>
+                        </p>
                         <p className="text-[10px] font-bold text-muted-foreground truncate">학생 번호: {phoneNumber || '미등록'}</p>
                         <p className="text-[8px] font-mono text-muted-foreground/40 mt-1 uppercase truncate">사용자번호: {member.id}</p>
                       </div>

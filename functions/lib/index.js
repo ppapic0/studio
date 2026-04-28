@@ -33,8 +33,8 @@ var __importStar = (this && this.__importStar) || (function () {
     };
 })();
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.scheduledOpenClawSnapshotExport = exports.generateOpenClawSnapshot = exports.refreshClassroomSignals = exports.stopStudentStudySessionSecure = exports.scheduledStudyBoxCarryoverExpiry = exports.openStudyRewardBoxesSecure = exports.openStudyRewardBoxSecure = exports.claimPlannerCompletionRewardSecure = exports.submitAttendanceRequestSecure = exports.applyPenaltyEventSecure = exports.adjustStudentPenaltyBalanceSecure = exports.adjustStudentPointBalanceSecure = exports.cancelPointBoostEventSecure = exports.createPointBoostEventSecure = exports.scheduledClassroomSignalsRefresh = exports.scheduledDailyRiskAlert = exports.repairRecentStudySessionTotals = exports.deleteManualStudySessionSecure = exports.updateManualStudySessionSecure = exports.createManualStudySessionSecure = exports.scheduledKioskAttendanceQueueWorker = exports.onKioskAttendanceQueueCreated = exports.enqueueKioskAttendanceActionSecure = exports.lookupKioskStudentsByPin = exports.setStudentAttendanceStatusSecure = exports.onSessionWritten = exports.onSessionCreated = exports.scheduledWeeklyReport = exports.cleanupOldDocuments = exports.scheduledAttendanceCheck = exports.runLateArrivalCheck = exports.sendPaymentReminderBatch = exports.notifyDailyReportReady = exports.notifyAttendanceSms = exports.scheduledSmsQueueDispatcher = exports.sendManualStudentSms = exports.updateSmsRecipientPreference = exports.cancelSmsQueueItem = exports.retrySmsQueueItem = exports.saveNotificationSettingsSecure = exports.confirmInvoicePayment = exports.completeSignupWithInvite = exports.redeemInviteCode = exports.createCounselingDemoBundle = exports.registerStudent = exports.updateStudentAccount = exports.deleteTeacherAccount = exports.deleteStudentAccount = exports.repairTodayAttendanceSmsQueue = exports.onAttendanceEventCreated = void 0;
-exports.generateStudyPlan = exports.syncGiftishowCatalogSecure = exports.scheduledGiftishowCatalogSync = exports.saveGiftishowSettingsSecure = exports.resendGiftishowOrderSecure = exports.rejectGiftishowOrderSecure = exports.reconcilePendingGiftishowOrders = exports.getGiftishowBizmoneySecure = exports.createGiftishowOrderRequestSecure = exports.cancelGiftishowOrderSecure = exports.cancelGiftishowSendFailSecure = exports.approveGiftishowOrderSecure = exports.reissueDailyRankingRewardV2Secure = exports.scheduledRankingRewardSettlement = exports.ensureCurrentUserMemberships = void 0;
+exports.generateOpenClawSnapshot = exports.refreshClassroomSignals = exports.stopStudentStudySessionSecure = exports.scheduledStudyBoxCarryoverExpiry = exports.openStudyRewardBoxesSecure = exports.openStudyRewardBoxSecure = exports.claimPlannerCompletionRewardSecure = exports.submitAttendanceRequestSecure = exports.applyPenaltyEventSecure = exports.adjustStudentPenaltyBalanceSecure = exports.adjustStudentPointBalanceSecure = exports.cancelPointBoostEventSecure = exports.createPointBoostEventSecure = exports.scheduledClassroomSignalsRefresh = exports.scheduledDailyRiskAlert = exports.repairRecentStudySessionTotals = exports.deleteManualStudySessionSecure = exports.updateManualStudySessionSecure = exports.createManualStudySessionSecure = exports.scheduledKioskAttendanceQueueWorker = exports.onKioskAttendanceQueueCreated = exports.enqueueKioskAttendanceActionSecure = exports.lookupKioskStudentsByPin = exports.setStudentAttendanceStatusSecure = exports.onSessionWritten = exports.onSessionCreated = exports.scheduledWeeklyReport = exports.cleanupOldDocuments = exports.scheduledAttendanceCheck = exports.runLateArrivalCheck = exports.sendPaymentReminderBatch = exports.notifyDailyReportReady = exports.notifyAttendanceSms = exports.scheduledSmsQueueDispatcher = exports.sendManualStudentSms = exports.updateSmsRecipientPreference = exports.cancelSmsQueueItem = exports.retrySmsQueueItem = exports.saveNotificationSettingsSecure = exports.confirmInvoicePayment = exports.completeSignupWithInvite = exports.redeemInviteCode = exports.createCounselingDemoBundle = exports.syncStudentEmailsForCenter = exports.registerStudent = exports.updateStudentAccount = exports.deleteTeacherAccount = exports.deleteStudentAccount = exports.repairTodayAttendanceSmsQueue = exports.onAttendanceEventCreated = void 0;
+exports.generateStudyPlan = exports.syncGiftishowCatalogSecure = exports.scheduledGiftishowCatalogSync = exports.saveGiftishowSettingsSecure = exports.resendGiftishowOrderSecure = exports.rejectGiftishowOrderSecure = exports.reconcilePendingGiftishowOrders = exports.getGiftishowBizmoneySecure = exports.createGiftishowOrderRequestSecure = exports.cancelGiftishowOrderSecure = exports.cancelGiftishowSendFailSecure = exports.approveGiftishowOrderSecure = exports.reissueDailyRankingRewardV2Secure = exports.scheduledRankingRewardSettlement = exports.ensureCurrentUserMemberships = exports.scheduledOpenClawSnapshotExport = void 0;
 const params_1 = require("firebase-functions/params");
 const functions = __importStar(require("firebase-functions"));
 const admin = __importStar(require("firebase-admin"));
@@ -4996,9 +4996,10 @@ exports.registerStudent = functions.region(region).https.onCall(async (data, con
     const db = admin.firestore();
     const auth = admin.auth();
     const { email, password, displayName, schoolName, grade, centerId, phoneNumber } = data;
+    const normalizedEmail = asTrimmedString(email).toLowerCase();
     if (!context.auth)
         throw new functions.https.HttpsError("unauthenticated", "인증 필요");
-    if (!email || !password || !displayName || !centerId) {
+    if (!normalizedEmail || !password || !displayName || !centerId) {
         throw new functions.https.HttpsError("invalid-argument", "필수값 누락");
     }
     const normalizedPhoneNumber = normalizePhoneNumber(phoneNumber);
@@ -5012,15 +5013,15 @@ exports.registerStudent = functions.region(region).https.onCall(async (data, con
         throw new functions.https.HttpsError("permission-denied", "센터 관리자만 학생 계정을 생성할 수 있습니다.");
     }
     try {
-        const userRecord = await auth.createUser({ email, password, displayName });
+        const userRecord = await auth.createUser({ email: normalizedEmail, password, displayName });
         const uid = userRecord.uid;
         const timestamp = admin.firestore.Timestamp.now();
         await db.runTransaction(async (t) => {
             const phonePayload = normalizedPhoneNumber ? { phoneNumber: normalizedPhoneNumber } : {};
-            t.set(db.doc(`users/${uid}`), Object.assign(Object.assign({ id: uid, email, displayName, schoolName }, phonePayload), { createdAt: timestamp, updatedAt: timestamp }));
-            t.set(db.doc(`centers/${centerId}/members/${uid}`), Object.assign({ id: uid, centerId, role: "student", status: "active", joinedAt: timestamp, displayName }, phonePayload));
+            t.set(db.doc(`users/${uid}`), Object.assign(Object.assign({ id: uid, email: normalizedEmail, displayName, schoolName }, phonePayload), { createdAt: timestamp, updatedAt: timestamp }));
+            t.set(db.doc(`centers/${centerId}/members/${uid}`), Object.assign({ id: uid, centerId, role: "student", status: "active", joinedAt: timestamp, displayName, email: normalizedEmail }, phonePayload));
             t.set(db.doc(`userCenters/${uid}/centers/${centerId}`), Object.assign({ id: centerId, centerId, role: "student", status: "active", joinedAt: timestamp }, phonePayload));
-            t.set(db.doc(`centers/${centerId}/students/${uid}`), { id: uid, name: displayName, schoolName, grade, phoneNumber: normalizedPhoneNumber || null, createdAt: timestamp, updatedAt: timestamp });
+            t.set(db.doc(`centers/${centerId}/students/${uid}`), { id: uid, name: displayName, email: normalizedEmail, schoolName, grade, phoneNumber: normalizedPhoneNumber || null, createdAt: timestamp, updatedAt: timestamp });
             t.set(db.doc(`centers/${centerId}/growthProgress/${uid}`), {
                 seasonLp: 0,
                 penaltyPoints: 0,
@@ -5038,6 +5039,96 @@ exports.registerStudent = functions.region(region).https.onCall(async (data, con
             userMessage: toSafeUserMessage(e, "학생 계정 생성 중 오류가 발생했습니다. 잠시 후 다시 시도해 주세요."),
         });
     }
+});
+async function resolveStudentEmailFromAuthOrUserDoc(params) {
+    var _a;
+    const { auth, db, uid } = params;
+    try {
+        const authUser = await auth.getUser(uid);
+        const authEmail = asTrimmedString(authUser.email).toLowerCase();
+        if (authEmail)
+            return authEmail;
+    }
+    catch (error) {
+        const authCode = getAuthErrorCode(error);
+        if (!authCode.includes("user-not-found")) {
+            console.warn("[syncStudentEmailsForCenter] auth lookup skipped", {
+                uid,
+                code: authCode || null,
+                message: (error === null || error === void 0 ? void 0 : error.message) || error,
+            });
+        }
+    }
+    const userSnap = await db.doc(`users/${uid}`).get();
+    const userEmail = asTrimmedString((_a = userSnap.data()) === null || _a === void 0 ? void 0 : _a.email).toLowerCase();
+    return userEmail || null;
+}
+exports.syncStudentEmailsForCenter = functions.region(region).runWith({
+    timeoutSeconds: 540,
+    memory: "1GB",
+}).https.onCall(async (data, context) => {
+    const db = admin.firestore();
+    const auth = admin.auth();
+    const centerId = asTrimmedString(data === null || data === void 0 ? void 0 : data.centerId);
+    if (!context.auth) {
+        throw new functions.https.HttpsError("unauthenticated", "인증 필요");
+    }
+    if (!centerId) {
+        throw new functions.https.HttpsError("invalid-argument", "센터 정보가 필요합니다.");
+    }
+    const callerMembership = await resolveCenterMembershipRole(db, centerId, context.auth.uid);
+    if (!callerMembership.role ||
+        !isAdminRole(callerMembership.role) ||
+        !isActiveMembershipStatus(callerMembership.status)) {
+        throw new functions.https.HttpsError("permission-denied", "센터 관리자만 학생 이메일을 동기화할 수 있습니다.");
+    }
+    const membersSnap = await db.collection(`centers/${centerId}/members`).where("role", "==", "student").get();
+    const timestamp = admin.firestore.Timestamp.now();
+    let batch = db.batch();
+    let batchOps = 0;
+    let checkedCount = 0;
+    let syncedCount = 0;
+    let missingCount = 0;
+    const commitBatchIfNeeded = async (force = false) => {
+        if (batchOps === 0)
+            return;
+        if (!force && batchOps < 440)
+            return;
+        await batch.commit();
+        batch = db.batch();
+        batchOps = 0;
+    };
+    for (const memberDoc of membersSnap.docs) {
+        const memberData = memberDoc.data();
+        const studentId = asTrimmedString(memberData.id) || memberDoc.id;
+        if (!studentId) {
+            missingCount += 1;
+            continue;
+        }
+        checkedCount += 1;
+        const resolvedEmail = await resolveStudentEmailFromAuthOrUserDoc({ auth, db, uid: studentId });
+        if (!resolvedEmail) {
+            missingCount += 1;
+            continue;
+        }
+        const syncPayload = {
+            email: resolvedEmail,
+            emailSyncedAt: timestamp,
+            updatedAt: timestamp,
+        };
+        batch.set(memberDoc.ref, syncPayload, { merge: true });
+        batch.set(db.doc(`centers/${centerId}/students/${studentId}`), syncPayload, { merge: true });
+        batchOps += 2;
+        syncedCount += 1;
+        await commitBatchIfNeeded();
+    }
+    await commitBatchIfNeeded(true);
+    return {
+        ok: true,
+        checkedCount,
+        syncedCount,
+        missingCount,
+    };
 });
 exports.createCounselingDemoBundle = functions.region(region).https.onCall(async (data, context) => {
     var _a, _b;
