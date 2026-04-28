@@ -1501,6 +1501,16 @@ function getPreviousDateKey(dateKey: string): string {
   return toDateKey(date);
 }
 
+function getRecentDateKeys(dateKey: string, count: number): string[] {
+  const keys: string[] = [];
+  let cursor = dateKey;
+  for (let index = 0; index < count; index += 1) {
+    keys.push(cursor);
+    cursor = getPreviousDateKey(cursor);
+  }
+  return keys;
+}
+
 function getStudyBoxCarryoverExpiresAtMs(dateKey: string): number {
   return getStudyDayWindowBounds(dateKey).endMs + STUDY_BOX_CARRYOVER_GRACE_MINUTES * MINUTE_MS;
 }
@@ -9399,7 +9409,7 @@ async function resolveActiveAttendanceFlowContext(params: {
     return { dateKey: toStudyDayKey(new Date(seatStartedAtMs)), startedAtMs: seatStartedAtMs, resolved: true };
   }
 
-  const evidenceDateKeys = Array.from(new Set([params.currentDateKey, getPreviousDateKey(params.currentDateKey)]));
+  const evidenceDateKeys = getRecentDateKeys(params.currentDateKey, 8);
   const eventSnaps = await Promise.all(
     evidenceDateKeys.map((dateKey) =>
       params.db
@@ -9412,11 +9422,13 @@ async function resolveActiveAttendanceFlowContext(params: {
   );
 
   let activeFlowStartMs = 0;
+  let activeFlowDateKey = "";
   eventSnaps
     .flatMap((snap) => snap.docs)
     .map((docSnap) => {
       const data = (docSnap.data() || {}) as Record<string, unknown>;
       return {
+        dateKey: asTrimmedString(data.dateKey),
         eventType: asTrimmedString(data.eventType),
         occurredAtMs: toMillisSafe(data.occurredAt) || toMillisSafe(data.createdAt),
       };
@@ -9426,15 +9438,21 @@ async function resolveActiveAttendanceFlowContext(params: {
     .forEach((event) => {
       if (event.eventType === "check_in" && event.occurredAtMs > 0) {
         activeFlowStartMs = event.occurredAtMs;
+        activeFlowDateKey = isValidDateKey(event.dateKey) ? event.dateKey : toStudyDayKey(new Date(event.occurredAtMs));
         return;
       }
       if (event.eventType === "check_out") {
         activeFlowStartMs = 0;
+        activeFlowDateKey = "";
       }
     });
 
   if (activeFlowStartMs > 0) {
-    return { dateKey: toStudyDayKey(new Date(activeFlowStartMs)), startedAtMs: activeFlowStartMs, resolved: true };
+    return {
+      dateKey: isValidDateKey(activeFlowDateKey) ? activeFlowDateKey : toStudyDayKey(new Date(activeFlowStartMs)),
+      startedAtMs: activeFlowStartMs,
+      resolved: true,
+    };
   }
 
   const statSnaps = await Promise.all(
@@ -9443,17 +9461,34 @@ async function resolveActiveAttendanceFlowContext(params: {
     )
   );
   let statCheckInMs = 0;
-  statSnaps.forEach((statSnap) => {
+  let statDateKey = "";
+  statSnaps.forEach((statSnap, index) => {
     const statData = statSnap.exists ? ((statSnap.data() || {}) as Record<string, unknown>) : {};
     const checkInMs = toMillisSafe(statData.checkInAt);
     const checkOutMs = toMillisSafe(statData.checkOutAt);
     if (checkInMs > 0 && checkInMs < params.nowMs + MINUTE_MS && checkInMs > statCheckInMs && (!checkOutMs || checkOutMs < checkInMs)) {
       statCheckInMs = checkInMs;
+      const storedDateKey = asTrimmedString(statData.activeStudyDayKey) || asTrimmedString(statData.dateKey);
+      statDateKey = isValidDateKey(storedDateKey) ? storedDateKey : evidenceDateKeys[index];
     }
   });
 
   if (statCheckInMs > 0) {
-    return { dateKey: toStudyDayKey(new Date(statCheckInMs)), startedAtMs: statCheckInMs, resolved: true };
+    return {
+      dateKey: isValidDateKey(statDateKey) ? statDateKey : toStudyDayKey(new Date(statCheckInMs)),
+      startedAtMs: statCheckInMs,
+      resolved: true,
+    };
+  }
+
+  const seatUpdatedAtMs = toMillisSafe(params.seatData.updatedAt);
+  const seatStatus = normalizeAttendanceSeatStatus(params.seatData.status);
+  if (seatStatus !== "absent" && seatUpdatedAtMs > 0 && seatUpdatedAtMs < params.nowMs + MINUTE_MS) {
+    return {
+      dateKey: toStudyDayKey(new Date(seatUpdatedAtMs)),
+      startedAtMs: seatStartedAtMs || seatUpdatedAtMs,
+      resolved: true,
+    };
   }
 
   return { dateKey: params.currentDateKey, startedAtMs: 0, resolved: false };
@@ -10032,20 +10067,34 @@ export const setStudentAttendanceStatusSecure = attendanceMutationFunctions.http
   }
 
   const seatHintRaw = isPlainObject(data?.seatHint) ? (data.seatHint as Record<string, unknown>) : {};
-  const result = await applyAttendanceStatusTransition({
-    db,
-    centerId,
-    studentId: effectiveStudentId,
-    nextStatus,
-    source,
-    actorUid: context.auth.uid,
-    seatId: asTrimmedString(data?.seatId) || null,
-    seatHint: {
-      seatNo: parseFiniteNumber(seatHintRaw.seatNo),
-      roomId: asTrimmedString(seatHintRaw.roomId) || null,
-      roomSeatNo: parseFiniteNumber(seatHintRaw.roomSeatNo),
-    },
-  });
+  let result: ApplyAttendanceStatusTransitionResult;
+  try {
+    result = await applyAttendanceStatusTransition({
+      db,
+      centerId,
+      studentId: effectiveStudentId,
+      nextStatus,
+      source,
+      actorUid: context.auth.uid,
+      seatId: asTrimmedString(data?.seatId) || null,
+      seatHint: {
+        seatNo: parseFiniteNumber(seatHintRaw.seatNo),
+        roomId: asTrimmedString(seatHintRaw.roomId) || null,
+        roomSeatNo: parseFiniteNumber(seatHintRaw.roomSeatNo),
+      },
+    });
+  } catch (error) {
+    console.error("[attendance-action] transition failed", {
+      centerId,
+      studentId: effectiveStudentId,
+      nextStatus,
+      source,
+      seatId: asTrimmedString(data?.seatId) || null,
+      code: (error as { code?: unknown })?.code || null,
+      message: error instanceof Error ? error.message : String(error),
+    });
+    throw error;
+  }
 
   void queueAttendanceTransitionSmsAfterCommit(db, {
     centerId,

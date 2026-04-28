@@ -435,7 +435,7 @@ export default function KioskPage() {
       console.error(e);
       toast({
         variant: "destructive",
-        title: "백엔드 처리 실패",
+        title: "출결 저장 확인 필요",
         description: getKioskErrorMessage(e),
       });
     });
