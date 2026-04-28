@@ -6,6 +6,8 @@ import type {
 import type { AttendanceAwaySlot, AttendanceScheduleDraft, SavedAttendanceRoutine } from '@/components/dashboard/student-planner/planner-constants';
 
 export const DEFAULT_SCHEDULE_TIMEZONE = 'Asia/Seoul';
+const MINUTES_PER_DAY = 24 * 60;
+const OVERNIGHT_DEPARTURE_CUTOFF_MINUTES = 6 * 60;
 
 export function parseTimeToMinutes(value: string) {
   const [hours, minutes] = value.split(':').map(Number);
@@ -28,6 +30,20 @@ export function addMinutesToTime(value: string, minutesToAdd: number) {
 
 function hasAwaySlotValue(slot: Pick<AttendanceAwaySlot, 'startTime' | 'endTime' | 'reason'>) {
   return Boolean(slot.startTime || slot.endTime || slot.reason?.trim());
+}
+
+function getOperationalDepartureMinutes(arrivalMinutes: number, departureMinutes: number) {
+  if (departureMinutes > arrivalMinutes) return departureMinutes;
+  if (arrivalMinutes > OVERNIGHT_DEPARTURE_CUTOFF_MINUTES && departureMinutes <= OVERNIGHT_DEPARTURE_CUTOFF_MINUTES) {
+    return departureMinutes + MINUTES_PER_DAY;
+  }
+  return departureMinutes;
+}
+
+function toOperationalScheduleMinutes(minutes: number, arrivalMinutes: number, operationalDepartureMinutes: number) {
+  return operationalDepartureMinutes >= MINUTES_PER_DAY && minutes < arrivalMinutes
+    ? minutes + MINUTES_PER_DAY
+    : minutes;
 }
 
 export function mergeAcademyIntoAwayDraft(draft: AttendanceScheduleDraft): AttendanceScheduleDraft {
@@ -125,7 +141,9 @@ export function validateScheduleDraft(
     return '시간 형식이 올바르지 않아요.';
   }
 
-  if (arrivalMinutes >= departureMinutes) {
+  const operationalDepartureMinutes = getOperationalDepartureMinutes(arrivalMinutes, departureMinutes);
+
+  if (arrivalMinutes >= operationalDepartureMinutes) {
     return '등원 예정 시간은 하원 예정 시간보다 빨라야 해요.';
   }
 
@@ -150,15 +168,17 @@ export function validateScheduleDraft(
 
   const outings = normalizeOutings(mergedDraft, mergedDraft.awaySlots || []);
   for (const outing of outings) {
-    const excursionStart = parseTimeToMinutes(outing.startTime);
-    const excursionEnd = parseTimeToMinutes(outing.endTime);
-    if (excursionStart === null || excursionEnd === null) {
+    const rawExcursionStart = parseTimeToMinutes(outing.startTime);
+    const rawExcursionEnd = parseTimeToMinutes(outing.endTime);
+    if (rawExcursionStart === null || rawExcursionEnd === null) {
       return '학원 및 외출 시간 형식이 올바르지 않아요.';
     }
+    const excursionStart = toOperationalScheduleMinutes(rawExcursionStart, arrivalMinutes, operationalDepartureMinutes);
+    const excursionEnd = toOperationalScheduleMinutes(rawExcursionEnd, arrivalMinutes, operationalDepartureMinutes);
     if (excursionStart >= excursionEnd) {
       return '시작 시간은 복귀 예정 시간보다 빨라야 해요.';
     }
-    if (excursionStart < arrivalMinutes || excursionEnd > departureMinutes) {
+    if (excursionStart < arrivalMinutes || excursionEnd > operationalDepartureMinutes) {
       return '학원 및 외출 시간은 등원~하원 예정 시간 안에서만 입력할 수 있어요.';
     }
   }

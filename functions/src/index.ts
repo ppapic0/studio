@@ -545,6 +545,8 @@ const STUDY_BOX_CARRYOVER_GRACE_MINUTES = 30;
 const STUDY_DAY_MS = 24 * 60 * 60 * 1000;
 const MINUTE_MS = 60 * 1000;
 const SECOND_MS = 1000;
+const SCHEDULE_DAY_MINUTES = 24 * 60;
+const OVERNIGHT_DEPARTURE_CUTOFF_MINUTES = 6 * 60;
 const MAX_STUDY_SESSION_MINUTES = 360;
 
 function isPlainObject(value: unknown): value is Record<string, unknown> {
@@ -1616,6 +1618,24 @@ function parseTimeToMinutes(value: unknown): number {
   const parsed = parseHourMinute(value);
   if (!parsed) return Number.NaN;
   return parsed.hour * 60 + parsed.minute;
+}
+
+function getOperationalDepartureMinutes(arrivalMinutes: number, departureMinutes: number): number {
+  if (departureMinutes > arrivalMinutes) return departureMinutes;
+  if (arrivalMinutes > OVERNIGHT_DEPARTURE_CUTOFF_MINUTES && departureMinutes <= OVERNIGHT_DEPARTURE_CUTOFF_MINUTES) {
+    return departureMinutes + SCHEDULE_DAY_MINUTES;
+  }
+  return departureMinutes;
+}
+
+function toOperationalScheduleMinutes(
+  minutes: number,
+  arrivalMinutes: number,
+  operationalDepartureMinutes: number
+): number {
+  return operationalDepartureMinutes >= SCHEDULE_DAY_MINUTES && minutes < arrivalMinutes
+    ? minutes + SCHEDULE_DAY_MINUTES
+    : minutes;
 }
 
 function normalizeMembershipStatus(value: unknown): string {
@@ -12674,7 +12694,16 @@ export const submitAttendanceRequestSecure = functions.region(region).https.onCa
       }
       const arrivalMinutes = parseTimeToMinutes(requestedArrivalTime);
       const departureMinutes = parseTimeToMinutes(requestedDepartureTime);
-      if (!Number.isFinite(arrivalMinutes) || !Number.isFinite(departureMinutes) || arrivalMinutes >= departureMinutes) {
+      const operationalDepartureMinutes =
+        Number.isFinite(arrivalMinutes) && Number.isFinite(departureMinutes)
+          ? getOperationalDepartureMinutes(arrivalMinutes, departureMinutes)
+          : Number.NaN;
+      if (
+        !Number.isFinite(arrivalMinutes) ||
+        !Number.isFinite(departureMinutes) ||
+        !Number.isFinite(operationalDepartureMinutes) ||
+        arrivalMinutes >= operationalDepartureMinutes
+      ) {
         throw new functions.https.HttpsError("invalid-argument", "Requested arrival/departure time is invalid.", {
           userMessage: "등원 예정 시간은 하원 예정 시간보다 빨라야 합니다.",
         });
@@ -12687,12 +12716,27 @@ export const submitAttendanceRequestSecure = functions.region(region).https.onCa
         }
         const academyStartMinutes = parseTimeToMinutes(requestedAcademyStartTime);
         const academyEndMinutes = parseTimeToMinutes(requestedAcademyEndTime);
-        if (!Number.isFinite(academyStartMinutes) || !Number.isFinite(academyEndMinutes) || academyStartMinutes >= academyEndMinutes) {
+        const operationalAcademyStartMinutes =
+          Number.isFinite(academyStartMinutes)
+            ? toOperationalScheduleMinutes(academyStartMinutes, arrivalMinutes, operationalDepartureMinutes)
+            : Number.NaN;
+        const operationalAcademyEndMinutes =
+          Number.isFinite(academyEndMinutes)
+            ? toOperationalScheduleMinutes(academyEndMinutes, arrivalMinutes, operationalDepartureMinutes)
+            : Number.NaN;
+        if (
+          !Number.isFinite(operationalAcademyStartMinutes) ||
+          !Number.isFinite(operationalAcademyEndMinutes) ||
+          operationalAcademyStartMinutes >= operationalAcademyEndMinutes
+        ) {
           throw new functions.https.HttpsError("invalid-argument", "Academy time is invalid.", {
             userMessage: "학원 시작 시간은 종료 시간보다 빨라야 합니다.",
           });
         }
-        if (academyStartMinutes < arrivalMinutes || academyEndMinutes > departureMinutes) {
+        if (
+          operationalAcademyStartMinutes < arrivalMinutes ||
+          operationalAcademyEndMinutes > operationalDepartureMinutes
+        ) {
           throw new functions.https.HttpsError("invalid-argument", "Academy time is outside attendance range.", {
             userMessage: "학원 시간은 등원부터 하원 사이에서만 등록할 수 있습니다.",
           });
