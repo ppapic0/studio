@@ -8377,6 +8377,50 @@ async function rejectKioskQueueItemAsStale(params) {
         updatedAt: admin.firestore.FieldValue.serverTimestamp(),
     }, { merge: true });
 }
+async function verifyKioskAttendanceQueueResult(params) {
+    const seatDoc = await resolveAttendanceSeatDocForTransition({
+        db: params.db,
+        centerId: params.centerId,
+        studentId: params.studentId,
+        seatId: params.seatId,
+    });
+    if (!seatDoc || !seatDoc.exists) {
+        return {
+            verified: false,
+            confirmedSeatId: (seatDoc === null || seatDoc === void 0 ? void 0 : seatDoc.id) || params.seatId || null,
+            confirmedStatus: null,
+            confirmedStudentId: null,
+            failedReason: "verification_seat_not_found",
+        };
+    }
+    const seatData = (seatDoc.data() || {});
+    const confirmedStudentId = asTrimmedString(seatData.studentId) || null;
+    const confirmedStatus = normalizeAttendanceSeatStatus(seatData.status);
+    if (confirmedStudentId !== params.studentId) {
+        return {
+            verified: false,
+            confirmedSeatId: seatDoc.id,
+            confirmedStatus,
+            confirmedStudentId,
+            failedReason: "verification_student_mismatch",
+        };
+    }
+    if (confirmedStatus !== params.expectedStatus) {
+        return {
+            verified: false,
+            confirmedSeatId: seatDoc.id,
+            confirmedStatus,
+            confirmedStudentId,
+            failedReason: "verification_status_mismatch",
+        };
+    }
+    return {
+        verified: true,
+        confirmedSeatId: seatDoc.id,
+        confirmedStatus,
+        confirmedStudentId,
+    };
+}
 async function processKioskAttendanceQueueItem(db, centerId, actionId) {
     var _a;
     const queueRef = db.doc(`centers/${centerId}/kioskAttendanceQueue/${actionId}`);
@@ -8479,20 +8523,65 @@ async function processKioskAttendanceQueueItem(db, centerId, actionId) {
             });
             return;
         }
+        const nextStatus = getKioskActionNextStatus(action);
         const result = await applyAttendanceStatusTransition({
             db,
             centerId,
             studentId,
-            nextStatus: getKioskActionNextStatus(action),
+            nextStatus,
             source: "kiosk",
             actorUid: asTrimmedString(queueData.requestedByUid) || null,
             seatId: current.seatId || seatId,
             seatHint,
             nowMs: effectiveActionAtMs,
         });
+        const verification = await verifyKioskAttendanceQueueResult({
+            db,
+            centerId,
+            studentId,
+            seatId: result.seatId || current.seatId || seatId,
+            expectedStatus: nextStatus,
+        });
+        if (!verification.verified) {
+            await queueRef.set({
+                status: "failed",
+                verified: false,
+                completedAt: admin.firestore.FieldValue.serverTimestamp(),
+                updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+                failedReason: "verification_failed",
+                failedCode: verification.failedReason || "verification_failed",
+                confirmedSeatId: verification.confirmedSeatId,
+                confirmedStatus: verification.confirmedStatus,
+                confirmedStudentId: verification.confirmedStudentId,
+                result: {
+                    previousStatus: result.previousStatus,
+                    nextStatus: result.nextStatus,
+                    eventType: result.eventType,
+                    eventId: result.eventId,
+                    eventAtMillis: result.eventAtMillis,
+                    sessionDateKey: result.sessionDateKey,
+                    sessionMinutes: result.sessionMinutes,
+                },
+                verification,
+            }, { merge: true });
+            console.error("[kiosk-attendance-queue] verification failed", {
+                centerId,
+                actionId,
+                studentId,
+                expectedStatus: nextStatus,
+                confirmedStatus: verification.confirmedStatus,
+                confirmedSeatId: verification.confirmedSeatId,
+                failedReason: verification.failedReason,
+            });
+            return;
+        }
         await queueAttendanceTransitionSmsAfterCommit(db, { centerId, result });
         await queueRef.set({
             status: "completed",
+            verified: true,
+            confirmedSeatId: verification.confirmedSeatId,
+            confirmedStatus: verification.confirmedStatus,
+            confirmedStudentId: verification.confirmedStudentId,
             completedAt: admin.firestore.FieldValue.serverTimestamp(),
             updatedAt: admin.firestore.FieldValue.serverTimestamp(),
             result: {
@@ -8504,6 +8593,7 @@ async function processKioskAttendanceQueueItem(db, centerId, actionId) {
                 sessionDateKey: result.sessionDateKey,
                 sessionMinutes: result.sessionMinutes,
             },
+            verification,
         }, { merge: true });
     }
     catch (error) {
@@ -8554,8 +8644,11 @@ async function readKioskAttendanceQueueCallableResult(params) {
     const failedReason = asTrimmedString(queueData.failedReason);
     const staleReason = asTrimmedString(queueData.staleReason);
     const userMessage = getKioskQueueCallableUserMessage(status);
-    return Object.assign(Object.assign(Object.assign({ ok: true, queued: status === "queued" || status === "processing", actionId: params.actionId, optimisticStatus,
-        status }, (userMessage ? { userMessage } : {})), (failedReason ? { failedReason } : {})), (staleReason ? { staleReason } : {}));
+    const confirmedStatus = parseAttendanceSeatStatus(queueData.confirmedStatus);
+    const confirmedSeatId = asTrimmedString(queueData.confirmedSeatId);
+    const result = isPlainObject(queueData.result) ? queueData.result : null;
+    return Object.assign(Object.assign(Object.assign(Object.assign(Object.assign(Object.assign(Object.assign({ ok: true, queued: status === "queued" || status === "processing", actionId: params.actionId, optimisticStatus,
+        status }, (queueData.verified === true ? { verified: true } : {})), (confirmedStatus ? { confirmedStatus } : {})), (confirmedSeatId ? { confirmedSeatId } : {})), (result ? { result } : {})), (userMessage ? { userMessage } : {})), (failedReason ? { failedReason } : {})), (staleReason ? { staleReason } : {}));
 }
 async function waitForKioskAttendanceQueueCallableResult(params) {
     let latest = await readKioskAttendanceQueueCallableResult(params);
@@ -8620,7 +8713,7 @@ exports.enqueueKioskAttendanceActionSecure = functions.region(region).https.onCa
             pin,
             action,
             expectedStatus, statusAtEnqueue: current.status, nextStatus: getKioskActionNextStatus(action), seatId: current.seatId || requestedSeatId, seatHint,
-            idempotencyKey, status: "queued", attemptCount: 0, requestedByUid: ((_a = context.auth) === null || _a === void 0 ? void 0 : _a.uid) || null, source: "kiosk", clientActionAt: admin.firestore.Timestamp.fromMillis(actionTime.actionAtMs), clientActionAtMillis: Math.max(0, Math.floor((_b = parseFiniteNumber(data === null || data === void 0 ? void 0 : data.clientActionAtMillis)) !== null && _b !== void 0 ? _b : 0)), acceptedAt: acceptedAtTs, effectiveActionAt: admin.firestore.Timestamp.fromMillis(actionTime.actionAtMs), effectiveActionAtMillis: actionTime.actionAtMs, actionTimeSource: actionTime.source }, (actionTime.correctionReason ? { actionTimeCorrectionReason: actionTime.correctionReason } : {})), { createdAt: admin.firestore.FieldValue.serverTimestamp(), updatedAt: admin.firestore.FieldValue.serverTimestamp() }));
+            idempotencyKey, inlinePreferred: true, status: "queued", attemptCount: 0, requestedByUid: ((_a = context.auth) === null || _a === void 0 ? void 0 : _a.uid) || null, source: "kiosk", clientActionAt: admin.firestore.Timestamp.fromMillis(actionTime.actionAtMs), clientActionAtMillis: Math.max(0, Math.floor((_b = parseFiniteNumber(data === null || data === void 0 ? void 0 : data.clientActionAtMillis)) !== null && _b !== void 0 ? _b : 0)), acceptedAt: acceptedAtTs, effectiveActionAt: admin.firestore.Timestamp.fromMillis(actionTime.actionAtMs), effectiveActionAtMillis: actionTime.actionAtMs, actionTimeSource: actionTime.source }, (actionTime.correctionReason ? { actionTimeCorrectionReason: actionTime.correctionReason } : {})), { createdAt: admin.firestore.FieldValue.serverTimestamp(), updatedAt: admin.firestore.FieldValue.serverTimestamp() }));
         return {
             actionId: queueRef.id,
             status: "queued",
@@ -8651,7 +8744,10 @@ exports.enqueueKioskAttendanceActionSecure = functions.region(region).https.onCa
 exports.onKioskAttendanceQueueCreated = functions
     .region(region)
     .firestore.document("centers/{centerId}/kioskAttendanceQueue/{actionId}")
-    .onCreate(async (_snap, context) => {
+    .onCreate(async (snap, context) => {
+    const data = snap.data() || {};
+    if (data.inlinePreferred === true)
+        return;
     const db = admin.firestore();
     await processKioskAttendanceQueueItem(db, context.params.centerId, context.params.actionId);
 });

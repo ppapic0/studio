@@ -25,6 +25,10 @@ export type EnqueueKioskAttendanceActionResult = {
   actionId: string;
   optimisticStatus: AttendanceCurrent['status'];
   status?: 'queued' | 'processing' | 'completed' | 'failed' | 'rejected_stale';
+  verified?: boolean;
+  confirmedStatus?: AttendanceCurrent['status'];
+  confirmedSeatId?: string;
+  result?: Record<string, unknown>;
   userMessage?: string;
   failedReason?: string;
   staleReason?: string;

@@ -10515,6 +10515,65 @@ async function rejectKioskQueueItemAsStale(params: {
   }, { merge: true });
 }
 
+async function verifyKioskAttendanceQueueResult(params: {
+  db: admin.firestore.Firestore;
+  centerId: string;
+  studentId: string;
+  seatId?: string | null;
+  expectedStatus: AttendanceSeatStatus;
+}): Promise<{
+  verified: boolean;
+  confirmedSeatId: string | null;
+  confirmedStatus: AttendanceSeatStatus | null;
+  confirmedStudentId: string | null;
+  failedReason?: string;
+}> {
+  const seatDoc = await resolveAttendanceSeatDocForTransition({
+    db: params.db,
+    centerId: params.centerId,
+    studentId: params.studentId,
+    seatId: params.seatId,
+  });
+  if (!seatDoc || !seatDoc.exists) {
+    return {
+      verified: false,
+      confirmedSeatId: seatDoc?.id || params.seatId || null,
+      confirmedStatus: null,
+      confirmedStudentId: null,
+      failedReason: "verification_seat_not_found",
+    };
+  }
+
+  const seatData = (seatDoc.data() || {}) as Record<string, unknown>;
+  const confirmedStudentId = asTrimmedString(seatData.studentId) || null;
+  const confirmedStatus = normalizeAttendanceSeatStatus(seatData.status);
+  if (confirmedStudentId !== params.studentId) {
+    return {
+      verified: false,
+      confirmedSeatId: seatDoc.id,
+      confirmedStatus,
+      confirmedStudentId,
+      failedReason: "verification_student_mismatch",
+    };
+  }
+  if (confirmedStatus !== params.expectedStatus) {
+    return {
+      verified: false,
+      confirmedSeatId: seatDoc.id,
+      confirmedStatus,
+      confirmedStudentId,
+      failedReason: "verification_status_mismatch",
+    };
+  }
+
+  return {
+    verified: true,
+    confirmedSeatId: seatDoc.id,
+    confirmedStatus,
+    confirmedStudentId,
+  };
+}
+
 async function processKioskAttendanceQueueItem(
   db: admin.firestore.Firestore,
   centerId: string,
@@ -10627,11 +10686,12 @@ async function processKioskAttendanceQueueItem(
       return;
     }
 
+    const nextStatus = getKioskActionNextStatus(action);
     const result = await applyAttendanceStatusTransition({
       db,
       centerId,
       studentId,
-      nextStatus: getKioskActionNextStatus(action),
+      nextStatus,
       source: "kiosk",
       actorUid: asTrimmedString(queueData.requestedByUid) || null,
       seatId: current.seatId || seatId,
@@ -10639,9 +10699,54 @@ async function processKioskAttendanceQueueItem(
       nowMs: effectiveActionAtMs,
     });
 
+    const verification = await verifyKioskAttendanceQueueResult({
+      db,
+      centerId,
+      studentId,
+      seatId: result.seatId || current.seatId || seatId,
+      expectedStatus: nextStatus,
+    });
+    if (!verification.verified) {
+      await queueRef.set({
+        status: "failed",
+        verified: false,
+        completedAt: admin.firestore.FieldValue.serverTimestamp(),
+        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        failedReason: "verification_failed",
+        failedCode: verification.failedReason || "verification_failed",
+        confirmedSeatId: verification.confirmedSeatId,
+        confirmedStatus: verification.confirmedStatus,
+        confirmedStudentId: verification.confirmedStudentId,
+        result: {
+          previousStatus: result.previousStatus,
+          nextStatus: result.nextStatus,
+          eventType: result.eventType,
+          eventId: result.eventId,
+          eventAtMillis: result.eventAtMillis,
+          sessionDateKey: result.sessionDateKey,
+          sessionMinutes: result.sessionMinutes,
+        },
+        verification,
+      }, { merge: true });
+      console.error("[kiosk-attendance-queue] verification failed", {
+        centerId,
+        actionId,
+        studentId,
+        expectedStatus: nextStatus,
+        confirmedStatus: verification.confirmedStatus,
+        confirmedSeatId: verification.confirmedSeatId,
+        failedReason: verification.failedReason,
+      });
+      return;
+    }
+
     await queueAttendanceTransitionSmsAfterCommit(db, { centerId, result });
     await queueRef.set({
       status: "completed",
+      verified: true,
+      confirmedSeatId: verification.confirmedSeatId,
+      confirmedStatus: verification.confirmedStatus,
+      confirmedStudentId: verification.confirmedStudentId,
       completedAt: admin.firestore.FieldValue.serverTimestamp(),
       updatedAt: admin.firestore.FieldValue.serverTimestamp(),
       result: {
@@ -10653,6 +10758,7 @@ async function processKioskAttendanceQueueItem(
         sessionDateKey: result.sessionDateKey,
         sessionMinutes: result.sessionMinutes,
       },
+      verification,
     }, { merge: true });
   } catch (error) {
     const retryable = isRetryableKioskQueueError(error) && claimed.attemptCount < KIOSK_ATTENDANCE_MAX_ATTEMPTS;
@@ -10715,6 +10821,9 @@ async function readKioskAttendanceQueueCallableResult(params: {
   const failedReason = asTrimmedString(queueData.failedReason);
   const staleReason = asTrimmedString(queueData.staleReason);
   const userMessage = getKioskQueueCallableUserMessage(status);
+  const confirmedStatus = parseAttendanceSeatStatus(queueData.confirmedStatus);
+  const confirmedSeatId = asTrimmedString(queueData.confirmedSeatId);
+  const result = isPlainObject(queueData.result) ? queueData.result : null;
 
   return {
     ok: true,
@@ -10722,6 +10831,10 @@ async function readKioskAttendanceQueueCallableResult(params: {
     actionId: params.actionId,
     optimisticStatus,
     status,
+    ...(queueData.verified === true ? { verified: true } : {}),
+    ...(confirmedStatus ? { confirmedStatus } : {}),
+    ...(confirmedSeatId ? { confirmedSeatId } : {}),
+    ...(result ? { result } : {}),
     ...(userMessage ? { userMessage } : {}),
     ...(failedReason ? { failedReason } : {}),
     ...(staleReason ? { staleReason } : {}),
@@ -10806,6 +10919,7 @@ export const enqueueKioskAttendanceActionSecure = functions.region(region).https
       seatId: current.seatId || requestedSeatId,
       seatHint,
       idempotencyKey,
+      inlinePreferred: true,
       status: "queued",
       attemptCount: 0,
       requestedByUid: context.auth?.uid || null,
@@ -10853,7 +10967,9 @@ export const enqueueKioskAttendanceActionSecure = functions.region(region).https
 export const onKioskAttendanceQueueCreated = functions
   .region(region)
   .firestore.document("centers/{centerId}/kioskAttendanceQueue/{actionId}")
-  .onCreate(async (_snap, context) => {
+  .onCreate(async (snap, context) => {
+    const data = snap.data() || {};
+    if (data.inlinePreferred === true) return;
     const db = admin.firestore();
     await processKioskAttendanceQueueItem(db, context.params.centerId, context.params.actionId);
   });
