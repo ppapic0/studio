@@ -25,6 +25,7 @@ type PlanItemCardProps = {
   badgeLabel?: string | null;
   metaLabel?: string | null;
   compact?: boolean;
+  completionActionLabel?: string;
   volumeMeta?: {
     targetAmount: number;
     actualAmount: number;
@@ -67,6 +68,7 @@ export function PlanItemCard({
   badgeLabel,
   metaLabel,
   compact = false,
+  completionActionLabel,
   volumeMeta = null,
 }: PlanItemCardProps) {
   const toneValue = toneMap[tone];
@@ -287,6 +289,23 @@ export function PlanItemCard({
                   </div>
                 </div>
               ) : null}
+            </div>
+          ) : null}
+
+          {!checked && completionActionLabel ? (
+            <div className="mt-3 flex justify-end">
+              <Button
+                type="button"
+                variant="secondary"
+                onClick={onToggle}
+                disabled={isCompletionControlDisabled}
+                className={cn(
+                  'h-8 rounded-full px-3 text-[10px] font-black shadow-none',
+                  isCompletionControlDisabled && 'opacity-55'
+                )}
+              >
+                {isCompletionControlDisabled ? '당일만' : completionActionLabel}
+              </Button>
             </div>
           ) : null}
         </div>

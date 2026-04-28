@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { BookOpen, ChevronDown, Loader2 } from 'lucide-react';
 
 import { Badge } from '@/components/ui/badge';
@@ -182,16 +182,18 @@ export function StudyPlanSheet({
   const [isPersonalSectionOpen, setIsPersonalSectionOpen] = useState(false);
   const [editDraft, setEditDraft] = useState<TaskEditDraft | null>(null);
   const [isEditSaving, setIsEditSaving] = useState(false);
+  const wasOpenRef = useRef(false);
   const completedPersonalCount = personalTasks.filter((task) => task.done).length;
   const fallbackCustomSubjectLabel = subjectOptions.find((item) => item.id === 'etc')?.label || '기타';
 
   useEffect(() => {
-    if (open) {
-      setIsStudySectionOpen(false);
+    if (open && !wasOpenRef.current) {
+      setIsStudySectionOpen(studyTasks.length > 0);
       setIsPersonalSectionOpen(false);
       setEditDraft(null);
     }
-  }, [open]);
+    wasOpenRef.current = open;
+  }, [open, studyTasks.length]);
 
   useEffect(() => {
     if (isPast) {
@@ -500,6 +502,7 @@ export function StudyPlanSheet({
                             isEditing={editDraft?.kind === 'study' && editDraft.id === task.id}
                             disabled={isPast}
                             completionDisabled={!canCompleteTasks}
+                            completionActionLabel="공부 완료"
                             isMobile={isMobile}
                             tone="emerald"
                             badgeLabel={task.subject === 'etc' ? task.subjectLabel?.trim() || subject?.label || '직접 입력' : subject?.label || '직접 입력'}
@@ -586,6 +589,7 @@ export function StudyPlanSheet({
                               isEditing={editDraft?.kind === 'personal' && editDraft.id === task.id}
                               disabled={isPast}
                               completionDisabled={!canCompleteTasks}
+                              completionActionLabel="완료"
                               isMobile={isMobile}
                               tone="amber"
                               badgeLabel="기타 일정"
