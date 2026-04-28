@@ -1046,6 +1046,7 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
   const canAccessAdminOnlyOperations =
     activeMembership?.role === 'centerAdmin' || activeMembership?.role === 'owner';
   const operationsRoomTitle = isTeacherOperationsRoom ? '선생님 운영실' : '센터관리자 운영실';
+  const canAdjustStudentPoints = canAccessAdminOnlyOperations;
   const canEditFocusSchedule =
     canAccessAdminOnlyOperations;
   const todayKey = today ? format(today, 'yyyy-MM-dd') : '';
@@ -5021,6 +5022,8 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
       focusAdjustmentKind === 'point'
         ? `${selectedFocusAdjustmentSnapshot.todayPoints.toLocaleString()}pt`
         : '오늘 기준';
+    const isFocusPointAdjustmentLocked =
+      focusAdjustmentKind === 'point' && !canAdjustStudentPoints;
 
     return (
       <Dialog
@@ -5079,6 +5082,7 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
                           : 'bg-[#FF7A16] text-white hover:bg-[#F06D0E]'
                         : 'text-[#14295F] hover:bg-[#EEF4FF]'
                     )}
+                    disabled={isFocusPointAdjustmentLocked}
                     onClick={() => setFocusAdjustmentMode(mode)}
                   >
                     {mode === 'add' ? '추가' : '차감'}
@@ -5096,6 +5100,7 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
                 value={focusAdjustmentAmountDraft}
                 onChange={(event) => setFocusAdjustmentAmountDraft(event.target.value)}
                 placeholder={focusAdjustmentKind === 'point' ? '예: 500' : '예: 1'}
+                disabled={isFocusPointAdjustmentLocked}
                 className="h-11 rounded-xl border-[#DCE7FF] font-bold text-[#14295F] placeholder:text-[#7F91B3]"
               />
             </div>
@@ -5106,6 +5111,7 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
                 value={focusAdjustmentReasonDraft}
                 onChange={(event) => setFocusAdjustmentReasonDraft(event.target.value)}
                 placeholder="예: 운영자 확인 후 기록 보정"
+                disabled={isFocusPointAdjustmentLocked}
                 className="min-h-[96px] rounded-xl border-[#DCE7FF] font-bold text-[#14295F] placeholder:text-[#7F91B3]"
               />
             </div>
@@ -5120,7 +5126,7 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
             <Button
               type="button"
               onClick={() => void handleSubmitFocusAdjustment()}
-              disabled={isFocusAdjustmentSaving}
+              disabled={isFocusAdjustmentSaving || isFocusPointAdjustmentLocked}
               className="rounded-xl bg-[#14295F] font-black text-white hover:bg-[#10224C]"
             >
               {isFocusAdjustmentSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
@@ -6726,6 +6732,15 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
     setPointAdjustmentReasonDraft('');
   };
   const openPointAdjustmentDialog = (grant: PointHistoryGrantRow) => {
+    if (!canAdjustStudentPoints) {
+      toast({
+        variant: 'destructive',
+        title: '포인트 조정 권한 없음',
+        description: '포인트 부여와 차감은 센터관리자만 할 수 있습니다.',
+      });
+      return;
+    }
+
     const progress = progressById.get(grant.studentId);
     setPointAdjustmentTarget({
       ...grant,
@@ -6738,6 +6753,14 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
   };
   const handleSubmitPointAdjustment = async () => {
     if (!functions || !centerId || !pointAdjustmentTarget) return;
+    if (!canAdjustStudentPoints) {
+      toast({
+        variant: 'destructive',
+        title: '포인트 조정 권한 없음',
+        description: '포인트 부여와 차감은 센터관리자만 할 수 있습니다.',
+      });
+      return;
+    }
 
     const amount = Math.floor(Number(pointAdjustmentAmountDraft));
     const reason = pointAdjustmentReasonDraft.trim();
@@ -7031,6 +7054,15 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
     }
   };
   const openFocusAdjustmentDialog = (kind: FocusAdjustmentKind, mode: PointAdjustmentMode = 'add') => {
+    if (kind === 'point' && !canAdjustStudentPoints) {
+      toast({
+        variant: 'destructive',
+        title: '포인트 조정 권한 없음',
+        description: '포인트 부여와 차감은 센터관리자만 할 수 있습니다.',
+      });
+      return;
+    }
+
     setFocusAdjustmentKind(kind);
     setFocusAdjustmentMode(mode);
     setFocusAdjustmentAmountDraft('');
@@ -7038,6 +7070,14 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
   };
   const handleSubmitFocusAdjustment = async () => {
     if (!functions || !centerId || !selectedFocusStudentId || !todayKey || !focusAdjustmentKind) return;
+    if (focusAdjustmentKind === 'point' && !canAdjustStudentPoints) {
+      toast({
+        variant: 'destructive',
+        title: '포인트 조정 권한 없음',
+        description: '포인트 부여와 차감은 센터관리자만 할 수 있습니다.',
+      });
+      return;
+    }
 
     const amount = Math.floor(Number(focusAdjustmentAmountDraft));
     const reason = focusAdjustmentReasonDraft.trim();
@@ -8683,6 +8723,8 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
                                       variant="outline"
                                       size="sm"
                                       className="h-8 rounded-xl border-[#DCE7FF] px-2.5 text-[11px] font-black text-[#2554D7]"
+                                      disabled={!canAdjustStudentPoints}
+                                      title={canAdjustStudentPoints ? undefined : '포인트 조정은 센터관리자만 가능합니다.'}
                                       onClick={() => openPointAdjustmentDialog(grant)}
                                     >
                                       <ArrowRightLeft className="mr-1 h-3.5 w-3.5" />
@@ -8717,6 +8759,8 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
                                         variant="outline"
                                         size="sm"
                                         className="h-8 rounded-xl border-[#DCE7FF] px-2.5 text-[11px] font-black text-[#2554D7]"
+                                        disabled={!canAdjustStudentPoints}
+                                        title={canAdjustStudentPoints ? undefined : '포인트 조정은 센터관리자만 가능합니다.'}
                                         onClick={() => openPointAdjustmentDialog(grant)}
                                       >
                                         <ArrowRightLeft className="mr-1 h-3.5 w-3.5" />
@@ -8807,6 +8851,7 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
                                   : 'bg-[#FF7A16] text-white hover:bg-[#e86d12]'
                                 : 'text-[#6E7EA3] hover:bg-[#F4F7FF]'
                             )}
+                            disabled={!canAdjustStudentPoints}
                             onClick={() => setPointAdjustmentMode(mode)}
                           >
                             {mode === 'add' ? '추가' : '차감'}
@@ -8827,6 +8872,7 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
                       value={pointAdjustmentAmountDraft}
                       onChange={(event) => setPointAdjustmentAmountDraft(event.target.value)}
                       placeholder="예: 100"
+                      disabled={!canAdjustStudentPoints}
                       className="h-11 rounded-xl border-[#DCE7FF] bg-white font-bold text-[#14295F]"
                     />
                   </div>
@@ -8838,6 +8884,7 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
                       value={pointAdjustmentReasonDraft}
                       onChange={(event) => setPointAdjustmentReasonDraft(event.target.value.slice(0, 160))}
                       placeholder="예: 출석 기록 누락 보정"
+                      disabled={!canAdjustStudentPoints}
                       className="min-h-24 rounded-xl border-[#DCE7FF] bg-white text-sm font-bold text-[#14295F]"
                     />
                     <p className="text-[11px] font-bold text-[#6E7EA3]">사유는 감사 로그와 학생 포인트 내역에 함께 남습니다.</p>
@@ -8858,7 +8905,7 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
                 <Button
                   type="button"
                   className="h-11 rounded-xl bg-[#14295F] px-5 font-black text-white hover:bg-[#10224C]"
-                  disabled={isPointAdjustmentSaving}
+                  disabled={isPointAdjustmentSaving || !canAdjustStudentPoints}
                   onClick={() => void handleSubmitPointAdjustment()}
                 >
                   {isPointAdjustmentSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
@@ -10329,6 +10376,8 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
                         size="sm"
                         variant="outline"
                         className="h-10 rounded-xl border-[#DCE7FF] bg-[#F7FAFF] px-2 text-xs font-black text-[#14295F] hover:bg-[#EEF4FF]"
+                        disabled={!canAdjustStudentPoints}
+                        title={canAdjustStudentPoints ? undefined : '포인트 조정은 센터관리자만 가능합니다.'}
                         onClick={() => openFocusAdjustmentDialog('point', 'add')}
                       >
                         <PlusCircle className="mr-1.5 h-3.5 w-3.5" />
@@ -10339,6 +10388,8 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
                         size="sm"
                         variant="outline"
                         className="h-10 rounded-xl border-[#FFD7BA] bg-[#FFF8F2] px-2 text-xs font-black text-[#C95A08] hover:bg-[#FFF2E8]"
+                        disabled={!canAdjustStudentPoints}
+                        title={canAdjustStudentPoints ? undefined : '포인트 조정은 센터관리자만 가능합니다.'}
                         onClick={() => openFocusAdjustmentDialog('point', 'subtract')}
                       >
                         <ArrowDownRight className="mr-1.5 h-3.5 w-3.5" />
