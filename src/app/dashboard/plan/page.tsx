@@ -347,6 +347,7 @@ const SUBJECTS = [
 ];
 const DEFAULT_CUSTOM_SUBJECT_LABEL = '직접 입력';
 const QUICK_ADD_MAX_ITEMS = 10;
+const TODAY_CHECKLIST_VISIBLE_LIMIT = 10;
 const QUICK_ADD_TITLE_MAX_LENGTH = 16;
 const QUICK_ADD_TAG_MAX_LENGTH = 12;
 
@@ -1766,7 +1767,10 @@ export default function StudyPlanPage() {
     () => [...studyTimeSummary.labeledBreakdown].sort((left, right) => right.minutes - left.minutes),
     [studyTimeSummary.labeledBreakdown]
   );
-  const visibleChecklistTasks = useMemo(() => orderedChecklistTasks.slice(0, 6), [orderedChecklistTasks]);
+  const visibleChecklistTasks = useMemo(
+    () => orderedChecklistTasks.slice(0, TODAY_CHECKLIST_VISIBLE_LIMIT),
+    [orderedChecklistTasks]
+  );
   const hiddenChecklistTaskCount = Math.max(0, checklistTasks.length - visibleChecklistTasks.length);
   const latestDiagnostic = effectivePlannerDiagnostic;
   const mainRecommendations = useMemo(
