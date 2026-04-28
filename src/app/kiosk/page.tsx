@@ -10,7 +10,11 @@ import { useAppContext } from '@/contexts/app-context';
 import { useMemoFirebase } from '@/hooks/use-memo-firebase';
 import { 
   collection, 
-  Timestamp
+  getDocs,
+  limit,
+  query,
+  Timestamp,
+  where
 } from 'firebase/firestore';
 import { httpsCallable } from 'firebase/functions';
 import { StudentProfile, AttendanceCurrent } from '@/lib/types';
@@ -60,6 +64,7 @@ type KioskSuccessFeedback = {
 
 const getKioskErrorMessage = (error: unknown) => {
   const raw = error as {
+    code?: unknown;
     message?: unknown;
     details?: unknown;
     customData?: unknown;
@@ -71,8 +76,18 @@ const getKioskErrorMessage = (error: unknown) => {
       if (typeof userMessage === 'string' && userMessage.trim()) return userMessage.trim();
     }
   }
+  if (isInternalKioskLookupError(error)) {
+    return '학생 조회가 일시적으로 지연되고 있습니다. 다시 입력해 주세요.';
+  }
   if (typeof raw.message === 'string' && raw.message.trim()) return raw.message.trim();
   return '잠시 후 다시 시도해 주세요. 문제가 계속되면 관리자에게 알려주세요.';
+};
+
+const isInternalKioskLookupError = (error: unknown) => {
+  const raw = error as { code?: unknown; message?: unknown };
+  const code = typeof raw.code === 'string' ? raw.code.toLowerCase() : '';
+  const message = typeof raw.message === 'string' ? raw.message.toLowerCase() : '';
+  return code === 'internal' || code === 'functions/internal' || message === 'internal' || message.includes('internal');
 };
 
 const getKioskActionKey = (
@@ -247,13 +262,66 @@ export default function KioskPage() {
     setPin(prev => prev.slice(0, -1));
   };
 
+  const lookupStudentFromFirestore = async (code: string): Promise<KioskStudentLookupResult | null> => {
+    if (!firestore || !centerId) return null;
+
+    const studentsRef = collection(firestore, 'centers', centerId, 'students');
+    const lookupValues: Array<string | number> = [code];
+    const numericCode = Number(code);
+    if (Number.isFinite(numericCode)) lookupValues.push(numericCode);
+
+    const studentDocs = new Map<string, StudentProfile>();
+    const studentSnaps = await Promise.all(
+      lookupValues.map((value) =>
+        getDocs(query(studentsRef, where('parentLinkCode', '==', value), limit(8)))
+      )
+    );
+
+    studentSnaps.forEach((snap) => {
+      snap.docs.forEach((docSnap) => {
+        const data = docSnap.data() as Omit<StudentProfile, 'id'>;
+        studentDocs.set(docSnap.id, { ...data, id: docSnap.id, parentLinkCode: code } as StudentProfile);
+      });
+    });
+
+    const students = Array.from(studentDocs.values()).slice(0, 8);
+    const seatSnaps = await Promise.all(
+      students.map((student) =>
+        getDocs(query(
+          collection(firestore, 'centers', centerId, 'attendanceCurrent'),
+          where('studentId', '==', student.id),
+          limit(10)
+        ))
+      )
+    );
+    const seats = seatSnaps.flatMap((snap, index) =>
+      snap.docs.map((docSnap) => ({
+        ...(docSnap.data() as AttendanceCurrent),
+        id: docSnap.id,
+        studentId: students[index]?.id || (docSnap.data() as AttendanceCurrent).studentId,
+      }))
+    );
+
+    return { ok: true, students, seats };
+  };
+
   const searchStudent = async (code: string) => {
     if (!lookupKioskStudentsByPin || !centerId) return;
     setIsSearching(true);
     try {
-      const result = await lookupKioskStudentsByPin({ centerId, pin: code });
-      const results = result.data?.students || [];
-      const seats = result.data?.seats || [];
+      let lookupData: KioskStudentLookupResult | null = null;
+      try {
+        const result = await lookupKioskStudentsByPin({ centerId, pin: code });
+        lookupData = result.data || null;
+      } catch (callableError) {
+        if (!isInternalKioskLookupError(callableError)) throw callableError;
+        console.warn('[kiosk] callable lookup failed with internal; trying Firestore fallback', callableError);
+        lookupData = await lookupStudentFromFirestore(code);
+        if (!lookupData) throw callableError;
+      }
+
+      const results = lookupData?.students || [];
+      const seats = lookupData?.seats || [];
       
       if (results.length > 0) {
         setMatchedStudents(results);

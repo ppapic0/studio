@@ -8127,15 +8127,42 @@ exports.lookupKioskStudentsByPin = functions.region(region).https.onCall(async (
             userMessage: "키오스크, 선생님, 관리자 계정만 학생을 조회할 수 있습니다.",
         });
     }
-    const studentDocs = await lookupKioskStudentDocsByPin(db, centerId, pin);
-    const students = studentDocs.map((docSnap) => buildKioskLookupStudentPayload(docSnap, pin));
-    const seatGroups = await Promise.all(students.map((student) => lookupKioskSeatRowsForStudent(db, centerId, student)));
-    const seats = seatGroups.flat();
-    return {
-        ok: true,
-        students,
-        seats,
-    };
+    try {
+        const studentDocs = await lookupKioskStudentDocsByPin(db, centerId, pin);
+        const students = studentDocs.map((docSnap) => buildKioskLookupStudentPayload(docSnap, pin));
+        const seatGroups = await Promise.all(students.map(async (student) => {
+            try {
+                return await lookupKioskSeatRowsForStudent(db, centerId, student);
+            }
+            catch (error) {
+                console.error("[kiosk-lookup] seat lookup failed", {
+                    centerId,
+                    studentId: student.id,
+                    message: error instanceof Error ? error.message : String(error),
+                });
+                return [];
+            }
+        }));
+        const seats = seatGroups.flat();
+        return {
+            ok: true,
+            students,
+            seats,
+        };
+    }
+    catch (error) {
+        if (error instanceof functions.https.HttpsError) {
+            throw error;
+        }
+        console.error("[kiosk-lookup] student lookup failed", {
+            centerId,
+            uid: context.auth.uid,
+            message: error instanceof Error ? error.message : String(error),
+        });
+        throw new functions.https.HttpsError("internal", "Kiosk student lookup failed.", {
+            userMessage: "학생 조회 중 오류가 발생했습니다. 다시 입력해 주세요.",
+        });
+    }
 });
 async function assertManualStudySessionMutationAllowed(params) {
     const membership = await resolveCenterMembershipRole(params.db, params.centerId, params.authUid);
