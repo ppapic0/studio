@@ -159,8 +159,8 @@ export default function SessionCorrectionPage() {
   const handleEditSave = async () => {
     if (!firestore || !centerId || !selectedStudent || !editTarget) return;
     const newMinutes = parseInt(editMinutes, 10);
-    if (!Number.isFinite(newMinutes) || newMinutes < 0 || newMinutes > 360) {
-      toast({ title: '오류', description: '0~360분 범위로 입력하세요.', variant: 'destructive' });
+    if (!Number.isFinite(newMinutes) || newMinutes < 0 || newMinutes > 1440) {
+      toast({ title: '오류', description: '0~1440분 범위로 입력하세요.', variant: 'destructive' });
       return;
     }
     setSaving(true);
@@ -398,11 +398,11 @@ export default function SessionCorrectionPage() {
               현재: <span className="font-black text-foreground">{toHm(editTarget?.durationMinutes ?? 0)}</span>
             </p>
             <div>
-              <Label className="text-xs font-bold">새 집중 시간 (분, 0~360)</Label>
+              <Label className="text-xs font-bold">새 집중 시간 (분, 0~1440)</Label>
               <Input
                 type="number"
                 min={0}
-                max={360}
+                max={1440}
                 value={editMinutes}
                 onChange={(e) => setEditMinutes(e.target.value)}
                 className="mt-1 h-9 rounded-xl"

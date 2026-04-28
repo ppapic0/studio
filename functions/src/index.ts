@@ -547,7 +547,7 @@ const MINUTE_MS = 60 * 1000;
 const SECOND_MS = 1000;
 const SCHEDULE_DAY_MINUTES = 24 * 60;
 const OVERNIGHT_DEPARTURE_CUTOFF_MINUTES = 6 * 60;
-const MAX_STUDY_SESSION_MINUTES = 360;
+const MAX_STUDY_SESSION_MINUTES = 24 * 60;
 
 function isPlainObject(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
@@ -9187,7 +9187,7 @@ async function syncMonthlyStudyTimeLeaderboardEntry(
 
 /**
  * 세션 문서 생성 시 durationMinutes 유효성 검증 및 서버 집계 보정
- * - 0분 이하 또는 360분 초과 세션은 경계값으로 클램프
+ * - 0분 이하 또는 하루를 초과한 세션은 경계값으로 클램프
  * - study-time leaderboard / dailyStudentStats는 세션 생성만 신뢰해 서버에서 누적
  * - closedReason이 있는 자동 종료 세션도 집계 대상에 포함
  */
@@ -9200,7 +9200,7 @@ export const onSessionCreated = functions
     const db = admin.firestore();
     const skipValidation = Boolean(data.closedReason);
     const rawDuration = Number(data.durationMinutes ?? 0);
-    const MAX_MINUTES = 360;
+    const MAX_MINUTES = MAX_STUDY_SESSION_MINUTES;
 
     let normalizedDuration = Number.isFinite(rawDuration) ? Math.max(0, Math.round(rawDuration)) : 0;
     let validationFlag: "clamped_negative" | "clamped_max" | null = null;
@@ -11320,7 +11320,7 @@ function assertManualSessionTimeInput(params: {
   }
   if (params.endMs - params.startMs > MAX_STUDY_SESSION_MINUTES * MINUTE_MS) {
     throw new functions.https.HttpsError("invalid-argument", "Manual session is too long.", {
-      userMessage: `세션은 한 번에 최대 ${MAX_STUDY_SESSION_MINUTES}분까지만 만들 수 있습니다.`,
+      userMessage: "세션은 한 번에 최대 24시간까지만 만들 수 있습니다.",
     });
   }
   if (params.endMs > Date.now() + 5 * MINUTE_MS) {

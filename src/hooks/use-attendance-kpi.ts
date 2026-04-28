@@ -265,7 +265,7 @@ function calculateClosedStudyMinutesFromAttendanceEvents(events: AttendanceEvent
     if ((event.eventType === 'away_start' || event.eventType === 'check_out') && activeStartAt) {
       const diffMinutes = Math.ceil((occurredAt.getTime() - activeStartAt.getTime()) / 60000);
       if (diffMinutes > 0) {
-        totalMinutes += Math.min(360, diffMinutes);
+        totalMinutes += diffMinutes;
       }
       activeStartAt = null;
     }
