@@ -145,6 +145,14 @@ export default function KioskPage() {
   const [isProcessing, setIsProcessing] = useState(false);
   const [successFeedback, setSuccessFeedback] = useState<KioskSuccessFeedback | null>(null);
 
+  const lookupKioskStudentsByPin = useMemo(() => {
+    if (!functions) return null;
+    return httpsCallable<{ centerId: string; pin: string }, KioskStudentLookupResult>(
+      functions,
+      'lookupKioskStudentsByPin'
+    );
+  }, [functions]);
+
   useEffect(() => {
     if (!successFeedback) return;
     const timer = window.setTimeout(() => setSuccessFeedback(null), 2400);
@@ -240,13 +248,9 @@ export default function KioskPage() {
   };
 
   const searchStudent = async (code: string) => {
-    if (!functions || !centerId) return;
+    if (!lookupKioskStudentsByPin || !centerId) return;
     setIsSearching(true);
     try {
-      const lookupKioskStudentsByPin = httpsCallable<
-        { centerId: string; pin: string },
-        KioskStudentLookupResult
-      >(functions, 'lookupKioskStudentsByPin');
       const result = await lookupKioskStudentsByPin({ centerId, pin: code });
       const results = result.data?.students || [];
       const seats = result.data?.seats || [];
@@ -277,7 +281,7 @@ export default function KioskPage() {
   };
 
   const handleStatusUpdate = async (student: StudentProfile, nextStatus: AttendanceCurrent['status']) => {
-    if (!firestore || !centerId || !attendanceList) return;
+    if (isProcessing || !firestore || !centerId) return;
     
     const seat = resolveSeatForStudent(student);
     if (!seat) {

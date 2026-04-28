@@ -53,6 +53,7 @@ const smsDispatcherFunctions = functions.region(region).runWith({
     vpcConnector: SMS_VPC_CONNECTOR,
     vpcConnectorEgressSettings: "ALL_TRAFFIC",
 });
+const attendanceMutationFunctions = functions.region(region);
 const MANUAL_PARENT_SMS_UID = "__manual_parent__";
 const STUDENT_SMS_FALLBACK_UID = "__student__";
 const allowedRoles = ["student", "teacher", "parent", "centerAdmin", "kiosk"];
@@ -7354,12 +7355,14 @@ async function resolveAttendanceSeatDocForTransition(params) {
     const { db, centerId, studentId } = params;
     const seatId = asTrimmedString(params.seatId);
     if (seatId) {
-        const directSnap = await db.doc(`centers/${centerId}/attendanceCurrent/${seatId}`).get();
-        const seatSnap = await db
-            .collection(`centers/${centerId}/attendanceCurrent`)
-            .where("studentId", "==", studentId)
-            .limit(10)
-            .get();
+        const [directSnap, seatSnap] = await Promise.all([
+            db.doc(`centers/${centerId}/attendanceCurrent/${seatId}`).get(),
+            db
+                .collection(`centers/${centerId}/attendanceCurrent`)
+                .where("studentId", "==", studentId)
+                .limit(10)
+                .get(),
+        ]);
         const existingStudentSeatDoc = pickPreferredAttendanceSeatDoc(seatSnap.docs);
         if (existingStudentSeatDoc) {
             const directData = directSnap.exists ? directSnap.data() : {};
@@ -7630,8 +7633,7 @@ async function applyAttendanceStatusTransition(params) {
         });
     }
     const initialSeatData = (seatDoc.data() || {});
-    const preflightSeatSnap = await seatDoc.ref.get();
-    const preflightSeatData = preflightSeatSnap.exists ? (preflightSeatSnap.data() || {}) : initialSeatData;
+    const preflightSeatData = initialSeatData;
     const preflightStudentId = asTrimmedString(preflightSeatData.studentId);
     if (preflightStudentId && preflightStudentId !== studentId) {
         throw new functions.https.HttpsError("failed-precondition", "Seat belongs to another student.", {
@@ -7925,7 +7927,7 @@ async function applyAttendanceStatusTransition(params) {
         };
     });
 }
-exports.setStudentAttendanceStatusSecure = smsDispatcherFunctions.https.onCall(async (data, context) => {
+exports.setStudentAttendanceStatusSecure = attendanceMutationFunctions.https.onCall(async (data, context) => {
     var _a;
     const db = admin.firestore();
     if (!((_a = context.auth) === null || _a === void 0 ? void 0 : _a.uid)) {
@@ -8018,6 +8020,89 @@ exports.setStudentAttendanceStatusSecure = smsDispatcherFunctions.https.onCall(a
     });
     return result;
 });
+function buildKioskLookupStudentPayload(docSnap, pin) {
+    var _a, _b, _c;
+    const student = (docSnap.data() || {});
+    return {
+        id: docSnap.id,
+        name: asTrimmedString(student.name || student.displayName, "학생"),
+        schoolName: asTrimmedString(student.schoolName),
+        grade: asTrimmedString(student.grade),
+        className: asTrimmedString(student.className),
+        seatNo: Math.max(0, Math.round((_a = parseFiniteNumber(student.seatNo)) !== null && _a !== void 0 ? _a : 0)),
+        seatId: asTrimmedString(student.seatId),
+        roomId: asTrimmedString(student.roomId),
+        roomSeatNo: Math.max(0, Math.round((_b = parseFiniteNumber(student.roomSeatNo)) !== null && _b !== void 0 ? _b : 0)),
+        seatLabel: asTrimmedString(student.seatLabel),
+        seatZone: asTrimmedString(student.seatZone),
+        targetDailyMinutes: Math.max(0, Math.round((_c = parseFiniteNumber(student.targetDailyMinutes)) !== null && _c !== void 0 ? _c : 0)),
+        parentUids: Array.isArray(student.parentUids)
+            ? student.parentUids.filter((uid) => typeof uid === "string" && uid.trim().length > 0)
+            : [],
+        parentLinkCode: pin,
+    };
+}
+async function lookupKioskStudentDocsByPin(db, centerId, pin) {
+    const lookupSnap = await getParentLinkLookupRef(db, pin).get();
+    const lookupData = lookupSnap.exists ? lookupSnap.data() : null;
+    const lookupCenterId = asTrimmedString(lookupData === null || lookupData === void 0 ? void 0 : lookupData.centerId);
+    const lookupStudentId = asTrimmedString(lookupData === null || lookupData === void 0 ? void 0 : lookupData.studentId);
+    if (lookupCenterId === centerId && lookupStudentId) {
+        const directStudentSnap = await db.doc(`centers/${centerId}/students/${lookupStudentId}`).get();
+        const directStudentData = directStudentSnap.exists ? (directStudentSnap.data() || {}) : {};
+        if (directStudentSnap.exists && normalizeParentLinkCodeValue(directStudentData.parentLinkCode) === pin) {
+            return [directStudentSnap];
+        }
+    }
+    const studentSnap = await db
+        .collection(`centers/${centerId}/students`)
+        .where("parentLinkCode", "==", pin)
+        .limit(8)
+        .get();
+    return studentSnap.docs;
+}
+function buildKioskLookupSeatPayload(studentId, docSnap) {
+    var _a, _b;
+    const seat = (docSnap.data() || {});
+    return {
+        id: docSnap.id,
+        studentId,
+        seatNo: Math.max(0, Math.round((_a = parseFiniteNumber(seat.seatNo)) !== null && _a !== void 0 ? _a : 0)),
+        roomId: asTrimmedString(seat.roomId),
+        roomSeatNo: Math.max(0, Math.round((_b = parseFiniteNumber(seat.roomSeatNo)) !== null && _b !== void 0 ? _b : 0)),
+        seatLabel: asTrimmedString(seat.seatLabel),
+        status: normalizeAttendanceSeatStatus(seat.status),
+        type: asTrimmedString(seat.type, "seat"),
+        lastCheckInAtMillis: toMillisSafe(seat.lastCheckInAt),
+        updatedAtMillis: toMillisSafe(seat.updatedAt),
+    };
+}
+async function lookupKioskSeatRowsForStudent(db, centerId, student) {
+    const seatId = asTrimmedString(student.seatId);
+    const [directSeatSnap, studentSeatSnap] = await Promise.all([
+        seatId ? db.doc(`centers/${centerId}/attendanceCurrent/${seatId}`).get() : Promise.resolve(null),
+        db
+            .collection(`centers/${centerId}/attendanceCurrent`)
+            .where("studentId", "==", student.id)
+            .limit(10)
+            .get(),
+    ]);
+    const seen = new Set();
+    const seatDocs = [];
+    const appendSeat = (docSnap) => {
+        if (!(docSnap === null || docSnap === void 0 ? void 0 : docSnap.exists) || seen.has(docSnap.id))
+            return;
+        const seatData = (docSnap.data() || {});
+        const linkedStudentId = asTrimmedString(seatData.studentId);
+        if (linkedStudentId && linkedStudentId !== student.id)
+            return;
+        seen.add(docSnap.id);
+        seatDocs.push(docSnap);
+    };
+    appendSeat(directSeatSnap);
+    studentSeatSnap.docs.forEach((docSnap) => appendSeat(docSnap));
+    return seatDocs.map((docSnap) => buildKioskLookupSeatPayload(student.id, docSnap));
+}
 exports.lookupKioskStudentsByPin = functions.region(region).https.onCall(async (data, context) => {
     var _a;
     const db = admin.firestore();
@@ -8042,57 +8127,10 @@ exports.lookupKioskStudentsByPin = functions.region(region).https.onCall(async (
             userMessage: "키오스크, 선생님, 관리자 계정만 학생을 조회할 수 있습니다.",
         });
     }
-    const studentSnap = await db
-        .collection(`centers/${centerId}/students`)
-        .where("parentLinkCode", "==", pin)
-        .limit(8)
-        .get();
-    const students = studentSnap.docs.map((docSnap) => {
-        var _a, _b, _c;
-        const student = (docSnap.data() || {});
-        return {
-            id: docSnap.id,
-            name: asTrimmedString(student.name || student.displayName, "학생"),
-            schoolName: asTrimmedString(student.schoolName),
-            grade: asTrimmedString(student.grade),
-            className: asTrimmedString(student.className),
-            seatNo: Math.max(0, Math.round((_a = parseFiniteNumber(student.seatNo)) !== null && _a !== void 0 ? _a : 0)),
-            seatId: asTrimmedString(student.seatId),
-            roomId: asTrimmedString(student.roomId),
-            roomSeatNo: Math.max(0, Math.round((_b = parseFiniteNumber(student.roomSeatNo)) !== null && _b !== void 0 ? _b : 0)),
-            seatLabel: asTrimmedString(student.seatLabel),
-            seatZone: asTrimmedString(student.seatZone),
-            targetDailyMinutes: Math.max(0, Math.round((_c = parseFiniteNumber(student.targetDailyMinutes)) !== null && _c !== void 0 ? _c : 0)),
-            parentUids: Array.isArray(student.parentUids)
-                ? student.parentUids.filter((uid) => typeof uid === "string" && uid.trim().length > 0)
-                : [],
-            parentLinkCode: pin,
-        };
-    });
-    const seats = [];
-    for (const student of students) {
-        const seatSnap = await db
-            .collection(`centers/${centerId}/attendanceCurrent`)
-            .where("studentId", "==", student.id)
-            .limit(10)
-            .get();
-        seatSnap.docs.forEach((docSnap) => {
-            var _a, _b;
-            const seat = (docSnap.data() || {});
-            seats.push({
-                id: docSnap.id,
-                studentId: student.id,
-                seatNo: Math.max(0, Math.round((_a = parseFiniteNumber(seat.seatNo)) !== null && _a !== void 0 ? _a : 0)),
-                roomId: asTrimmedString(seat.roomId),
-                roomSeatNo: Math.max(0, Math.round((_b = parseFiniteNumber(seat.roomSeatNo)) !== null && _b !== void 0 ? _b : 0)),
-                seatLabel: asTrimmedString(seat.seatLabel),
-                status: normalizeAttendanceSeatStatus(seat.status),
-                type: asTrimmedString(seat.type, "seat"),
-                lastCheckInAtMillis: toMillisSafe(seat.lastCheckInAt),
-                updatedAtMillis: toMillisSafe(seat.updatedAt),
-            });
-        });
-    }
+    const studentDocs = await lookupKioskStudentDocsByPin(db, centerId, pin);
+    const students = studentDocs.map((docSnap) => buildKioskLookupStudentPayload(docSnap, pin));
+    const seatGroups = await Promise.all(students.map((student) => lookupKioskSeatRowsForStudent(db, centerId, student)));
+    const seats = seatGroups.flat();
     return {
         ok: true,
         students,
