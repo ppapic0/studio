@@ -14,6 +14,8 @@ export type StudentRankEntry = {
 
 export type StudentRankingSnapshot = Record<StudentRankRange, StudentRankEntry[]> & {
   dailyWaitingTopMinutes?: number | null;
+  dateKey?: string | null;
+  generatedAt?: string | null;
 };
 
 export const EMPTY_STUDENT_RANKING_SNAPSHOT: StudentRankingSnapshot = {
@@ -21,6 +23,8 @@ export const EMPTY_STUDENT_RANKING_SNAPSHOT: StudentRankingSnapshot = {
   weekly: [],
   monthly: [],
   dailyWaitingTopMinutes: null,
+  dateKey: null,
+  generatedAt: null,
 };
 
 type IdTokenUser = {
@@ -30,12 +34,18 @@ type IdTokenUser = {
 export async function fetchStudentRankingSnapshot({
   centerId,
   user,
+  dateKey,
 }: {
   centerId: string;
   user: IdTokenUser;
+  dateKey?: string | null;
 }): Promise<StudentRankingSnapshot> {
   const token = await user.getIdToken();
-  const response = await fetch(`/api/student-rankings?centerId=${encodeURIComponent(centerId)}`, {
+  const params = new URLSearchParams({ centerId });
+  if (dateKey) {
+    params.set('dateKey', dateKey);
+  }
+  const response = await fetch(`/api/student-rankings?${params.toString()}`, {
     headers: {
       Authorization: `Bearer ${token}`,
     },
@@ -55,5 +65,7 @@ export async function fetchStudentRankingSnapshot({
     dailyWaitingTopMinutes: Number.isFinite(Number(payload.dailyWaitingTopMinutes))
       ? Math.max(0, Number(payload.dailyWaitingTopMinutes))
       : null,
+    dateKey: typeof payload.dateKey === 'string' ? payload.dateKey : null,
+    generatedAt: typeof payload.generatedAt === 'string' ? payload.generatedAt : null,
   };
 }

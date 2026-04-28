@@ -11,6 +11,7 @@ import {
   getDailyRankWindowState,
   startOfKstMonthDate,
   startOfKstWeekDate,
+  toKstDateKey,
   type DailyRankWindowState,
 } from '@/lib/student-ranking-policy';
 
@@ -36,6 +37,8 @@ type RankEntrySeed = Omit<RankEntry, 'rank'> & {
 
 type StudentRankingSnapshot = Record<RankRange, RankEntry[]> & {
   dailyWaitingTopMinutes?: number | null;
+  dateKey?: string | null;
+  generatedAt?: string | null;
 };
 type RankCompetitionWindow = ReturnType<typeof getDailyRankCompetitionWindow>;
 
@@ -44,6 +47,8 @@ const EMPTY_SNAPSHOT: StudentRankingSnapshot = {
   weekly: [],
   monthly: [],
   dailyWaitingTopMinutes: null,
+  dateKey: null,
+  generatedAt: null,
 };
 
 export const dynamic = 'force-dynamic';
@@ -234,6 +239,13 @@ function getStudyLogDayDateKey(
     : docSnap.id;
 }
 
+function parseRankingDateKey(value: string) {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return null;
+  const date = new Date(`${value}T12:00:00+09:00`);
+  if (Number.isNaN(date.getTime())) return null;
+  return toKstDateKey(date) === value ? date : null;
+}
+
 function applyCompetitionRanks(entries: Omit<RankEntry, 'rank'>[]): RankEntry[] {
   const sorted = [...entries].sort((left, right) => right.value - left.value);
   let lastValue: number | null = null;
@@ -334,6 +346,7 @@ export async function GET(request: NextRequest) {
   const authHeader = request.headers.get('authorization') || '';
   const idToken = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : '';
   const centerId = request.nextUrl.searchParams.get('centerId')?.trim() || '';
+  const requestedDateKey = request.nextUrl.searchParams.get('dateKey')?.trim() || '';
 
   if (!idToken) {
     return noStoreJson({ error: 'unauthorized' }, { status: 401 });
@@ -341,6 +354,16 @@ export async function GET(request: NextRequest) {
 
   if (!centerId) {
     return noStoreJson({ error: 'centerId-required' }, { status: 400 });
+  }
+
+  const now = new Date();
+  const todayDateKey = toKstDateKey(now);
+  const requestedDate = requestedDateKey ? parseRankingDateKey(requestedDateKey) : null;
+  if (requestedDateKey && !requestedDate) {
+    return noStoreJson({ error: 'invalid-dateKey' }, { status: 400 });
+  }
+  if (requestedDateKey && requestedDateKey > todayDateKey) {
+    return noStoreJson({ error: 'future-dateKey' }, { status: 400 });
   }
 
   let uid = '';
@@ -357,16 +380,23 @@ export async function GET(request: NextRequest) {
       return noStoreJson({ error: 'forbidden' }, { status: 403 });
     }
 
-    const now = new Date();
     const nowMs = now.getTime();
-    const dailyRankWindow = getDailyRankWindowState(now);
+    const currentDailyRankWindow = getDailyRankWindowState(now);
+    const targetDate = requestedDate || now;
+    const dailyRankWindow = requestedDate
+      ? getDailyRankCompetitionWindow(targetDate)
+      : currentDailyRankWindow;
+    const shouldIncludeLiveAttendance = dailyRankWindow.competitionDateKey === currentDailyRankWindow.competitionDateKey;
+    const referenceLimitMs = requestedDate
+      ? Math.min(nowMs, dailyRankWindow.endsAt.getTime())
+      : nowMs;
     const previousDailyRankWindow = getDailyRankCompetitionWindow(
       new Date(dailyRankWindow.competitionDate.getTime() - 24 * 60 * 60 * 1000)
     );
     const dailyDateKeys = dailyRankWindow.coveredDateKeys;
-    const weeklyRankWindows = eachKstDateOfInterval(startOfKstWeekDate(now), now)
+    const weeklyRankWindows = eachKstDateOfInterval(startOfKstWeekDate(targetDate), targetDate)
       .map((date) => getDailyRankCompetitionWindow(date));
-    const monthlyRankWindows = eachKstDateOfInterval(startOfKstMonthDate(now), now)
+    const monthlyRankWindows = eachKstDateOfInterval(startOfKstMonthDate(targetDate), targetDate)
       .map((date) => getDailyRankCompetitionWindow(date));
     const weeklyCoveredDateKeys = getCoveredDateKeysFromRankWindows(weeklyRankWindows);
     const monthlyCoveredDateKeys = getCoveredDateKeysFromRankWindows(monthlyRankWindows);
@@ -589,13 +619,13 @@ export async function GET(request: NextRequest) {
       weeklyStudySessionSnaps,
       weeklyRankWindows,
       shouldInclude,
-      nowMs
+      referenceLimitMs
     );
     const monthlyMinutesByStudentDate = collectRankWindowMinutesByDateFromSessionSnapshots(
       monthlyStudySessionSnaps,
       monthlyRankWindows,
       shouldInclude,
-      nowMs
+      referenceLimitMs
     );
 
     const weeklyTotals = foldRankMinutesByDate(weeklyMinutesByStudentDate);
@@ -641,9 +671,9 @@ export async function GET(request: NextRequest) {
 
       const liveStartedAtMs = toTimestampMillis(selectedRecord.lastCheckInAt);
       const liveStatus = getActiveLiveRankStatus(selectedRecord.status);
-      if (!liveStatus || liveStartedAtMs <= 0) return;
+      if (!shouldIncludeLiveAttendance || !liveStatus || liveStartedAtMs <= 0) return;
 
-      const dailyLiveReferenceMs = Math.min(nowMs, dailyRankWindow.endsAt.getTime());
+      const dailyLiveReferenceMs = Math.min(referenceLimitMs, dailyRankWindow.endsAt.getTime());
       const dailyLiveMinutes = getDailyRankWindowOverlapMinutes(liveStartedAtMs, dailyLiveReferenceMs, dailyRankWindow);
       if (dailyLiveMinutes > 0) {
         dailyLiveAttendanceMeta.set(studentId, {
@@ -723,6 +753,8 @@ export async function GET(request: NextRequest) {
       weekly: weeklyEntries,
       monthly: monthlyEntries,
       dailyWaitingTopMinutes,
+      dateKey: dailyRankWindow.competitionDateKey,
+      generatedAt: now.toISOString(),
     });
   } catch (error) {
     if (process.env.NODE_ENV !== 'production' && isMissingAdminCredentialsError(error)) {

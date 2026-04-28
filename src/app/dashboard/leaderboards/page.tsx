@@ -4,9 +4,12 @@ import { useEffect, useMemo, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { AnimatePresence, LayoutGroup, motion, useReducedMotion } from 'framer-motion';
 import {
+  CalendarDays,
   Clock3,
   Crown,
+  ListOrdered,
   Loader2,
+  RotateCcw,
   ShieldAlert,
   Sparkles,
   Trophy,
@@ -22,7 +25,7 @@ import {
   type StudentRankEntry,
   type StudentRankingSnapshot,
 } from '@/lib/student-ranking-client';
-import { getDailyRankWindowState } from '@/lib/student-ranking-policy';
+import { getDailyRankWindowState, toKstDateKey } from '@/lib/student-ranking-policy';
 import {
   assignStudentRankingTrackRanks,
   getLiveAdjustedStudentRankValue,
@@ -140,6 +143,38 @@ const RANKING_KICKER_CLASS =
   'inline-flex items-center gap-2 rounded-full border border-[#F5C97B]/30 bg-[rgba(255,198,112,0.08)] px-3 py-2 text-[11px] font-black tracking-[0.2em] text-[#FFD89A]';
 const RANKING_STATUS_BADGE_CLASS =
   'rounded-full border border-white/12 bg-[rgba(255,255,255,0.06)] px-3 py-1.5 text-[10px] font-black tracking-[0.18em] text-[#B7C7E8]';
+const DATE_KEY_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
+
+function isValidRankingDateKey(value: string | null | undefined) {
+  return Boolean(value && DATE_KEY_PATTERN.test(value));
+}
+
+function isRankRange(value: string | null): value is RankRange {
+  return value === 'daily' || value === 'weekly' || value === 'monthly';
+}
+
+function canViewRankingHistory(role?: string | null) {
+  return role === 'centerAdmin' || role === 'owner' || role === 'teacher';
+}
+
+function formatRankingDateLabel(dateKey: string) {
+  if (!isValidRankingDateKey(dateKey)) return '기준일 없음';
+  const [, month, day] = dateKey.split('-');
+  return `${dateKey} 기준 · ${Number(month)}/${Number(day)}`;
+}
+
+function getHistoryRangeLabel(range: RankRange) {
+  if (range === 'daily') return '일간';
+  if (range === 'weekly') return '주간';
+  return '월간';
+}
+
+function getRankingHistorySummaryLabel(range: RankRange, dateKey: string) {
+  const rangeLabel = getHistoryRangeLabel(range);
+  if (range === 'daily') return `${formatRankingDateLabel(dateKey)} ${rangeLabel} 랭킹`;
+  if (range === 'weekly') return `${formatRankingDateLabel(dateKey)} 포함 주간 랭킹`;
+  return `${formatRankingDateLabel(dateKey)} 포함 월간 랭킹`;
+}
 
 function formatSchoolName(value?: string | null) {
   const trimmed = value?.trim();
@@ -1471,6 +1506,165 @@ function MonthlyRewardPolicyNotice({ isMobile }: { isMobile: boolean }) {
   );
 }
 
+function RankingHistoryControls({
+  selectedDateKey,
+  maxDateKey,
+  isHistorical,
+  isMobile,
+  onDateChange,
+  onReset,
+}: {
+  selectedDateKey: string;
+  maxDateKey: string;
+  isHistorical: boolean;
+  isMobile: boolean;
+  onDateChange: (dateKey: string) => void;
+  onReset: () => void;
+}) {
+  return (
+    <section className={cn(
+      'student-utility-card border border-white/10 bg-[linear-gradient(180deg,rgba(255,255,255,0.075)_0%,rgba(255,255,255,0.035)_100%)] text-white shadow-[0_22px_52px_-34px_rgba(0,0,0,0.72)] backdrop-blur-xl',
+      isMobile ? 'mx-0 rounded-[1.4rem] p-4' : 'rounded-[26px] px-5 py-4'
+    )}>
+      <div className={cn('flex gap-3', isMobile ? 'flex-col' : 'items-center justify-between')}>
+        <div className="min-w-0">
+          <div className="inline-flex items-center gap-2 rounded-full border border-[#F5C97B]/25 bg-[rgba(255,198,112,0.08)] px-3 py-1.5 text-[10px] font-black tracking-[0.18em] text-[#FFD89A]">
+            <CalendarDays className="h-3.5 w-3.5" />
+            기준일 조회
+          </div>
+          <div className="mt-2 font-aggro-display text-[1.4rem] font-black tracking-[-0.04em] text-white">
+            {isHistorical ? '과거 랭킹 트랙' : '현재 랭킹 트랙'}
+          </div>
+          <p className="mt-1 text-sm font-semibold leading-6 text-[#B7C7E8]">
+            {formatRankingDateLabel(selectedDateKey)}
+          </p>
+        </div>
+
+        <div className={cn('flex gap-2', isMobile ? 'w-full flex-col' : 'items-center')}>
+          <label className={cn(
+            'flex items-center gap-2 rounded-[1rem] border border-white/12 bg-[rgba(255,255,255,0.06)] px-3 py-2 text-sm font-black text-white',
+            isMobile ? 'w-full' : 'min-w-[190px]'
+          )}>
+            <CalendarDays className="h-4 w-4 shrink-0 text-[#FFD89A]" />
+            <input
+              type="date"
+              value={selectedDateKey}
+              max={maxDateKey}
+              onChange={(event) => onDateChange(event.target.value)}
+              className="min-w-0 flex-1 bg-transparent font-black text-white outline-none [color-scheme:dark]"
+            />
+          </label>
+          <button
+            type="button"
+            onClick={onReset}
+            className={cn(
+              'inline-flex items-center justify-center gap-2 rounded-[1rem] border border-[#F5C97B]/25 bg-[rgba(255,198,112,0.08)] px-4 py-3 text-sm font-black text-[#FFD89A] transition hover:bg-[rgba(255,198,112,0.14)]',
+              isMobile ? 'w-full' : 'shrink-0'
+            )}
+          >
+            <RotateCcw className="h-4 w-4" />
+            현재 보기
+          </button>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function RankingHistoryBoard({
+  entries,
+  range,
+  dateKey,
+  isMobile,
+}: {
+  entries: StudentRankEntry[];
+  range: RankRange;
+  dateKey: string;
+  isMobile: boolean;
+}) {
+  const topEntry = entries[0] ?? null;
+  const totalMinutes = entries.reduce((sum, entry) => sum + Math.max(0, Math.round(entry.value || 0)), 0);
+
+  return (
+    <section className={cn(RANKING_SECTION_PANEL_CLASS, 'student-utility-card relative overflow-hidden p-5 text-white md:p-6')}>
+      <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(140deg,rgba(255,255,255,0.08),transparent_36%,transparent_74%,rgba(255,165,78,0.08))]" />
+      <div className="relative space-y-5">
+        <div className={cn('flex gap-4', isMobile ? 'flex-col' : 'items-start justify-between')}>
+          <div className="min-w-0">
+            <div className={RANKING_KICKER_CLASS}>
+              <ListOrdered className="h-4 w-4" />
+              전체 순위
+            </div>
+            <h2 className="font-aggro-display mt-3 text-[2rem] font-black leading-[0.95] tracking-[-0.05em] text-white md:text-[2.45rem]">
+              {getRankingHistorySummaryLabel(range, dateKey)}
+            </h2>
+            <p className="mt-3 text-sm font-semibold leading-7 text-[#B7C7E8]">
+              {entries.length.toLocaleString()}명 집계 · 총 {formatStudyCompact(totalMinutes)}
+            </p>
+          </div>
+          {topEntry ? (
+            <div className={cn(
+              'rounded-[1.25rem] border border-[#F5C97B]/25 bg-[rgba(255,198,112,0.08)] px-4 py-3',
+              isMobile ? 'w-full' : 'min-w-[220px] text-right'
+            )}>
+              <div className="text-[10px] font-black tracking-[0.18em] text-[#FFD89A]">1위</div>
+              <div className="mt-1 truncate text-lg font-black text-white">{topEntry.displayNameSnapshot}</div>
+              <div className="mt-1 text-sm font-bold text-[#B7C7E8]">{formatStudyCompact(topEntry.value)}</div>
+            </div>
+          ) : null}
+        </div>
+
+        {entries.length > 0 ? (
+          <div className="overflow-hidden rounded-[1.35rem] border border-white/10 bg-[rgba(255,255,255,0.04)]">
+            <div className="max-h-[560px] overflow-auto">
+              <table className="w-full min-w-[660px] border-collapse text-left">
+                <thead className="sticky top-0 z-10 bg-[#10244F]/95 backdrop-blur">
+                  <tr className="border-b border-white/10 text-[11px] font-black tracking-[0.18em] text-[#AFC0E6]">
+                    <th className="w-[86px] px-4 py-3">순위</th>
+                    <th className="px-4 py-3">학생</th>
+                    <th className="px-4 py-3">반</th>
+                    <th className="px-4 py-3">학교</th>
+                    <th className="px-4 py-3 text-right">공부시간</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {entries.map((entry) => (
+                    <tr key={`${entry.studentId}-${entry.rank}`} className="border-b border-white/8 text-sm font-bold text-white last:border-b-0">
+                      <td className="px-4 py-3">
+                        <span className={cn(
+                          'inline-flex min-w-[3rem] justify-center rounded-full border px-2.5 py-1 text-xs font-black',
+                          entry.rank === 1
+                            ? 'border-[#F5C97B]/35 bg-[rgba(245,201,123,0.16)] text-[#FFE0A6]'
+                            : 'border-white/12 bg-[rgba(255,255,255,0.06)] text-[#D8E4FF]'
+                        )}>
+                          {entry.rank}위
+                        </span>
+                      </td>
+                      <td className="px-4 py-3">
+                        <div className="font-black">{entry.displayNameSnapshot}</div>
+                        <div className="mt-0.5 text-xs font-semibold text-[#AFC0E6]">{entry.studentId}</div>
+                      </td>
+                      <td className="px-4 py-3 text-[#D8E4FF]">{entry.classNameSnapshot || '-'}</td>
+                      <td className="px-4 py-3 text-[#D8E4FF]">{formatSchoolName(entry.schoolNameSnapshot)}</td>
+                      <td className="px-4 py-3 text-right font-aggro-display text-lg font-black tracking-[-0.04em] text-[#FFE09E]">
+                        {formatStudyCompact(entry.value)}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        ) : (
+          <div className="rounded-[1.25rem] border border-dashed border-white/14 bg-[rgba(255,255,255,0.035)] px-5 py-8 text-center text-sm font-bold text-[#B7C7E8]">
+            해당 기준일에 집계된 랭킹 기록이 없습니다.
+          </div>
+        )}
+      </div>
+    </section>
+  );
+}
+
 function RecommendationChip({
   recommendation,
   onApply,
@@ -1575,9 +1769,11 @@ export default function RankingBattlePage() {
   const { activeMembership, viewMode, isTimerActive, startTime } = useAppContext();
   const isMobile = viewMode === 'mobile';
 
-  const range = (searchParams.get('range') as RankRange) || 'daily';
+  const rangeParam = searchParams.get('range');
+  const range = isRankRange(rangeParam) ? rangeParam : 'daily';
   const viewerId = user?.uid ?? 'viewer-local';
   const centerId = activeMembership?.id ?? null;
+  const canUseRankingHistory = canViewRankingHistory(activeMembership?.role);
 
   const [snapshot, setSnapshot] = useState<StudentRankingSnapshot>(EMPTY_STUDENT_RANKING_SNAPSHOT);
   const [loading, setLoading] = useState(true);
@@ -1601,6 +1797,16 @@ export default function RankingBattlePage() {
     () => getDailyRankWindowState(new Date(clockNowMs)),
     [clockNowMs]
   );
+  const currentCompetitionDateKey = dailyRankWindow.competitionDateKey;
+  const todayCalendarDateKey = useMemo(() => toKstDateKey(new Date(clockNowMs)), [clockNowMs]);
+  const requestedDateParam = searchParams.get('date');
+  const selectedDateKey = canUseRankingHistory && isValidRankingDateKey(requestedDateParam) && requestedDateParam! <= todayCalendarDateKey
+    ? requestedDateParam as string
+    : currentCompetitionDateKey;
+  const snapshotDateKey = canUseRankingHistory && selectedDateKey !== currentCompetitionDateKey
+    ? selectedDateKey
+    : null;
+  const isHistoricalSnapshot = Boolean(snapshotDateKey);
 
   useEffect(() => {
     let cancelled = false;
@@ -1617,7 +1823,7 @@ export default function RankingBattlePage() {
       if (isInitialLoad) setLoading(true);
 
       try {
-        const result = await fetchStudentRankingSnapshot({ centerId, user });
+        const result = await fetchStudentRankingSnapshot({ centerId, user, dateKey: snapshotDateKey });
         if (cancelled) return;
         setSnapshot(result);
         setFetchError(null);
@@ -1635,15 +1841,17 @@ export default function RankingBattlePage() {
     };
 
     void loadSnapshot(true);
-    intervalId = window.setInterval(() => {
-      void loadSnapshot(false);
-    }, SNAPSHOT_REFRESH_MS);
+    if (!snapshotDateKey) {
+      intervalId = window.setInterval(() => {
+        void loadSnapshot(false);
+      }, SNAPSHOT_REFRESH_MS);
+    }
 
     return () => {
       cancelled = true;
       if (intervalId) window.clearInterval(intervalId);
     };
-  }, [centerId, user]);
+  }, [centerId, snapshotDateKey, user]);
 
   const currentRangeEntries = snapshot[range] ?? [];
   const dailyWaitingTopMinutes = Math.max(0, Number(snapshot.dailyWaitingTopMinutes || 0));
@@ -1705,7 +1913,7 @@ export default function RankingBattlePage() {
   const diffBelow = viewer && below ? Math.max(0, viewer.value - below.value) : 0;
   const mode = viewer ? getBattleMode(viewer.rank, diffAbove, diffBelow) : 'chase';
   const pressure = viewer ? getPressureLevel(viewer.rank, diffAbove, diffBelow) : 'stable';
-  const isDailyWaiting = range === 'daily' && !dailyRankWindow.isLive;
+  const isDailyWaiting = !isHistoricalSnapshot && range === 'daily' && !dailyRankWindow.isLive;
   const recommendations = useMemo(
     () => (viewer ? buildMainRecommendations({ viewer, top, below, logs }) : []),
     [viewer, top, below, logs]
@@ -1736,6 +1944,25 @@ export default function RankingBattlePage() {
     const nextParams = new URLSearchParams(searchParams.toString());
     nextParams.set('range', nextRange);
     router.replace(`/dashboard/leaderboards?${nextParams.toString()}`, { scroll: false });
+  }
+
+  function handleRankingDateChange(nextDateKey: string) {
+    if (!canUseRankingHistory || !isValidRankingDateKey(nextDateKey)) return;
+    const nextParams = new URLSearchParams(searchParams.toString());
+    if (nextDateKey === currentCompetitionDateKey) {
+      nextParams.delete('date');
+    } else {
+      nextParams.set('date', nextDateKey);
+    }
+    const queryString = nextParams.toString();
+    router.replace(`/dashboard/leaderboards${queryString ? `?${queryString}` : ''}`, { scroll: false });
+  }
+
+  function handleResetRankingDate() {
+    const nextParams = new URLSearchParams(searchParams.toString());
+    nextParams.delete('date');
+    const queryString = nextParams.toString();
+    router.replace(`/dashboard/leaderboards${queryString ? `?${queryString}` : ''}`, { scroll: false });
   }
 
   function handleApplyRecommendation(item: BattleRecommendation) {
@@ -1776,6 +2003,17 @@ export default function RankingBattlePage() {
     router.push('/dashboard/plan/diagnosis');
   }
 
+  const rankingHistoryControls = canUseRankingHistory ? (
+    <RankingHistoryControls
+      selectedDateKey={selectedDateKey}
+      maxDateKey={todayCalendarDateKey}
+      isHistorical={isHistoricalSnapshot}
+      isMobile={isMobile}
+      onDateChange={handleRankingDateChange}
+      onReset={handleResetRankingDate}
+    />
+  ) : null;
+
   if (loading && currentRangeEntries.length === 0 && selfLiveStartedAtMs <= 0 && !isDailyWaiting) {
     return (
       <main className={cn('student-font-shell min-h-screen px-4 py-8', RANKING_PAGE_SHELL_CLASS)}>
@@ -1811,6 +2049,8 @@ export default function RankingBattlePage() {
             isMobile={isMobile}
           />
 
+          {rankingHistoryControls}
+
           {fetchError ? (
             <div className="rounded-[24px] border border-[#F5C97B]/20 bg-[rgba(255,198,112,0.08)] px-4 py-3 text-sm font-semibold text-[#FFD89A]">
               {fetchError}
@@ -1832,6 +2072,45 @@ export default function RankingBattlePage() {
     );
   }
 
+  if (canUseRankingHistory && !isDailyWaiting) {
+    return (
+      <main className={cn(
+        'student-font-shell',
+        RANKING_PAGE_SHELL_CLASS,
+        isMobile ? 'min-h-0 px-0 py-0' : 'min-h-screen px-4 py-6 md:px-6 md:py-8'
+      )}>
+        <div className={cn('mx-auto', isMobile ? 'max-w-none space-y-4' : 'max-w-7xl space-y-5')}>
+          <HeroBattleHeader
+            range={range}
+            onRangeChange={handleRangeChange}
+            activeMessage={isHistoricalSnapshot ? getRankingHistorySummaryLabel(range, selectedDateKey) : `${getHistoryRangeLabel(range)} 전체 순위`}
+            isLive={false}
+            statusLabel={isHistoricalSnapshot ? '과거 조회' : '전체 순위'}
+            subtitleOverride="학생별 순위와 누적 공부시간을 전체 목록으로 확인합니다."
+            isMobile={isMobile}
+          />
+
+          {rankingHistoryControls}
+
+          {fetchError ? (
+            <div className="rounded-[24px] border border-[#F5C97B]/20 bg-[rgba(255,198,112,0.08)] px-4 py-3 text-sm font-semibold text-[#FFD89A]">
+              {fetchError}
+            </div>
+          ) : null}
+
+          {range === 'monthly' ? <MonthlyRewardPolicyNotice isMobile={isMobile} /> : null}
+
+          <RankingHistoryBoard
+            entries={currentRangeEntries}
+            range={range}
+            dateKey={selectedDateKey}
+            isMobile={isMobile}
+          />
+        </div>
+      </main>
+    );
+  }
+
   if (shouldShowEmptyState) {
     return (
       <main className={cn(
@@ -1848,6 +2127,8 @@ export default function RankingBattlePage() {
             statusLabel="실시간 조회"
             isMobile={isMobile}
           />
+
+          {rankingHistoryControls}
 
           {fetchError ? (
             <div className="rounded-[24px] border border-[#F5C97B]/20 bg-[rgba(255,198,112,0.08)] px-4 py-3 text-sm font-semibold text-[#FFD89A]">
@@ -1885,6 +2166,8 @@ export default function RankingBattlePage() {
           isMobile={isMobile}
         />
 
+        {rankingHistoryControls}
+
         {fetchError ? (
           <div className="rounded-[24px] border border-[#F5C97B]/20 bg-[rgba(255,198,112,0.08)] px-4 py-3 text-sm font-semibold text-[#FFD89A]">
             {fetchError}
@@ -1908,6 +2191,7 @@ export default function RankingBattlePage() {
             </div>
           </div>
         )}
+
       </div>
     </main>
   );
