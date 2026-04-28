@@ -57,6 +57,37 @@ const MANUAL_PARENT_SMS_UID = "__manual_parent__";
 const STUDENT_SMS_FALLBACK_UID = "__student__";
 const allowedRoles = ["student", "teacher", "parent", "centerAdmin", "kiosk"];
 const adminRoles = new Set(["centerAdmin", "owner", "admin", "centerManager"]);
+const signupRoleAliases = {
+    student: "student",
+    "학생": "student",
+    teacher: "teacher",
+    "선생님": "teacher",
+    "교사": "teacher",
+    "강사": "teacher",
+    parent: "parent",
+    "학부모": "parent",
+    "보호자": "parent",
+    centeradmin: "centerAdmin",
+    centeradministrator: "centerAdmin",
+    "센터관리자": "centerAdmin",
+    kiosk: "kiosk",
+    kioskaccount: "kiosk",
+    kioskmode: "kiosk",
+    tabletkiosk: "kiosk",
+    attendancekiosk: "kiosk",
+    "키오스크": "kiosk",
+    "키오스크계정": "kiosk",
+    "태블릿키오스크": "kiosk",
+};
+function normalizeSignupRole(value) {
+    var _a;
+    const normalized = String(value !== null && value !== void 0 ? value : "").trim();
+    if (allowedRoles.includes(normalized)) {
+        return normalized;
+    }
+    const compact = normalized.toLowerCase().replace(/[\s._-]+/g, "");
+    return (_a = signupRoleAliases[compact]) !== null && _a !== void 0 ? _a : null;
+}
 const SMS_BYTE_LIMIT = 90;
 const PARENT_LINK_FAILED_ATTEMPT_LIMIT = 5;
 const PARENT_LINK_FAILED_ATTEMPT_WINDOW_MS = 30 * 60 * 1000;
@@ -3803,12 +3834,13 @@ async function refreshClassroomSignalsForCenter(db, centerId, nowKst) {
     return payload;
 }
 function assertInviteUsable(inv, expectedRole) {
-    if (!allowedRoles.includes(inv.intendedRole)) {
+    const inviteRole = normalizeSignupRole(inv.intendedRole);
+    if (!inviteRole) {
         throw new functions.https.HttpsError("failed-precondition", "Invite has invalid role configuration.", {
             userMessage: "초대 코드의 역할 설정이 올바르지 않습니다. 센터 관리자에게 문의해 주세요.",
         });
     }
-    if (expectedRole && inv.intendedRole !== expectedRole) {
+    if (expectedRole && inviteRole !== expectedRole) {
         throw new functions.https.HttpsError("failed-precondition", "Invite role does not match selected signup role.", {
             userMessage: "선택한 역할과 초대 코드 권한이 맞지 않습니다.",
         });
@@ -5077,7 +5109,7 @@ exports.completeSignupWithInvite = functions.region(region).https.onCall(async (
         throw new functions.https.HttpsError("unauthenticated", "로그인이 필요합니다.");
     }
     const uid = context.auth.uid;
-    const role = data === null || data === void 0 ? void 0 : data.role;
+    const role = normalizeSignupRole(data === null || data === void 0 ? void 0 : data.role);
     const code = String((data === null || data === void 0 ? void 0 : data.code) || "").trim();
     const schoolName = String((data === null || data === void 0 ? void 0 : data.schoolName) || "").trim();
     const grade = String((data === null || data === void 0 ? void 0 : data.grade) || "고등학생").trim();
@@ -5110,8 +5142,14 @@ exports.completeSignupWithInvite = functions.region(region).https.onCall(async (
     const privacyConsentInput = normalizeConsentInput(legalConsentsInput.privacy, "signup");
     const age14ConsentInput = normalizeConsentInput(legalConsentsInput.age14, "signup");
     const marketingEmailConsentInput = normalizeConsentInput(legalConsentsInput.marketingEmail, "signup");
-    if (!allowedRoles.includes(role)) {
-        throw new functions.https.HttpsError("invalid-argument", "선택한 역할이 유효하지 않습니다.");
+    if (!role) {
+        console.warn("[completeSignupWithInvite] invalid signup role", {
+            uid,
+            requestedRole: asTrimmedString(data === null || data === void 0 ? void 0 : data.role),
+        });
+        throw new functions.https.HttpsError("invalid-argument", "선택한 역할이 유효하지 않습니다.", {
+            userMessage: "선택한 역할이 유효하지 않습니다. 화면을 새로고침한 뒤 다시 시도해 주세요.",
+        });
     }
     if (!termsConsentInput.agreed || !termsConsentInput.version) {
         throw new functions.https.HttpsError("invalid-argument", "Terms consent is required.", {

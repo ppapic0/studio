@@ -28,6 +28,39 @@ const allowedRoles = ["student", "teacher", "parent", "centerAdmin", "kiosk"] as
 const adminRoles = new Set(["centerAdmin", "owner", "admin", "centerManager"]);
 type AllowedRole = (typeof allowedRoles)[number];
 
+const signupRoleAliases: Record<string, AllowedRole> = {
+  student: "student",
+  "학생": "student",
+  teacher: "teacher",
+  "선생님": "teacher",
+  "교사": "teacher",
+  "강사": "teacher",
+  parent: "parent",
+  "학부모": "parent",
+  "보호자": "parent",
+  centeradmin: "centerAdmin",
+  centeradministrator: "centerAdmin",
+  "센터관리자": "centerAdmin",
+  kiosk: "kiosk",
+  kioskaccount: "kiosk",
+  kioskmode: "kiosk",
+  tabletkiosk: "kiosk",
+  attendancekiosk: "kiosk",
+  "키오스크": "kiosk",
+  "키오스크계정": "kiosk",
+  "태블릿키오스크": "kiosk",
+};
+
+function normalizeSignupRole(value: unknown): AllowedRole | null {
+  const normalized = String(value ?? "").trim();
+  if ((allowedRoles as readonly string[]).includes(normalized)) {
+    return normalized as AllowedRole;
+  }
+
+  const compact = normalized.toLowerCase().replace(/[\s._-]+/g, "");
+  return signupRoleAliases[compact] ?? null;
+}
+
 type InviteDoc = {
   centerId: string;
   intendedRole: AllowedRole;
@@ -5083,12 +5116,13 @@ async function refreshClassroomSignalsForCenter(
 }
 
 function assertInviteUsable(inv: InviteDoc, expectedRole?: AllowedRole) {
-  if (!allowedRoles.includes(inv.intendedRole)) {
+  const inviteRole = normalizeSignupRole(inv.intendedRole);
+  if (!inviteRole) {
     throw new functions.https.HttpsError("failed-precondition", "Invite has invalid role configuration.", {
       userMessage: "초대 코드의 역할 설정이 올바르지 않습니다. 센터 관리자에게 문의해 주세요.",
     });
   }
-  if (expectedRole && inv.intendedRole !== expectedRole) {
+  if (expectedRole && inviteRole !== expectedRole) {
     throw new functions.https.HttpsError("failed-precondition", "Invite role does not match selected signup role.", {
       userMessage: "선택한 역할과 초대 코드 권한이 맞지 않습니다.",
     });
@@ -6508,7 +6542,7 @@ export const completeSignupWithInvite = functions.region(region).https.onCall(as
   }
 
   const uid = context.auth.uid;
-  const role = data?.role as AllowedRole;
+  const role = normalizeSignupRole(data?.role);
   const code = String(data?.code || "").trim();
   const schoolName = String(data?.schoolName || "").trim();
   const grade = String(data?.grade || "고등학생").trim();
@@ -6546,8 +6580,14 @@ export const completeSignupWithInvite = functions.region(region).https.onCall(as
   const age14ConsentInput = normalizeConsentInput(legalConsentsInput.age14, "signup");
   const marketingEmailConsentInput = normalizeConsentInput(legalConsentsInput.marketingEmail, "signup");
 
-  if (!allowedRoles.includes(role)) {
-    throw new functions.https.HttpsError("invalid-argument", "선택한 역할이 유효하지 않습니다.");
+  if (!role) {
+    console.warn("[completeSignupWithInvite] invalid signup role", {
+      uid,
+      requestedRole: asTrimmedString(data?.role),
+    });
+    throw new functions.https.HttpsError("invalid-argument", "선택한 역할이 유효하지 않습니다.", {
+      userMessage: "선택한 역할이 유효하지 않습니다. 화면을 새로고침한 뒤 다시 시도해 주세요.",
+    });
   }
   if (!termsConsentInput.agreed || !termsConsentInput.version) {
     throw new functions.https.HttpsError("invalid-argument", "Terms consent is required.", {
