@@ -4,7 +4,6 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { StudentDashboard } from '@/components/dashboard/student-dashboard';
-import { TeacherDashboard } from '@/components/dashboard/teacher-dashboard';
 import { AdminDashboard } from '@/components/dashboard/admin-dashboard';
 import { ParentDashboard } from '@/components/dashboard/parent-dashboard';
 import { useUser, useFunctions, useFirestore, useMemoFirebase, useDoc } from '@/firebase';
@@ -727,7 +726,7 @@ export default function DashboardPage() {
     if (userRole === 'teacher') {
       return (
         <>
-          <TeacherDashboard isActive={true} />
+          <AdminDashboard isActive={true} />
           {legalConsentDialog}
         </>
       );

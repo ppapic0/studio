@@ -1042,8 +1042,12 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
 
   const isMobile = viewMode === 'mobile';
   const centerId = activeMembership?.id;
-  const canEditFocusSchedule =
+  const isTeacherOperationsRoom = activeMembership?.role === 'teacher';
+  const canAccessAdminOnlyOperations =
     activeMembership?.role === 'centerAdmin' || activeMembership?.role === 'owner';
+  const operationsRoomTitle = isTeacherOperationsRoom ? '선생님 운영실' : '센터관리자 운영실';
+  const canEditFocusSchedule =
+    canAccessAdminOnlyOperations;
   const todayKey = today ? format(today, 'yyyy-MM-dd') : '';
   const yesterdayKey = today ? format(subDays(today, 1), 'yyyy-MM-dd') : '';
   const selectedFocusPlanWeekKeys = useMemo(() => {
@@ -3869,45 +3873,59 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
   }, [heatmapInterventionSignals]);
 
   const quickActionLinks = useMemo(
-    () => [
-      {
-        href: '/dashboard#live-classroom',
-        label: '실시간 교실',
-        description: '운영실 안에서 좌석 상태와 배치를 바로 봅니다.',
-        icon: LayoutGrid,
-      },
-      {
-        href: '/dashboard/teacher/students',
-        label: '학생 360',
-        description: '학생별 KPI와 원본 로그를 바로 봅니다.',
-        icon: Users,
-      },
-      {
-        href: '/dashboard/attendance',
-        label: '출결 KPI',
-        description: '미처리 요청과 반복 지각 학생을 봅니다.',
-        icon: ClipboardCheck,
-      },
-      {
-        href: '/dashboard/settings/notifications',
-        label: '문자 콘솔',
-        description: '오늘 문자 접수와 비용 흐름을 확인합니다.',
-        icon: MessageSquare,
-      },
-      {
-        href: '/dashboard/leads',
-        label: '리드 / 상담',
-        description: '입학 대기와 상담 후속 관리를 이어갑니다.',
-        icon: Megaphone,
-      },
-      {
-        href: '/dashboard/revenue',
-        label: '수익 분석',
-        description: '수납 경고와 운영 비용 흐름을 봅니다.',
-        icon: TrendingUp,
-      },
-    ],
-    []
+    () => {
+      const links = [
+        {
+          href: '/dashboard#live-classroom',
+          label: '실시간 교실',
+          description: '운영실 안에서 좌석 상태와 배치를 바로 봅니다.',
+          icon: LayoutGrid,
+        },
+        {
+          href: '/dashboard/teacher/students',
+          label: '학생 360',
+          description: '학생별 KPI와 원본 로그를 바로 봅니다.',
+          icon: Users,
+        },
+        {
+          href: '/dashboard/attendance',
+          label: '출결 KPI',
+          description: '미처리 요청과 반복 지각 학생을 봅니다.',
+          icon: ClipboardCheck,
+        },
+        canAccessAdminOnlyOperations
+          ? {
+              href: '/dashboard/settings/notifications',
+              label: '문자 콘솔',
+              description: '오늘 문자 접수와 발송 상태를 확인합니다.',
+              icon: MessageSquare,
+            }
+          : {
+              href: '/dashboard/appointments',
+              label: '상담 / 소통',
+              description: '상담 예약과 보호자 소통 흐름을 확인합니다.',
+              icon: MessageSquare,
+            },
+        {
+          href: '/dashboard/leads',
+          label: '리드 / 상담',
+          description: '입학 대기와 상담 후속 관리를 이어갑니다.',
+          icon: Megaphone,
+        },
+      ];
+
+      if (canAccessAdminOnlyOperations) {
+        links.push({
+          href: '/dashboard/revenue',
+          label: '수익 분석',
+          description: '수납 경고와 운영 비용 흐름을 봅니다.',
+          icon: TrendingUp,
+        });
+      }
+
+      return links;
+    },
+    [canAccessAdminOnlyOperations]
   );
 
   const isOpenClawBusy = isOpenClawExporting || openClawIntegration?.status === 'exporting';
@@ -4028,9 +4046,11 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
           detail:
             urgentInterventionStudents[0]
               ? `${urgentInterventionStudents[0].studentName} · ${urgentInterventionStudents[0].topReason}`
-              : '비즈니스 분석에서 리스크 인텔리전스를 열어 우선 개입 학생을 먼저 확인하세요.',
-          actionLabel: '비즈니스 분석',
-          href: '/dashboard/revenue?showRisk=1#risk-analysis',
+              : canAccessAdminOnlyOperations
+                ? '비즈니스 분석에서 리스크 인텔리전스를 열어 우선 개입 학생을 먼저 확인하세요.'
+                : '운영실에서 우선 개입 학생을 먼저 확인하세요.',
+          actionLabel: canAccessAdminOnlyOperations ? '비즈니스 분석' : '우선 학생 보기',
+          href: canAccessAdminOnlyOperations ? '/dashboard/revenue?showRisk=1#risk-analysis' : undefined,
           icon: ShieldAlert,
           toneClass: 'bg-rose-100 text-rose-700',
         },
@@ -4070,15 +4090,19 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
           icon: Megaphone,
           toneClass: 'bg-blue-100 text-blue-700',
         },
-        {
-          key: 'cost',
-          title: `문자·수납 비용 흐름`,
-          detail: '비용 분석에서 문자 비용과 수납/전환 효율을 함께 점검하세요.',
-          actionLabel: '비용 분석',
-          href: '/dashboard/revenue',
-          icon: TrendingUp,
-          toneClass: 'bg-emerald-100 text-emerald-700',
-        },
+        ...(canAccessAdminOnlyOperations
+          ? [
+              {
+                key: 'cost',
+                title: `문자·수납 비용 흐름`,
+                detail: '비용 분석에서 문자 비용과 수납/전환 효율을 함께 점검하세요.',
+                actionLabel: '비용 분석',
+                href: '/dashboard/revenue',
+                icon: TrendingUp,
+                toneClass: 'bg-emerald-100 text-emerald-700',
+              },
+            ]
+          : []),
       ].filter((item) => {
         if (item.key === 'attendance-request') return pendingOtherAttendanceRequests.length > 0;
         if (item.key === 'schedule-change') return pendingScheduleChangeRequests.length > 0;
@@ -4089,7 +4113,7 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
         if (item.key === 'lead') return (metrics?.leadPipelineCount30d ?? 0) > 0;
         return true;
       }),
-    [attendanceBoardSummary, attendanceSeatSignalsByStudentId, metrics, parentContactRecommendations, pendingOtherAttendanceRequests, pendingScheduleChangeRequests, urgentInterventionStudents]
+    [attendanceBoardSummary, attendanceSeatSignalsByStudentId, canAccessAdminOnlyOperations, metrics, parentContactRecommendations, pendingOtherAttendanceRequests, pendingScheduleChangeRequests, urgentInterventionStudents]
   );
 
   const todayAttendanceContactTargets = useMemo(() => {
@@ -5376,7 +5400,9 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
     { label: '학생 360', icon: <Users className="h-4 w-4" />, href: '/dashboard/teacher/students' },
     { label: '출결 KPI', icon: <ClipboardCheck className="h-4 w-4" />, href: '/dashboard/attendance' },
     { label: '리드 / 상담', icon: <Megaphone className="h-4 w-4" />, href: '/dashboard/leads' },
-    { label: '수익 분석', icon: <TrendingUp className="h-4 w-4" />, href: '/dashboard/revenue' },
+    ...(canAccessAdminOnlyOperations
+      ? [{ label: '수익 분석', icon: <TrendingUp className="h-4 w-4" />, href: '/dashboard/revenue' }]
+      : []),
   ];
 
   const liveSyncLabel = format(liveTickMs || now || Date.now(), 'HH:mm');
@@ -7641,22 +7667,26 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
         panels={adminOperationsInboxPanels}
         headerActions={
           <>
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => setIsPointBoostDialogOpen(true)}
-              className="h-10 rounded-xl border-2 border-[#DCE7FF] bg-white px-3 text-xs font-black text-[#14295F]"
-            >
-              포인트 부스트
-            </Button>
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => setIsAnnouncementDialogOpen(true)}
-              className="h-10 rounded-xl border-2 border-[#DCE7FF] bg-white px-3 text-xs font-black text-[#14295F]"
-            >
-              공지 보내기
-            </Button>
+            {canAccessAdminOnlyOperations ? (
+              <>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setIsPointBoostDialogOpen(true)}
+                  className="h-10 rounded-xl border-2 border-[#DCE7FF] bg-white px-3 text-xs font-black text-[#14295F]"
+                >
+                  포인트 부스트
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setIsAnnouncementDialogOpen(true)}
+                  className="h-10 rounded-xl border-2 border-[#DCE7FF] bg-white px-3 text-xs font-black text-[#14295F]"
+                >
+                  공지 보내기
+                </Button>
+              </>
+            ) : null}
             <Button
               type="button"
               variant="outline"
@@ -8487,7 +8517,7 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
     <div className={cn('mx-auto flex w-full max-w-[1520px] flex-col gap-6', isMobile ? 'px-1 pb-8' : 'px-4 py-6')}>
       <AdminWorkbenchCommandBar
         eyebrow="센터 운영"
-        title="센터관리자 운영실"
+        title={operationsRoomTitle}
         variant="adminStudio"
         quickActions={workbenchQuickActions}
         selectValue={selectedClass}
@@ -8522,7 +8552,7 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
           {renderManualStudySessionDialog()}
           {renderEditStudySessionDialog()}
           {renderFocusAdjustmentDialog()}
-          {renderHomeInsightsSection()}
+          {canAccessAdminOnlyOperations ? renderHomeInsightsSection() : null}
 
           <Dialog
             open={isTodayPointsDialogOpen}

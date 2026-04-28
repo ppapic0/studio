@@ -4,7 +4,7 @@ import { useEffect } from 'react';
 import { Loader2 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 
-import { TeacherDashboard } from '@/components/dashboard/teacher-dashboard';
+import { AdminDashboard } from '@/components/dashboard/admin-dashboard';
 import { useAppContext } from '@/contexts/app-context';
 
 const CLASSROOM_ROLES = new Set(['teacher', 'centerAdmin', 'owner']);
@@ -59,5 +59,5 @@ export default function TeacherHomePage() {
     );
   }
 
-  return <TeacherDashboard isActive={true} />;
+  return <AdminDashboard isActive={true} />;
 }
