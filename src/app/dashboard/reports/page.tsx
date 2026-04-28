@@ -360,31 +360,96 @@ export default function DailyReportsPage() {
   const [trustReviewWarnings, setTrustReviewWarnings] = useState<ReportTrustReviewWarning[]>([]);
   const [isTrustReviewOpen, setIsTrustReviewOpen] = useState(false);
   const pageRootRef = useRef<HTMLDivElement | null>(null);
+  const writeModalTriggerRef = useRef<HTMLElement | null>(null);
+  const writeModalContentRef = useRef<HTMLDivElement | null>(null);
+  const reportContentTextareaRef = useRef<HTMLTextAreaElement | null>(null);
+  const sendReportButtonRef = useRef<HTMLButtonElement | null>(null);
+  const reportFocusTimerRef = useRef<number | null>(null);
+  const isClosingWriteModalRef = useRef(false);
 
-  const moveReportDialogFocusToPage = () => {
+  const clearReportFocusTimer = () => {
+    if (reportFocusTimerRef.current !== null) {
+      window.clearTimeout(reportFocusTimerRef.current);
+      reportFocusTimerRef.current = null;
+    }
+  };
+
+  const blurActiveReportElement = () => {
     const activeElement = document.activeElement;
     if (activeElement instanceof HTMLElement) {
       activeElement.blur();
     }
-    window.requestAnimationFrame(() => {
-      pageRootRef.current?.focus({ preventScroll: true });
-    });
+  };
+
+  const focusReportElement = (element: HTMLElement | null) => {
+    if (!element?.isConnected || element.closest('[aria-hidden="true"]')) {
+      return false;
+    }
+
+    element.focus({ preventScroll: true });
+    return document.activeElement === element;
+  };
+
+  const scheduleReportFocus = (targets: Array<() => HTMLElement | null>, delayMs = 50) => {
+    clearReportFocusTimer();
+    blurActiveReportElement();
+
+    const tryFocus = (remainingAttempts: number) => {
+      reportFocusTimerRef.current = null;
+
+      for (const getTarget of targets) {
+        if (focusReportElement(getTarget())) {
+          return;
+        }
+      }
+
+      if (remainingAttempts > 0) {
+        reportFocusTimerRef.current = window.setTimeout(() => tryFocus(remainingAttempts - 1), 50);
+      }
+    };
+
+    reportFocusTimerRef.current = window.setTimeout(() => tryFocus(4), delayMs);
+  };
+
+  const moveReportDialogFocusToPage = () => {
+    scheduleReportFocus([
+      () => writeModalTriggerRef.current,
+      () => pageRootRef.current,
+    ]);
+  };
+
+  const moveTrustReviewFocusToWriteModal = () => {
+    if (isClosingWriteModalRef.current) {
+      moveReportDialogFocusToPage();
+      return;
+    }
+
+    scheduleReportFocus([
+      () => sendReportButtonRef.current,
+      () => reportContentTextareaRef.current,
+      () => writeModalContentRef.current,
+    ]);
   };
 
   const handleWriteModalOpenChange = (open: boolean) => {
     if (!open) {
+      isClosingWriteModalRef.current = true;
       moveReportDialogFocusToPage();
       setIsTrustReviewOpen(false);
+    } else {
+      isClosingWriteModalRef.current = false;
     }
     setIsWriteModalOpen(open);
   };
 
   const handleTrustReviewOpenChange = (open: boolean) => {
     if (!open) {
-      moveReportDialogFocusToPage();
+      moveTrustReviewFocusToWriteModal();
     }
     setIsTrustReviewOpen(open);
   };
+
+  useEffect(() => () => clearReportFocusTimer(), []);
 
   const formatTimestampLabel = (value: unknown, fallback: string) => {
     const parsed = toDateSafe(value);
@@ -541,7 +606,7 @@ export default function DailyReportsPage() {
     [filteredStudents, reportByStudentId, reportReadCount30dByStudentId, studyLogSummaryByStudentId]
   );
 
-  const handleOpenWriteModal = async (studentId: string, studentName: string) => {
+  const handleOpenWriteModal = async (studentId: string, studentName: string, triggerElement?: HTMLElement | null) => {
     const studyLogSummary = studyLogSummaryByStudentId[studentId];
     if (!studyLogSummary?.hasStudyRecord) {
       toast({
@@ -551,6 +616,8 @@ export default function DailyReportsPage() {
       });
       return;
     }
+    writeModalTriggerRef.current = triggerElement || null;
+    isClosingWriteModalRef.current = false;
     setSelectedStudent({ id: studentId, name: studentName });
     const existing = dailyReports?.find(r => r.studentId === studentId);
     setReportContent(existing?.content || '');
@@ -869,11 +936,10 @@ export default function DailyReportsPage() {
 
       toast({ title: status === 'sent' ? "발송 완료" : "저장 완료" });
       setTrustReviewWarnings([]);
-      moveReportDialogFocusToPage();
+      isClosingWriteModalRef.current = true;
       setIsTrustReviewOpen(false);
-      window.requestAnimationFrame(() => {
-        setIsWriteModalOpen(false);
-      });
+      setIsWriteModalOpen(false);
+      moveReportDialogFocusToPage();
     } catch (e: any) {
       toast({ variant: "destructive", title: "저장 실패" });
     } finally {
@@ -941,7 +1007,7 @@ export default function DailyReportsPage() {
                   <div 
                     key={student.id} 
                     className="p-3 rounded-2xl border-2 border-transparent hover:border-primary/10 hover:bg-primary/5 cursor-pointer flex items-center gap-3 transition-all active:scale-95"
-                    onClick={() => handleOpenWriteModal(student.id, student.displayName || '학생')}
+                    onClick={(event) => void handleOpenWriteModal(student.id, student.displayName || '학생', event.currentTarget)}
                   >
                     <Avatar className="h-10 w-10 border-2 border-white shadow-sm ring-1 ring-border/50">
                       <AvatarFallback className="bg-primary/5 text-primary font-black text-xs">{student.displayName?.charAt(0)}</AvatarFallback>
@@ -1108,7 +1174,7 @@ export default function DailyReportsPage() {
                         </div>
                       </div>
                       <Button 
-                        onClick={() => handleOpenWriteModal(student.id, student.displayName || '학생')} 
+                        onClick={(event) => void handleOpenWriteModal(student.id, student.displayName || '학생', event.currentTarget)} 
                         className={cn(
                           "rounded-2xl font-black shrink-0 transition-all duration-300",
                           isMobile ? "h-12 w-12 p-0 shadow-lg" : "h-16 px-10 text-base shadow-xl",
@@ -1132,6 +1198,7 @@ export default function DailyReportsPage() {
 
       <Dialog open={isWriteModalOpen} onOpenChange={handleWriteModalOpenChange}>
         <DialogContent
+          ref={writeModalContentRef}
           onCloseAutoFocus={(event) => {
             event.preventDefault();
             moveReportDialogFocusToPage();
@@ -1255,6 +1322,7 @@ export default function DailyReportsPage() {
                 </Label>
                 <div className="relative group">
                   <Textarea 
+                    ref={reportContentTextareaRef}
                     value={reportContent}
                     onChange={(e) => setReportContent(e.target.value)}
                     className={cn(
@@ -1306,7 +1374,7 @@ export default function DailyReportsPage() {
             )}
             <div className={cn("flex gap-3", isMobile ? "w-full" : "")}>
               <Button variant="outline" className="rounded-2xl h-14 px-8 font-black flex-1 sm:flex-none border-2 shadow-sm" onClick={() => handleSaveReport('draft')} disabled={isSaving}>임시 저장</Button>
-              <Button className="rounded-2xl h-14 px-12 font-black gap-3 shadow-xl flex-1 sm:flex-none active:scale-95 transition-all" onClick={() => handleSaveReport('sent')} disabled={isSaving || !reportContent.trim() || !selectedStudentCanSendReport}>
+              <Button ref={sendReportButtonRef} className="rounded-2xl h-14 px-12 font-black gap-3 shadow-xl flex-1 sm:flex-none active:scale-95 transition-all" onClick={() => handleSaveReport('sent')} disabled={isSaving || !reportContent.trim() || !selectedStudentCanSendReport}>
                 <Send className="h-5 w-5" /> 발송
               </Button>
             </div>
@@ -1318,7 +1386,7 @@ export default function DailyReportsPage() {
         <AlertDialogContent
           onCloseAutoFocus={(event) => {
             event.preventDefault();
-            moveReportDialogFocusToPage();
+            moveTrustReviewFocusToWriteModal();
           }}
           className="rounded-[2rem] border-none bg-white p-0 shadow-2xl sm:max-w-xl"
         >
@@ -1361,7 +1429,6 @@ export default function DailyReportsPage() {
           </div>
           <AlertDialogFooter className="gap-2 border-t border-slate-100 bg-slate-50 px-6 py-4 sm:space-x-0">
             <AlertDialogCancel
-              onClick={moveReportDialogFocusToPage}
               className="mt-0 h-11 rounded-xl border-slate-200 bg-white px-5 font-black text-slate-700"
             >
               다시 확인할게요
@@ -1369,7 +1436,6 @@ export default function DailyReportsPage() {
             <Button
               type="button"
               onClick={() => {
-                moveReportDialogFocusToPage();
                 void handleSaveReport('sent', { skipTrustReview: true });
               }}
               disabled={isSaving}
