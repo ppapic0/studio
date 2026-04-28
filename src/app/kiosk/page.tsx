@@ -281,7 +281,7 @@ export default function KioskPage() {
   };
 
   const handleStatusUpdate = async (student: StudentProfile, nextStatus: AttendanceCurrent['status']) => {
-    if (isProcessing || !firestore || !centerId) return;
+    if (isProcessing || !centerId) return;
     
     const seat = resolveSeatForStudent(student);
     if (!seat) {
@@ -317,7 +317,7 @@ export default function KioskPage() {
         },
       });
 
-      if (nextStatus === 'studying') {
+      if (nextStatus === 'studying' && firestore) {
         void syncAutoAttendanceRecord({
           firestore,
           centerId,
