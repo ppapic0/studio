@@ -16,7 +16,7 @@ import {
   Undo2,
   UserRound,
 } from 'lucide-react';
-import { collection, getDocs, limit, query, Timestamp, where } from 'firebase/firestore';
+import { collection, doc, getDoc, getDocs, limit, query, Timestamp, where, type Firestore } from 'firebase/firestore';
 import { httpsCallable } from 'firebase/functions';
 
 import { Button } from '@/components/ui/button';
@@ -210,6 +210,7 @@ function writeOutbox(items: KioskOutboxItem[]) {
 
 function getKioskErrorMessage(error: unknown) {
   const raw = error as {
+    code?: unknown;
     message?: unknown;
     details?: unknown;
     customData?: unknown;
@@ -221,8 +222,70 @@ function getKioskErrorMessage(error: unknown) {
       if (typeof userMessage === 'string' && userMessage.trim()) return userMessage.trim();
     }
   }
-  if (typeof raw.message === 'string' && raw.message.trim()) return raw.message.trim();
+  const code = typeof raw.code === 'string' ? raw.code.toLowerCase() : '';
+  const message = typeof raw.message === 'string' ? raw.message.trim() : '';
+  if (code.includes('internal') || /(^|\b)(functions\/)?internal(\b|$)/i.test(message)) {
+    return '키오스크 출결 처리 중 서버 응답이 불안정했습니다. 실제 반영 여부를 확인한 뒤 다시 처리합니다.';
+  }
+  if (message) return message;
   return '잠시 후 다시 시도해 주세요.';
+}
+
+function getKioskCallableErrorCode(error: unknown): string {
+  const raw = error as { code?: unknown };
+  return typeof raw?.code === 'string' ? raw.code.toLowerCase().replace(/^functions\//, '') : '';
+}
+
+function shouldUseDirectKioskAttendanceFallback(error: unknown): boolean {
+  const code = getKioskCallableErrorCode(error);
+  const message = error instanceof Error ? error.message : String((error as { message?: unknown })?.message || '');
+  return (
+    code === 'internal' ||
+    code === 'unavailable' ||
+    code === 'deadline-exceeded' ||
+    /\b(functions\/)?(internal|unavailable|deadline-exceeded)\b/i.test(message)
+  );
+}
+
+async function verifyKioskSeatStatus(params: {
+  firestore: Firestore | null;
+  payload: EnqueueKioskAttendanceActionInput;
+  expectedStatus: AttendanceStatus;
+}): Promise<{
+  verified: boolean;
+  confirmedStatus?: AttendanceStatus;
+  confirmedSeatId?: string;
+}> {
+  if (!params.firestore || !params.payload.seatId) {
+    return { verified: false };
+  }
+
+  const seatSnap = await getDoc(doc(
+    params.firestore,
+    'centers',
+    params.payload.centerId,
+    'attendanceCurrent',
+    params.payload.seatId
+  ));
+  if (!seatSnap.exists()) {
+    return { verified: false, confirmedSeatId: params.payload.seatId };
+  }
+
+  const seatData = seatSnap.data() as Partial<AttendanceCurrent>;
+  if (seatData.studentId && seatData.studentId !== params.payload.studentId) {
+    return {
+      verified: false,
+      confirmedSeatId: seatSnap.id,
+      confirmedStatus: normalizeStatus(seatData.status),
+    };
+  }
+
+  const confirmedStatus = normalizeStatus(seatData.status);
+  return {
+    verified: confirmedStatus === params.expectedStatus,
+    confirmedSeatId: seatSnap.id,
+    confirmedStatus,
+  };
 }
 
 export default function KioskPage() {
@@ -474,24 +537,110 @@ export default function KioskPage() {
 
   const sendActionToBackend = useCallback(async (payload: EnqueueKioskAttendanceActionInput): Promise<EnqueueKioskAttendanceActionResult> => {
     saveActionForRetry(payload);
+    const nextStatus = getNextStatusForAction(payload.action);
     if (!functions) {
       void flushOutbox();
       return {
         ok: true,
         queued: true,
         actionId: payload.idempotencyKey,
-        optimisticStatus: getNextStatusForAction(payload.action),
+        optimisticStatus: nextStatus,
         status: 'queued',
         userMessage: '네트워크가 연결되면 자동으로 다시 전송합니다.',
       };
     }
 
-    const result = await enqueueKioskAttendanceActionSecure(functions, payload);
+    let result: EnqueueKioskAttendanceActionResult;
+    try {
+      result = await enqueueKioskAttendanceActionSecure(functions, payload);
+    } catch (error) {
+      if (!shouldUseDirectKioskAttendanceFallback(error)) {
+        throw error;
+      }
+
+      const alreadyApplied = await verifyKioskSeatStatus({
+        firestore,
+        payload,
+        expectedStatus: nextStatus,
+      });
+      if (alreadyApplied.verified) {
+        return {
+          ok: true,
+          queued: false,
+          actionId: payload.idempotencyKey,
+          optimisticStatus: nextStatus,
+          status: 'completed',
+          verified: true,
+          confirmedStatus: alreadyApplied.confirmedStatus || nextStatus,
+          confirmedSeatId: alreadyApplied.confirmedSeatId,
+          result: {
+            fallback: 'post_error_verification',
+            originalError: getKioskErrorMessage(error),
+          },
+        };
+      }
+
+      const directAttendanceFn = httpsCallable<
+        {
+          centerId: string;
+          studentId: string;
+          nextStatus: AttendanceStatus;
+          seatId?: string;
+          seatHint?: EnqueueKioskAttendanceActionInput['seatHint'];
+          source: 'kiosk';
+        },
+        Record<string, unknown>
+      >(functions, 'setStudentAttendanceStatusSecure');
+      const directResult = await directAttendanceFn({
+        centerId: payload.centerId,
+        studentId: payload.studentId,
+        nextStatus,
+        seatId: payload.seatId || undefined,
+        seatHint: payload.seatHint || undefined,
+        source: 'kiosk',
+      });
+      const verified = await verifyKioskSeatStatus({
+        firestore,
+        payload,
+        expectedStatus: nextStatus,
+      });
+
+      if (!verified.verified) {
+        return {
+          ok: true,
+          queued: false,
+          actionId: payload.idempotencyKey,
+          optimisticStatus: nextStatus,
+          status: 'failed',
+          confirmedStatus: verified.confirmedStatus,
+          confirmedSeatId: verified.confirmedSeatId,
+          result: directResult.data,
+          userMessage: '출결 처리 요청은 보냈지만 실제 상태 확인에 실패했습니다. 번호를 다시 입력해 현재 상태를 확인해 주세요.',
+          failedReason: getKioskErrorMessage(error),
+        };
+      }
+
+      result = {
+        ok: true,
+        queued: false,
+        actionId: payload.idempotencyKey,
+        optimisticStatus: nextStatus,
+        status: 'completed',
+        verified: true,
+        confirmedStatus: verified.confirmedStatus || nextStatus,
+        confirmedSeatId: verified.confirmedSeatId,
+        result: {
+          ...directResult.data,
+          fallback: 'setStudentAttendanceStatusSecure',
+          originalError: getKioskErrorMessage(error),
+        },
+      };
+    }
     if (result.status === 'completed' || result.status === 'failed' || result.status === 'rejected_stale') {
       removeActionFromRetry(payload.idempotencyKey);
     }
     return result;
-  }, [flushOutbox, functions, removeActionFromRetry, saveActionForRetry]);
+  }, [firestore, flushOutbox, functions, removeActionFromRetry, saveActionForRetry]);
 
   useEffect(() => {
     void flushOutbox();
