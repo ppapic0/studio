@@ -10199,11 +10199,6 @@ exports.submitAttendanceRequestSecure = functions.region(region).https.onCall(as
                 userMessage: "변경 유형을 다시 확인해 주세요.",
             });
         }
-        if (reason.length < 5) {
-            throw new functions.https.HttpsError("invalid-argument", "Reason is too short.", {
-                userMessage: "변경 사유는 5자 이상 입력해 주세요.",
-            });
-        }
         const todayDateKey = toDateKey(toKstDate(new Date()));
         if (requestDate !== todayDateKey) {
             throw new functions.https.HttpsError("failed-precondition", "Schedule change requests are same-day only.", {

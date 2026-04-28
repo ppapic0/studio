@@ -3161,14 +3161,6 @@ export default function StudyPlanPage() {
     if (!activeMembership?.id || !selectedDateKey) return;
 
     const trimmedReason = sameDayReason.trim();
-    if (trimmedReason.length < 5) {
-      toast({
-        variant: 'destructive',
-        title: '사유를 조금 더 적어주세요',
-        description: '당일 변경 사유는 5자 이상 입력해야 해요.',
-      });
-      return;
-    }
 
     setIsSubmitting(true);
     setAttendanceSaveError(null);

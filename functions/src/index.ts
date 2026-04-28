@@ -12682,11 +12682,6 @@ export const submitAttendanceRequestSecure = functions.region(region).https.onCa
         userMessage: "변경 유형을 다시 확인해 주세요.",
       });
     }
-    if (reason.length < 5) {
-      throw new functions.https.HttpsError("invalid-argument", "Reason is too short.", {
-        userMessage: "변경 사유는 5자 이상 입력해 주세요.",
-      });
-    }
 
     const todayDateKey = toDateKey(toKstDate(new Date()));
     if (requestDate !== todayDateKey) {
