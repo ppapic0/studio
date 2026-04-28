@@ -10994,10 +10994,6 @@ async function processKioskAttendanceQueueItem(
   }
 }
 
-function sleepKioskQueueMs(ms: number): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, ms));
-}
-
 function getKioskQueueCallableUserMessage(status: KioskAttendanceQueueStatus): string | null {
   if (status === "completed") return null;
   if (status === "failed") {
@@ -11042,22 +11038,247 @@ async function readKioskAttendanceQueueCallableResult(params: {
   };
 }
 
-async function waitForKioskAttendanceQueueCallableResult(params: {
+async function processKioskAttendanceQueueItemInlineFast(params: {
   db: admin.firestore.Firestore;
   centerId: string;
   actionId: string;
   fallbackOptimisticStatus: AttendanceSeatStatus;
 }): Promise<Record<string, unknown>> {
-  let latest = await readKioskAttendanceQueueCallableResult(params);
-  for (let attempt = 0; attempt < 5; attempt += 1) {
-    const status = parseKioskAttendanceQueueStatus(latest.status);
-    if (status === "completed" || status === "failed" || status === "rejected_stale") {
-      return latest;
-    }
-    await sleepKioskQueueMs(160);
-    latest = await readKioskAttendanceQueueCallableResult(params);
+  const { db, centerId, actionId, fallbackOptimisticStatus } = params;
+  const queueRef = db.doc(`centers/${centerId}/kioskAttendanceQueue/${actionId}`);
+  const nowMs = Date.now();
+  const nowTs = admin.firestore.Timestamp.fromMillis(nowMs);
+  const leaseExpiresAt = admin.firestore.Timestamp.fromMillis(nowMs + KIOSK_ATTENDANCE_LOCK_TTL_MS);
+  const queueSnap = await queueRef.get();
+  if (!queueSnap.exists) {
+    return {
+      ok: true,
+      queued: false,
+      actionId,
+      optimisticStatus: fallbackOptimisticStatus,
+      status: "failed",
+      userMessage: "키오스크 출결 요청을 찾지 못했습니다. 번호를 다시 입력해 주세요.",
+      failedReason: "queue_not_found",
+    };
   }
-  return latest;
+
+  const queueData = (queueSnap.data() || {}) as Record<string, unknown>;
+  const status = parseKioskAttendanceQueueStatus(queueData.status);
+  if (status === "completed" || status === "failed" || status === "rejected_stale") {
+    return readKioskAttendanceQueueCallableResult({
+      db,
+      centerId,
+      actionId,
+      fallbackOptimisticStatus,
+    });
+  }
+  if (status === "processing" && toMillisSafe(queueData.leaseExpiresAt) > nowMs) {
+    return readKioskAttendanceQueueCallableResult({
+      db,
+      centerId,
+      actionId,
+      fallbackOptimisticStatus,
+    });
+  }
+
+  const studentId = asTrimmedString(queueData.studentId);
+  const action = parseKioskAttendanceQueueAction(queueData.action);
+  const expectedStatus = parseAttendanceSeatStatus(queueData.expectedStatus);
+  const seatId = asTrimmedString(queueData.seatId) || null;
+  const seatHint = normalizeKioskSeatHint(queueData.seatHint);
+  const effectiveActionAtMs = Math.max(0, Math.floor(parseFiniteNumber(queueData.effectiveActionAtMillis) ?? nowMs));
+  if (!studentId || !action || !expectedStatus) {
+    await queueRef.set({
+      status: "failed",
+      failedReason: "invalid_inline_fast_payload",
+      completedAt: admin.firestore.FieldValue.serverTimestamp(),
+      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+    }, { merge: true });
+    return readKioskAttendanceQueueCallableResult({
+      db,
+      centerId,
+      actionId,
+      fallbackOptimisticStatus,
+    });
+  }
+
+  const nextStatus = getKioskActionNextStatus(action);
+  await queueRef.set({
+    status: "processing",
+    processingStartedAt: nowTs,
+    leaseExpiresAt,
+    attemptCount: admin.firestore.FieldValue.increment(1),
+    processingMode: "inline_fast",
+    updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+  }, { merge: true });
+
+  const current = await resolveKioskQueueSeatStatus({ db, centerId, studentId, seatId });
+  if (current.status !== expectedStatus) {
+    if (current.status === nextStatus) {
+      const alreadyApplied = await completeKioskQueueItemAsAlreadyApplied({
+        db,
+        centerId,
+        actionId,
+        studentId,
+        seatId: current.seatId || seatId,
+        action,
+        expectedStatus,
+        nextStatus,
+        currentStatus: current.status,
+      });
+      if (!alreadyApplied) {
+        await rejectKioskQueueItemAsStale({
+          db,
+          centerId,
+          actionId,
+          reason: "already_applied_verification_failed",
+          currentStatus: current.status,
+          expectedStatus,
+        });
+      }
+    } else {
+      await rejectKioskQueueItemAsStale({
+        db,
+        centerId,
+        actionId,
+        reason: "status_changed_before_inline_fast_processing",
+        currentStatus: current.status,
+        expectedStatus,
+      });
+    }
+    return readKioskAttendanceQueueCallableResult({
+      db,
+      centerId,
+      actionId,
+      fallbackOptimisticStatus: nextStatus,
+    });
+  }
+  if (!isKioskActionAllowedFromStatus(action, current.status)) {
+    await rejectKioskQueueItemAsStale({
+      db,
+      centerId,
+      actionId,
+      reason: "action_not_allowed_from_inline_fast_status",
+      currentStatus: current.status,
+      expectedStatus,
+    });
+    return readKioskAttendanceQueueCallableResult({
+      db,
+      centerId,
+      actionId,
+      fallbackOptimisticStatus: nextStatus,
+    });
+  }
+
+  try {
+    const result = await applyAttendanceStatusTransition({
+      db,
+      centerId,
+      studentId,
+      nextStatus,
+      source: "kiosk",
+      actorUid: asTrimmedString(queueData.requestedByUid) || null,
+      seatId: current.seatId || seatId,
+      seatHint,
+      nowMs: effectiveActionAtMs,
+    });
+    const verification = await verifyKioskAttendanceQueueResult({
+      db,
+      centerId,
+      studentId,
+      seatId: result.seatId || current.seatId || seatId,
+      expectedStatus: nextStatus,
+    });
+    const resultPayload = {
+      previousStatus: result.previousStatus,
+      nextStatus: result.nextStatus,
+      eventType: result.eventType,
+      eventId: result.eventId,
+      eventAtMillis: result.eventAtMillis,
+      sessionDateKey: result.sessionDateKey,
+      sessionMinutes: result.sessionMinutes,
+    };
+
+    if (!verification.verified) {
+      await queueRef.set({
+        status: "failed",
+        verified: false,
+        completedAt: admin.firestore.FieldValue.serverTimestamp(),
+        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        failedReason: "verification_failed",
+        failedCode: verification.failedReason || "verification_failed",
+        confirmedSeatId: verification.confirmedSeatId,
+        confirmedStatus: verification.confirmedStatus,
+        confirmedStudentId: verification.confirmedStudentId,
+        result: resultPayload,
+        verification,
+      }, { merge: true });
+      return readKioskAttendanceQueueCallableResult({
+        db,
+        centerId,
+        actionId,
+        fallbackOptimisticStatus: nextStatus,
+      });
+    }
+
+    await queueRef.set({
+      status: "completed",
+      verified: true,
+      confirmedSeatId: verification.confirmedSeatId,
+      confirmedStatus: verification.confirmedStatus,
+      confirmedStudentId: verification.confirmedStudentId,
+      completedAt: admin.firestore.FieldValue.serverTimestamp(),
+      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      result: resultPayload,
+      verification,
+    }, { merge: true });
+
+    void queueAttendanceTransitionSmsAfterCommit(db, { centerId, result }).catch((error) => {
+      console.error("[attendance-sms-v2] kiosk inline fast queue failed", {
+        centerId,
+        eventId: result.eventId || null,
+        eventType: result.eventType || null,
+        message: error instanceof Error ? error.message : String(error),
+      });
+    });
+
+    return {
+      ok: true,
+      queued: false,
+      actionId,
+      optimisticStatus: nextStatus,
+      status: "completed",
+      verified: true,
+      confirmedStatus: verification.confirmedStatus,
+      confirmedSeatId: verification.confirmedSeatId,
+      result: resultPayload,
+    };
+  } catch (error) {
+    const retryable = isRetryableKioskQueueError(error);
+    await queueRef.set({
+      status: retryable ? "queued" : "failed",
+      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      failedReason: getKioskQueueErrorMessage(error),
+      failedCode: getKioskQueueErrorCode(error) || null,
+      ...(retryable
+        ? { nextAttemptAt: admin.firestore.Timestamp.fromMillis(nowMs + 1000) }
+        : { completedAt: admin.firestore.FieldValue.serverTimestamp() }),
+    }, { merge: true });
+    console.error("[kiosk-attendance-queue] inline fast processing failed", {
+      centerId,
+      actionId,
+      studentId,
+      retryable,
+      code: getKioskQueueErrorCode(error),
+      message: getKioskQueueErrorMessage(error),
+    });
+    return readKioskAttendanceQueueCallableResult({
+      db,
+      centerId,
+      actionId,
+      fallbackOptimisticStatus: nextStatus,
+    });
+  }
 }
 
 export const enqueueKioskAttendanceActionSecure = functions.region(region).runWith({
@@ -11153,21 +11374,7 @@ export const enqueueKioskAttendanceActionSecure = functions.region(region).runWi
       };
     });
 
-    if (enqueueResult.status === "queued" || enqueueResult.status === "processing") {
-      try {
-        await processKioskAttendanceQueueItem(db, centerId, enqueueResult.actionId);
-      } catch (error) {
-        console.error("[kiosk-attendance-queue] inline processing failed", {
-          centerId,
-          actionId: enqueueResult.actionId,
-          studentId,
-          code: getKioskQueueErrorCode(error),
-          message: getKioskQueueErrorMessage(error),
-        });
-      }
-    }
-
-    return waitForKioskAttendanceQueueCallableResult({
+    return processKioskAttendanceQueueItemInlineFast({
       db,
       centerId,
       actionId: enqueueResult.actionId,

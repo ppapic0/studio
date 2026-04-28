@@ -91,8 +91,9 @@ type KioskOutboxItem = {
 
 const OUTBOX_STORAGE_KEY = 'track:kiosk-attendance-outbox:v1';
 const MAX_OUTBOX_ITEMS = 40;
-const SUCCESS_FEEDBACK_VISIBLE_MS = 900;
-const RESET_AFTER_SUCCESS_MS = 140;
+const SUCCESS_FEEDBACK_VISIBLE_MS = 620;
+const RESET_AFTER_SUCCESS_MS = 70;
+const PROCESSING_FEEDBACK_DELAY_MS = 80;
 const kioskTouchClass = 'touch-manipulation select-none [-webkit-tap-highlight-color:transparent] [touch-action:manipulation]';
 
 const ACTIONS: Record<KioskAttendanceAction, KioskActionConfig> = {
@@ -353,6 +354,7 @@ export default function KioskPage() {
   const lookupVersionRef = useRef(0);
   const pendingActionRef = useRef(false);
   const flushingOutboxRef = useRef(false);
+  const actionProcessingTimerRef = useRef<number | null>(null);
 
   const lookupKioskStudentsByPin = useMemo(() => {
     if (!functions) return null;
@@ -375,6 +377,10 @@ export default function KioskPage() {
 
   const resetKiosk = useCallback(() => {
     lookupVersionRef.current += 1;
+    if (actionProcessingTimerRef.current !== null) {
+      window.clearTimeout(actionProcessingTimerRef.current);
+      actionProcessingTimerRef.current = null;
+    }
     setPin('');
     setStep('pin');
     setMatchedStudents([]);
@@ -382,6 +388,7 @@ export default function KioskPage() {
     setSelectedStudent(null);
     setLookupMessage('번호 확인 중');
     setIsSearching(false);
+    setActionProcessingLabel(null);
   }, []);
 
   const resolveSeatForStudent = useCallback((student: KioskStudent): KioskLookupAttendance | null => {
@@ -707,6 +714,12 @@ export default function KioskPage() {
     return () => window.clearTimeout(timer);
   }, [successFeedback]);
 
+  useEffect(() => () => {
+    if (actionProcessingTimerRef.current !== null) {
+      window.clearTimeout(actionProcessingTimerRef.current);
+    }
+  }, []);
+
   const handleNumberClick = useCallback((num: string) => {
     if (isSearching || step !== 'pin') return;
     setPin((previous) => {
@@ -751,7 +764,13 @@ export default function KioskPage() {
     const config = ACTIONS[action];
     const nextStatus = getNextStatusForAction(action);
     pendingActionRef.current = true;
-    setActionProcessingLabel(`${config.label} 처리 중`);
+    if (actionProcessingTimerRef.current !== null) {
+      window.clearTimeout(actionProcessingTimerRef.current);
+    }
+    actionProcessingTimerRef.current = window.setTimeout(() => {
+      setActionProcessingLabel(`${config.label} 처리 중`);
+      actionProcessingTimerRef.current = null;
+    }, PROCESSING_FEEDBACK_DELAY_MS);
 
     const payload: EnqueueKioskAttendanceActionInput = {
       centerId,
@@ -808,6 +827,10 @@ export default function KioskPage() {
       void flushOutbox();
       resetKiosk();
     } finally {
+      if (actionProcessingTimerRef.current !== null) {
+        window.clearTimeout(actionProcessingTimerRef.current);
+        actionProcessingTimerRef.current = null;
+      }
       setActionProcessingLabel(null);
       pendingActionRef.current = false;
     }
@@ -833,10 +856,10 @@ export default function KioskPage() {
       </div>
 
       {successFeedback && (
-        <div className="pointer-events-none fixed inset-0 z-[120] flex items-center justify-center bg-[#061330]/48 p-5 backdrop-blur-[2px]">
+        <div className="pointer-events-none fixed inset-0 z-[120] flex items-center justify-center bg-[#061330]/42 p-5">
           <div className={cn(
             'w-full max-w-lg rounded-[2rem] border-4 p-9 text-center shadow-[0_44px_80px_-34px_rgba(6,19,48,0.9)]',
-            'animate-in zoom-in-95 fade-in duration-100',
+            'animate-in zoom-in-95 fade-in duration-75 will-change-transform',
             successFeedback.overlayClass
           )}>
             <div className={cn('mx-auto flex h-24 w-24 items-center justify-center rounded-[1.65rem] shadow-xl', successFeedback.iconClass)}>
@@ -852,8 +875,8 @@ export default function KioskPage() {
       )}
 
       {actionProcessingLabel && (
-        <div className="fixed inset-0 z-[115] flex items-center justify-center bg-[#061330]/45 p-5 backdrop-blur-sm">
-          <div className="w-full max-w-sm rounded-[2rem] border border-[#D7E4FF] bg-white p-8 text-center shadow-[0_34px_70px_-34px_rgba(6,19,48,0.75)]">
+        <div className="fixed inset-0 z-[115] flex items-center justify-center bg-[#061330]/38 p-5 animate-in fade-in duration-75">
+          <div className="w-full max-w-sm rounded-[2rem] border border-[#D7E4FF] bg-white p-8 text-center shadow-[0_34px_70px_-34px_rgba(6,19,48,0.75)] will-change-transform">
             <Loader2 className="mx-auto h-12 w-12 animate-spin text-[#FF7A16]" />
             <p className="mt-5 text-xl font-black text-[#14295F]">{actionProcessingLabel}</p>
           </div>
@@ -1049,10 +1072,10 @@ export default function KioskPage() {
                          onClick={() => handleAction(action)}
                          disabled={Boolean(actionProcessingLabel)}
                          className={cn(
-                           kioskTouchClass,
-                           'h-36 rounded-[1.65rem] text-white transition active:scale-[0.99] active:brightness-95 sm:h-44',
-                           'flex flex-col items-center justify-center gap-4 border-0 text-2xl font-black',
-                           config.buttonClass
+                          kioskTouchClass,
+                          'h-36 rounded-[1.65rem] text-white transition-transform duration-75 will-change-transform active:scale-[0.985] active:brightness-95 sm:h-44',
+                          'flex flex-col items-center justify-center gap-4 border-0 text-2xl font-black',
+                          config.buttonClass
                         )}
                       >
                         <span className={cn('flex h-14 w-14 items-center justify-center rounded-[1.1rem]', config.iconClass)}>
