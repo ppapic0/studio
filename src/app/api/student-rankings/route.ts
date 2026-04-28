@@ -388,10 +388,16 @@ export async function GET(request: NextRequest) {
 
     const nowMs = now.getTime();
     const currentDailyRankWindow = getDailyRankWindowState(now);
+    const currentCompetitionDateKey = currentDailyRankWindow.competitionDateKey;
+    if (requestedDateKey && requestedDateKey > currentCompetitionDateKey) {
+      return noStoreJson({ error: 'future-dateKey' }, { status: 400 });
+    }
+
     const targetDate = requestedDate || now;
     const dailyRankWindow = requestedDate
       ? getDailyRankCompetitionWindow(targetDate)
       : currentDailyRankWindow;
+    const periodAnchorDate = dailyRankWindow.competitionDate;
     const shouldIncludeLiveAttendance = dailyRankWindow.competitionDateKey === currentDailyRankWindow.competitionDateKey;
     const referenceLimitMs = requestedDate
       ? Math.min(nowMs, dailyRankWindow.endsAt.getTime())
@@ -400,9 +406,9 @@ export async function GET(request: NextRequest) {
       new Date(dailyRankWindow.competitionDate.getTime() - 24 * 60 * 60 * 1000)
     );
     const dailyDateKeys = dailyRankWindow.coveredDateKeys;
-    const weeklyRankWindows = eachKstDateOfInterval(startOfKstWeekDate(targetDate), targetDate)
+    const weeklyRankWindows = eachKstDateOfInterval(startOfKstWeekDate(periodAnchorDate), periodAnchorDate)
       .map((date) => getDailyRankCompetitionWindow(date));
-    const monthlyRankWindows = eachKstDateOfInterval(startOfKstMonthDate(targetDate), targetDate)
+    const monthlyRankWindows = eachKstDateOfInterval(startOfKstMonthDate(periodAnchorDate), periodAnchorDate)
       .map((date) => getDailyRankCompetitionWindow(date));
     const weeklyCoveredDateKeys = getCoveredDateKeysFromRankWindows(weeklyRankWindows);
     const monthlyCoveredDateKeys = getCoveredDateKeysFromRankWindows(monthlyRankWindows);
