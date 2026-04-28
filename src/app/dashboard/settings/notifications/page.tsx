@@ -471,11 +471,18 @@ function pickAttendanceEventTime(
       .filter((row) => {
         if (row.eventType !== eventType) return false;
         const rowDateKey = row.activeStudyDayKey || row.flowDateKey || row.dateKey;
-        return !dateKey || !rowDateKey || rowDateKey === dateKey;
+        if (dateKey && rowDateKey && rowDateKey !== dateKey) return false;
+        const eventDate = toDateSafe(row.occurredAt) || toDateSafe(row.createdAt);
+        return !dateKey || !isPreResetRecordOnDifferentStudyDay(eventDate, dateKey);
       })
       .map((row) => toDateSafe(row.occurredAt) || toDateSafe(row.createdAt)),
     mode
   );
+}
+
+function isPreResetRecordOnDifferentStudyDay(date: Date | null, boardDateKey: string) {
+  if (!date) return false;
+  return date.getHours() < 1 && getStudyDayKey(date) !== boardDateKey;
 }
 
 function resolveAttendanceDateForBoard(
@@ -485,12 +492,36 @@ function resolveAttendanceDateForBoard(
 ) {
   if (rowDateKey && rowDateKey !== boardDateKey) return null;
   if (!date) return null;
-  if (date.getHours() < 1 && getStudyDayKey(date) !== boardDateKey) return null;
+  if (isPreResetRecordOnDifferentStudyDay(date, boardDateKey)) return null;
   return date;
 }
 
-function isSmsRowOnBoardDate(row: { dateKey?: string }, boardDateKey: string) {
-  return row.dateKey === boardDateKey;
+function resolveSmsRowEventDate(row: {
+  dateKey?: string;
+  eventAt?: { toDate?: () => Date };
+  createdAt?: { toDate?: () => Date };
+  renderedMessage?: string | null;
+  message?: string | null;
+}) {
+  const explicitEventDate = toDateSafe(row.eventAt);
+  if (explicitEventDate) return explicitEventDate;
+
+  const messageTimeLabel = extractTimeLabelFromSmsMessage(row.renderedMessage || row.message);
+  if (!messageTimeLabel) return null;
+
+  return dateFromDateKeyAndTimeLabel(row.dateKey, messageTimeLabel, toDateSafe(row.createdAt));
+}
+
+function isSmsRowOnBoardDate(row: {
+  dateKey?: string;
+  eventAt?: { toDate?: () => Date };
+  createdAt?: { toDate?: () => Date };
+  renderedMessage?: string | null;
+  message?: string | null;
+}, boardDateKey: string) {
+  if (row.dateKey !== boardDateKey) return false;
+  const eventDate = resolveSmsRowEventDate(row);
+  return !isPreResetRecordOnDifferentStudyDay(eventDate, boardDateKey);
 }
 
 function formatTimeLabelFromDate(date?: Date | null) {
@@ -937,6 +968,8 @@ export default function NotificationSettingsPage() {
       if (!row.studentId) return;
       const rowDateKey = row.activeStudyDayKey || row.flowDateKey || row.dateKey;
       if (rowDateKey && rowDateKey !== todayDateKey) return;
+      const eventDate = toDateSafe(row.occurredAt) || toDateSafe(row.createdAt);
+      if (isPreResetRecordOnDifferentStudyDay(eventDate, todayDateKey)) return;
       const current = next.get(row.studentId) || [];
       current.push(row);
       next.set(row.studentId, current);
