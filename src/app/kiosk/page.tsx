@@ -1,7 +1,7 @@
 'use client';
 
 import Image from 'next/image';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type PointerEvent } from 'react';
 import { useRouter } from 'next/navigation';
 import {
   ArrowLeft,
@@ -91,6 +91,9 @@ type KioskOutboxItem = {
 
 const OUTBOX_STORAGE_KEY = 'track:kiosk-attendance-outbox:v1';
 const MAX_OUTBOX_ITEMS = 40;
+const SUCCESS_FEEDBACK_VISIBLE_MS = 900;
+const RESET_AFTER_SUCCESS_MS = 140;
+const kioskTouchClass = 'touch-manipulation select-none [-webkit-tap-highlight-color:transparent] [touch-action:manipulation]';
 
 const ACTIONS: Record<KioskAttendanceAction, KioskActionConfig> = {
   check_in: {
@@ -191,6 +194,12 @@ function createIdempotencyKey() {
     return crypto.randomUUID();
   }
   return `kiosk_${Date.now()}_${Math.random().toString(36).slice(2, 12)}`;
+}
+
+function handleKioskPointerPress(event: PointerEvent<HTMLElement>, action: () => void) {
+  if (event.pointerType === 'mouse') return;
+  event.preventDefault();
+  action();
 }
 
 function readOutbox(): KioskOutboxItem[] {
@@ -694,7 +703,7 @@ export default function KioskPage() {
 
   useEffect(() => {
     if (!successFeedback) return;
-    const timer = window.setTimeout(() => setSuccessFeedback(null), 1800);
+    const timer = window.setTimeout(() => setSuccessFeedback(null), SUCCESS_FEEDBACK_VISIBLE_MS);
     return () => window.clearTimeout(timer);
   }, [successFeedback]);
 
@@ -789,7 +798,7 @@ export default function KioskPage() {
       });
       window.setTimeout(() => {
         resetKiosk();
-      }, 260);
+      }, RESET_AFTER_SUCCESS_MS);
     } catch (error) {
       toast({
         variant: 'destructive',
@@ -810,7 +819,7 @@ export default function KioskPage() {
   const selectedActions = selectedSeat ? getAllowedActions(selectedStatus) : [];
 
   return (
-    <div className="min-h-screen overflow-hidden bg-[#F7FAFF] text-[#14295F]">
+    <div className={cn('min-h-screen overflow-hidden bg-[#F7FAFF] text-[#14295F]', kioskTouchClass)}>
       <div className="pointer-events-none fixed inset-0 overflow-hidden">
         <Image
           src="/track-logo-mark-transparent.png"
@@ -824,10 +833,10 @@ export default function KioskPage() {
       </div>
 
       {successFeedback && (
-        <div className="fixed inset-0 z-[120] flex items-center justify-center bg-[#061330]/55 p-5 backdrop-blur-sm">
+        <div className="pointer-events-none fixed inset-0 z-[120] flex items-center justify-center bg-[#061330]/48 p-5 backdrop-blur-[2px]">
           <div className={cn(
             'w-full max-w-lg rounded-[2rem] border-4 p-9 text-center shadow-[0_44px_80px_-34px_rgba(6,19,48,0.9)]',
-            'animate-in zoom-in-95 fade-in duration-150',
+            'animate-in zoom-in-95 fade-in duration-100',
             successFeedback.overlayClass
           )}>
             <div className={cn('mx-auto flex h-24 w-24 items-center justify-center rounded-[1.65rem] shadow-xl', successFeedback.iconClass)}>
@@ -918,8 +927,9 @@ export default function KioskPage() {
                       type="button"
                       variant="outline"
                       disabled={isSearching}
+                      onPointerDown={(event) => handleKioskPointerPress(event, () => handleNumberClick(num))}
                       onClick={() => handleNumberClick(num)}
-                      className="h-20 rounded-[1.35rem] border-2 border-[#D7E4FF] bg-white text-3xl font-black text-[#14295F] shadow-sm active:scale-[0.98] sm:h-24"
+                      className={cn(kioskTouchClass, 'h-20 rounded-[1.35rem] border-2 border-[#D7E4FF] bg-white text-3xl font-black text-[#14295F] shadow-sm active:scale-[0.99] active:bg-[#F1F6FF] sm:h-24')}
                     >
                       {num}
                     </Button>
@@ -928,8 +938,9 @@ export default function KioskPage() {
                     type="button"
                     variant="outline"
                     disabled={isSearching}
+                    onPointerDown={(event) => handleKioskPointerPress(event, resetKiosk)}
                     onClick={resetKiosk}
-                    className="h-20 rounded-[1.35rem] border-2 border-[#D7E4FF] bg-[#F7FAFF] text-base font-black text-[#5C6E97] sm:h-24"
+                    className={cn(kioskTouchClass, 'h-20 rounded-[1.35rem] border-2 border-[#D7E4FF] bg-[#F7FAFF] text-base font-black text-[#5C6E97] active:scale-[0.99] active:bg-white sm:h-24')}
                   >
                     <RotateCcw className="mr-2 h-5 w-5" />
                     초기화
@@ -938,8 +949,9 @@ export default function KioskPage() {
                     type="button"
                     variant="outline"
                     disabled={isSearching}
+                    onPointerDown={(event) => handleKioskPointerPress(event, () => handleNumberClick('0'))}
                     onClick={() => handleNumberClick('0')}
-                    className="h-20 rounded-[1.35rem] border-2 border-[#D7E4FF] bg-white text-3xl font-black text-[#14295F] shadow-sm active:scale-[0.98] sm:h-24"
+                    className={cn(kioskTouchClass, 'h-20 rounded-[1.35rem] border-2 border-[#D7E4FF] bg-white text-3xl font-black text-[#14295F] shadow-sm active:scale-[0.99] active:bg-[#F1F6FF] sm:h-24')}
                   >
                     0
                   </Button>
@@ -947,8 +959,9 @@ export default function KioskPage() {
                     type="button"
                     variant="outline"
                     disabled={isSearching}
+                    onPointerDown={(event) => handleKioskPointerPress(event, handleDelete)}
                     onClick={handleDelete}
-                    className="h-20 rounded-[1.35rem] border-2 border-[#D7E4FF] bg-[#F7FAFF] text-[#14295F] sm:h-24"
+                    className={cn(kioskTouchClass, 'h-20 rounded-[1.35rem] border-2 border-[#D7E4FF] bg-[#F7FAFF] text-[#14295F] active:scale-[0.99] active:bg-white sm:h-24')}
                     aria-label="한 글자 지우기"
                   >
                     <Delete className="h-8 w-8" />
@@ -968,11 +981,17 @@ export default function KioskPage() {
                   <button
                     key={student.id}
                     type="button"
+                    onPointerDown={(event) =>
+                      handleKioskPointerPress(event, () => {
+                        setSelectedStudent(student);
+                        setStep('action');
+                      })
+                    }
                     onClick={() => {
                       setSelectedStudent(student);
                       setStep('action');
                     }}
-                    className="flex min-h-20 items-center justify-between rounded-[1.35rem] border border-[#D7E4FF] bg-[#F7FAFF] px-5 py-4 text-left shadow-sm transition hover:border-[#FF7A16]/40 hover:bg-white"
+                    className={cn(kioskTouchClass, 'flex min-h-20 items-center justify-between rounded-[1.35rem] border border-[#D7E4FF] bg-[#F7FAFF] px-5 py-4 text-left shadow-sm transition hover:border-[#FF7A16]/40 hover:bg-white active:scale-[0.99] active:bg-white')}
                   >
                     <div className="flex min-w-0 items-center gap-4">
                       <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-[1rem] bg-white text-[#14295F] shadow-[0_12px_24px_-20px_rgba(20,41,95,0.45)]">
@@ -992,8 +1011,9 @@ export default function KioskPage() {
               <Button
                 type="button"
                 variant="ghost"
+                onPointerDown={(event) => handleKioskPointerPress(event, resetKiosk)}
                 onClick={resetKiosk}
-                className="mt-5 h-12 w-full rounded-[1rem] text-base font-black text-[#5C6E97] hover:bg-[#F1F6FF] hover:text-[#14295F]"
+                className={cn(kioskTouchClass, 'mt-5 h-12 w-full rounded-[1rem] text-base font-black text-[#5C6E97] hover:bg-[#F1F6FF] hover:text-[#14295F]')}
               >
                 처음으로
               </Button>
@@ -1023,14 +1043,16 @@ export default function KioskPage() {
                     const config = ACTIONS[action];
                     return (
                       <Button
-                        key={action}
-                        type="button"
-                        onClick={() => handleAction(action)}
-                        disabled={Boolean(actionProcessingLabel)}
-                        className={cn(
-                          'h-36 rounded-[1.65rem] text-white transition active:scale-[0.98] sm:h-44',
-                          'flex flex-col items-center justify-center gap-4 border-0 text-2xl font-black',
-                          config.buttonClass
+                         key={action}
+                         type="button"
+                         onPointerDown={(event) => handleKioskPointerPress(event, () => void handleAction(action))}
+                         onClick={() => handleAction(action)}
+                         disabled={Boolean(actionProcessingLabel)}
+                         className={cn(
+                           kioskTouchClass,
+                           'h-36 rounded-[1.65rem] text-white transition active:scale-[0.99] active:brightness-95 sm:h-44',
+                           'flex flex-col items-center justify-center gap-4 border-0 text-2xl font-black',
+                           config.buttonClass
                         )}
                       >
                         <span className={cn('flex h-14 w-14 items-center justify-center rounded-[1.1rem]', config.iconClass)}>
@@ -1051,8 +1073,9 @@ export default function KioskPage() {
               <Button
                 type="button"
                 variant="ghost"
+                onPointerDown={(event) => handleKioskPointerPress(event, resetKiosk)}
                 onClick={resetKiosk}
-                className="mt-5 h-12 w-full rounded-[1rem] text-base font-black text-[#5C6E97] hover:bg-[#F1F6FF] hover:text-[#14295F]"
+                className={cn(kioskTouchClass, 'mt-5 h-12 w-full rounded-[1rem] text-base font-black text-[#5C6E97] hover:bg-[#F1F6FF] hover:text-[#14295F]')}
               >
                 처음으로
               </Button>

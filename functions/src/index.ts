@@ -26,7 +26,7 @@ const attendanceMutationFunctions = functions.region(region);
 const MANUAL_PARENT_SMS_UID = "__manual_parent__";
 const STUDENT_SMS_FALLBACK_UID = "__student__";
 const allowedRoles = ["student", "teacher", "parent", "centerAdmin", "kiosk"] as const;
-const adminRoles = new Set(["centerAdmin", "owner", "admin", "centerManager"]);
+const adminRoles = new Set(["centerAdmin", "owner", "admin", "centerManager", "kiosk"]);
 type AllowedRole = (typeof allowedRoles)[number];
 
 const signupRoleAliases: Record<string, AllowedRole> = {
@@ -10933,7 +10933,6 @@ async function processKioskAttendanceQueueItem(
       return;
     }
 
-    await queueAttendanceTransitionSmsAfterCommit(db, { centerId, result });
     await queueRef.set({
       status: "completed",
       verified: true,
@@ -10953,6 +10952,15 @@ async function processKioskAttendanceQueueItem(
       },
       verification,
     }, { merge: true });
+
+    void queueAttendanceTransitionSmsAfterCommit(db, { centerId, result }).catch((error) => {
+      console.error("[attendance-sms-v2] kiosk post-transition queue failed", {
+        centerId,
+        eventId: result.eventId || null,
+        eventType: result.eventType || null,
+        message: error instanceof Error ? error.message : String(error),
+      });
+    });
   } catch (error) {
     const retryable = isRetryableKioskQueueError(error) && claimed.attemptCount < KIOSK_ATTENDANCE_MAX_ATTEMPTS;
     await queueRef.set({

@@ -28,7 +28,8 @@ export function isActiveMembershipStatus(status?: string | null) {
 }
 
 export function isAdminRole(role?: string | null) {
-  return normalizeMembershipRole(role) === 'centerAdmin';
+  const normalizedRole = normalizeMembershipRole(role);
+  return normalizedRole === 'centerAdmin' || normalizedRole === 'kiosk';
 }
 
 export function isTeacherOrAdminRole(role?: string | null) {

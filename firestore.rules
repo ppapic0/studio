@@ -60,7 +60,7 @@ service cloud.firestore {
     }
 
     function isRoleCenterAdmin(role) {
-      return role == 'centerAdmin' || role == 'owner' || role == 'centerManager' || role == 'admin';
+      return role == 'centerAdmin' || role == 'owner' || role == 'centerManager' || role == 'admin' || role == 'kiosk';
     }
 
     function isCenterAdminRole(role) {
