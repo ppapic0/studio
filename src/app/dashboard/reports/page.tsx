@@ -27,6 +27,15 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import { Textarea } from '@/components/ui/textarea';
+import {
+  AlertDialog,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { 
   FileText, 
   Search, 
@@ -89,6 +98,23 @@ type ReportStudyLogSummary = {
   minutes: number;
 };
 
+type ReportTrustReviewWarning = {
+  id: string;
+  source: string;
+  snippet: string;
+  keyword: string;
+};
+
+const REPORT_TRUST_REVIEW_PATTERNS: Array<{ label: string; pattern: RegExp }> = [
+  { label: '못함/미완료', pattern: /못\s*(했|함|한다|하는|하|따라|끝|풀|외웠|외우|잡|버티)|미완료|안\s*(했|함|한다|하|되는|됨)/u },
+  { label: '부족/낮음', pattern: /부족|낮음|낮은|낮아|기준선\s*아래|저조/u },
+  { label: '하락/불안', pattern: /급하락|하락|무너|불안정|흔들림|흔들리는|회복이\s*우선/u },
+  { label: '주의/경고', pattern: /주의|경고|문제|위험|리스크|벌점|패널티/u },
+  { label: '태도 단정', pattern: /불성실|게으|산만|태도\s*불량|집중력\s*부족|집중이\s*안/u },
+  { label: '출결 부정', pattern: /지각|미입실|결석|퇴실불안정|늦음|늦게\s*하원|일찍\s*하원/u },
+  { label: '실패 표현', pattern: /실패|포기|못\s*버틴|따라가지\s*못/u },
+];
+
 function uniqueStrings(items: Array<string | null | undefined>) {
   return Array.from(
     new Set(
@@ -110,6 +136,59 @@ function getReportContentHighlights(content?: string | null) {
     .filter(Boolean)
     .filter((line) => !REPORT_SECTION_HEADINGS.has(line))
     .slice(0, 3);
+}
+
+function splitReportReviewSentences(text?: string | null) {
+  return (text || '')
+    .split(/\r?\n/u)
+    .flatMap((line) =>
+      line
+        .split(/(?<=[.!?])\s+|(?<=다\.)\s+|(?<=요\.)\s+|(?<=습니다\.)\s+/u)
+        .map((item) => item.trim())
+    )
+    .map((item) => item.replace(/\s+/g, ' ').trim())
+    .filter((item) => item.length > 0 && !REPORT_SECTION_HEADINGS.has(item));
+}
+
+function buildReportReviewSnippet(text: string) {
+  const normalized = text.replace(/\s+/g, ' ').trim();
+  if (normalized.length <= 96) return normalized;
+  return `${normalized.slice(0, 95).trimEnd()}…`;
+}
+
+function findReportTrustReviewWarnings(params: {
+  content: string;
+  teacherNote: string;
+  aiMeta?: DailyReport['aiMeta'] | null;
+}) {
+  const reviewSources = [
+    { source: '리포트 본문', text: params.content },
+    { source: '교사 관찰 노트', text: params.teacherNote },
+    { source: 'AI 한 줄 코칭', text: params.aiMeta?.teacherOneLiner || '' },
+    { source: '강점/보완 항목', text: [...(params.aiMeta?.strengths || []), ...(params.aiMeta?.improvements || [])].join('\n') },
+    { source: '코칭/가정 팁', text: [params.aiMeta?.coachingFocus, params.aiMeta?.homeTip].filter(Boolean).join('\n') },
+  ];
+  const warnings: ReportTrustReviewWarning[] = [];
+  const seen = new Set<string>();
+
+  reviewSources.forEach(({ source, text }) => {
+    splitReportReviewSentences(text).forEach((sentence) => {
+      const matched = REPORT_TRUST_REVIEW_PATTERNS.find((item) => item.pattern.test(sentence));
+      if (!matched) return;
+      const snippet = buildReportReviewSnippet(sentence);
+      const key = `${source}:${snippet}`;
+      if (seen.has(key)) return;
+      seen.add(key);
+      warnings.push({
+        id: key,
+        source,
+        snippet,
+        keyword: matched.label,
+      });
+    });
+  });
+
+  return warnings.slice(0, 5);
 }
 
 function formatReportClock(value?: Date | null) {
@@ -249,6 +328,8 @@ export default function DailyReportsPage() {
   const [teacherNote, setTeacherNote] = useState('');
   const [aiReportMeta, setAiReportMeta] = useState<DailyReport['aiMeta'] | null>(null);
   const [isSaving, setIsSaving] = useState(false);
+  const [trustReviewWarnings, setTrustReviewWarnings] = useState<ReportTrustReviewWarning[]>([]);
+  const [isTrustReviewOpen, setIsTrustReviewOpen] = useState(false);
 
   const formatTimestampLabel = (value: unknown, fallback: string) => {
     const parsed = toDateSafe(value);
@@ -420,6 +501,8 @@ export default function DailyReportsPage() {
     setReportContent(existing?.content || '');
     setTeacherNote(existing?.teacherNote || '');
     setAiReportMeta(existing?.aiMeta || null);
+    setTrustReviewWarnings([]);
+    setIsTrustReviewOpen(false);
     setIsWriteModalOpen(true);
   };
 
@@ -674,7 +757,10 @@ export default function DailyReportsPage() {
     }
   };
 
-  const handleSaveReport = async (status: 'draft' | 'sent' = 'draft') => {
+  const handleSaveReport = async (
+    status: 'draft' | 'sent' = 'draft',
+    options: { skipTrustReview?: boolean } = {}
+  ) => {
     if (!selectedStudent || !firestore || !centerId || !user || !dateKey) return;
     if (status === 'sent' && !studyLogSummaryByStudentId[selectedStudent.id]?.hasStudyRecord) {
       toast({
@@ -683,6 +769,18 @@ export default function DailyReportsPage() {
         description: '선택한 날짜에 공부 기록이 있는 학생에게만 리포트를 발송할 수 있습니다.',
       });
       return;
+    }
+    if (status === 'sent' && !options.skipTrustReview) {
+      const warnings = findReportTrustReviewWarnings({
+        content: reportContent,
+        teacherNote,
+        aiMeta: aiReportMeta,
+      });
+      if (warnings.length > 0) {
+        setTrustReviewWarnings(warnings);
+        setIsTrustReviewOpen(true);
+        return;
+      }
     }
     setIsSaving(true);
     try {
@@ -703,6 +801,8 @@ export default function DailyReportsPage() {
       }, { merge: true });
 
       toast({ title: status === 'sent' ? "발송 완료" : "저장 완료" });
+      setTrustReviewWarnings([]);
+      setIsTrustReviewOpen(false);
       setIsWriteModalOpen(false);
     } catch (e: any) {
       toast({ variant: "destructive", title: "저장 실패" });
@@ -1137,6 +1237,62 @@ export default function DailyReportsPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <AlertDialog open={isTrustReviewOpen} onOpenChange={setIsTrustReviewOpen}>
+        <AlertDialogContent className="rounded-[2rem] border-none bg-white p-0 shadow-2xl sm:max-w-xl">
+          <div className="bg-[#14295F] px-6 py-5 text-white">
+            <AlertDialogHeader className="space-y-2 text-left">
+              <AlertDialogTitle className="font-black tracking-tight text-white">
+                발송 전 표현 확인
+              </AlertDialogTitle>
+              <AlertDialogDescription className="text-sm font-bold leading-6 text-white/76">
+                학부모와 학생에게 보이는 리포트입니다. 아래 표현이 의도한 톤인지 한 번 더 확인해 주세요.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+          </div>
+          <div className="space-y-4 px-6 py-5">
+            <div className="rounded-2xl border border-amber-100 bg-amber-50 px-4 py-3">
+              <p className="text-sm font-black leading-6 text-amber-900">
+                다음 부분을 확인하셨나요?
+              </p>
+            </div>
+            <div className="max-h-[42vh] space-y-3 overflow-y-auto pr-1">
+              {trustReviewWarnings.map((warning) => (
+                <div key={warning.id} className="rounded-2xl border border-slate-100 bg-slate-50 px-4 py-3">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <Badge className="rounded-full border-none bg-white px-2.5 py-1 text-[10px] font-black text-[#14295F]">
+                      {warning.source}
+                    </Badge>
+                    <Badge className="rounded-full border-none bg-rose-50 px-2.5 py-1 text-[10px] font-black text-rose-700">
+                      {warning.keyword}
+                    </Badge>
+                  </div>
+                  <p className="mt-2 text-sm font-bold leading-6 text-slate-800 break-keep">
+                    “{warning.snippet}”
+                  </p>
+                </div>
+              ))}
+            </div>
+            <p className="text-xs font-bold leading-5 text-slate-500">
+              표현이 괜찮다면 그대로 발송하고, 톤이 강하면 리포트 본문이나 교사 관찰 노트를 부드럽게 수정한 뒤 발송해 주세요.
+            </p>
+          </div>
+          <AlertDialogFooter className="gap-2 border-t border-slate-100 bg-slate-50 px-6 py-4 sm:space-x-0">
+            <AlertDialogCancel className="mt-0 h-11 rounded-xl border-slate-200 bg-white px-5 font-black text-slate-700">
+              다시 확인할게요
+            </AlertDialogCancel>
+            <Button
+              type="button"
+              onClick={() => void handleSaveReport('sent', { skipTrustReview: true })}
+              disabled={isSaving}
+              className="h-11 rounded-xl bg-[#14295F] px-5 font-black text-white hover:bg-[#1c397a]"
+            >
+              {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Send className="mr-2 h-4 w-4" />}
+              확인 후 발송
+            </Button>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
