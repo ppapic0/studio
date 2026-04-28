@@ -252,6 +252,24 @@ function ensureViewerEntry(entries: StudentRankEntry[], viewerId: string) {
   return assignStudentRankingTrackRanks([...entries.map((entry) => ({ ...entry, isViewer: entry.studentId === viewerId })), fallbackViewer]);
 }
 
+function buildStudentRankingBattleEntries(entries: StudentRankEntry[], viewerId: string, shouldIncludeViewerFallback: boolean) {
+  const limitedEntries = entries.slice(0, 50);
+
+  if (shouldIncludeViewerFallback) {
+    return ensureViewerEntry(limitedEntries, viewerId).map((entry) => ({
+      ...entry,
+      isViewer: entry.studentId === viewerId,
+    }));
+  }
+
+  return assignStudentRankingTrackRanks(
+    limitedEntries.map((entry) => ({
+      ...entry,
+      isViewer: false,
+    }))
+  );
+}
+
 function getBattleMode(rank: number, diffAbove: number, diffBelow: number): BattleMode {
   if (rank === 1) return diffBelow <= 24 ? 'danger' : 'defense';
   if (diffAbove <= 20) return 'attack';
@@ -636,12 +654,14 @@ function BattleGauge({
   rightLabel,
   leftValue,
   rightValue,
+  leftSummaryLabel = '내 현재 누적',
   isMobile = false,
 }: {
   leftLabel: string;
   rightLabel: string;
   leftValue: number;
   rightValue: number;
+  leftSummaryLabel?: string;
   isMobile?: boolean;
 }) {
   const shouldReduceMotion = useReducedMotion();
@@ -707,7 +727,7 @@ function BattleGauge({
           'rounded-2xl border border-[#FFC97C]/25 bg-[rgba(255,201,124,0.08)] text-[#FFE09E]',
           isMobile ? 'px-3 py-2.5' : 'px-3 py-2'
         )}>
-          내 현재 누적 {formatStudyCompact(leftValue)}
+          {leftSummaryLabel} {formatStudyCompact(leftValue)}
         </div>
         <div className={cn(
           'rounded-2xl border border-white/10 bg-[rgba(255,255,255,0.05)] text-right text-[#B7C7E8]',
@@ -781,6 +801,7 @@ function MyBattleCard({
   range,
   mode,
   pressure,
+  isStudentPerspective = true,
   isMobile = false,
 }: {
   viewer: BattleEntry;
@@ -789,11 +810,18 @@ function MyBattleCard({
   range: RankRange;
   mode: BattleMode;
   pressure: PressureLevel;
+  isStudentPerspective?: boolean;
   isMobile?: boolean;
 }) {
   const shouldReduceMotion = useReducedMotion();
   const diffAbove = Math.max(0, (top?.value ?? viewer.value) - viewer.value);
   const diffBelow = below ? Math.max(0, viewer.value - below.value) : 0;
+  const focusedStudentName = maskLeaderboardStudentName(viewer.displayNameSnapshot);
+  const rankLabel = isStudentPerspective ? '내 현재 순위' : '현재 기준 순위';
+  const gaugeLeftLabel = isStudentPerspective ? '내 현재 누적' : '기준 학생 누적';
+  const gaugeRightLabel = viewer.rank === 1 ? '바로 아래 기준' : '1위 기준';
+  const summaryLeftLabel = isStudentPerspective ? '내 현재 누적' : '기준 학생 누적';
+  const positionBadgeLabel = isStudentPerspective ? '현재 위치' : '기준 학생';
   const statusLabel =
     mode === 'attack'
       ? '상승 구간'
@@ -802,14 +830,17 @@ function MyBattleCard({
         : mode === 'danger'
           ? '간격 주의'
           : '간격 축소';
-  const helperCopy =
-    mode === 'attack'
+  const helperCopy = isStudentPerspective
+    ? mode === 'attack'
       ? `1위와 ${formatGapLabel(diffAbove)} 차이입니다. 지금 흐름이면 간격을 크게 줄일 수 있어요.`
       : mode === 'defense'
         ? `2위와 ${formatGapLabel(diffBelow)} 차이입니다. 현재 페이스를 유지하면 선두를 지킬 수 있어요.`
         : mode === 'danger'
           ? `${below?.displayNameSnapshot ?? '바로 아래 학생'} 님과 ${formatGapLabel(diffBelow)} 차이입니다. 다음 블록 집중이 필요해요.`
-          : `상위권과 ${formatGapLabel(diffAbove)} 차이입니다. 지금 한 블록이 순위를 바꿀 수 있어요.`;
+          : `상위권과 ${formatGapLabel(diffAbove)} 차이입니다. 지금 한 블록이 순위를 바꿀 수 있어요.`
+    : viewer.rank === 1
+      ? `${focusedStudentName} 학생이 현재 ${formatStudyClock(viewer.value)} 누적으로 선두입니다.${below ? ` 2위와 ${formatGapLabel(diffBelow)} 차이입니다.` : ''}`
+      : `${focusedStudentName} 학생은 현재 ${viewer.rank}위이고, 1위와 ${formatGapLabel(diffAbove)} 차이입니다.`;
 
   if (isMobile) {
     return (
@@ -829,14 +860,14 @@ function MyBattleCard({
               {statusLabel}
             </div>
             <div className={RANKING_STATUS_BADGE_CLASS}>
-              현재 위치
+              {positionBadgeLabel}
             </div>
           </div>
 
           <div className={cn(MOBILE_BATTLE_INSET_CLASS, 'mt-3 px-4 py-4')}>
             <div className="flex items-start justify-between gap-3">
               <div>
-                <div className="text-[10px] font-black tracking-[0.18em] text-[#AFC0E6]">내 현재 순위</div>
+                <div className="text-[10px] font-black tracking-[0.18em] text-[#AFC0E6]">{rankLabel}</div>
                 <div className="font-aggro-display mt-2 text-[3.1rem] font-black leading-none tracking-[-0.07em] text-white">
                   #{viewer.rank}
                 </div>
@@ -858,10 +889,11 @@ function MyBattleCard({
 
           <div className="mt-3">
             <BattleGauge
-              leftLabel="내 현재 누적"
-              rightLabel={viewer.rank === 1 ? '바로 아래 기준' : '1위 기준'}
+              leftLabel={gaugeLeftLabel}
+              rightLabel={gaugeRightLabel}
               leftValue={viewer.value}
               rightValue={viewer.rank === 1 ? (below?.value ?? viewer.value - 10) : (top?.value ?? viewer.value + 10)}
+              leftSummaryLabel={summaryLeftLabel}
               isMobile
             />
           </div>
@@ -908,13 +940,13 @@ function MyBattleCard({
               <div className="mt-4 text-[11px] font-black tracking-[0.22em] text-[#AFC0E6]">{getBattleTrackLabel(range)}</div>
             </div>
             <div className={RANKING_STATUS_BADGE_CLASS}>
-              현재 순위
+              {positionBadgeLabel}
             </div>
           </div>
 
           <div className="mt-4 grid gap-5 md:grid-cols-[180px_minmax(0,1fr)] md:items-end">
             <div>
-              <div className="text-[11px] font-black tracking-[0.2em] text-[#AFC0E6]">내 현재 순위</div>
+              <div className="text-[11px] font-black tracking-[0.2em] text-[#AFC0E6]">{rankLabel}</div>
               <div className="font-aggro-display mt-3 text-6xl font-black leading-none tracking-[-0.06em] text-white">#{viewer.rank}</div>
             </div>
             <div>
@@ -940,10 +972,11 @@ function MyBattleCard({
 
         <div className="mt-5">
           <BattleGauge
-            leftLabel="내 현재 누적"
-            rightLabel={viewer.rank === 1 ? '바로 아래 기준' : '1위 기준'}
+            leftLabel={gaugeLeftLabel}
+            rightLabel={gaugeRightLabel}
             leftValue={viewer.value}
             rightValue={viewer.rank === 1 ? (below?.value ?? viewer.value - 10) : (top?.value ?? viewer.value + 10)}
+            leftSummaryLabel={summaryLeftLabel}
           />
         </div>
       </div>
@@ -1220,10 +1253,12 @@ function LiveTopThreeBoard({ entries }: { entries: BattleEntry[] }) {
 function StandingsSidebar({
   leaders,
   viewer,
+  isStudentPerspective = true,
   isMobile = false,
 }: {
   leaders: BattleEntry[];
   viewer: BattleEntry;
+  isStudentPerspective?: boolean;
   isMobile?: boolean;
 }) {
   const shouldReduceMotion = useReducedMotion();
@@ -1254,7 +1289,7 @@ function StandingsSidebar({
             상위권 인사이트
           </h3>
           <p className={cn('mt-2 font-semibold leading-6 text-[#B7C7E8]', isMobile ? 'text-[13px]' : 'text-sm')}>
-            현재 누적 공부시간 기준으로 상위권 흐름과 내 위치를 빠르게 읽을 수 있습니다.
+            현재 누적 공부시간 기준으로 상위권 흐름과 {isStudentPerspective ? '내 위치' : '기준 학생 위치'}를 빠르게 읽을 수 있습니다.
           </p>
         </div>
 
@@ -1375,7 +1410,7 @@ function StandingsSidebar({
           isMobile ? 'mt-3 flex items-center justify-between gap-3 px-4 py-3.5' : 'mt-4 flex items-center justify-between gap-3 px-4 py-4'
         )}>
           <div className="min-w-0">
-            <div className="text-[10px] font-black tracking-[0.18em] text-[#AFC0E6]">내 현재 순위</div>
+            <div className="text-[10px] font-black tracking-[0.18em] text-[#AFC0E6]">{isStudentPerspective ? '내 현재 순위' : '기준 학생 순위'}</div>
             <div className="mt-1 flex items-end gap-2">
               <div className={cn('font-aggro-display font-black leading-none tracking-[-0.06em] text-white', isMobile ? 'text-[1.8rem]' : 'text-[2.2rem]')}>
                 #{viewer.rank}
@@ -1775,9 +1810,10 @@ export default function RankingBattlePage() {
 
   const rangeParam = searchParams.get('range');
   const range = isRankRange(rangeParam) ? rangeParam : 'daily';
-  const viewerId = user?.uid ?? 'viewer-local';
+  const authViewerId = user?.uid ?? 'viewer-local';
   const centerId = activeMembership?.id ?? null;
-  const canUseRankingHistory = canViewRankingHistory(activeMembership?.role);
+  const isStudentPerspective = activeMembership?.role === 'student';
+  const canUseRankingHistory = false;
 
   const [snapshot, setSnapshot] = useState<StudentRankingSnapshot>(EMPTY_STUDENT_RANKING_SNAPSHOT);
   const [loading, setLoading] = useState(true);
@@ -1786,7 +1822,7 @@ export default function RankingBattlePage() {
   const [floatingEvents, setFloatingEvents] = useState<FloatingEvent[]>([]);
   const [heroIndex, setHeroIndex] = useState(0);
   const [clockNowMs, setClockNowMs] = useState(() => Date.now());
-  const selfLiveStartedAtMs = isTimerActive && startTime ? startTime : 0;
+  const selfLiveStartedAtMs = isStudentPerspective && isTimerActive && startTime ? startTime : 0;
 
   useEffect(() => {
     setClockNowMs(Date.now());
@@ -1859,13 +1895,11 @@ export default function RankingBattlePage() {
 
   const currentRangeEntries = snapshot[range] ?? [];
   const dailyWaitingTopMinutes = Math.max(0, Number(snapshot.dailyWaitingTopMinutes || 0));
+  const viewerId = isStudentPerspective ? authViewerId : currentRangeEntries[0]?.studentId ?? authViewerId;
 
   const baseEntries = useMemo(() => {
-    return ensureViewerEntry(currentRangeEntries.slice(0, 50), viewerId).map((entry) => ({
-      ...entry,
-      isViewer: entry.studentId === viewerId,
-    }));
-  }, [currentRangeEntries, viewerId]);
+    return buildStudentRankingBattleEntries(currentRangeEntries, viewerId, isStudentPerspective);
+  }, [currentRangeEntries, isStudentPerspective, viewerId]);
 
   const battleEntries = useMemo(() => {
     return assignStudentRankingTrackRanks(
@@ -1907,8 +1941,8 @@ export default function RankingBattlePage() {
   }, [floatingEvents]);
 
   const viewer = useMemo(
-    () => battleEntries.find((entry) => entry.studentId === viewerId) ?? battleEntries[0] ?? null,
-    [battleEntries, viewerId]
+    () => (isStudentPerspective ? battleEntries.find((entry) => entry.studentId === viewerId) : null) ?? battleEntries[0] ?? null,
+    [battleEntries, isStudentPerspective, viewerId]
   );
   const top = battleEntries[0] ?? null;
   const liveLeaders = useMemo(() => battleEntries.slice(0, 3), [battleEntries]);
@@ -2182,16 +2216,16 @@ export default function RankingBattlePage() {
 
         {isMobile ? (
           <div className="space-y-4">
-            <MyBattleCard viewer={viewer} top={top} below={below} range={range} mode={mode} pressure={pressure} isMobile />
-            <StandingsSidebar leaders={liveLeaders} viewer={viewer} isMobile />
+            <MyBattleCard viewer={viewer} top={top} below={below} range={range} mode={mode} pressure={pressure} isStudentPerspective={isStudentPerspective} isMobile />
+            <StandingsSidebar leaders={liveLeaders} viewer={viewer} isStudentPerspective={isStudentPerspective} isMobile />
           </div>
         ) : (
           <div className="grid gap-5 xl:grid-cols-[minmax(0,1.08fr)_320px]">
             <div className="space-y-5">
-              <MyBattleCard viewer={viewer} top={top} below={below} range={range} mode={mode} pressure={pressure} />
+              <MyBattleCard viewer={viewer} top={top} below={below} range={range} mode={mode} pressure={pressure} isStudentPerspective={isStudentPerspective} />
             </div>
             <div className="space-y-5">
-              <StandingsSidebar leaders={liveLeaders} viewer={viewer} />
+              <StandingsSidebar leaders={liveLeaders} viewer={viewer} isStudentPerspective={isStudentPerspective} />
             </div>
           </div>
         )}

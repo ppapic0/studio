@@ -15,6 +15,7 @@ import {
   MessageCircle,
   Monitor,
   MonitorSmartphone,
+  Trophy,
   Wallet,
 } from 'lucide-react';
 
@@ -50,6 +51,7 @@ export function BottomNav({ playStudentEntry = false }: BottomNavProps) {
     { href: '/dashboard', label: '운영', icon: LayoutDashboard },
     { href: '/dashboard/teacher', label: '교실', icon: Monitor },
     { href: '/dashboard/reports', label: '리포트', icon: FileText },
+    { href: '/dashboard/leaderboards', label: '랭킹', icon: Trophy },
     { href: '/dashboard/leads', label: '리드DB', icon: Megaphone },
     { href: '/dashboard/teacher/students', label: '학생', icon: GraduationCap },
     { href: '/dashboard/appointments', label: '상담', icon: MessageCircle },
@@ -83,6 +85,7 @@ export function BottomNav({ playStudentEntry = false }: BottomNavProps) {
       { href: '/dashboard/teacher', label: '교실', icon: Monitor },
       { href: '/kiosk', label: '키오스크', icon: MonitorSmartphone },
       { href: '/dashboard/reports', label: '리포트', icon: FileText },
+      { href: '/dashboard/leaderboards', label: '랭킹', icon: Trophy },
       { href: '/dashboard/leads', label: '리드DB', icon: Megaphone },
       { href: '/dashboard/teacher/students', label: '학생', icon: GraduationCap },
       { href: '/dashboard/appointments', label: '상담', icon: MessageCircle },
