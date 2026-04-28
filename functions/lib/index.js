@@ -844,12 +844,13 @@ async function finalizeStudySession(params) {
         if (shouldCloseSeat && closeAttendanceEvent && createdSessionCount > 0) {
             const closeEventAt = admin.firestore.Timestamp.fromMillis(Math.max(startMs, Math.floor(closeAttendanceEvent.eventAtMs || effectiveEndMs)));
             const closeEventRef = db.collection(`centers/${centerId}/attendanceEvents`).doc();
-            transaction.set(closeEventRef, Object.assign(Object.assign(Object.assign({ studentId, dateKey: closeAttendanceEvent.dateKey, eventType: "check_out", occurredAt: closeEventAt, createdAt: admin.firestore.FieldValue.serverTimestamp(), source: closeAttendanceEvent.source }, (closeAttendanceEvent.seatId ? { seatId: closeAttendanceEvent.seatId } : {})), (closeAttendanceEvent.statusBefore ? { statusBefore: closeAttendanceEvent.statusBefore } : {})), { statusAfter: closeAttendanceEvent.statusAfter || "absent" }));
+            transaction.set(closeEventRef, Object.assign(Object.assign(Object.assign({ studentId, dateKey: closeAttendanceEvent.dateKey, activeStudyDayKey: closeAttendanceEvent.dateKey, flowDateKey: closeAttendanceEvent.dateKey, eventType: "check_out", occurredAt: closeEventAt, createdAt: admin.firestore.FieldValue.serverTimestamp(), source: closeAttendanceEvent.source }, (closeAttendanceEvent.seatId ? { seatId: closeAttendanceEvent.seatId } : {})), (closeAttendanceEvent.statusBefore ? { statusBefore: closeAttendanceEvent.statusBefore } : {})), { statusAfter: closeAttendanceEvent.statusAfter || "absent" }));
             const attendanceStatRef = db.doc(`centers/${centerId}/attendanceDailyStats/${closeAttendanceEvent.dateKey}/students/${studentId}`);
             transaction.set(attendanceStatRef, {
                 centerId,
                 studentId,
                 dateKey: closeAttendanceEvent.dateKey,
+                activeStudyDayKey: closeAttendanceEvent.dateKey,
                 attendanceStatus: closeAttendanceEvent.statusAfter || "absent",
                 checkOutAt: closeEventAt,
                 hasCheckOutRecord: true,
@@ -2014,7 +2015,8 @@ function resolveTemplateByEvent(settings, eventType) {
     return settings.smsTemplateLateAlert || DEFAULT_SMS_TEMPLATES.late_alert;
 }
 function buildSmsDedupeKey(params) {
-    const dateKey = toStudyDayKey(params.eventAt);
+    const overrideDateKey = asTrimmedString(params.dateKeyOverride);
+    const dateKey = isValidDateKey(overrideDateKey) ? overrideDateKey : toStudyDayKey(params.eventAt);
     if (params.eventType === "late_alert") {
         return `${params.centerId}_${params.studentId}_${params.eventType}_${dateKey}`;
     }
@@ -2022,7 +2024,8 @@ function buildSmsDedupeKey(params) {
 }
 function buildAttendanceEventSmsDedupeKey(params) {
     const normalizedEventType = normalizeSmsEventType(params.eventType);
-    const dateKey = toStudyDayKey(params.eventAt);
+    const overrideDateKey = asTrimmedString(params.dateKeyOverride);
+    const dateKey = isValidDateKey(overrideDateKey) ? overrideDateKey : toStudyDayKey(params.eventAt);
     const eventId = asTrimmedString(params.eventId).replace(/[^A-Za-z0-9_-]/g, "_").slice(0, 120);
     return `${params.centerId}_${params.studentId}_${normalizedEventType}_${dateKey}_event_${eventId}`;
 }
@@ -2268,6 +2271,7 @@ async function queueParentSmsNotification(db, params) {
         studentId,
         eventType,
         eventAt: smsEventAt,
+        dateKeyOverride: smsDateKey,
     });
     const dedupeRef = db.doc(`centers/${centerId}/smsDedupes/${dedupeKey}`);
     const ts = admin.firestore.Timestamp.now();
@@ -2588,6 +2592,7 @@ async function queueAttendanceEventSmsV2(db, params) {
             eventType: smsEventType,
             eventAt,
             eventId,
+            dateKeyOverride: asTrimmedString(eventData.dateKey) || null,
         });
         const queueResult = await queueParentSmsNotification(db, {
             centerId,
@@ -2803,6 +2808,336 @@ function shouldRepairAttendanceSmsEvent(params) {
         force: params.smsStatus === "failed" || params.existingQueueState === "retryable",
     };
 }
+function isStudyEndSmsRow(value) {
+    return normalizeAttendanceEventForParentSms(value) === "study_end";
+}
+function isCheckOutAttendanceEvent(value) {
+    return asTrimmedString(value) === "check_out";
+}
+function isSameEventMinute(leftMs, rightMs) {
+    return leftMs > 0 && rightMs > 0 && Math.abs(leftMs - rightMs) <= 2 * MINUTE_MS;
+}
+async function resolveCorrectStudyEndDateKeyForRepair(db, params) {
+    const storedDateKey = asTrimmedString(params.storedDateKey);
+    const studentId = asTrimmedString(params.studentId);
+    if (!isValidDateKey(storedDateKey) || !studentId || params.eventAtMs <= 0)
+        return null;
+    const eventAt = new Date(params.eventAtMs);
+    const directStudyDayKey = toStudyDayKey(eventAt);
+    if (directStudyDayKey && directStudyDayKey !== storedDateKey) {
+        return directStudyDayKey;
+    }
+    const previousDateKey = getPreviousDateKey(storedDateKey);
+    const storedBounds = getStudyDayWindowBounds(storedDateKey);
+    const maxOvernightFlowMs = 20 * 60 * MINUTE_MS;
+    const [currentStatSnap, previousStatSnap, previousEventsSnap, previousStudyDaySnap] = await Promise.all([
+        db.doc(`centers/${params.centerId}/attendanceDailyStats/${storedDateKey}/students/${studentId}`).get(),
+        db.doc(`centers/${params.centerId}/attendanceDailyStats/${previousDateKey}/students/${studentId}`).get(),
+        db
+            .collection(`centers/${params.centerId}/attendanceEvents`)
+            .where("studentId", "==", studentId)
+            .where("dateKey", "==", previousDateKey)
+            .limit(160)
+            .get(),
+        db.doc(`centers/${params.centerId}/studyLogs/${studentId}/days/${previousDateKey}`).get(),
+    ]);
+    const currentStatData = currentStatSnap.exists ? (currentStatSnap.data() || {}) : {};
+    const currentCheckInMs = toMillisSafe(currentStatData.checkInAt);
+    if (currentCheckInMs >= storedBounds.startMs && currentCheckInMs < params.eventAtMs) {
+        return null;
+    }
+    const previousStatData = previousStatSnap.exists ? (previousStatSnap.data() || {}) : {};
+    const previousCheckInMs = toMillisSafe(previousStatData.checkInAt);
+    const previousCheckOutMs = toMillisSafe(previousStatData.checkOutAt);
+    const isPlausiblePreviousCheckIn = previousCheckInMs > 0 &&
+        previousCheckInMs < params.eventAtMs &&
+        params.eventAtMs - previousCheckInMs <= maxOvernightFlowMs;
+    if (isPlausiblePreviousCheckIn &&
+        (previousCheckOutMs <= 0 ||
+            previousCheckOutMs < previousCheckInMs ||
+            isSameEventMinute(previousCheckOutMs, params.eventAtMs))) {
+        return previousDateKey;
+    }
+    let openStartMs = 0;
+    previousEventsSnap.docs
+        .map((docSnap) => {
+        const data = (docSnap.data() || {});
+        return {
+            eventType: asTrimmedString(data.eventType),
+            occurredAtMs: toMillisSafe(data.occurredAt) || toMillisSafe(data.createdAt),
+        };
+    })
+        .filter((event) => event.occurredAtMs > 0 && event.occurredAtMs <= params.eventAtMs + MINUTE_MS)
+        .sort((left, right) => left.occurredAtMs - right.occurredAtMs)
+        .forEach((event) => {
+        if (event.eventType === "check_in" || event.eventType === "away_end") {
+            openStartMs = event.occurredAtMs;
+        }
+        if (event.eventType === "check_out") {
+            openStartMs = 0;
+        }
+    });
+    if (openStartMs > 0 && params.eventAtMs - openStartMs <= maxOvernightFlowMs) {
+        return previousDateKey;
+    }
+    const previousStudyDayData = previousStudyDaySnap.exists
+        ? (previousStudyDaySnap.data() || {})
+        : {};
+    const previousFirstSessionMs = toMillisSafe(previousStudyDayData.firstSessionStartAt);
+    const previousLastSessionMs = toMillisSafe(previousStudyDayData.lastSessionEndAt);
+    if (previousFirstSessionMs > 0 &&
+        previousFirstSessionMs < params.eventAtMs &&
+        params.eventAtMs - previousFirstSessionMs <= maxOvernightFlowMs &&
+        (previousLastSessionMs <= 0 ||
+            previousLastSessionMs <= params.eventAtMs ||
+            isSameEventMinute(previousLastSessionMs, params.eventAtMs))) {
+        return previousDateKey;
+    }
+    return null;
+}
+function matchesStudyEndSmsRowForDateKeyRepair(rowData, params) {
+    if (asTrimmedString(rowData.studentId) !== params.studentId)
+        return false;
+    if (!isStudyEndSmsRow(rowData.eventType))
+        return false;
+    const metadata = asRecord(rowData.metadata);
+    const sourceEventId = asTrimmedString(rowData.sourceEventId || (metadata === null || metadata === void 0 ? void 0 : metadata.sourceEventId));
+    if (params.eventId && sourceEventId === params.eventId)
+        return true;
+    if (params.oldDedupeKey && asTrimmedString(rowData.dedupeKey) === params.oldDedupeKey)
+        return true;
+    const rowEventAtMs = toMillisSafe(rowData.eventAt || (metadata === null || metadata === void 0 ? void 0 : metadata.eventAt));
+    return isSameEventMinute(rowEventAtMs, params.eventAtMs);
+}
+async function updateStudyEndSmsRowsDateKeyForRepair(db, params) {
+    const snap = await db
+        .collection(`centers/${params.centerId}/${params.collectionName}`)
+        .where("dateKey", "==", params.fromDateKey)
+        .limit(2000)
+        .get();
+    const matchedDocs = snap.docs.filter((docSnap) => matchesStudyEndSmsRowForDateKeyRepair((docSnap.data() || {}), params));
+    for (const chunk of chunkArray(matchedDocs, 450)) {
+        const batch = db.batch();
+        chunk.forEach((docSnap) => {
+            batch.set(docSnap.ref, Object.assign(Object.assign({ dateKey: params.toDateKey }, (params.nextDedupeKey ? { dedupeKey: params.nextDedupeKey } : {})), { dateKeyCorrectedAt: admin.firestore.FieldValue.serverTimestamp(), dateKeyCorrectedFrom: params.fromDateKey, updatedAt: admin.firestore.FieldValue.serverTimestamp() }), { merge: true });
+        });
+        await batch.commit();
+    }
+    return matchedDocs.length;
+}
+async function moveAttendanceStudyEndStatForRepair(db, params) {
+    const eventAt = admin.firestore.Timestamp.fromMillis(params.eventAtMs);
+    const fromRef = db.doc(`centers/${params.centerId}/attendanceDailyStats/${params.fromDateKey}/students/${params.studentId}`);
+    const toRef = db.doc(`centers/${params.centerId}/attendanceDailyStats/${params.toDateKey}/students/${params.studentId}`);
+    await db.runTransaction(async (transaction) => {
+        const [fromSnap, toSnap] = await Promise.all([transaction.get(fromRef), transaction.get(toRef)]);
+        const fromData = fromSnap.exists ? (fromSnap.data() || {}) : {};
+        const toData = toSnap.exists ? (toSnap.data() || {}) : {};
+        const fromCheckOutMs = toMillisSafe(fromData.checkOutAt);
+        const fromCheckInMs = toMillisSafe(fromData.checkInAt);
+        const toCheckOutMs = toMillisSafe(toData.checkOutAt);
+        transaction.set(toRef, {
+            centerId: params.centerId,
+            studentId: params.studentId,
+            dateKey: params.toDateKey,
+            activeStudyDayKey: params.toDateKey,
+            attendanceStatus: "absent",
+            checkOutAt: toCheckOutMs > 0 && toCheckOutMs >= params.eventAtMs ? toData.checkOutAt : eventAt,
+            hasCheckOutRecord: true,
+            dateKeyCorrectedAt: admin.firestore.FieldValue.serverTimestamp(),
+            dateKeyCorrectedFrom: params.fromDateKey,
+            updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        }, { merge: true });
+        if (!fromSnap.exists)
+            return;
+        const shouldClearSourceCheckout = fromCheckOutMs <= 0 || isSameEventMinute(fromCheckOutMs, params.eventAtMs);
+        if (!shouldClearSourceCheckout)
+            return;
+        transaction.set(fromRef, Object.assign(Object.assign({ checkOutAt: admin.firestore.FieldValue.delete(), hasCheckOutRecord: admin.firestore.FieldValue.delete(), checkoutSessionMissing: admin.firestore.FieldValue.delete() }, (fromCheckInMs <= 0 ? { attendanceStatus: admin.firestore.FieldValue.delete() } : {})), { dateKeyCorrectedAt: admin.firestore.FieldValue.serverTimestamp(), dateKeyCorrectedTo: params.toDateKey, updatedAt: admin.firestore.FieldValue.serverTimestamp() }), { merge: true });
+    });
+    return 1;
+}
+async function repairStandaloneStudyEndSmsRowsForDate(db, params) {
+    var _a;
+    const snap = await db
+        .collection(`centers/${params.centerId}/${params.collectionName}`)
+        .where("dateKey", "==", params.dateKey)
+        .limit(2000)
+        .get();
+    const updates = [];
+    for (const docSnap of snap.docs) {
+        const data = (docSnap.data() || {});
+        if (!isStudyEndSmsRow(data.eventType))
+            continue;
+        const eventAtMs = toMillisSafe(data.eventAt || ((_a = asRecord(data.metadata)) === null || _a === void 0 ? void 0 : _a.eventAt));
+        if (eventAtMs <= 0)
+            continue;
+        const studentId = asTrimmedString(data.studentId);
+        const correctDateKey = studentId
+            ? await resolveCorrectStudyEndDateKeyForRepair(db, {
+                centerId: params.centerId,
+                studentId,
+                storedDateKey: params.dateKey,
+                eventAtMs,
+            })
+            : toStudyDayKey(new Date(eventAtMs));
+        if (!correctDateKey || correctDateKey === params.dateKey)
+            continue;
+        const nextDedupeKey = studentId
+            ? buildSmsDedupeKey({
+                centerId: params.centerId,
+                studentId,
+                eventType: "study_end",
+                eventAt: new Date(eventAtMs),
+                dateKeyOverride: correctDateKey,
+            })
+            : "";
+        updates.push({ docSnap, correctDateKey, nextDedupeKey });
+    }
+    for (const chunk of chunkArray(updates, 450)) {
+        const batch = db.batch();
+        chunk.forEach(({ docSnap, correctDateKey, nextDedupeKey }) => {
+            batch.set(docSnap.ref, Object.assign(Object.assign({ dateKey: correctDateKey }, (nextDedupeKey ? { dedupeKey: nextDedupeKey } : {})), { dateKeyCorrectedAt: admin.firestore.FieldValue.serverTimestamp(), dateKeyCorrectedFrom: params.dateKey, updatedAt: admin.firestore.FieldValue.serverTimestamp() }), { merge: true });
+        });
+        await batch.commit();
+    }
+    return updates.length;
+}
+async function repairStandaloneStudyEndStatsForDate(db, centerId, dateKey) {
+    const statsSnap = await db.collection(`centers/${centerId}/attendanceDailyStats/${dateKey}/students`).limit(1000).get();
+    let correctedCount = 0;
+    for (const statDoc of statsSnap.docs) {
+        const data = (statDoc.data() || {});
+        const studentId = asTrimmedString(data.studentId, statDoc.id);
+        const checkOutMs = toMillisSafe(data.checkOutAt);
+        if (!studentId || checkOutMs <= 0)
+            continue;
+        const correctDateKey = await resolveCorrectStudyEndDateKeyForRepair(db, {
+            centerId,
+            studentId,
+            storedDateKey: dateKey,
+            eventAtMs: checkOutMs,
+        });
+        if (!correctDateKey || correctDateKey === dateKey)
+            continue;
+        correctedCount += await moveAttendanceStudyEndStatForRepair(db, {
+            centerId,
+            studentId,
+            fromDateKey: dateKey,
+            toDateKey: correctDateKey,
+            eventAtMs: checkOutMs,
+        });
+    }
+    return correctedCount;
+}
+async function repairMisclassifiedStudyEndDateKeysForCenter(db, centerId, dateKey) {
+    const result = {
+        eventCorrectionCount: 0,
+        smsQueueDateKeyCorrectionCount: 0,
+        smsDeliveryLogDateKeyCorrectionCount: 0,
+        attendanceStatDateKeyCorrectionCount: 0,
+        dedupeDateKeyCorrectionCount: 0,
+    };
+    const eventsSnap = await db
+        .collection(`centers/${centerId}/attendanceEvents`)
+        .where("dateKey", "==", dateKey)
+        .limit(1500)
+        .get();
+    const checkOutEvents = eventsSnap.docs
+        .map((eventDoc) => {
+        const eventData = (eventDoc.data() || {});
+        const eventAtMs = toMillisSafe(eventData.occurredAt) || toMillisSafe(eventData.createdAt);
+        return {
+            eventDoc,
+            eventData,
+            studentId: asTrimmedString(eventData.studentId),
+            eventAtMs,
+        };
+    })
+        .filter((event) => event.studentId && event.eventAtMs > 0 && isCheckOutAttendanceEvent(event.eventData.eventType));
+    for (const event of checkOutEvents) {
+        const correctDateKey = await resolveCorrectStudyEndDateKeyForRepair(db, {
+            centerId,
+            studentId: event.studentId,
+            storedDateKey: dateKey,
+            eventAtMs: event.eventAtMs,
+        });
+        if (!correctDateKey || correctDateKey === dateKey)
+            continue;
+        const eventAt = new Date(event.eventAtMs);
+        const oldDedupeKey = asTrimmedString(event.eventData.smsDedupeKey);
+        const nextDedupeKey = buildAttendanceEventSmsDedupeKey({
+            centerId,
+            studentId: event.studentId,
+            eventType: "study_end",
+            eventAt,
+            eventId: event.eventDoc.id,
+            dateKeyOverride: correctDateKey,
+        });
+        await event.eventDoc.ref.set({
+            dateKey: correctDateKey,
+            activeStudyDayKey: correctDateKey,
+            flowDateKey: correctDateKey,
+            smsDedupeKey: nextDedupeKey,
+            dateKeyCorrectedAt: admin.firestore.FieldValue.serverTimestamp(),
+            dateKeyCorrectedFrom: dateKey,
+            updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        }, { merge: true });
+        result.eventCorrectionCount += 1;
+        result.attendanceStatDateKeyCorrectionCount += await moveAttendanceStudyEndStatForRepair(db, {
+            centerId,
+            studentId: event.studentId,
+            fromDateKey: dateKey,
+            toDateKey: correctDateKey,
+            eventAtMs: event.eventAtMs,
+        });
+        result.smsQueueDateKeyCorrectionCount += await updateStudyEndSmsRowsDateKeyForRepair(db, {
+            centerId,
+            collectionName: "smsQueue",
+            fromDateKey: dateKey,
+            toDateKey: correctDateKey,
+            studentId: event.studentId,
+            eventId: event.eventDoc.id,
+            oldDedupeKey,
+            nextDedupeKey,
+            eventAtMs: event.eventAtMs,
+        });
+        result.smsDeliveryLogDateKeyCorrectionCount += await updateStudyEndSmsRowsDateKeyForRepair(db, {
+            centerId,
+            collectionName: "smsDeliveryLogs",
+            fromDateKey: dateKey,
+            toDateKey: correctDateKey,
+            studentId: event.studentId,
+            eventId: event.eventDoc.id,
+            oldDedupeKey,
+            nextDedupeKey,
+            eventAtMs: event.eventAtMs,
+        });
+        await db.doc(`centers/${centerId}/smsDedupes/${nextDedupeKey}`).set({
+            centerId,
+            studentId: event.studentId,
+            eventType: "study_end",
+            dedupeKey: nextDedupeKey,
+            dateKey: correctDateKey,
+            sourceEventId: event.eventDoc.id,
+            correctedFromDedupeKey: oldDedupeKey || null,
+            correctedAt: admin.firestore.FieldValue.serverTimestamp(),
+        }, { merge: true });
+        result.dedupeDateKeyCorrectionCount += 1;
+    }
+    result.attendanceStatDateKeyCorrectionCount += await repairStandaloneStudyEndStatsForDate(db, centerId, dateKey);
+    result.smsQueueDateKeyCorrectionCount += await repairStandaloneStudyEndSmsRowsForDate(db, {
+        centerId,
+        collectionName: "smsQueue",
+        dateKey,
+    });
+    result.smsDeliveryLogDateKeyCorrectionCount += await repairStandaloneStudyEndSmsRowsForDate(db, {
+        centerId,
+        collectionName: "smsDeliveryLogs",
+        dateKey,
+    });
+    return result;
+}
 async function repairAttendanceSmsQueueForCenter(db, centerId, dateKey, options = {}) {
     const eventsSnap = await db
         .collection(`centers/${centerId}/attendanceEvents`)
@@ -2856,6 +3191,7 @@ async function repairAttendanceSmsQueueForCenter(db, centerId, dateKey, options 
             eventType: event.eventType,
             eventAt: event.eventAt,
             eventId: event.eventId,
+            dateKeyOverride: asTrimmedString(event.data.dateKey) || dateKey,
         });
         const existingQueueState = getExistingAttendanceSmsQueueState(existingQueues, {
             studentId: event.studentId,
@@ -2931,8 +3267,9 @@ exports.repairTodayAttendanceSmsQueue = smsDispatcherFunctions.https.onCall(asyn
     if (requestedDateKey !== todayKey) {
         throw new functions.https.HttpsError("invalid-argument", "현재 운영일의 문자 접수만 복구할 수 있습니다.");
     }
+    const correctionResult = await repairMisclassifiedStudyEndDateKeysForCenter(db, centerId, todayKey);
     const result = await repairAttendanceSmsQueueForCenter(db, centerId, todayKey);
-    return Object.assign({ ok: true }, result);
+    return Object.assign(Object.assign({ ok: true }, result), { dateKeyCorrectionCount: correctionResult.eventCorrectionCount, smsQueueDateKeyCorrectionCount: correctionResult.smsQueueDateKeyCorrectionCount, smsDeliveryLogDateKeyCorrectionCount: correctionResult.smsDeliveryLogDateKeyCorrectionCount, attendanceStatDateKeyCorrectionCount: correctionResult.attendanceStatDateKeyCorrectionCount, dedupeDateKeyCorrectionCount: correctionResult.dedupeDateKeyCorrectionCount });
 });
 async function runLateArrivalCheckForCenter(db, centerId, nowKst, attendanceSnap) {
     const settings = await loadNotificationSettings(db, centerId);
@@ -7110,10 +7447,10 @@ async function resolveActiveAttendanceFlowContext(params) {
     const fieldStartedAtMs = toMillisSafe(params.seatData.activeStudyStartedAt);
     const seatStartedAtMs = fieldStartedAtMs || toMillisSafe(params.seatData.lastCheckInAt);
     if (isValidDateKey(fieldDateKey)) {
-        return { dateKey: fieldDateKey, startedAtMs: seatStartedAtMs };
+        return { dateKey: fieldDateKey, startedAtMs: seatStartedAtMs, resolved: true };
     }
     if (seatStartedAtMs > 0 && seatStartedAtMs < params.nowMs + MINUTE_MS) {
-        return { dateKey: toStudyDayKey(new Date(seatStartedAtMs)), startedAtMs: seatStartedAtMs };
+        return { dateKey: toStudyDayKey(new Date(seatStartedAtMs)), startedAtMs: seatStartedAtMs, resolved: true };
     }
     const evidenceDateKeys = Array.from(new Set([params.currentDateKey, getPreviousDateKey(params.currentDateKey)]));
     const eventSnaps = await Promise.all(evidenceDateKeys.map((dateKey) => params.db
@@ -7144,7 +7481,7 @@ async function resolveActiveAttendanceFlowContext(params) {
         }
     });
     if (activeFlowStartMs > 0) {
-        return { dateKey: toStudyDayKey(new Date(activeFlowStartMs)), startedAtMs: activeFlowStartMs };
+        return { dateKey: toStudyDayKey(new Date(activeFlowStartMs)), startedAtMs: activeFlowStartMs, resolved: true };
     }
     const statSnaps = await Promise.all(evidenceDateKeys.map((dateKey) => params.db.doc(`centers/${params.centerId}/attendanceDailyStats/${dateKey}/students/${params.studentId}`).get()));
     let statCheckInMs = 0;
@@ -7157,9 +7494,9 @@ async function resolveActiveAttendanceFlowContext(params) {
         }
     });
     if (statCheckInMs > 0) {
-        return { dateKey: toStudyDayKey(new Date(statCheckInMs)), startedAtMs: statCheckInMs };
+        return { dateKey: toStudyDayKey(new Date(statCheckInMs)), startedAtMs: statCheckInMs, resolved: true };
     }
-    return { dateKey: params.currentDateKey, startedAtMs: 0 };
+    return { dateKey: params.currentDateKey, startedAtMs: 0, resolved: false };
 }
 async function resolveOpenStudyStartMsFromAttendanceEvidence(params) {
     const seatStartMs = toMillisSafe(params.seatData.lastCheckInAt);
@@ -7281,8 +7618,27 @@ async function applyAttendanceStatusTransition(params) {
         });
     }
     const preflightStatus = normalizeAttendanceSeatStatus(preflightSeatData.status);
+    if (preflightStatus === "absent" && nextStatus === "absent") {
+        return {
+            ok: true,
+            noop: true,
+            previousStatus: preflightStatus,
+            nextStatus,
+            seatId: seatDoc.id,
+            eventType: null,
+            eventId: null,
+            eventAtMillis: null,
+            duplicatedSession: true,
+            sessionId: null,
+            sessionDateKey: null,
+            sessionMinutes: 0,
+            totalMinutesAfterSession: 0,
+            attendanceAchieved: false,
+            bonus6hAchieved: false,
+        };
+    }
     const preflightFlowContext = preflightStatus === "absent" && nextStatus === "studying"
-        ? { dateKey: currentDateKey, startedAtMs: nowMs }
+        ? { dateKey: currentDateKey, startedAtMs: nowMs, resolved: true }
         : await resolveActiveAttendanceFlowContext({
             db,
             centerId,
@@ -7291,6 +7647,11 @@ async function applyAttendanceStatusTransition(params) {
             nowMs,
             seatData: preflightSeatData,
         });
+    if (preflightStatus !== "absent" && !preflightFlowContext.resolved) {
+        throw new functions.https.HttpsError("failed-precondition", "Active attendance flow date could not be resolved.", {
+            userMessage: "진행 중인 등원 흐름의 기준일을 찾지 못했습니다. 새로고침 후에도 같으면 관리자에게 출결 보정을 요청해 주세요.",
+        });
+    }
     const attendanceDateKey = preflightFlowContext.dateKey;
     const activeStudyStartedAtMs = preflightFlowContext.startedAtMs > 0
         ? preflightFlowContext.startedAtMs
@@ -7393,6 +7754,7 @@ async function applyAttendanceStatusTransition(params) {
                     centerId,
                     studentId,
                     dateKey: attendanceDateKey,
+                    activeStudyDayKey: attendanceDateKey,
                     attendanceStatus: nextStatus,
                     source: params.source,
                     updatedAt: admin.firestore.FieldValue.serverTimestamp(),
@@ -7424,7 +7786,7 @@ async function applyAttendanceStatusTransition(params) {
                 }
                 transaction.set(repeatStatRef, repeatStatPatch, { merge: true });
                 transaction.set(seatDoc.ref, repeatSeatPatch, { merge: true });
-                transaction.set(repeatEventRef, Object.assign({ studentId, dateKey: attendanceDateKey, eventType: repeatEventType, occurredAt: nowTs, createdAt: admin.firestore.FieldValue.serverTimestamp(), source: params.source, seatId: seatDoc.id, statusBefore: prevStatus, statusAfter: nextStatus, repeatAction: true }, (params.actorUid ? { actorUid: params.actorUid } : {})));
+                transaction.set(repeatEventRef, Object.assign({ studentId, dateKey: attendanceDateKey, activeStudyDayKey: attendanceDateKey, flowDateKey: attendanceDateKey, eventType: repeatEventType, occurredAt: nowTs, createdAt: admin.firestore.FieldValue.serverTimestamp(), source: params.source, seatId: seatDoc.id, statusBefore: prevStatus, statusAfter: nextStatus, repeatAction: true }, (params.actorUid ? { actorUid: params.actorUid } : {})));
                 return {
                     ok: true,
                     noop: false,
@@ -7485,6 +7847,7 @@ async function applyAttendanceStatusTransition(params) {
             centerId,
             studentId,
             dateKey: attendanceDateKey,
+            activeStudyDayKey: attendanceDateKey,
             attendanceStatus: nextStatus,
             source: params.source,
             updatedAt: admin.firestore.FieldValue.serverTimestamp(),
@@ -7504,7 +7867,7 @@ async function applyAttendanceStatusTransition(params) {
         }
         transaction.set(statRef, statPatch, { merge: true });
         if (eventType && eventRef) {
-            transaction.set(eventRef, Object.assign(Object.assign({ studentId, dateKey: attendanceDateKey, eventType, occurredAt: nowTs, createdAt: admin.firestore.FieldValue.serverTimestamp(), source: params.source, seatId: seatDoc.id, statusBefore: prevStatus, statusAfter: nextStatus }, (shouldAllowCheckoutWithoutSession ? { sessionFinalizeSkipped: true, sessionFinalizeSkipReason: "missing_open_session_start" } : {})), (params.actorUid ? { actorUid: params.actorUid } : {})));
+            transaction.set(eventRef, Object.assign(Object.assign({ studentId, dateKey: attendanceDateKey, activeStudyDayKey: attendanceDateKey, flowDateKey: attendanceDateKey, eventType, occurredAt: nowTs, createdAt: admin.firestore.FieldValue.serverTimestamp(), source: params.source, seatId: seatDoc.id, statusBefore: prevStatus, statusAfter: nextStatus }, (shouldAllowCheckoutWithoutSession ? { sessionFinalizeSkipped: true, sessionFinalizeSkipReason: "missing_open_session_start" } : {})), (params.actorUid ? { actorUid: params.actorUid } : {})));
         }
         if (eventType === "check_in" && progressSnap) {
             const progressData = progressSnap.exists ? (progressSnap.data() || {}) : {};

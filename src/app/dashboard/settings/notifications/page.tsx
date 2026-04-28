@@ -214,6 +214,7 @@ type StudentSmsBoardEventSummary = {
   status: 'sent' | 'queued' | 'failed' | 'suppressed' | 'missing_phone' | 'recorded' | 'none';
   timeLabel: string;
   badgeLabel: string;
+  dateKey: string;
   attendanceAt: Date | null;
   queueRows: SmsQueueRow[];
   logRows: SmsDeliveryLogRow[];
@@ -241,6 +242,8 @@ type AttendanceEventRow = {
   id: string;
   studentId?: string;
   dateKey?: string;
+  activeStudyDayKey?: string;
+  flowDateKey?: string;
   eventType?: string;
   occurredAt?: { toDate?: () => Date };
   createdAt?: { toDate?: () => Date };
@@ -460,14 +463,34 @@ function pickDateByMode(values: Array<Date | null | undefined>, mode: 'earliest'
 function pickAttendanceEventTime(
   rows: AttendanceEventRow[],
   eventType: string,
-  mode: 'earliest' | 'latest'
+  mode: 'earliest' | 'latest',
+  dateKey?: string
 ) {
   return pickDateByMode(
     rows
-      .filter((row) => row.eventType === eventType)
+      .filter((row) => {
+        if (row.eventType !== eventType) return false;
+        const rowDateKey = row.activeStudyDayKey || row.flowDateKey || row.dateKey;
+        return !dateKey || !rowDateKey || rowDateKey === dateKey;
+      })
       .map((row) => toDateSafe(row.occurredAt) || toDateSafe(row.createdAt)),
     mode
   );
+}
+
+function resolveAttendanceDateForBoard(
+  date: Date | null,
+  boardDateKey: string,
+  rowDateKey?: string | null
+) {
+  if (rowDateKey && rowDateKey !== boardDateKey) return null;
+  if (!date) return null;
+  if (date.getHours() < 1 && getStudyDayKey(date) !== boardDateKey) return null;
+  return date;
+}
+
+function isSmsRowOnBoardDate(row: { dateKey?: string }, boardDateKey: string) {
+  return row.dateKey === boardDateKey;
 }
 
 function formatTimeLabelFromDate(date?: Date | null) {
@@ -878,12 +901,20 @@ export default function NotificationSettingsPage() {
     [preferencesRaw]
   );
   const attendanceRecordsByStudentId = useMemo<Map<string, AttendanceRecordRow>>(
-    () => new Map((attendanceRecordsTodayRaw || []).map((row) => [getStudentIdFromDatedAttendanceRow(row), row] as const)),
-    [attendanceRecordsTodayRaw]
+    () => new Map(
+      (attendanceRecordsTodayRaw || [])
+        .filter((row) => !row.dateKey || row.dateKey === todayDateKey)
+        .map((row) => [getStudentIdFromDatedAttendanceRow(row), row] as const)
+    ),
+    [attendanceRecordsTodayRaw, todayDateKey]
   );
   const attendanceDailyStatsByStudentId = useMemo<Map<string, AttendanceDailyStatRow>>(
-    () => new Map((attendanceDailyStatsTodayRaw || []).map((row) => [getStudentIdFromDatedAttendanceRow(row), row] as const)),
-    [attendanceDailyStatsTodayRaw]
+    () => new Map(
+      (attendanceDailyStatsTodayRaw || [])
+        .filter((row) => !row.dateKey || row.dateKey === todayDateKey)
+        .map((row) => [getStudentIdFromDatedAttendanceRow(row), row] as const)
+    ),
+    [attendanceDailyStatsTodayRaw, todayDateKey]
   );
   const attendanceCurrentByStudentId = useMemo<Map<string, AttendanceCurrentRow>>(() => {
     const next = new Map<string, AttendanceCurrentRow>();
@@ -904,6 +935,8 @@ export default function NotificationSettingsPage() {
     const next = new Map<string, AttendanceEventRow[]>();
     (attendanceEventsTodayRaw || []).forEach((row) => {
       if (!row.studentId) return;
+      const rowDateKey = row.activeStudyDayKey || row.flowDateKey || row.dateKey;
+      if (rowDateKey && rowDateKey !== todayDateKey) return;
       const current = next.get(row.studentId) || [];
       current.push(row);
       next.set(row.studentId, current);
@@ -919,7 +952,7 @@ export default function NotificationSettingsPage() {
       );
     });
     return next;
-  }, [attendanceEventsTodayRaw]);
+  }, [attendanceEventsTodayRaw, todayDateKey]);
 
   const providerReady = useMemo(() => {
     if (!form.smsEnabled) return false;
@@ -1098,28 +1131,28 @@ export default function NotificationSettingsPage() {
         const resolveAttendanceTime = (eventType: TodayBoardEventType) => {
           if (eventType === 'study_start') {
             return pickDateByMode([
-              pickAttendanceEventTime(attendanceEvents, 'check_in', 'earliest'),
-              toDateSafe(attendanceDailyStat?.checkInAt),
-              toDateSafe(attendanceRecord?.checkInAt),
+              pickAttendanceEventTime(attendanceEvents, 'check_in', 'earliest', todayKey),
+              resolveAttendanceDateForBoard(toDateSafe(attendanceDailyStat?.checkInAt), todayKey, attendanceDailyStat?.dateKey),
+              resolveAttendanceDateForBoard(toDateSafe(attendanceRecord?.checkInAt), todayKey, attendanceRecord?.dateKey),
               liveCheckInToday
             ], 'earliest');
           }
           if (eventType === 'study_end') {
-            return (
-              toDateSafe(attendanceDailyStat?.checkOutAt) ||
-              pickAttendanceEventTime(attendanceEvents, 'check_out', 'latest')
-            );
+            return pickDateByMode([
+              pickAttendanceEventTime(attendanceEvents, 'check_out', 'latest', todayKey),
+              resolveAttendanceDateForBoard(toDateSafe(attendanceDailyStat?.checkOutAt), todayKey, attendanceDailyStat?.dateKey),
+            ], 'latest');
           }
           if (eventType === 'away_start') {
-            return pickAttendanceEventTime(attendanceEvents, 'away_start', 'latest');
+            return pickAttendanceEventTime(attendanceEvents, 'away_start', 'latest', todayKey);
           }
-          return pickAttendanceEventTime(attendanceEvents, 'away_end', 'latest');
+          return pickAttendanceEventTime(attendanceEvents, 'away_end', 'latest', todayKey);
         };
         const studentLogs = deliveryRows.filter(
-          (row) => row.studentId === student.studentId && row.dateKey === todayKey && TODAY_BOARD_EVENTS.some((item) => item.value === row.eventType)
+          (row) => row.studentId === student.studentId && isSmsRowOnBoardDate(row, todayKey) && TODAY_BOARD_EVENTS.some((item) => item.value === row.eventType)
         );
         const studentQueueRows = queueRows.filter(
-          (row) => row.studentId === student.studentId && row.dateKey === todayKey && TODAY_BOARD_EVENTS.some((item) => item.value === row.eventType)
+          (row) => row.studentId === student.studentId && isSmsRowOnBoardDate(row, todayKey) && TODAY_BOARD_EVENTS.some((item) => item.value === row.eventType)
         );
         const hasMissingPhone = student.parentRows.every((row) => row.isPhoneMissing);
         const events = TODAY_BOARD_EVENTS.reduce((acc, item) => {
@@ -1153,6 +1186,7 @@ export default function NotificationSettingsPage() {
               status: 'sent',
               timeLabel: formatTimeLabelFromDate(sentEventTime),
               badgeLabel: formatTimeLabelFromDate(sentEventTime),
+              dateKey: todayKey,
               queueRows: queueRowsForEvent,
               logRows,
             };
@@ -1162,6 +1196,7 @@ export default function NotificationSettingsPage() {
               status: 'queued',
               timeLabel: '-',
               badgeLabel: '대기',
+              dateKey: todayKey,
               queueRows: queueRowsForEvent,
               logRows,
             };
@@ -1171,6 +1206,7 @@ export default function NotificationSettingsPage() {
               status: 'failed',
               timeLabel: '-',
               badgeLabel: '실패',
+              dateKey: todayKey,
               queueRows: queueRowsForEvent,
               logRows,
             };
@@ -1180,6 +1216,7 @@ export default function NotificationSettingsPage() {
               status: 'failed',
               timeLabel: '-',
               badgeLabel: '실패',
+              dateKey: todayKey,
               queueRows: queueRowsForEvent,
               logRows,
             };
@@ -1189,6 +1226,7 @@ export default function NotificationSettingsPage() {
               status: 'suppressed',
               timeLabel: '-',
               badgeLabel: '수신거부',
+              dateKey: todayKey,
               queueRows: queueRowsForEvent,
               logRows,
             };
@@ -1198,6 +1236,7 @@ export default function NotificationSettingsPage() {
               status: hasMissingPhone ? 'missing_phone' : 'recorded',
               timeLabel: formatTimeLabelFromDate(attendanceTime),
               badgeLabel: hasMissingPhone ? '번호없음' : '미접수',
+              dateKey: todayKey,
               queueRows: queueRowsForEvent,
               logRows,
             };
@@ -1207,6 +1246,7 @@ export default function NotificationSettingsPage() {
               status: 'missing_phone',
               timeLabel: '-',
               badgeLabel: '번호없음',
+              dateKey: todayKey,
               queueRows: queueRowsForEvent,
               logRows,
             };
@@ -1216,6 +1256,7 @@ export default function NotificationSettingsPage() {
               status: 'none',
               timeLabel: '-',
               badgeLabel: '-',
+              dateKey: todayKey,
               queueRows: queueRowsForEvent,
               logRows,
             };
@@ -1533,10 +1574,19 @@ export default function NotificationSettingsPage() {
         skippedCount?: number;
         noRecipientCount?: number;
         targetCount?: number;
+        dateKeyCorrectionCount?: number;
+        smsQueueDateKeyCorrectionCount?: number;
+        smsDeliveryLogDateKeyCorrectionCount?: number;
+        attendanceStatDateKeyCorrectionCount?: number;
       };
+      const correctedCount =
+        (data.dateKeyCorrectionCount || 0) +
+        (data.smsQueueDateKeyCorrectionCount || 0) +
+        (data.smsDeliveryLogDateKeyCorrectionCount || 0) +
+        (data.attendanceStatDateKeyCorrectionCount || 0);
       toast({
-        title: '운영일 누락 문자 복구 완료',
-        description: `큐 ${data.queuedCount || 0}건 · 수신제외 ${data.suppressedCount || 0}건 · 기존접수 ${data.skippedCount || 0}건 · 번호없음 ${data.noRecipientCount || 0}건`,
+        title: '운영일 보정/누락 문자 복구 완료',
+        description: `운영일 보정 ${correctedCount}건 · 큐 ${data.queuedCount || 0}건 · 수신제외 ${data.suppressedCount || 0}건 · 기존접수 ${data.skippedCount || 0}건 · 번호없음 ${data.noRecipientCount || 0}건`,
       });
     } catch (error: any) {
       toast({
@@ -1668,19 +1718,25 @@ export default function NotificationSettingsPage() {
     }
   };
 
-  const handleResendStudentEvent = async (studentId: string, eventType: TodayBoardEventType, attendanceAt?: Date | null) => {
+  const handleResendStudentEvent = async (
+    studentId: string,
+    eventType: TodayBoardEventType,
+    attendanceAt?: Date | null,
+    eventDateKey?: string
+  ) => {
     if (!functions || !centerId) return;
     const actionKey = `resend-${studentId}-${eventType}`;
     setManualSmsActionKey(actionKey);
     try {
       const notifyAttendanceSms = httpsCallable(functions, 'notifyAttendanceSms');
       const eventDate = attendanceAt && Number.isFinite(attendanceAt.getTime()) ? attendanceAt : null;
+      const targetDateKey = eventDateKey || todayDateKey;
       await notifyAttendanceSms({
         centerId,
         studentId,
         eventType,
         force: true,
-        ...(eventDate ? { eventAt: eventDate.toISOString(), dateKey: todayDateKey } : { dateKey: todayDateKey }),
+        ...(eventDate ? { eventAt: eventDate.toISOString(), dateKey: targetDateKey } : { dateKey: targetDateKey }),
       });
       toast({
         title: '문자 재발송 요청 완료',
@@ -1973,7 +2029,7 @@ export default function NotificationSettingsPage() {
               disabled={isRepairingTodaySms || isLoading}
             >
               {isRepairingTodaySms ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCcw className="h-4 w-4" />}
-              운영일 누락 문자 복구
+              운영일 보정·누락 복구
             </Button>
           </div>
         </CardHeader>
@@ -2340,7 +2396,7 @@ export default function NotificationSettingsPage() {
                               variant="outline"
                               className="h-8 rounded-lg px-3 text-xs font-black"
                               disabled={manualSmsActionKey === `resend-${selectedBoardStudent.studentId}-${event.value}`}
-                              onClick={() => void handleResendStudentEvent(selectedBoardStudent.studentId, event.value, summary.attendanceAt)}
+                              onClick={() => void handleResendStudentEvent(selectedBoardStudent.studentId, event.value, summary.attendanceAt, summary.dateKey)}
                             >
                               {manualSmsActionKey === `resend-${selectedBoardStudent.studentId}-${event.value}` ? <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" /> : <RefreshCcw className="mr-1 h-3.5 w-3.5" />}
                               다시 보내기
