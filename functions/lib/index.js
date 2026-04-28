@@ -33,8 +33,8 @@ var __importStar = (this && this.__importStar) || (function () {
     };
 })();
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.reissueDailyRankingRewardV2Secure = exports.scheduledRankingRewardSettlement = exports.ensureCurrentUserMemberships = exports.scheduledOpenClawSnapshotExport = exports.generateOpenClawSnapshot = exports.refreshClassroomSignals = exports.stopStudentStudySessionSecure = exports.scheduledStudyBoxCarryoverExpiry = exports.openStudyRewardBoxesSecure = exports.openStudyRewardBoxSecure = exports.claimPlannerCompletionRewardSecure = exports.submitAttendanceRequestSecure = exports.applyPenaltyEventSecure = exports.adjustStudentPenaltyBalanceSecure = exports.adjustStudentPointBalanceSecure = exports.cancelPointBoostEventSecure = exports.createPointBoostEventSecure = exports.scheduledClassroomSignalsRefresh = exports.scheduledDailyRiskAlert = exports.repairRecentStudySessionTotals = exports.deleteManualStudySessionSecure = exports.updateManualStudySessionSecure = exports.createManualStudySessionSecure = exports.lookupKioskStudentsByPin = exports.setStudentAttendanceStatusSecure = exports.onSessionWritten = exports.onSessionCreated = exports.scheduledWeeklyReport = exports.cleanupOldDocuments = exports.scheduledAttendanceCheck = exports.runLateArrivalCheck = exports.sendPaymentReminderBatch = exports.notifyDailyReportReady = exports.notifyAttendanceSms = exports.scheduledSmsQueueDispatcher = exports.sendManualStudentSms = exports.updateSmsRecipientPreference = exports.cancelSmsQueueItem = exports.retrySmsQueueItem = exports.saveNotificationSettingsSecure = exports.confirmInvoicePayment = exports.completeSignupWithInvite = exports.redeemInviteCode = exports.createCounselingDemoBundle = exports.registerStudent = exports.updateStudentAccount = exports.deleteTeacherAccount = exports.deleteStudentAccount = exports.repairTodayAttendanceSmsQueue = exports.onAttendanceEventCreated = void 0;
-exports.generateStudyPlan = exports.syncGiftishowCatalogSecure = exports.scheduledGiftishowCatalogSync = exports.saveGiftishowSettingsSecure = exports.resendGiftishowOrderSecure = exports.rejectGiftishowOrderSecure = exports.reconcilePendingGiftishowOrders = exports.getGiftishowBizmoneySecure = exports.createGiftishowOrderRequestSecure = exports.cancelGiftishowOrderSecure = exports.cancelGiftishowSendFailSecure = exports.approveGiftishowOrderSecure = void 0;
+exports.scheduledOpenClawSnapshotExport = exports.generateOpenClawSnapshot = exports.refreshClassroomSignals = exports.stopStudentStudySessionSecure = exports.scheduledStudyBoxCarryoverExpiry = exports.openStudyRewardBoxesSecure = exports.openStudyRewardBoxSecure = exports.claimPlannerCompletionRewardSecure = exports.submitAttendanceRequestSecure = exports.applyPenaltyEventSecure = exports.adjustStudentPenaltyBalanceSecure = exports.adjustStudentPointBalanceSecure = exports.cancelPointBoostEventSecure = exports.createPointBoostEventSecure = exports.scheduledClassroomSignalsRefresh = exports.scheduledDailyRiskAlert = exports.repairRecentStudySessionTotals = exports.deleteManualStudySessionSecure = exports.updateManualStudySessionSecure = exports.createManualStudySessionSecure = exports.scheduledKioskAttendanceQueueWorker = exports.onKioskAttendanceQueueCreated = exports.enqueueKioskAttendanceActionSecure = exports.lookupKioskStudentsByPin = exports.setStudentAttendanceStatusSecure = exports.onSessionWritten = exports.onSessionCreated = exports.scheduledWeeklyReport = exports.cleanupOldDocuments = exports.scheduledAttendanceCheck = exports.runLateArrivalCheck = exports.sendPaymentReminderBatch = exports.notifyDailyReportReady = exports.notifyAttendanceSms = exports.scheduledSmsQueueDispatcher = exports.sendManualStudentSms = exports.updateSmsRecipientPreference = exports.cancelSmsQueueItem = exports.retrySmsQueueItem = exports.saveNotificationSettingsSecure = exports.confirmInvoicePayment = exports.completeSignupWithInvite = exports.redeemInviteCode = exports.createCounselingDemoBundle = exports.registerStudent = exports.updateStudentAccount = exports.deleteTeacherAccount = exports.deleteStudentAccount = exports.repairTodayAttendanceSmsQueue = exports.onAttendanceEventCreated = void 0;
+exports.generateStudyPlan = exports.syncGiftishowCatalogSecure = exports.scheduledGiftishowCatalogSync = exports.saveGiftishowSettingsSecure = exports.resendGiftishowOrderSecure = exports.rejectGiftishowOrderSecure = exports.reconcilePendingGiftishowOrders = exports.getGiftishowBizmoneySecure = exports.createGiftishowOrderRequestSecure = exports.cancelGiftishowOrderSecure = exports.cancelGiftishowSendFailSecure = exports.approveGiftishowOrderSecure = exports.reissueDailyRankingRewardV2Secure = exports.scheduledRankingRewardSettlement = exports.ensureCurrentUserMemberships = void 0;
 const params_1 = require("firebase-functions/params");
 const functions = __importStar(require("firebase-functions"));
 const admin = __importStar(require("firebase-admin"));
@@ -8102,12 +8102,27 @@ async function lookupKioskStudentDocsByPin(db, centerId, pin) {
             return [directStudentSnap];
         }
     }
-    const studentSnap = await db
+    const lookupValues = [pin];
+    const numericPin = Number(pin);
+    if (Number.isFinite(numericPin)) {
+        lookupValues.push(numericPin);
+    }
+    const studentSnaps = await Promise.all(lookupValues.map((value) => db
         .collection(`centers/${centerId}/students`)
-        .where("parentLinkCode", "==", pin)
+        .where("parentLinkCode", "==", value)
         .limit(8)
-        .get();
-    return studentSnap.docs;
+        .get()));
+    const seen = new Set();
+    const docs = [];
+    studentSnaps.forEach((snap) => {
+        snap.docs.forEach((docSnap) => {
+            if (seen.has(docSnap.id))
+                return;
+            seen.add(docSnap.id);
+            docs.push(docSnap);
+        });
+    });
+    return docs.slice(0, 8);
 }
 function buildKioskLookupSeatPayload(studentId, docSnap) {
     var _a, _b;
@@ -8211,6 +8226,417 @@ exports.lookupKioskStudentsByPin = functions.region(region).https.onCall(async (
             userMessage: "학생 조회 중 오류가 발생했습니다. 다시 입력해 주세요.",
         });
     }
+});
+const KIOSK_ATTENDANCE_LOCK_TTL_MS = 90 * 1000;
+const KIOSK_ATTENDANCE_MAX_ATTEMPTS = 3;
+const KIOSK_ATTENDANCE_MAX_CLIENT_PAST_MS = 12 * 60 * 60 * 1000;
+const KIOSK_ATTENDANCE_MAX_CLIENT_FUTURE_MS = 5 * MINUTE_MS;
+function parseKioskAttendanceQueueAction(value) {
+    const normalized = asTrimmedString(value);
+    if (normalized === "check_in" ||
+        normalized === "away_start" ||
+        normalized === "away_end" ||
+        normalized === "check_out") {
+        return normalized;
+    }
+    return null;
+}
+function parseKioskAttendanceQueueStatus(value) {
+    const normalized = asTrimmedString(value);
+    if (normalized === "queued" ||
+        normalized === "processing" ||
+        normalized === "completed" ||
+        normalized === "failed" ||
+        normalized === "rejected_stale") {
+        return normalized;
+    }
+    return "queued";
+}
+function sanitizeKioskIdempotencyKey(value) {
+    const normalized = asTrimmedString(value);
+    return /^[A-Za-z0-9_-]{12,160}$/.test(normalized) ? normalized : "";
+}
+function getKioskActionNextStatus(action) {
+    if (action === "check_in" || action === "away_end")
+        return "studying";
+    if (action === "away_start")
+        return "away";
+    return "absent";
+}
+function isKioskActionAllowedFromStatus(action, status) {
+    if (action === "check_in")
+        return status === "absent";
+    if (action === "away_start")
+        return status === "studying";
+    if (action === "away_end")
+        return status === "away" || status === "break";
+    return status === "studying" || status === "away" || status === "break";
+}
+function resolveKioskActionTime(params) {
+    var _a;
+    const acceptedAtMs = Math.max(0, Math.floor(params.acceptedAtMs));
+    const clientMs = Math.max(0, Math.floor((_a = parseFiniteNumber(params.clientActionAtMillis)) !== null && _a !== void 0 ? _a : 0));
+    if (!clientMs) {
+        return { actionAtMs: acceptedAtMs, source: "server", correctionReason: "missing_client_time" };
+    }
+    if (clientMs > acceptedAtMs + KIOSK_ATTENDANCE_MAX_CLIENT_FUTURE_MS) {
+        return { actionAtMs: acceptedAtMs, source: "server", correctionReason: "client_time_too_far_future" };
+    }
+    if (clientMs < acceptedAtMs - KIOSK_ATTENDANCE_MAX_CLIENT_PAST_MS) {
+        return { actionAtMs: acceptedAtMs, source: "server", correctionReason: "client_time_too_far_past" };
+    }
+    return { actionAtMs: clientMs, source: "client" };
+}
+function normalizeKioskSeatHint(value) {
+    const raw = isPlainObject(value) ? value : {};
+    return {
+        seatNo: parseFiniteNumber(raw.seatNo),
+        roomId: asTrimmedString(raw.roomId) || null,
+        roomSeatNo: parseFiniteNumber(raw.roomSeatNo),
+    };
+}
+async function assertKioskAttendanceQueueCaller(params) {
+    const membership = await resolveCenterMembershipRole(params.db, params.centerId, params.authUid);
+    if (!membership.role || !isActiveMembershipStatus(membership.status)) {
+        throw new functions.https.HttpsError("permission-denied", "Inactive membership.", {
+            userMessage: "현재 계정 상태로는 키오스크를 사용할 수 없습니다.",
+        });
+    }
+    if (membership.role !== "kiosk" && membership.role !== "teacher" && !isAdminRole(membership.role)) {
+        throw new functions.https.HttpsError("permission-denied", "Invalid kiosk attendance role.", {
+            userMessage: "키오스크, 선생님, 관리자 계정만 출결 키오스크를 사용할 수 있습니다.",
+        });
+    }
+}
+async function assertKioskPinMatchesStudent(params) {
+    const docs = await lookupKioskStudentDocsByPin(params.db, params.centerId, params.pin);
+    if (!docs.some((docSnap) => docSnap.id === params.studentId)) {
+        throw new functions.https.HttpsError("failed-precondition", "PIN does not match requested student.", {
+            userMessage: "학생 번호와 학생 정보가 맞지 않습니다. 번호를 다시 입력해 주세요.",
+        });
+    }
+}
+async function resolveKioskQueueSeatStatus(params) {
+    const seatSnap = await resolveAttendanceSeatDocForTransition({
+        db: params.db,
+        centerId: params.centerId,
+        studentId: params.studentId,
+        seatId: params.seatId,
+    });
+    if (!seatSnap) {
+        throw new functions.https.HttpsError("failed-precondition", "Attendance seat not found.", {
+            userMessage: "좌석이 배정된 학생만 출결 키오스크를 사용할 수 있습니다.",
+        });
+    }
+    if (!seatSnap.exists) {
+        return { seatId: seatSnap.id, status: "absent" };
+    }
+    const seatData = (seatSnap.data() || {});
+    const linkedStudentId = asTrimmedString(seatData.studentId);
+    if (linkedStudentId && linkedStudentId !== params.studentId) {
+        throw new functions.https.HttpsError("failed-precondition", "Seat belongs to another student.", {
+            userMessage: "선택한 좌석이 다른 학생에게 배정되어 있습니다.",
+        });
+    }
+    return {
+        seatId: seatSnap.id,
+        status: normalizeAttendanceSeatStatus(seatData.status),
+    };
+}
+function getKioskQueueErrorMessage(error) {
+    const message = error instanceof Error ? error.message : String(error || "");
+    return message.slice(0, 480) || "Unknown kiosk attendance queue error.";
+}
+function getKioskQueueErrorCode(error) {
+    const raw = error;
+    return typeof (raw === null || raw === void 0 ? void 0 : raw.code) === "string" ? raw.code : "";
+}
+function isRetryableKioskQueueError(error) {
+    const code = getKioskQueueErrorCode(error);
+    return code === "aborted" || code === "deadline-exceeded" || code === "internal" || code === "unavailable";
+}
+async function releaseKioskAttendanceLock(params) {
+    const lockRef = params.db.doc(`centers/${params.centerId}/kioskAttendanceLocks/${params.studentId}`);
+    await params.db.runTransaction(async (transaction) => {
+        const lockSnap = await transaction.get(lockRef);
+        if (!lockSnap.exists)
+            return;
+        const lockData = lockSnap.data() || {};
+        if (asTrimmedString(lockData.queueId) === params.actionId) {
+            transaction.delete(lockRef);
+        }
+    });
+}
+async function rejectKioskQueueItemAsStale(params) {
+    await params.db.doc(`centers/${params.centerId}/kioskAttendanceQueue/${params.actionId}`).set({
+        status: "rejected_stale",
+        staleReason: params.reason,
+        currentStatus: params.currentStatus,
+        expectedStatus: params.expectedStatus,
+        completedAt: admin.firestore.FieldValue.serverTimestamp(),
+        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+    }, { merge: true });
+}
+async function processKioskAttendanceQueueItem(db, centerId, actionId) {
+    var _a;
+    const queueRef = db.doc(`centers/${centerId}/kioskAttendanceQueue/${actionId}`);
+    const nowMs = Date.now();
+    const nowTs = admin.firestore.Timestamp.fromMillis(nowMs);
+    const leaseExpiresAt = admin.firestore.Timestamp.fromMillis(nowMs + KIOSK_ATTENDANCE_LOCK_TTL_MS);
+    const claimed = await db.runTransaction(async (transaction) => {
+        var _a;
+        const queueSnap = await transaction.get(queueRef);
+        if (!queueSnap.exists)
+            return null;
+        const queueData = (queueSnap.data() || {});
+        const status = parseKioskAttendanceQueueStatus(queueData.status);
+        if (status === "completed" || status === "failed" || status === "rejected_stale")
+            return null;
+        const existingLeaseMs = toMillisSafe(queueData.leaseExpiresAt);
+        if (status === "processing" && existingLeaseMs > nowMs)
+            return null;
+        const studentId = asTrimmedString(queueData.studentId);
+        if (!studentId) {
+            transaction.set(queueRef, {
+                status: "failed",
+                failedReason: "missing_student_id",
+                updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+            }, { merge: true });
+            return null;
+        }
+        const nextAttemptAtMs = toMillisSafe(queueData.nextAttemptAt);
+        if (status === "queued" && nextAttemptAtMs > nowMs)
+            return null;
+        const lockRef = db.doc(`centers/${centerId}/kioskAttendanceLocks/${studentId}`);
+        const lockSnap = await transaction.get(lockRef);
+        if (lockSnap.exists) {
+            const lockData = lockSnap.data() || {};
+            const lockQueueId = asTrimmedString(lockData.queueId);
+            const lockExpiresAtMs = toMillisSafe(lockData.leaseExpiresAt);
+            if (lockQueueId && lockQueueId !== actionId && lockExpiresAtMs > nowMs) {
+                transaction.set(queueRef, {
+                    status: "queued",
+                    nextAttemptAt: admin.firestore.Timestamp.fromMillis(nowMs + 2000),
+                    updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+                }, { merge: true });
+                return null;
+            }
+        }
+        const attemptCount = Math.max(0, Math.round((_a = parseFiniteNumber(queueData.attemptCount)) !== null && _a !== void 0 ? _a : 0)) + 1;
+        transaction.set(lockRef, {
+            centerId,
+            studentId,
+            queueId: actionId,
+            leaseExpiresAt,
+            updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        }, { merge: true });
+        transaction.set(queueRef, {
+            status: "processing",
+            processingStartedAt: nowTs,
+            leaseExpiresAt,
+            attemptCount,
+            updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        }, { merge: true });
+        return {
+            queueData,
+            studentId,
+            attemptCount,
+        };
+    });
+    if (!claimed)
+        return;
+    const queueData = claimed.queueData;
+    const studentId = claimed.studentId;
+    const action = parseKioskAttendanceQueueAction(queueData.action);
+    const expectedStatus = parseAttendanceSeatStatus(queueData.expectedStatus);
+    const seatId = asTrimmedString(queueData.seatId) || null;
+    const seatHint = normalizeKioskSeatHint(queueData.seatHint);
+    const effectiveActionAtMs = Math.max(0, Math.floor((_a = parseFiniteNumber(queueData.effectiveActionAtMillis)) !== null && _a !== void 0 ? _a : nowMs));
+    try {
+        if (!action || !expectedStatus) {
+            throw new functions.https.HttpsError("invalid-argument", "Invalid kiosk queue action payload.");
+        }
+        const current = await resolveKioskQueueSeatStatus({ db, centerId, studentId, seatId });
+        if (current.status !== expectedStatus) {
+            await rejectKioskQueueItemAsStale({
+                db,
+                centerId,
+                actionId,
+                reason: "status_changed_before_processing",
+                currentStatus: current.status,
+                expectedStatus,
+            });
+            return;
+        }
+        if (!isKioskActionAllowedFromStatus(action, current.status)) {
+            await rejectKioskQueueItemAsStale({
+                db,
+                centerId,
+                actionId,
+                reason: "action_not_allowed_from_current_status",
+                currentStatus: current.status,
+                expectedStatus,
+            });
+            return;
+        }
+        const result = await applyAttendanceStatusTransition({
+            db,
+            centerId,
+            studentId,
+            nextStatus: getKioskActionNextStatus(action),
+            source: "kiosk",
+            actorUid: asTrimmedString(queueData.requestedByUid) || null,
+            seatId: current.seatId || seatId,
+            seatHint,
+            nowMs: effectiveActionAtMs,
+        });
+        await queueAttendanceTransitionSmsAfterCommit(db, { centerId, result });
+        await queueRef.set({
+            status: "completed",
+            completedAt: admin.firestore.FieldValue.serverTimestamp(),
+            updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+            result: {
+                previousStatus: result.previousStatus,
+                nextStatus: result.nextStatus,
+                eventType: result.eventType,
+                eventId: result.eventId,
+                eventAtMillis: result.eventAtMillis,
+                sessionDateKey: result.sessionDateKey,
+                sessionMinutes: result.sessionMinutes,
+            },
+        }, { merge: true });
+    }
+    catch (error) {
+        const retryable = isRetryableKioskQueueError(error) && claimed.attemptCount < KIOSK_ATTENDANCE_MAX_ATTEMPTS;
+        await queueRef.set(Object.assign({ status: retryable ? "queued" : "failed", updatedAt: admin.firestore.FieldValue.serverTimestamp(), failedReason: getKioskQueueErrorMessage(error), failedCode: getKioskQueueErrorCode(error) || null }, (retryable
+            ? { nextAttemptAt: admin.firestore.Timestamp.fromMillis(nowMs + Math.pow(3, claimed.attemptCount) * 1000) }
+            : { completedAt: admin.firestore.FieldValue.serverTimestamp() })), { merge: true });
+        console.error("[kiosk-attendance-queue] processing failed", {
+            centerId,
+            actionId,
+            studentId,
+            retryable,
+            attemptCount: claimed.attemptCount,
+            code: getKioskQueueErrorCode(error),
+            message: getKioskQueueErrorMessage(error),
+        });
+    }
+    finally {
+        await releaseKioskAttendanceLock({ db, centerId, studentId, actionId }).catch((error) => {
+            console.error("[kiosk-attendance-queue] lock release failed", {
+                centerId,
+                actionId,
+                studentId,
+                message: error instanceof Error ? error.message : String(error),
+            });
+        });
+    }
+}
+exports.enqueueKioskAttendanceActionSecure = functions.region(region).https.onCall(async (data, context) => {
+    var _a;
+    const db = admin.firestore();
+    if (!((_a = context.auth) === null || _a === void 0 ? void 0 : _a.uid)) {
+        throw new functions.https.HttpsError("unauthenticated", "로그인이 필요합니다.");
+    }
+    const centerId = asTrimmedString(data === null || data === void 0 ? void 0 : data.centerId);
+    const studentId = asTrimmedString(data === null || data === void 0 ? void 0 : data.studentId);
+    const pin = asTrimmedString(data === null || data === void 0 ? void 0 : data.pin).replace(/\D/g, "");
+    const action = parseKioskAttendanceQueueAction(data === null || data === void 0 ? void 0 : data.action);
+    const expectedStatusInput = parseAttendanceSeatStatus(data === null || data === void 0 ? void 0 : data.expectedStatus);
+    const idempotencyKey = sanitizeKioskIdempotencyKey(data === null || data === void 0 ? void 0 : data.idempotencyKey);
+    if (!centerId || !studentId || !/^\d{6}$/.test(pin) || !action || !idempotencyKey) {
+        throw new functions.https.HttpsError("invalid-argument", "Invalid kiosk attendance queue input.", {
+            userMessage: "키오스크 출결 정보를 다시 확인해 주세요.",
+        });
+    }
+    await assertKioskAttendanceQueueCaller({ db, centerId, authUid: context.auth.uid });
+    await assertKioskPinMatchesStudent({ db, centerId, studentId, pin });
+    const acceptedAtMs = Date.now();
+    const acceptedAtTs = admin.firestore.Timestamp.fromMillis(acceptedAtMs);
+    const actionTime = resolveKioskActionTime({
+        clientActionAtMillis: data === null || data === void 0 ? void 0 : data.clientActionAtMillis,
+        acceptedAtMs,
+    });
+    const seatHint = normalizeKioskSeatHint(data === null || data === void 0 ? void 0 : data.seatHint);
+    const requestedSeatId = asTrimmedString(data === null || data === void 0 ? void 0 : data.seatId) || null;
+    const current = await resolveKioskQueueSeatStatus({
+        db,
+        centerId,
+        studentId,
+        seatId: requestedSeatId,
+    });
+    const expectedStatus = expectedStatusInput || current.status;
+    const queueRef = db.doc(`centers/${centerId}/kioskAttendanceQueue/${idempotencyKey}`);
+    const enqueueResult = await db.runTransaction(async (transaction) => {
+        var _a, _b;
+        const existingSnap = await transaction.get(queueRef);
+        if (existingSnap.exists) {
+            const existing = existingSnap.data() || {};
+            return {
+                actionId: queueRef.id,
+                status: parseKioskAttendanceQueueStatus(existing.status),
+                optimisticStatus: asTrimmedString(existing.nextStatus) || getKioskActionNextStatus(action),
+            };
+        }
+        transaction.set(queueRef, Object.assign(Object.assign({ centerId,
+            studentId,
+            pin,
+            action,
+            expectedStatus, statusAtEnqueue: current.status, nextStatus: getKioskActionNextStatus(action), seatId: current.seatId || requestedSeatId, seatHint,
+            idempotencyKey, status: "queued", attemptCount: 0, requestedByUid: ((_a = context.auth) === null || _a === void 0 ? void 0 : _a.uid) || null, source: "kiosk", clientActionAt: admin.firestore.Timestamp.fromMillis(actionTime.actionAtMs), clientActionAtMillis: Math.max(0, Math.floor((_b = parseFiniteNumber(data === null || data === void 0 ? void 0 : data.clientActionAtMillis)) !== null && _b !== void 0 ? _b : 0)), acceptedAt: acceptedAtTs, effectiveActionAt: admin.firestore.Timestamp.fromMillis(actionTime.actionAtMs), effectiveActionAtMillis: actionTime.actionAtMs, actionTimeSource: actionTime.source }, (actionTime.correctionReason ? { actionTimeCorrectionReason: actionTime.correctionReason } : {})), { createdAt: admin.firestore.FieldValue.serverTimestamp(), updatedAt: admin.firestore.FieldValue.serverTimestamp() }));
+        return {
+            actionId: queueRef.id,
+            status: "queued",
+            optimisticStatus: getKioskActionNextStatus(action),
+        };
+    });
+    return {
+        ok: true,
+        queued: enqueueResult.status === "queued" || enqueueResult.status === "processing",
+        actionId: enqueueResult.actionId,
+        optimisticStatus: enqueueResult.optimisticStatus,
+        status: enqueueResult.status,
+    };
+});
+exports.onKioskAttendanceQueueCreated = functions
+    .region(region)
+    .firestore.document("centers/{centerId}/kioskAttendanceQueue/{actionId}")
+    .onCreate(async (_snap, context) => {
+    const db = admin.firestore();
+    await processKioskAttendanceQueueItem(db, context.params.centerId, context.params.actionId);
+});
+exports.scheduledKioskAttendanceQueueWorker = functions
+    .region(region)
+    .pubsub.schedule("every 1 minutes")
+    .timeZone("Asia/Seoul")
+    .onRun(async () => {
+    const db = admin.firestore();
+    const centersSnap = await db.collection("centers").get();
+    const nowMs = Date.now();
+    let processed = 0;
+    for (const centerDoc of centersSnap.docs) {
+        const queueRef = db.collection(`centers/${centerDoc.id}/kioskAttendanceQueue`);
+        const [queuedSnap, processingSnap] = await Promise.all([
+            queueRef.where("status", "==", "queued").limit(20).get(),
+            queueRef.where("status", "==", "processing").limit(20).get(),
+        ]);
+        const docs = [
+            ...queuedSnap.docs,
+            ...processingSnap.docs.filter((docSnap) => {
+                const data = docSnap.data() || {};
+                const leaseExpiresAtMs = toMillisSafe(data.leaseExpiresAt);
+                return leaseExpiresAtMs <= nowMs;
+            }),
+        ];
+        for (const docSnap of docs) {
+            await processKioskAttendanceQueueItem(db, centerDoc.id, docSnap.id);
+            processed += 1;
+        }
+    }
+    console.log("[kiosk-attendance-queue] scheduled worker complete", {
+        centerCount: centersSnap.size,
+        processed,
+    });
 });
 async function assertManualStudySessionMutationAllowed(params) {
     const membership = await resolveCenterMembershipRole(params.db, params.centerId, params.authUid);

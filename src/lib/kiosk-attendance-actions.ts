@@ -1,0 +1,40 @@
+import { httpsCallable, type Functions } from 'firebase/functions';
+import type { AttendanceCurrent } from '@/lib/types';
+
+export type KioskAttendanceAction = 'check_in' | 'away_start' | 'away_end' | 'check_out';
+
+export type EnqueueKioskAttendanceActionInput = {
+  centerId: string;
+  studentId: string;
+  pin: string;
+  action: KioskAttendanceAction;
+  expectedStatus: AttendanceCurrent['status'];
+  seatId?: string | null;
+  seatHint?: {
+    seatNo?: number | null;
+    roomId?: string | null;
+    roomSeatNo?: number | null;
+  } | null;
+  idempotencyKey: string;
+  clientActionAtMillis: number;
+};
+
+export type EnqueueKioskAttendanceActionResult = {
+  ok: true;
+  queued: boolean;
+  actionId: string;
+  optimisticStatus: AttendanceCurrent['status'];
+  status?: 'queued' | 'processing' | 'completed' | 'failed' | 'rejected_stale';
+};
+
+export async function enqueueKioskAttendanceActionSecure(
+  functions: Functions,
+  input: EnqueueKioskAttendanceActionInput
+): Promise<EnqueueKioskAttendanceActionResult> {
+  const callable = httpsCallable<EnqueueKioskAttendanceActionInput, EnqueueKioskAttendanceActionResult>(
+    functions,
+    'enqueueKioskAttendanceActionSecure'
+  );
+  const result = await callable(input);
+  return result.data;
+}

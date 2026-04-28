@@ -1,76 +1,208 @@
-
 'use client';
 
-import { useEffect, useRef, useState, useMemo } from 'react';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import { useFirestore, useCollection, useFunctions } from '@/firebase';
-import { useAppContext } from '@/contexts/app-context';
-import { useMemoFirebase } from '@/hooks/use-memo-firebase';
-import { 
-  collection, 
-  getDocs,
-  limit,
-  query,
-  Timestamp,
-  where
-} from 'firebase/firestore';
-import { httpsCallable } from 'firebase/functions';
-import { StudentProfile, AttendanceCurrent } from '@/lib/types';
-import { cn } from '@/lib/utils';
-import { 
-  Delete, 
-  Loader2, 
-  LogIn, 
-  LogOut, 
-  MonitorSmartphone, 
-  Sparkles, 
-  Clock,
-  Zap,
-  ArrowLeft,
-  Coffee,
-  Undo2
-} from 'lucide-react';
-import { useToast } from '@/hooks/use-toast';
+import Image from 'next/image';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { syncAutoAttendanceRecord } from '@/lib/attendance-auto';
+import {
+  ArrowLeft,
+  CheckCircle2,
+  Coffee,
+  Delete,
+  Loader2,
+  LogIn,
+  LogOut,
+  RotateCcw,
+  ShieldCheck,
+  Undo2,
+  UserRound,
+} from 'lucide-react';
+import { collection, getDocs, limit, query, Timestamp, where } from 'firebase/firestore';
+import { httpsCallable } from 'firebase/functions';
+
+import { Button } from '@/components/ui/button';
+import { useToast } from '@/hooks/use-toast';
+import { useAppContext } from '@/contexts/app-context';
+import { useFirestore, useFunctions } from '@/firebase';
+import { cn } from '@/lib/utils';
 import { resolveSeatIdentity } from '@/lib/seat-layout';
-import { setStudentAttendanceStatusSecure } from '@/lib/study-session-actions';
+import type { AttendanceCurrent, StudentProfile } from '@/lib/types';
+import {
+  enqueueKioskAttendanceActionSecure,
+  type EnqueueKioskAttendanceActionInput,
+  type KioskAttendanceAction,
+} from '@/lib/kiosk-attendance-actions';
 import type { LucideIcon } from 'lucide-react';
 
-type KioskActionKey = 'checkIn' | 'return' | 'away' | 'checkOut';
+type KioskStep = 'pin' | 'select' | 'action';
+type AttendanceStatus = AttendanceCurrent['status'];
 
-type KioskLookupAttendance = AttendanceCurrent & {
-  lastCheckInAtMillis?: number;
-  updatedAtMillis?: number;
-};
+type KioskStudent = Pick<StudentProfile, 'id' | 'name'> &
+  Partial<StudentProfile> & {
+    parentLinkCode?: string;
+    seatNo?: number;
+    seatId?: string;
+    roomId?: string;
+    roomSeatNo?: number;
+    seatLabel?: string;
+    seatZone?: string;
+  };
+
+type KioskLookupAttendance = Pick<AttendanceCurrent, 'id' | 'status'> &
+  Partial<AttendanceCurrent> & {
+    studentId?: string;
+    lastCheckInAtMillis?: number;
+    updatedAtMillis?: number;
+  };
 
 type KioskStudentLookupResult = {
   ok?: boolean;
-  students?: StudentProfile[];
+  students?: KioskStudent[];
   seats?: KioskLookupAttendance[];
 };
 
+type KioskActionConfig = {
+  action: KioskAttendanceAction;
+  label: string;
+  completeTitle: string;
+  completeDescription: (studentName: string) => string;
+  Icon: LucideIcon;
+  buttonClass: string;
+  iconClass: string;
+  overlayClass: string;
+};
+
 type KioskSuccessFeedback = {
-  actionKey: KioskActionKey;
   title: string;
   description: string;
-  badge: string;
+  label: string;
   Icon: LucideIcon;
-  panelClass: string;
+  overlayClass: string;
   iconClass: string;
 };
 
-const KIOSK_LOOKUP_RETRY_DELAYS_MS = [0, 700, 1600, 2800];
+type KioskOutboxItem = {
+  id: string;
+  payload: EnqueueKioskAttendanceActionInput;
+  attempts: number;
+  createdAt: number;
+  lastError?: string;
+};
 
-function wait(ms: number) {
-  return new Promise((resolve) => window.setTimeout(resolve, ms));
+const OUTBOX_STORAGE_KEY = 'track:kiosk-attendance-outbox:v1';
+const MAX_OUTBOX_ITEMS = 40;
+
+const ACTIONS: Record<KioskAttendanceAction, KioskActionConfig> = {
+  check_in: {
+    action: 'check_in',
+    label: '등원',
+    completeTitle: '등원 처리 완료',
+    completeDescription: (studentName) => `${studentName} 학생 등원이 처리되었습니다.`,
+    Icon: LogIn,
+    buttonClass: 'bg-[#14295F] text-white shadow-[0_24px_42px_-26px_rgba(20,41,95,0.85)] hover:bg-[#10224E]',
+    iconClass: 'bg-white text-[#14295F]',
+    overlayClass: 'bg-[#14295F] text-white border-[#D7E4FF]',
+  },
+  away_start: {
+    action: 'away_start',
+    label: '외출',
+    completeTitle: '외출 처리 완료',
+    completeDescription: (studentName) => `${studentName} 학생 외출이 처리되었습니다.`,
+    Icon: Coffee,
+    buttonClass: 'bg-[#FF7A16] text-white shadow-[0_24px_42px_-26px_rgba(255,122,22,0.9)] hover:bg-[#E9680C]',
+    iconClass: 'bg-white text-[#C95A08]',
+    overlayClass: 'bg-[#FF7A16] text-white border-[#FFD7B0]',
+  },
+  away_end: {
+    action: 'away_end',
+    label: '복귀',
+    completeTitle: '복귀 처리 완료',
+    completeDescription: (studentName) => `${studentName} 학생 복귀가 처리되었습니다.`,
+    Icon: Undo2,
+    buttonClass: 'bg-[#0EA36A] text-white shadow-[0_24px_42px_-26px_rgba(14,163,106,0.85)] hover:bg-[#0B8C5A]',
+    iconClass: 'bg-white text-[#0B8C5A]',
+    overlayClass: 'bg-[#0EA36A] text-white border-[#C7F5E3]',
+  },
+  check_out: {
+    action: 'check_out',
+    label: '퇴실',
+    completeTitle: '퇴실 처리 완료',
+    completeDescription: (studentName) => `${studentName} 학생 퇴실이 처리되었습니다.`,
+    Icon: LogOut,
+    buttonClass: 'bg-[#F04462] text-white shadow-[0_24px_42px_-26px_rgba(240,68,98,0.86)] hover:bg-[#D93654]',
+    iconClass: 'bg-white text-[#D93654]',
+    overlayClass: 'bg-[#F04462] text-white border-[#FFD1DB]',
+  },
+};
+
+const statusLabel: Record<AttendanceStatus, string> = {
+  studying: '등원 중',
+  away: '외출 중',
+  break: '외출 중',
+  absent: '미등원',
+};
+
+function normalizeStatus(status?: string | null): AttendanceStatus {
+  if (status === 'studying' || status === 'away' || status === 'break' || status === 'absent') return status;
+  return 'absent';
 }
 
-const getKioskErrorMessage = (error: unknown) => {
+function getAllowedActions(status: AttendanceStatus): KioskAttendanceAction[] {
+  if (status === 'studying') return ['away_start', 'check_out'];
+  if (status === 'away' || status === 'break') return ['away_end', 'check_out'];
+  return ['check_in'];
+}
+
+function getSeatActivityRank(status?: AttendanceStatus) {
+  if (status === 'studying') return 0;
+  if (status === 'away' || status === 'break') return 1;
+  if (status === 'absent') return 3;
+  return 2;
+}
+
+function getSeatSortMillis(seat: KioskLookupAttendance) {
+  return (
+    seat.lastCheckInAtMillis ||
+    seat.updatedAtMillis ||
+    seat.lastCheckInAt?.toMillis?.() ||
+    seat.updatedAt?.toMillis?.() ||
+    0
+  );
+}
+
+function pickPreferredSeat(seats: KioskLookupAttendance[]) {
+  return seats
+    .slice()
+    .sort((left, right) => {
+      const rankDiff = getSeatActivityRank(left.status) - getSeatActivityRank(right.status);
+      if (rankDiff !== 0) return rankDiff;
+      return getSeatSortMillis(right) - getSeatSortMillis(left);
+    })[0] || null;
+}
+
+function createIdempotencyKey() {
+  if (typeof crypto !== 'undefined' && 'randomUUID' in crypto) {
+    return crypto.randomUUID();
+  }
+  return `kiosk_${Date.now()}_${Math.random().toString(36).slice(2, 12)}`;
+}
+
+function readOutbox(): KioskOutboxItem[] {
+  if (typeof window === 'undefined') return [];
+  try {
+    const parsed = JSON.parse(window.localStorage.getItem(OUTBOX_STORAGE_KEY) || '[]');
+    return Array.isArray(parsed) ? parsed.slice(0, MAX_OUTBOX_ITEMS) : [];
+  } catch {
+    return [];
+  }
+}
+
+function writeOutbox(items: KioskOutboxItem[]) {
+  if (typeof window === 'undefined') return;
+  window.localStorage.setItem(OUTBOX_STORAGE_KEY, JSON.stringify(items.slice(-MAX_OUTBOX_ITEMS)));
+}
+
+function getKioskErrorMessage(error: unknown) {
   const raw = error as {
-    code?: unknown;
     message?: unknown;
     details?: unknown;
     customData?: unknown;
@@ -82,73 +214,9 @@ const getKioskErrorMessage = (error: unknown) => {
       if (typeof userMessage === 'string' && userMessage.trim()) return userMessage.trim();
     }
   }
-  if (isInternalKioskLookupError(error)) {
-    return '백엔드에서 학생 정보를 확인 중입니다. 번호는 유지되니 잠시 후 다시 확인해 주세요.';
-  }
   if (typeof raw.message === 'string' && raw.message.trim()) return raw.message.trim();
-  return '잠시 후 다시 시도해 주세요. 문제가 계속되면 관리자에게 알려주세요.';
-};
-
-const isInternalKioskLookupError = (error: unknown) => {
-  const raw = error as { code?: unknown; message?: unknown };
-  const code = typeof raw.code === 'string' ? raw.code.toLowerCase() : '';
-  const message = typeof raw.message === 'string' ? raw.message.toLowerCase() : '';
-  return code === 'internal' || code === 'functions/internal' || message === 'internal' || message.includes('internal');
-};
-
-const getKioskActionKey = (
-  prevStatus: AttendanceCurrent['status'] | undefined,
-  nextStatus: AttendanceCurrent['status']
-): KioskActionKey => {
-  if (nextStatus === 'studying' && (prevStatus === 'away' || prevStatus === 'break')) return 'return';
-  if (nextStatus === 'studying') return 'checkIn';
-  if (nextStatus === 'away' || nextStatus === 'break') return 'away';
-  return 'checkOut';
-};
-
-const getKioskSuccessFeedback = (
-  studentName: string,
-  prevStatus: AttendanceCurrent['status'] | undefined,
-  nextStatus: AttendanceCurrent['status']
-): KioskSuccessFeedback => {
-  const actionKey = getKioskActionKey(prevStatus, nextStatus);
-  const base = {
-    checkIn: {
-      title: '등원 처리 완료',
-      description: `${studentName} 학생 등원이 정상 처리되었습니다.`,
-      badge: '등원',
-      Icon: LogIn,
-      panelClass: 'border-blue-200 bg-blue-600 text-white shadow-blue-950/30',
-      iconClass: 'bg-white text-blue-600',
-    },
-    return: {
-      title: '복귀 처리 완료',
-      description: `${studentName} 학생 복귀가 정상 처리되었습니다.`,
-      badge: '복귀',
-      Icon: Undo2,
-      panelClass: 'border-emerald-200 bg-emerald-600 text-white shadow-emerald-950/30',
-      iconClass: 'bg-white text-emerald-600',
-    },
-    away: {
-      title: '외출 처리 완료',
-      description: `${studentName} 학생 외출이 정상 처리되었습니다.`,
-      badge: '외출',
-      Icon: Coffee,
-      panelClass: 'border-amber-200 bg-amber-500 text-white shadow-amber-950/30',
-      iconClass: 'bg-white text-amber-600',
-    },
-    checkOut: {
-      title: '퇴실 처리 완료',
-      description: `${studentName} 학생 퇴실이 정상 처리되었습니다.`,
-      badge: '퇴실',
-      Icon: LogOut,
-      panelClass: 'border-rose-200 bg-rose-600 text-white shadow-rose-950/30',
-      iconClass: 'bg-white text-rose-600',
-    },
-  } satisfies Record<KioskActionKey, Omit<KioskSuccessFeedback, 'actionKey'>>;
-
-  return { actionKey, ...base[actionKey] };
-};
+  return '잠시 후 다시 시도해 주세요.';
+}
 
 export default function KioskPage() {
   const firestore = useFirestore();
@@ -156,17 +224,19 @@ export default function KioskPage() {
   const { activeMembership } = useAppContext();
   const { toast } = useToast();
   const router = useRouter();
-  const centerId = activeMembership?.id;
 
+  const centerId = activeMembership?.id;
   const [pin, setPin] = useState('');
-  const [matchedStudents, setMatchedStudents] = useState<StudentProfile[]>([]);
-  const [lookupAttendanceList, setLookupAttendanceList] = useState<KioskLookupAttendance[]>([]);
+  const [step, setStep] = useState<KioskStep>('pin');
+  const [matchedStudents, setMatchedStudents] = useState<KioskStudent[]>([]);
+  const [lookupSeats, setLookupSeats] = useState<KioskLookupAttendance[]>([]);
+  const [selectedStudent, setSelectedStudent] = useState<KioskStudent | null>(null);
   const [isSearching, setIsSearching] = useState(false);
-  const [showResults, setShowResults] = useState(false);
-  const [isProcessing, setIsProcessing] = useState(false);
-  const [lookupMessage, setLookupMessage] = useState('학생 정보를 확인 중...');
+  const [lookupMessage, setLookupMessage] = useState('번호 확인 중');
   const [successFeedback, setSuccessFeedback] = useState<KioskSuccessFeedback | null>(null);
+  const lookupVersionRef = useRef(0);
   const pendingActionRef = useRef(false);
+  const flushingOutboxRef = useRef(false);
 
   const lookupKioskStudentsByPin = useMemo(() => {
     if (!functions) return null;
@@ -176,101 +246,52 @@ export default function KioskPage() {
     );
   }, [functions]);
 
-  useEffect(() => {
-    if (!successFeedback) return;
-    const timer = window.setTimeout(() => setSuccessFeedback(null), 2400);
-    return () => window.clearTimeout(timer);
-  }, [successFeedback]);
-
-  // 실시간 좌석 현황 조회
-  const attendanceQuery = useMemoFirebase(() => {
-    if (!firestore || !centerId) return null;
-    if (activeMembership?.role === 'kiosk') return null;
-    return collection(firestore, 'centers', centerId, 'attendanceCurrent');
-  }, [firestore, centerId, activeMembership?.role]);
-  const { data: attendanceList } = useCollection<AttendanceCurrent>(attendanceQuery);
-
-  const lookupAttendanceByStudentId = useMemo(() => {
+  const lookupSeatsByStudentId = useMemo(() => {
     const mapped = new Map<string, KioskLookupAttendance[]>();
-    lookupAttendanceList.forEach((attendance) => {
-      if (!attendance.studentId) return;
-      const bucket = mapped.get(attendance.studentId) || [];
-      bucket.push(attendance);
-      mapped.set(attendance.studentId, bucket);
+    lookupSeats.forEach((seat) => {
+      if (!seat.studentId) return;
+      const bucket = mapped.get(seat.studentId) || [];
+      bucket.push({ ...seat, status: normalizeStatus(seat.status) });
+      mapped.set(seat.studentId, bucket);
     });
     return mapped;
-  }, [lookupAttendanceList]);
+  }, [lookupSeats]);
 
-  const getSeatActivityRank = (status?: AttendanceCurrent['status']) => {
-    if (status === 'studying') return 0;
-    if (status === 'away' || status === 'break') return 1;
-    if (status === 'absent') return 3;
-    return 2;
-  };
+  const resetKiosk = useCallback(() => {
+    lookupVersionRef.current += 1;
+    setPin('');
+    setStep('pin');
+    setMatchedStudents([]);
+    setLookupSeats([]);
+    setSelectedStudent(null);
+    setLookupMessage('번호 확인 중');
+    setIsSearching(false);
+  }, []);
 
-  const getSeatSortMillis = (seat: AttendanceCurrent | KioskLookupAttendance) => {
-    return (
-      ('lastCheckInAtMillis' in seat ? seat.lastCheckInAtMillis || 0 : 0) ||
-      ('updatedAtMillis' in seat ? seat.updatedAtMillis || 0 : 0) ||
-      seat.lastCheckInAt?.toMillis?.() ||
-      seat.updatedAt?.toMillis?.() ||
-      0
-    );
-  };
-
-  const pickPreferredSeatForKiosk = (seats: Array<AttendanceCurrent | KioskLookupAttendance>) => {
-    return seats
-      .slice()
-      .sort((left, right) => {
-        const rankDiff = getSeatActivityRank(left.status) - getSeatActivityRank(right.status);
-        if (rankDiff !== 0) return rankDiff;
-        const leftTime = getSeatSortMillis(left);
-        const rightTime = getSeatSortMillis(right);
-        return rightTime - leftTime;
-      })[0] || null;
-  };
-
-  const resolveSeatForStudent = (student: StudentProfile) => {
-    const liveSeat = pickPreferredSeatForKiosk(
-      [
-        ...(attendanceList || []),
-        ...(lookupAttendanceByStudentId.get(student.id) || []),
-      ].filter((attendance) => attendance.studentId === student.id)
-    );
+  const resolveSeatForStudent = useCallback((student: KioskStudent): KioskLookupAttendance | null => {
+    const liveSeat = pickPreferredSeat(lookupSeatsByStudentId.get(student.id) || []);
     if (liveSeat) return liveSeat;
 
-    const identity = resolveSeatIdentity(student);
-    if (!identity.seatId || identity.seatNo <= 0) return null;
-
-    const fallbackSeat = attendanceList?.find((attendance) => attendance.id === identity.seatId);
-    if (fallbackSeat) return fallbackSeat;
+    const identity = resolveSeatIdentity(student as StudentProfile);
+    const seatId = identity.seatId || student.seatId || '';
+    const seatNo = identity.seatNo || Number(student.seatNo || 0);
+    if (!seatId || seatNo <= 0) return null;
 
     return {
-      id: identity.seatId,
-      seatNo: identity.seatNo,
-      roomId: identity.roomId,
-      roomSeatNo: identity.roomSeatNo,
+      id: seatId,
+      studentId: student.id,
+      seatNo,
+      roomId: identity.roomId || student.roomId,
+      roomSeatNo: identity.roomSeatNo || student.roomSeatNo,
+      seatLabel: student.seatLabel,
+      seatZone: student.seatZone,
       status: 'absent',
       type: 'seat',
       updatedAt: Timestamp.now(),
-    } as AttendanceCurrent;
-  };
+    };
+  }, [lookupSeatsByStudentId]);
 
-  const handleNumberClick = (num: string) => {
-    if (pin.length < 6) {
-      const nextPin = pin + num;
-      setPin(nextPin);
-      if (nextPin.length === 6) {
-        searchStudent(nextPin);
-      }
-    }
-  };
-
-  const handleDelete = () => {
-    setPin(prev => prev.slice(0, -1));
-  };
-
-  const lookupStudentFromFirestore = async (code: string): Promise<KioskStudentLookupResult | null> => {
+  const lookupStudentFromFirestore = useCallback(async (code: string): Promise<KioskStudentLookupResult | null> => {
     if (!firestore || !centerId) return null;
 
     const studentsRef = collection(firestore, 'centers', centerId, 'students');
@@ -278,7 +299,7 @@ export default function KioskPage() {
     const numericCode = Number(code);
     if (Number.isFinite(numericCode)) lookupValues.push(numericCode);
 
-    const studentDocs = new Map<string, StudentProfile>();
+    const studentDocs = new Map<string, KioskStudent>();
     const studentSnaps = await Promise.all(
       lookupValues.map((value) =>
         getDocs(query(studentsRef, where('parentLinkCode', '==', value), limit(8)))
@@ -287,8 +308,14 @@ export default function KioskPage() {
 
     studentSnaps.forEach((snap) => {
       snap.docs.forEach((docSnap) => {
-        const data = docSnap.data() as Omit<StudentProfile, 'id'>;
-        studentDocs.set(docSnap.id, { ...data, id: docSnap.id, parentLinkCode: code } as StudentProfile);
+        const data = docSnap.data() as Omit<KioskStudent, 'id'>;
+        const raw = data as Record<string, unknown>;
+        studentDocs.set(docSnap.id, {
+          ...data,
+          id: docSnap.id,
+          name: String(data.name || raw.displayName || '학생'),
+          parentLinkCode: code,
+        });
       });
     });
 
@@ -303,397 +330,479 @@ export default function KioskPage() {
       )
     );
     const seats = seatSnaps.flatMap((snap, index) =>
-      snap.docs.map((docSnap) => ({
-        ...(docSnap.data() as AttendanceCurrent),
-        id: docSnap.id,
-        studentId: students[index]?.id || (docSnap.data() as AttendanceCurrent).studentId,
-      }))
+      snap.docs.map((docSnap) => {
+        const data = docSnap.data() as AttendanceCurrent;
+        return {
+          ...data,
+          id: docSnap.id,
+          studentId: students[index]?.id || data.studentId,
+          status: normalizeStatus(data.status),
+        };
+      })
     );
 
     return { ok: true, students, seats };
-  };
+  }, [centerId, firestore]);
 
-  const lookupStudentFromBackendWithRetry = async (code: string): Promise<KioskStudentLookupResult | null> => {
+  const lookupStudentFromBackend = useCallback(async (code: string): Promise<KioskStudentLookupResult | null> => {
     if (!lookupKioskStudentsByPin || !centerId) return null;
+    const result = await lookupKioskStudentsByPin({ centerId, pin: code });
+    return result.data || null;
+  }, [centerId, lookupKioskStudentsByPin]);
 
-    let lastError: unknown = null;
-    for (const [attemptIndex, delayMs] of KIOSK_LOOKUP_RETRY_DELAYS_MS.entries()) {
-      if (delayMs > 0) {
-        setLookupMessage('백엔드에서 학생 정보를 다시 확인 중...');
-        await wait(delayMs);
-      } else {
-        setLookupMessage('백엔드에서 학생 정보를 확인 중...');
-      }
-
-      try {
-        const result = await lookupKioskStudentsByPin({ centerId, pin: code });
-        return result.data || null;
-      } catch (error) {
-        lastError = error;
-        if (!isInternalKioskLookupError(error)) throw error;
-        console.warn(`[kiosk] backend lookup internal retry ${attemptIndex + 1}/${KIOSK_LOOKUP_RETRY_DELAYS_MS.length}`, error);
-      }
-    }
-
-    throw lastError || new Error('Kiosk student lookup failed.');
-  };
-
-  const searchStudent = async (code: string) => {
-    if ((!lookupKioskStudentsByPin && !firestore) || !centerId) return;
+  const searchStudent = useCallback(async (code: string) => {
+    if (!centerId || (!firestore && !lookupKioskStudentsByPin)) return;
+    const lookupVersion = lookupVersionRef.current + 1;
+    lookupVersionRef.current = lookupVersion;
     setIsSearching(true);
-    setLookupMessage('학생 번호를 백엔드로 확인 중...');
+    setLookupMessage('번호 확인 중');
+
     try {
       let lookupData: KioskStudentLookupResult | null = null;
-      const backendLookupPromise = lookupKioskStudentsByPin
-        ? lookupStudentFromBackendWithRetry(code)
-            .then((data) => ({ data, error: null as unknown }))
-            .catch((error) => ({ data: null, error }))
-        : null;
-
-      if (firestore) {
-        try {
-          setLookupMessage('학생 정보를 빠르게 확인 중...');
-          lookupData = await lookupStudentFromFirestore(code);
-        } catch (firestoreError) {
-          console.warn('[kiosk] Firestore lookup failed; trying callable fallback', firestoreError);
-        }
-      }
-
-      if ((!lookupData || !lookupData.students?.length) && backendLookupPromise) {
-        const backendLookup = await backendLookupPromise;
-        if (backendLookup.data) {
-          lookupData = backendLookup.data;
-        } else if (backendLookup.error) {
-          throw backendLookup.error;
-        }
-      }
-
-      if (!lookupData) {
+      try {
         lookupData = await lookupStudentFromFirestore(code);
+      } catch (firestoreError) {
+        console.warn('[kiosk] fast Firestore lookup failed', firestoreError);
       }
 
-      const results = lookupData?.students || [];
-      const seats = lookupData?.seats || [];
-      
-      if (results.length > 0) {
-        setMatchedStudents(results);
-        setLookupAttendanceList(seats);
-        setShowResults(true);
-      } else {
-        toast({ 
-          variant: "destructive", 
-          title: "일치하는 정보 없음", 
-          description: "핀번호를 다시 확인해 주세요." 
-        });
-        setPin('');
+      if ((!lookupData || !lookupData.students?.length) && lookupKioskStudentsByPin) {
+        setLookupMessage('학생 정보 확인 중');
+        lookupData = await lookupStudentFromBackend(code);
       }
-    } catch (e) {
-      console.error(e);
+
+      if (lookupVersion !== lookupVersionRef.current) return;
+
+      const students = lookupData?.students || [];
+      const seats = (lookupData?.seats || []).map((seat) => ({ ...seat, status: normalizeStatus(seat.status) }));
+      if (!students.length) {
+        toast({
+          variant: 'destructive',
+          title: '일치하는 정보 없음',
+          description: '번호를 다시 입력해 주세요.',
+        });
+        resetKiosk();
+        return;
+      }
+
+      setMatchedStudents(students);
+      setLookupSeats(seats);
+      if (students.length === 1) {
+        setSelectedStudent(students[0]);
+        setStep('action');
+      } else {
+        setSelectedStudent(null);
+        setStep('select');
+      }
+    } catch (error) {
+      console.error('[kiosk] student lookup failed', error);
       toast({
-        variant: isInternalKioskLookupError(e) ? "default" : "destructive",
-        title: "조회 실패",
-        description: getKioskErrorMessage(e),
+        variant: 'destructive',
+        title: '조회 실패',
+        description: getKioskErrorMessage(error),
       });
-      if (!isInternalKioskLookupError(e)) {
-        setPin('');
+      resetKiosk();
+    } finally {
+      if (lookupVersion === lookupVersionRef.current) {
+        setIsSearching(false);
+        setLookupMessage('번호 확인 중');
+      }
+    }
+  }, [
+    centerId,
+    firestore,
+    lookupKioskStudentsByPin,
+    lookupStudentFromBackend,
+    lookupStudentFromFirestore,
+    resetKiosk,
+    toast,
+  ]);
+
+  const flushOutbox = useCallback(async () => {
+    if (!functions || flushingOutboxRef.current) return;
+    flushingOutboxRef.current = true;
+    try {
+      let items = readOutbox();
+      for (const item of items) {
+        try {
+          await enqueueKioskAttendanceActionSecure(functions, item.payload);
+          items = readOutbox().filter((candidate) => candidate.id !== item.id);
+          writeOutbox(items);
+        } catch (error) {
+          const nextItems = readOutbox().map((candidate) =>
+            candidate.id === item.id
+              ? { ...candidate, attempts: candidate.attempts + 1, lastError: getKioskErrorMessage(error) }
+              : candidate
+          );
+          writeOutbox(nextItems);
+          console.warn('[kiosk] queued attendance delivery pending', error);
+          break;
+        }
       }
     } finally {
-      setIsSearching(false);
-      setLookupMessage('학생 정보를 확인 중...');
+      flushingOutboxRef.current = false;
     }
-  };
+  }, [functions]);
 
-  const handleStatusUpdate = (student: StudentProfile, nextStatus: AttendanceCurrent['status']) => {
-    if (pendingActionRef.current || !centerId) return;
-    
-    const seat = resolveSeatForStudent(student);
+  const queueActionForDelivery = useCallback((payload: EnqueueKioskAttendanceActionInput) => {
+    const items = readOutbox().filter((item) => item.id !== payload.idempotencyKey);
+    writeOutbox([
+      ...items,
+      {
+        id: payload.idempotencyKey,
+        payload,
+        attempts: 0,
+        createdAt: Date.now(),
+      },
+    ]);
+    void flushOutbox();
+  }, [flushOutbox]);
+
+  useEffect(() => {
+    void flushOutbox();
+    const interval = window.setInterval(() => void flushOutbox(), 10000);
+    const handleOnline = () => void flushOutbox();
+    window.addEventListener('online', handleOnline);
+    return () => {
+      window.clearInterval(interval);
+      window.removeEventListener('online', handleOnline);
+    };
+  }, [flushOutbox]);
+
+  useEffect(() => {
+    if (!successFeedback) return;
+    const timer = window.setTimeout(() => setSuccessFeedback(null), 1800);
+    return () => window.clearTimeout(timer);
+  }, [successFeedback]);
+
+  const handleNumberClick = useCallback((num: string) => {
+    if (isSearching || step !== 'pin') return;
+    setPin((previous) => {
+      if (previous.length >= 6) return previous;
+      const next = previous + num;
+      if (next.length === 6) {
+        window.setTimeout(() => void searchStudent(next), 0);
+      }
+      return next;
+    });
+  }, [isSearching, searchStudent, step]);
+
+  const handleDelete = useCallback(() => {
+    if (isSearching || step !== 'pin') return;
+    setPin((previous) => previous.slice(0, -1));
+  }, [isSearching, step]);
+
+  const handleAction = useCallback((action: KioskAttendanceAction) => {
+    if (!centerId || !selectedStudent || pendingActionRef.current) return;
+    const seat = resolveSeatForStudent(selectedStudent);
     if (!seat) {
-      toast({ 
-        variant: "destructive", 
-        title: "좌석 미배정", 
-        description: "관리자에게 좌석 배정을 요청하세요." 
+      toast({
+        variant: 'destructive',
+        title: '좌석 미배정',
+        description: '관리자에게 좌석 배정을 요청해 주세요.',
       });
       resetKiosk();
       return;
     }
 
-    const prevStatus = seat.status;
-    if (prevStatus === nextStatus && nextStatus !== 'absent') {
-      toast({ title: "이미 해당 상태입니다." });
+    const status = normalizeStatus(seat.status);
+    if (!getAllowedActions(status).includes(action)) {
+      toast({
+        variant: 'destructive',
+        title: '처리할 수 없는 상태',
+        description: '번호를 다시 입력해 현재 상태를 확인해 주세요.',
+      });
       resetKiosk();
       return;
     }
 
+    const config = ACTIONS[action];
     pendingActionRef.current = true;
-    setIsProcessing(true);
+    setSuccessFeedback({
+      title: config.completeTitle,
+      description: config.completeDescription(selectedStudent.name),
+      label: config.label,
+      Icon: config.Icon,
+      overlayClass: config.overlayClass,
+      iconClass: config.iconClass,
+    });
 
-    const nowDate = new Date();
-    const feedback = getKioskSuccessFeedback(student.name, prevStatus, nextStatus);
-    setSuccessFeedback(feedback);
-    toast({
-      title: feedback.title,
-      description: '요청을 접수했습니다. 실제 저장과 문자 처리는 백엔드에서 이어서 진행됩니다.',
+    queueActionForDelivery({
+      centerId,
+      studentId: selectedStudent.id,
+      pin,
+      action,
+      expectedStatus: status,
+      seatId: seat.id,
+      seatHint: {
+        seatNo: seat.seatNo ?? selectedStudent.seatNo ?? null,
+        roomId: seat.roomId || selectedStudent.roomId || null,
+        roomSeatNo: seat.roomSeatNo ?? selectedStudent.roomSeatNo ?? null,
+      },
+      idempotencyKey: createIdempotencyKey(),
+      clientActionAtMillis: Date.now(),
     });
 
     window.setTimeout(() => {
-      resetKiosk();
-      setIsProcessing(false);
       pendingActionRef.current = false;
-    }, 350);
-
-    void setStudentAttendanceStatusSecure({
-      centerId,
-      studentId: student.id,
-      nextStatus,
-      source: 'kiosk',
-      seatId: seat.id,
-      seatHint: {
-        seatNo: seat.seatNo,
-        roomId: seat.roomId || null,
-        roomSeatNo: seat.roomSeatNo || null,
-      },
-    }).then(() => {
-      if (nextStatus !== 'studying' || !firestore) return;
-
-      void syncAutoAttendanceRecord({
-        firestore,
-        centerId,
-        studentId: student.id,
-        studentName: student.name,
-        targetDate: nowDate,
-        checkInAt: nowDate,
-      }).catch((syncError: any) => {
-        console.warn('[kiosk] auto attendance sync skipped', syncError?.message || syncError);
-      });
-    }).catch((e) => {
-      console.error(e);
-      toast({
-        variant: "destructive",
-        title: "출결 저장 확인 필요",
-        description: getKioskErrorMessage(e),
-      });
-    });
-  };
-
-  const resetKiosk = () => {
-    setPin('');
-    setMatchedStudents([]);
-    setLookupAttendanceList([]);
-    setShowResults(false);
-    setLookupMessage('학생 정보를 확인 중...');
-  };
-
-  const getStatusInfo = (status?: string) => {
-    switch (status) {
-      case 'studying': return { label: '학습 중', color: 'bg-blue-500', icon: Zap };
-      case 'away': return { label: '외출/휴식 중', color: 'bg-amber-500', icon: Coffee };
-      case 'break': return { label: '휴식 중', color: 'bg-amber-500', icon: Coffee };
-      default: return { label: '미입실 (퇴실 상태)', color: 'bg-slate-400', icon: Clock };
-    }
-  };
+      resetKiosk();
+    }, 260);
+  }, [centerId, pin, queueActionForDelivery, resetKiosk, resolveSeatForStudent, selectedStudent, toast]);
 
   const canGoBack = activeMembership?.role === 'teacher' || activeMembership?.role === 'centerAdmin';
+  const selectedSeat = selectedStudent ? resolveSeatForStudent(selectedStudent) : null;
+  const selectedStatus = normalizeStatus(selectedSeat?.status);
+  const selectedActions = selectedSeat ? getAllowedActions(selectedStatus) : [];
 
   return (
-    <div className="min-h-screen bg-[#fafafa] flex flex-col items-center justify-center p-4 relative overflow-hidden">
-      <div className="absolute -top-40 -right-40 w-[600px] h-[600px] bg-primary/5 rounded-full blur-3xl pointer-events-none" />
-      <div className="absolute -bottom-40 -left-40 w-[600px] h-[600px] bg-accent/5 rounded-full blur-3xl pointer-events-none" />
-
-      {successFeedback && (
-        <div
-          className="fixed inset-0 z-[120] flex items-center justify-center bg-slate-950/45 p-6 backdrop-blur-md animate-in fade-in duration-200"
-          onClick={() => setSuccessFeedback(null)}
-        >
-          <div
-            className={cn(
-              "w-full max-w-xl rounded-[3rem] border-4 p-10 text-center shadow-[0_40px_90px_-24px] animate-in zoom-in-95 duration-200",
-              successFeedback.panelClass
-            )}
-          >
-            <div className={cn("mx-auto mb-6 flex h-24 w-24 items-center justify-center rounded-[2rem] shadow-2xl", successFeedback.iconClass)}>
-              <successFeedback.Icon className="h-12 w-12" />
-            </div>
-            <div className="mx-auto mb-4 w-fit rounded-full bg-white/20 px-5 py-2 text-sm font-black">
-              {successFeedback.badge}
-            </div>
-            <h2 className="text-5xl font-black tracking-tighter">{successFeedback.title}</h2>
-            <p className="mt-5 text-xl font-black text-white/90">{successFeedback.description}</p>
-          </div>
-        </div>
-      )}
-
-      {canGoBack && !showResults && (
-        <div className="fixed top-8 left-8 z-50">
-          <Button 
-            variant="outline" 
-            onClick={() => router.push('/dashboard')}
-            className="rounded-2xl h-12 px-6 font-black gap-2 border-2 shadow-xl bg-white/80 backdrop-blur-md hover:bg-primary hover:text-white transition-all active:scale-95"
-          >
-            <ArrowLeft className="h-4 w-4" /> 대시보드 돌아가기
-          </Button>
-        </div>
-      )}
-
-      <header className="flex flex-col items-center text-center gap-2 mb-12 relative z-10">
-        <div className="bg-primary p-5 rounded-[2.5rem] shadow-inner mb-4 animate-in zoom-in duration-700">
-          <MonitorSmartphone className="h-12 w-12 text-white" />
-        </div>
-        <h1 className="text-5xl font-black tracking-tighter text-primary">출결 키오스크</h1>
-        <p className="text-base font-black text-muted-foreground">번호 입력 후 학생 상태 버튼 하나만 눌러주세요.</p>
-      </header>
-
-      <div className="w-full max-w-3xl relative z-10">
-        {!showResults ? (
-          <Card className="rounded-[4rem] border-none shadow-[0_50px_100px_-20px_rgba(0,0,0,0.15)] bg-white overflow-hidden ring-1 ring-black/5 animate-in slide-in-from-bottom-8 duration-700">
-            <CardHeader className="bg-muted/5 border-b p-12 text-center">
-              <CardTitle className="text-3xl font-black tracking-tighter">번호 6자리 입력</CardTitle>
-              <CardDescription className="font-bold pt-3 text-base">학생을 찾은 뒤 등원, 외출, 복귀, 퇴실 중 하나를 누릅니다.</CardDescription>
-            </CardHeader>
-            <CardContent className="relative p-12 space-y-12">
-              {isSearching && (
-                <div className="absolute inset-0 z-10 bg-white/80 backdrop-blur-sm flex flex-col items-center justify-center gap-4">
-                  <Loader2 className="h-12 w-12 animate-spin text-primary" />
-                  <p className="font-black text-primary">{lookupMessage}</p>
-                </div>
-              )}
-              <div className="space-y-4">
-                <div className="flex justify-center gap-4">
-                  {[...Array(6)].map((_, i) => (
-                    <div 
-                      key={i} 
-                      className={cn(
-                        "w-14 h-18 rounded-3xl border-4 flex items-center justify-center text-3xl font-black transition-all duration-300",
-                        pin.length > i ? "border-primary bg-primary text-white scale-110 shadow-2xl shadow-primary/20" : "border-muted bg-muted/20"
-                      )}
-                    >
-                      {pin[i] ? '●' : ''}
-                    </div>
-                  ))}
-                </div>
-                <p className="text-center text-sm font-bold text-muted-foreground">
-                  숫자를 누르면 자동으로 입력되고, 6자리가 채워지면 바로 조회합니다.
-                </p>
-              </div>
-
-              <div className="grid grid-cols-3 gap-5">
-                {['1', '2', '3', '4', '5', '6', '7', '8', '9'].map(num => (
-                  <Button 
-                    key={num} 
-                    variant="outline" 
-                    onClick={() => handleNumberClick(num)}
-                    disabled={isSearching}
-                    className="h-24 rounded-3xl text-3xl font-black border-2 hover:bg-primary hover:text-white hover:border-primary transition-all active:scale-90 shadow-sm"
-                  >
-                    {num}
-                  </Button>
-                ))}
-                <Button variant="ghost" onClick={resetKiosk} disabled={isSearching} className="h-24 rounded-3xl text-xl font-black">초기화</Button>
-                <Button variant="outline" onClick={() => handleNumberClick('0')} disabled={isSearching} className="h-24 rounded-3xl text-3xl font-black border-2 shadow-sm">0</Button>
-                <Button variant="ghost" onClick={handleDelete} disabled={isSearching} className="h-24 rounded-3xl"><Delete className="h-10 w-10" /></Button>
-              </div>
-            </CardContent>
-          </Card>
-        ) : (
-          <div className="grid gap-6 w-full animate-in zoom-in-95 duration-500">
-            {matchedStudents.map(student => {
-              const seat = resolveSeatForStudent(student);
-              const statusInfo = getStatusInfo(seat?.status);
-              const isReturnState = seat?.status === 'away' || seat?.status === 'break';
-              
-              return (
-                <Card key={student.id} className="rounded-[4rem] border-none shadow-[0_50px_100px_-20px_rgba(0,0,0,0.15)] bg-white overflow-hidden ring-1 ring-black/5 relative group transition-all duration-500">
-                  <div className="absolute top-0 right-0 p-12 opacity-5 pointer-events-none">
-                    <Sparkles className="h-64 w-64 rotate-12" />
-                  </div>
-                  
-                  <CardContent className="p-12 sm:p-16 flex flex-col items-center text-center gap-8">
-                    <div className="space-y-4 w-full">
-                      <div className="flex flex-col items-center gap-2">
-                        <Badge className={cn("rounded-full font-black text-xs px-4 py-1 border-none shadow-lg mb-2 text-white", statusInfo.color)}>
-                          현재 {statusInfo.label}
-                        </Badge>
-                        <h3 className="text-6xl font-black tracking-tighter text-primary">{student.name}</h3>
-                        <p className="font-bold text-xl text-muted-foreground opacity-60">{student.schoolName} · {student.grade}</p>
-                      </div>
-                    </div>
-
-                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 w-full mt-4">
-                      <Button 
-                        disabled={isProcessing || seat?.status === 'studying'}
-                        onClick={() => handleStatusUpdate(student, 'studying')}
-                        className={cn(
-                          "h-48 rounded-[2.5rem] font-black flex flex-col gap-4 shadow-xl transition-all active:scale-95",
-                          seat?.status === 'studying'
-                            ? "bg-muted text-muted-foreground opacity-40"
-                            : isReturnState
-                              ? "bg-emerald-600 hover:bg-emerald-700 text-white shadow-emerald-200"
-                              : "bg-blue-600 hover:bg-blue-700 text-white shadow-blue-200"
-                        )}
-                      >
-                        {isReturnState ? <Undo2 className="h-12 w-12" /> : <LogIn className="h-12 w-12" />}
-                        <div className="grid">
-                          <span className="text-2xl">{isReturnState ? '복귀' : '입실'}</span>
-                          <span className="text-[10px] opacity-60 uppercase tracking-widest">{isReturnState ? 'Return' : 'Start Study'}</span>
-                        </div>
-                      </Button>
-
-                      <Button 
-                        disabled={isProcessing || seat?.status === 'away' || seat?.status === 'absent'}
-                        onClick={() => handleStatusUpdate(student, 'away')}
-                        className={cn(
-                          "h-48 rounded-[2.5rem] font-black flex flex-col gap-4 shadow-xl transition-all active:scale-95",
-                          (seat?.status === 'away' || seat?.status === 'absent') ? "bg-muted text-muted-foreground opacity-40" : "bg-amber-500 hover:bg-amber-600 text-white shadow-amber-200"
-                        )}
-                      >
-                        <Coffee className="h-12 w-12" />
-                        <div className="grid">
-                          <span className="text-2xl">외출/휴식</span>
-                          <span className="text-[10px] opacity-60 uppercase tracking-widest">Take a Break</span>
-                        </div>
-                      </Button>
-
-                      <Button 
-                        disabled={isProcessing}
-                        onClick={() => handleStatusUpdate(student, 'absent')}
-                        className={cn(
-                          "h-48 rounded-[2.5rem] font-black flex flex-col gap-4 shadow-xl transition-all active:scale-95",
-                          seat?.status === 'absent' ? "bg-rose-100 text-rose-700 shadow-rose-100" : "bg-rose-500 hover:bg-rose-600 text-white shadow-rose-200"
-                        )}
-                      >
-                        <LogOut className="h-12 w-12" />
-                        <div className="grid">
-                          <span className="text-2xl">퇴실</span>
-                          <span className="text-[11px] opacity-75">퇴실 기록 남기기</span>
-                        </div>
-                      </Button>
-                    </div>
-
-                    {isProcessing && (
-                      <div className="flex items-center gap-2 text-primary font-black animate-pulse mt-4">
-                        <Loader2 className="h-5 w-5 animate-spin" /> 시스템 업데이트 중...
-                      </div>
-                    )}
-                  </CardContent>
-                </Card>
-              );
-            })}
-            
-            <Button 
-              variant="ghost" 
-              onClick={resetKiosk}
-              className="mt-4 text-xl font-black text-muted-foreground/60 hover:text-primary transition-all gap-2"
-            >
-              <Undo2 className="h-6 w-6" /> 처음으로 돌아가기
-            </Button>
-          </div>
-        )}
+    <div className="min-h-screen overflow-hidden bg-[#F7FAFF] text-[#14295F]">
+      <div className="pointer-events-none fixed inset-0 overflow-hidden">
+        <Image
+          src="/track-logo-mark-transparent.png"
+          alt=""
+          width={720}
+          height={720}
+          priority
+          className="absolute -right-24 top-12 h-[34rem] w-[34rem] opacity-[0.035]"
+        />
+        <div className="absolute inset-x-0 top-0 h-1 bg-[#FF7A16]" />
       </div>
 
-      <footer className="mt-16 opacity-30">
-        <div className="flex items-center gap-3 font-black text-xs uppercase tracking-[0.5em] text-primary">
-          Smart Number Attendance System
+      {successFeedback && (
+        <div className="fixed inset-0 z-[120] flex items-center justify-center bg-[#061330]/55 p-5 backdrop-blur-sm">
+          <div className={cn(
+            'w-full max-w-lg rounded-[2rem] border-4 p-9 text-center shadow-[0_44px_80px_-34px_rgba(6,19,48,0.9)]',
+            'animate-in zoom-in-95 fade-in duration-150',
+            successFeedback.overlayClass
+          )}>
+            <div className={cn('mx-auto flex h-24 w-24 items-center justify-center rounded-[1.65rem] shadow-xl', successFeedback.iconClass)}>
+              <successFeedback.Icon className="h-12 w-12" />
+            </div>
+            <div className="mt-6 font-aggro-display text-5xl leading-none text-white sm:text-6xl">
+              처리 완료
+            </div>
+            <p className="mt-4 text-xl font-black text-white">{successFeedback.label}</p>
+            <p className="mt-3 text-base font-bold leading-6 text-white/86">{successFeedback.description}</p>
+          </div>
         </div>
-      </footer>
+      )}
+
+      <main className="relative z-10 mx-auto flex min-h-screen w-full max-w-5xl flex-col px-5 py-6 sm:px-8">
+        <div className="flex items-center justify-between gap-4">
+          <div className="flex items-center gap-3">
+            <div className="flex h-14 w-14 items-center justify-center rounded-[1.15rem] border border-[#D7E4FF] bg-white shadow-[0_14px_30px_-24px_rgba(20,41,95,0.42)]">
+              <Image src="/track-logo-mark-transparent.png" alt="TRACK" width={36} height={36} priority />
+            </div>
+            <div>
+              <p className="font-aggro-display text-2xl leading-none text-[#14295F]">출결 키오스크</p>
+              <p className="mt-1 text-xs font-black text-[#5C6E97]">TRACK Attendance</p>
+            </div>
+          </div>
+
+          {canGoBack ? (
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => router.push('/dashboard')}
+              className="h-11 rounded-[1rem] border-[#D7E4FF] bg-white px-4 text-sm font-black text-[#14295F] shadow-sm hover:bg-[#F1F6FF]"
+            >
+              <ArrowLeft className="mr-2 h-4 w-4" />
+              대시보드
+            </Button>
+          ) : null}
+        </div>
+
+        <section className="mx-auto flex w-full max-w-3xl flex-1 flex-col justify-center py-8">
+          {step === 'pin' ? (
+            <div className="rounded-[2rem] border border-[#D7E4FF] bg-white p-6 shadow-[0_34px_80px_-54px_rgba(20,41,95,0.52)] sm:p-8">
+              <div className="text-center">
+                <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-[1.35rem] bg-[#14295F] text-white shadow-[0_20px_36px_-24px_rgba(20,41,95,0.7)]">
+                  <ShieldCheck className="h-8 w-8" />
+                </div>
+                <h1 className="mt-6 font-aggro-display text-5xl leading-none text-[#14295F] sm:text-6xl">
+                  번호 6자리 입력
+                </h1>
+              </div>
+
+              <div className="mt-8 flex justify-center gap-3 sm:gap-4">
+                {Array.from({ length: 6 }).map((_, index) => (
+                  <div
+                    key={index}
+                    className={cn(
+                      'flex h-16 w-12 items-center justify-center rounded-[1rem] border-2 text-2xl font-black transition-colors sm:h-[4.6rem] sm:w-14',
+                      pin.length > index
+                        ? 'border-[#14295F] bg-[#14295F] text-white'
+                        : 'border-[#D7E4FF] bg-[#F7FAFF] text-[#A6B5D1]'
+                    )}
+                  >
+                    {pin[index] ? '●' : ''}
+                  </div>
+                ))}
+              </div>
+
+              <div className="relative mt-8">
+                {isSearching ? (
+                  <div className="absolute inset-0 z-10 flex flex-col items-center justify-center rounded-[1.6rem] bg-white/88 backdrop-blur-sm">
+                    <Loader2 className="h-10 w-10 animate-spin text-[#FF7A16]" />
+                    <p className="mt-3 text-base font-black text-[#14295F]">{lookupMessage}</p>
+                  </div>
+                ) : null}
+                <div className="grid grid-cols-3 gap-3 sm:gap-4">
+                  {['1', '2', '3', '4', '5', '6', '7', '8', '9'].map((num) => (
+                    <Button
+                      key={num}
+                      type="button"
+                      variant="outline"
+                      disabled={isSearching}
+                      onClick={() => handleNumberClick(num)}
+                      className="h-20 rounded-[1.35rem] border-2 border-[#D7E4FF] bg-white text-3xl font-black text-[#14295F] shadow-sm active:scale-[0.98] sm:h-24"
+                    >
+                      {num}
+                    </Button>
+                  ))}
+                  <Button
+                    type="button"
+                    variant="outline"
+                    disabled={isSearching}
+                    onClick={resetKiosk}
+                    className="h-20 rounded-[1.35rem] border-2 border-[#D7E4FF] bg-[#F7FAFF] text-base font-black text-[#5C6E97] sm:h-24"
+                  >
+                    <RotateCcw className="mr-2 h-5 w-5" />
+                    초기화
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    disabled={isSearching}
+                    onClick={() => handleNumberClick('0')}
+                    className="h-20 rounded-[1.35rem] border-2 border-[#D7E4FF] bg-white text-3xl font-black text-[#14295F] shadow-sm active:scale-[0.98] sm:h-24"
+                  >
+                    0
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    disabled={isSearching}
+                    onClick={handleDelete}
+                    className="h-20 rounded-[1.35rem] border-2 border-[#D7E4FF] bg-[#F7FAFF] text-[#14295F] sm:h-24"
+                    aria-label="한 글자 지우기"
+                  >
+                    <Delete className="h-8 w-8" />
+                  </Button>
+                </div>
+              </div>
+            </div>
+          ) : null}
+
+          {step === 'select' ? (
+            <div className="rounded-[2rem] border border-[#D7E4FF] bg-white p-6 shadow-[0_34px_80px_-54px_rgba(20,41,95,0.52)] sm:p-8">
+              <div className="text-center">
+                <p className="font-aggro-display text-4xl leading-none text-[#14295F] sm:text-5xl">학생 선택</p>
+              </div>
+              <div className="mt-7 grid gap-3">
+                {matchedStudents.map((student) => (
+                  <button
+                    key={student.id}
+                    type="button"
+                    onClick={() => {
+                      setSelectedStudent(student);
+                      setStep('action');
+                    }}
+                    className="flex min-h-20 items-center justify-between rounded-[1.35rem] border border-[#D7E4FF] bg-[#F7FAFF] px-5 py-4 text-left shadow-sm transition hover:border-[#FF7A16]/40 hover:bg-white"
+                  >
+                    <div className="flex min-w-0 items-center gap-4">
+                      <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-[1rem] bg-white text-[#14295F] shadow-[0_12px_24px_-20px_rgba(20,41,95,0.45)]">
+                        <UserRound className="h-6 w-6" />
+                      </div>
+                      <div className="min-w-0">
+                        <p className="truncate text-xl font-black text-[#14295F]">{student.name}</p>
+                        <p className="mt-1 truncate text-sm font-bold text-[#5C6E97]">
+                          {[student.schoolName, student.grade, student.className].filter(Boolean).join(' · ') || '학생 정보'}
+                        </p>
+                      </div>
+                    </div>
+                    <span className="rounded-full bg-[#14295F] px-4 py-2 text-sm font-black text-white">선택</span>
+                  </button>
+                ))}
+              </div>
+              <Button
+                type="button"
+                variant="ghost"
+                onClick={resetKiosk}
+                className="mt-5 h-12 w-full rounded-[1rem] text-base font-black text-[#5C6E97] hover:bg-[#F1F6FF] hover:text-[#14295F]"
+              >
+                처음으로
+              </Button>
+            </div>
+          ) : null}
+
+          {step === 'action' && selectedStudent ? (
+            <div className="rounded-[2rem] border border-[#D7E4FF] bg-white p-6 shadow-[0_34px_80px_-54px_rgba(20,41,95,0.52)] sm:p-8">
+              <div className="text-center">
+                <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-[1.35rem] bg-[#F7FAFF] text-[#14295F] ring-1 ring-[#D7E4FF]">
+                  <UserRound className="h-8 w-8" />
+                </div>
+                <p className="mt-5 font-aggro-display text-5xl leading-none text-[#14295F] sm:text-6xl">
+                  {selectedStudent.name}
+                </p>
+                <p className="mt-3 text-base font-black text-[#5C6E97]">
+                  {[selectedStudent.schoolName, selectedStudent.grade, selectedStudent.className].filter(Boolean).join(' · ') || '학생 정보'}
+                </p>
+                <div className="mt-5 inline-flex rounded-full border border-[#D7E4FF] bg-[#F7FAFF] px-4 py-2 text-sm font-black text-[#14295F]">
+                  현재 {selectedSeat ? statusLabel[selectedStatus] : '좌석 미배정'}
+                </div>
+              </div>
+
+              {selectedSeat ? (
+                <div className={cn('mt-8 grid gap-4', selectedActions.length === 1 ? 'grid-cols-1' : 'grid-cols-1 sm:grid-cols-2')}>
+                  {selectedActions.map((action) => {
+                    const config = ACTIONS[action];
+                    return (
+                      <Button
+                        key={action}
+                        type="button"
+                        onClick={() => handleAction(action)}
+                        className={cn(
+                          'h-36 rounded-[1.65rem] text-white transition active:scale-[0.98] sm:h-44',
+                          'flex flex-col items-center justify-center gap-4 border-0 text-2xl font-black',
+                          config.buttonClass
+                        )}
+                      >
+                        <span className={cn('flex h-14 w-14 items-center justify-center rounded-[1.1rem]', config.iconClass)}>
+                          <config.Icon className="h-8 w-8" />
+                        </span>
+                        {config.label}
+                      </Button>
+                    );
+                  })}
+                </div>
+              ) : (
+                <div className="mt-8 rounded-[1.35rem] border border-[#FFD7B0] bg-[#FFF8F1] p-5 text-center">
+                  <p className="text-lg font-black text-[#14295F]">좌석 배정 확인 필요</p>
+                  <p className="mt-2 text-sm font-bold text-[#8A5A2B]">관리자에게 좌석 배정을 요청해 주세요.</p>
+                </div>
+              )}
+
+              <Button
+                type="button"
+                variant="ghost"
+                onClick={resetKiosk}
+                className="mt-5 h-12 w-full rounded-[1rem] text-base font-black text-[#5C6E97] hover:bg-[#F1F6FF] hover:text-[#14295F]"
+              >
+                처음으로
+              </Button>
+            </div>
+          ) : null}
+        </section>
+
+        <footer className="pb-2 text-center text-[11px] font-black text-[#8FA0BE]">
+          TRACK LEARNING SYSTEM
+        </footer>
+      </main>
+
+      <div className="fixed bottom-4 right-4 hidden items-center gap-2 rounded-full border border-[#D7E4FF] bg-white px-3 py-2 text-[11px] font-black text-[#5C6E97] shadow-sm sm:flex">
+        <CheckCircle2 className="h-4 w-4 text-[#FF7A16]" />
+        Queue Ready
+      </div>
     </div>
   );
 }

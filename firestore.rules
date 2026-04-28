@@ -469,6 +469,16 @@ service cloud.firestore {
         allow delete: if isCenterAdmin(centerId);
       }
 
+      match /kioskAttendanceQueue/{actionId} {
+        allow read: if isTeacherOrAdmin(centerId);
+        allow create, update, delete: if false;
+      }
+
+      match /kioskAttendanceLocks/{studentId} {
+        allow read: if isTeacherOrAdmin(centerId);
+        allow create, update, delete: if false;
+      }
+
       match /kpiDaily/{dateKey} {
         allow read, write: if isCenterAdmin(centerId);
       }
