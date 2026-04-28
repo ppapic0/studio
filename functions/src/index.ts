@@ -10060,6 +10060,92 @@ export const setStudentAttendanceStatusSecure = smsDispatcherFunctions.https.onC
   return result;
 });
 
+export const lookupKioskStudentsByPin = functions.region(region).https.onCall(async (data, context) => {
+  const db = admin.firestore();
+  if (!context.auth?.uid) {
+    throw new functions.https.HttpsError("unauthenticated", "로그인이 필요합니다.");
+  }
+
+  const centerId = asTrimmedString(data?.centerId);
+  const pin = asTrimmedString(data?.pin).replace(/\D/g, "");
+  if (!centerId || !/^\d{6}$/.test(pin)) {
+    throw new functions.https.HttpsError("invalid-argument", "Invalid kiosk lookup input.", {
+      userMessage: "학생 번호 6자리를 다시 입력해 주세요.",
+    });
+  }
+
+  const membership = await resolveCenterMembershipRole(db, centerId, context.auth.uid);
+  if (!membership.role || !isActiveMembershipStatus(membership.status)) {
+    throw new functions.https.HttpsError("permission-denied", "Inactive membership.", {
+      userMessage: "현재 계정 상태로는 키오스크를 사용할 수 없습니다.",
+    });
+  }
+  if (membership.role !== "kiosk" && membership.role !== "teacher" && !isAdminRole(membership.role)) {
+    throw new functions.https.HttpsError("permission-denied", "Invalid kiosk lookup role.", {
+      userMessage: "키오스크, 선생님, 관리자 계정만 학생을 조회할 수 있습니다.",
+    });
+  }
+
+  const studentSnap = await db
+    .collection(`centers/${centerId}/students`)
+    .where("parentLinkCode", "==", pin)
+    .limit(8)
+    .get();
+
+  const students = studentSnap.docs.map((docSnap) => {
+    const student = (docSnap.data() || {}) as Record<string, unknown>;
+    return {
+      id: docSnap.id,
+      name: asTrimmedString(student.name || student.displayName, "학생"),
+      schoolName: asTrimmedString(student.schoolName),
+      grade: asTrimmedString(student.grade),
+      className: asTrimmedString(student.className),
+      seatNo: Math.max(0, Math.round(parseFiniteNumber(student.seatNo) ?? 0)),
+      seatId: asTrimmedString(student.seatId),
+      roomId: asTrimmedString(student.roomId),
+      roomSeatNo: Math.max(0, Math.round(parseFiniteNumber(student.roomSeatNo) ?? 0)),
+      seatLabel: asTrimmedString(student.seatLabel),
+      seatZone: asTrimmedString(student.seatZone),
+      targetDailyMinutes: Math.max(0, Math.round(parseFiniteNumber(student.targetDailyMinutes) ?? 0)),
+      parentUids: Array.isArray(student.parentUids)
+        ? student.parentUids.filter((uid): uid is string => typeof uid === "string" && uid.trim().length > 0)
+        : [],
+      parentLinkCode: pin,
+    };
+  });
+
+  const seats: Array<Record<string, unknown>> = [];
+  for (const student of students) {
+    const seatSnap = await db
+      .collection(`centers/${centerId}/attendanceCurrent`)
+      .where("studentId", "==", student.id)
+      .limit(10)
+      .get();
+
+    seatSnap.docs.forEach((docSnap) => {
+      const seat = (docSnap.data() || {}) as Record<string, unknown>;
+      seats.push({
+        id: docSnap.id,
+        studentId: student.id,
+        seatNo: Math.max(0, Math.round(parseFiniteNumber(seat.seatNo) ?? 0)),
+        roomId: asTrimmedString(seat.roomId),
+        roomSeatNo: Math.max(0, Math.round(parseFiniteNumber(seat.roomSeatNo) ?? 0)),
+        seatLabel: asTrimmedString(seat.seatLabel),
+        status: normalizeAttendanceSeatStatus(seat.status),
+        type: asTrimmedString(seat.type, "seat"),
+        lastCheckInAtMillis: toMillisSafe(seat.lastCheckInAt),
+        updatedAtMillis: toMillisSafe(seat.updatedAt),
+      });
+    });
+  }
+
+  return {
+    ok: true,
+    students,
+    seats,
+  };
+});
+
 type RepairRecentStudySessionTotalsResult = {
   ok: true;
   studentCount: number;

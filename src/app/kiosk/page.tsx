@@ -5,16 +5,14 @@ import { useEffect, useState, useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { useFirestore, useCollection } from '@/firebase';
+import { useFirestore, useCollection, useFunctions } from '@/firebase';
 import { useAppContext } from '@/contexts/app-context';
 import { useMemoFirebase } from '@/hooks/use-memo-firebase';
 import { 
   collection, 
-  query, 
-  where, 
-  getDocs,
   Timestamp
 } from 'firebase/firestore';
+import { httpsCallable } from 'firebase/functions';
 import { StudentProfile, AttendanceCurrent } from '@/lib/types';
 import { cn } from '@/lib/utils';
 import { 
@@ -38,6 +36,17 @@ import { setStudentAttendanceStatusSecure } from '@/lib/study-session-actions';
 import type { LucideIcon } from 'lucide-react';
 
 type KioskActionKey = 'checkIn' | 'return' | 'away' | 'checkOut';
+
+type KioskLookupAttendance = AttendanceCurrent & {
+  lastCheckInAtMillis?: number;
+  updatedAtMillis?: number;
+};
+
+type KioskStudentLookupResult = {
+  ok?: boolean;
+  students?: StudentProfile[];
+  seats?: KioskLookupAttendance[];
+};
 
 type KioskSuccessFeedback = {
   actionKey: KioskActionKey;
@@ -122,6 +131,7 @@ const getKioskSuccessFeedback = (
 
 export default function KioskPage() {
   const firestore = useFirestore();
+  const functions = useFunctions();
   const { activeMembership } = useAppContext();
   const { toast } = useToast();
   const router = useRouter();
@@ -129,6 +139,7 @@ export default function KioskPage() {
 
   const [pin, setPin] = useState('');
   const [matchedStudents, setMatchedStudents] = useState<StudentProfile[]>([]);
+  const [lookupAttendanceList, setLookupAttendanceList] = useState<KioskLookupAttendance[]>([]);
   const [isSearching, setIsSearching] = useState(false);
   const [showResults, setShowResults] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
@@ -143,9 +154,21 @@ export default function KioskPage() {
   // 실시간 좌석 현황 조회
   const attendanceQuery = useMemoFirebase(() => {
     if (!firestore || !centerId) return null;
+    if (activeMembership?.role === 'kiosk') return null;
     return collection(firestore, 'centers', centerId, 'attendanceCurrent');
-  }, [firestore, centerId]);
+  }, [firestore, centerId, activeMembership?.role]);
   const { data: attendanceList } = useCollection<AttendanceCurrent>(attendanceQuery);
+
+  const lookupAttendanceByStudentId = useMemo(() => {
+    const mapped = new Map<string, KioskLookupAttendance[]>();
+    lookupAttendanceList.forEach((attendance) => {
+      if (!attendance.studentId) return;
+      const bucket = mapped.get(attendance.studentId) || [];
+      bucket.push(attendance);
+      mapped.set(attendance.studentId, bucket);
+    });
+    return mapped;
+  }, [lookupAttendanceList]);
 
   const getSeatActivityRank = (status?: AttendanceCurrent['status']) => {
     if (status === 'studying') return 0;
@@ -154,21 +177,34 @@ export default function KioskPage() {
     return 2;
   };
 
-  const pickPreferredSeatForKiosk = (seats: AttendanceCurrent[]) => {
+  const getSeatSortMillis = (seat: AttendanceCurrent | KioskLookupAttendance) => {
+    return (
+      ('lastCheckInAtMillis' in seat ? seat.lastCheckInAtMillis || 0 : 0) ||
+      ('updatedAtMillis' in seat ? seat.updatedAtMillis || 0 : 0) ||
+      seat.lastCheckInAt?.toMillis?.() ||
+      seat.updatedAt?.toMillis?.() ||
+      0
+    );
+  };
+
+  const pickPreferredSeatForKiosk = (seats: Array<AttendanceCurrent | KioskLookupAttendance>) => {
     return seats
       .slice()
       .sort((left, right) => {
         const rankDiff = getSeatActivityRank(left.status) - getSeatActivityRank(right.status);
         if (rankDiff !== 0) return rankDiff;
-        const leftTime = left.lastCheckInAt?.toMillis?.() || left.updatedAt?.toMillis?.() || 0;
-        const rightTime = right.lastCheckInAt?.toMillis?.() || right.updatedAt?.toMillis?.() || 0;
+        const leftTime = getSeatSortMillis(left);
+        const rightTime = getSeatSortMillis(right);
         return rightTime - leftTime;
       })[0] || null;
   };
 
   const resolveSeatForStudent = (student: StudentProfile) => {
     const liveSeat = pickPreferredSeatForKiosk(
-      (attendanceList || []).filter((attendance) => attendance.studentId === student.id)
+      [
+        ...(attendanceList || []),
+        ...(lookupAttendanceByStudentId.get(student.id) || []),
+      ].filter((attendance) => attendance.studentId === student.id)
     );
     if (liveSeat) return liveSeat;
 
@@ -204,18 +240,20 @@ export default function KioskPage() {
   };
 
   const searchStudent = async (code: string) => {
-    if (!firestore || !centerId) return;
+    if (!functions || !centerId) return;
     setIsSearching(true);
     try {
-      const q = query(
-        collection(firestore, 'centers', centerId, 'students'),
-        where('parentLinkCode', '==', code)
-      );
-      const snap = await getDocs(q);
-      const results = snap.docs.map(d => ({ id: d.id, ...d.data() } as StudentProfile));
+      const lookupKioskStudentsByPin = httpsCallable<
+        { centerId: string; pin: string },
+        KioskStudentLookupResult
+      >(functions, 'lookupKioskStudentsByPin');
+      const result = await lookupKioskStudentsByPin({ centerId, pin: code });
+      const results = result.data?.students || [];
+      const seats = result.data?.seats || [];
       
       if (results.length > 0) {
         setMatchedStudents(results);
+        setLookupAttendanceList(seats);
         setShowResults(true);
       } else {
         toast({ 
@@ -227,6 +265,12 @@ export default function KioskPage() {
       }
     } catch (e) {
       console.error(e);
+      toast({
+        variant: "destructive",
+        title: "조회 실패",
+        description: getKioskErrorMessage(e),
+      });
+      setPin('');
     } finally {
       setIsSearching(false);
     }
@@ -305,6 +349,7 @@ export default function KioskPage() {
   const resetKiosk = () => {
     setPin('');
     setMatchedStudents([]);
+    setLookupAttendanceList([]);
     setShowResults(false);
   };
 

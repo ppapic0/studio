@@ -33,8 +33,8 @@ var __importStar = (this && this.__importStar) || (function () {
     };
 })();
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.cancelGiftishowSendFailSecure = exports.approveGiftishowOrderSecure = exports.reissueDailyRankingRewardV2Secure = exports.scheduledRankingRewardSettlement = exports.ensureCurrentUserMemberships = exports.scheduledOpenClawSnapshotExport = exports.generateOpenClawSnapshot = exports.refreshClassroomSignals = exports.stopStudentStudySessionSecure = exports.scheduledStudyBoxCarryoverExpiry = exports.openStudyRewardBoxSecure = exports.claimPlannerCompletionRewardSecure = exports.submitAttendanceRequestSecure = exports.applyPenaltyEventSecure = exports.adjustStudentPenaltyBalanceSecure = exports.adjustStudentPointBalanceSecure = exports.cancelPointBoostEventSecure = exports.createPointBoostEventSecure = exports.scheduledClassroomSignalsRefresh = exports.scheduledDailyRiskAlert = exports.repairRecentStudySessionTotals = exports.deleteManualStudySessionSecure = exports.updateManualStudySessionSecure = exports.createManualStudySessionSecure = exports.setStudentAttendanceStatusSecure = exports.onSessionWritten = exports.onSessionCreated = exports.scheduledWeeklyReport = exports.cleanupOldDocuments = exports.scheduledAttendanceCheck = exports.runLateArrivalCheck = exports.sendPaymentReminderBatch = exports.notifyDailyReportReady = exports.notifyAttendanceSms = exports.scheduledSmsQueueDispatcher = exports.sendManualStudentSms = exports.updateSmsRecipientPreference = exports.cancelSmsQueueItem = exports.retrySmsQueueItem = exports.saveNotificationSettingsSecure = exports.confirmInvoicePayment = exports.completeSignupWithInvite = exports.redeemInviteCode = exports.createCounselingDemoBundle = exports.registerStudent = exports.updateStudentAccount = exports.deleteTeacherAccount = exports.deleteStudentAccount = exports.repairTodayAttendanceSmsQueue = exports.onAttendanceEventCreated = void 0;
-exports.generateStudyPlan = exports.syncGiftishowCatalogSecure = exports.scheduledGiftishowCatalogSync = exports.saveGiftishowSettingsSecure = exports.resendGiftishowOrderSecure = exports.rejectGiftishowOrderSecure = exports.reconcilePendingGiftishowOrders = exports.getGiftishowBizmoneySecure = exports.createGiftishowOrderRequestSecure = exports.cancelGiftishowOrderSecure = void 0;
+exports.approveGiftishowOrderSecure = exports.reissueDailyRankingRewardV2Secure = exports.scheduledRankingRewardSettlement = exports.ensureCurrentUserMemberships = exports.scheduledOpenClawSnapshotExport = exports.generateOpenClawSnapshot = exports.refreshClassroomSignals = exports.stopStudentStudySessionSecure = exports.scheduledStudyBoxCarryoverExpiry = exports.openStudyRewardBoxSecure = exports.claimPlannerCompletionRewardSecure = exports.submitAttendanceRequestSecure = exports.applyPenaltyEventSecure = exports.adjustStudentPenaltyBalanceSecure = exports.adjustStudentPointBalanceSecure = exports.cancelPointBoostEventSecure = exports.createPointBoostEventSecure = exports.scheduledClassroomSignalsRefresh = exports.scheduledDailyRiskAlert = exports.repairRecentStudySessionTotals = exports.deleteManualStudySessionSecure = exports.updateManualStudySessionSecure = exports.createManualStudySessionSecure = exports.lookupKioskStudentsByPin = exports.setStudentAttendanceStatusSecure = exports.onSessionWritten = exports.onSessionCreated = exports.scheduledWeeklyReport = exports.cleanupOldDocuments = exports.scheduledAttendanceCheck = exports.runLateArrivalCheck = exports.sendPaymentReminderBatch = exports.notifyDailyReportReady = exports.notifyAttendanceSms = exports.scheduledSmsQueueDispatcher = exports.sendManualStudentSms = exports.updateSmsRecipientPreference = exports.cancelSmsQueueItem = exports.retrySmsQueueItem = exports.saveNotificationSettingsSecure = exports.confirmInvoicePayment = exports.completeSignupWithInvite = exports.redeemInviteCode = exports.createCounselingDemoBundle = exports.registerStudent = exports.updateStudentAccount = exports.deleteTeacherAccount = exports.deleteStudentAccount = exports.repairTodayAttendanceSmsQueue = exports.onAttendanceEventCreated = void 0;
+exports.generateStudyPlan = exports.syncGiftishowCatalogSecure = exports.scheduledGiftishowCatalogSync = exports.saveGiftishowSettingsSecure = exports.resendGiftishowOrderSecure = exports.rejectGiftishowOrderSecure = exports.reconcilePendingGiftishowOrders = exports.getGiftishowBizmoneySecure = exports.createGiftishowOrderRequestSecure = exports.cancelGiftishowOrderSecure = exports.cancelGiftishowSendFailSecure = void 0;
 const params_1 = require("firebase-functions/params");
 const functions = __importStar(require("firebase-functions"));
 const admin = __importStar(require("firebase-admin"));
@@ -8017,6 +8017,87 @@ exports.setStudentAttendanceStatusSecure = smsDispatcherFunctions.https.onCall(a
         });
     });
     return result;
+});
+exports.lookupKioskStudentsByPin = functions.region(region).https.onCall(async (data, context) => {
+    var _a;
+    const db = admin.firestore();
+    if (!((_a = context.auth) === null || _a === void 0 ? void 0 : _a.uid)) {
+        throw new functions.https.HttpsError("unauthenticated", "로그인이 필요합니다.");
+    }
+    const centerId = asTrimmedString(data === null || data === void 0 ? void 0 : data.centerId);
+    const pin = asTrimmedString(data === null || data === void 0 ? void 0 : data.pin).replace(/\D/g, "");
+    if (!centerId || !/^\d{6}$/.test(pin)) {
+        throw new functions.https.HttpsError("invalid-argument", "Invalid kiosk lookup input.", {
+            userMessage: "학생 번호 6자리를 다시 입력해 주세요.",
+        });
+    }
+    const membership = await resolveCenterMembershipRole(db, centerId, context.auth.uid);
+    if (!membership.role || !isActiveMembershipStatus(membership.status)) {
+        throw new functions.https.HttpsError("permission-denied", "Inactive membership.", {
+            userMessage: "현재 계정 상태로는 키오스크를 사용할 수 없습니다.",
+        });
+    }
+    if (membership.role !== "kiosk" && membership.role !== "teacher" && !isAdminRole(membership.role)) {
+        throw new functions.https.HttpsError("permission-denied", "Invalid kiosk lookup role.", {
+            userMessage: "키오스크, 선생님, 관리자 계정만 학생을 조회할 수 있습니다.",
+        });
+    }
+    const studentSnap = await db
+        .collection(`centers/${centerId}/students`)
+        .where("parentLinkCode", "==", pin)
+        .limit(8)
+        .get();
+    const students = studentSnap.docs.map((docSnap) => {
+        var _a, _b, _c;
+        const student = (docSnap.data() || {});
+        return {
+            id: docSnap.id,
+            name: asTrimmedString(student.name || student.displayName, "학생"),
+            schoolName: asTrimmedString(student.schoolName),
+            grade: asTrimmedString(student.grade),
+            className: asTrimmedString(student.className),
+            seatNo: Math.max(0, Math.round((_a = parseFiniteNumber(student.seatNo)) !== null && _a !== void 0 ? _a : 0)),
+            seatId: asTrimmedString(student.seatId),
+            roomId: asTrimmedString(student.roomId),
+            roomSeatNo: Math.max(0, Math.round((_b = parseFiniteNumber(student.roomSeatNo)) !== null && _b !== void 0 ? _b : 0)),
+            seatLabel: asTrimmedString(student.seatLabel),
+            seatZone: asTrimmedString(student.seatZone),
+            targetDailyMinutes: Math.max(0, Math.round((_c = parseFiniteNumber(student.targetDailyMinutes)) !== null && _c !== void 0 ? _c : 0)),
+            parentUids: Array.isArray(student.parentUids)
+                ? student.parentUids.filter((uid) => typeof uid === "string" && uid.trim().length > 0)
+                : [],
+            parentLinkCode: pin,
+        };
+    });
+    const seats = [];
+    for (const student of students) {
+        const seatSnap = await db
+            .collection(`centers/${centerId}/attendanceCurrent`)
+            .where("studentId", "==", student.id)
+            .limit(10)
+            .get();
+        seatSnap.docs.forEach((docSnap) => {
+            var _a, _b;
+            const seat = (docSnap.data() || {});
+            seats.push({
+                id: docSnap.id,
+                studentId: student.id,
+                seatNo: Math.max(0, Math.round((_a = parseFiniteNumber(seat.seatNo)) !== null && _a !== void 0 ? _a : 0)),
+                roomId: asTrimmedString(seat.roomId),
+                roomSeatNo: Math.max(0, Math.round((_b = parseFiniteNumber(seat.roomSeatNo)) !== null && _b !== void 0 ? _b : 0)),
+                seatLabel: asTrimmedString(seat.seatLabel),
+                status: normalizeAttendanceSeatStatus(seat.status),
+                type: asTrimmedString(seat.type, "seat"),
+                lastCheckInAtMillis: toMillisSafe(seat.lastCheckInAt),
+                updatedAtMillis: toMillisSafe(seat.updatedAt),
+            });
+        });
+    }
+    return {
+        ok: true,
+        students,
+        seats,
+    };
 });
 async function assertManualStudySessionMutationAllowed(params) {
     const membership = await resolveCenterMembershipRole(params.db, params.centerId, params.authUid);
