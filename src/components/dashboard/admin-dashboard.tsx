@@ -3187,6 +3187,8 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
       plannedArrival: signal?.routineExpectedArrivalTime || student?.expectedArrivalTime || '-',
       firstCheckInLabel: signal?.firstCheckInLabel || '-',
       plannedDeparture: signal?.plannedDepartureTime || '-',
+      latestAwayStartLabel: signal?.latestAwayStartLabel || '-',
+      latestAwayEndLabel: signal?.latestAwayEndLabel || (signal?.latestAwayStartLabel ? '복귀 전' : '-'),
       outingLabel,
       scheduleLabel: [classScheduleLabel, signal?.scheduleMovementSummary].filter(Boolean).join(' · ') || classScheduleLabel || '등록된 일정 없음',
       parentName:
@@ -9863,14 +9865,22 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
                       <p className="text-[10px] font-black uppercase tracking-[0.14em] text-[#5C6E97]">오늘 하원 일정</p>
                       <p className="mt-2 truncate text-base font-black text-[#14295F]">{selectedFocusOperationsSummary.plannedDeparture}</p>
                     </div>
-                    <div className="min-w-0 rounded-2xl border border-[#FFD7BA] bg-[#FFF8F2] p-3 sm:col-span-2">
-                      <p className="text-[10px] font-black uppercase tracking-[0.14em] text-[#C95A08]">오늘 외출 일정</p>
-                      <p className="mt-2 line-clamp-2 text-sm font-black leading-5 text-[#14295F]">{selectedFocusOperationsSummary.outingLabel}</p>
-                      <p className="mt-1 truncate text-[11px] font-bold text-[#6E7EA3]">{selectedFocusOperationsSummary.scheduleLabel}</p>
+                    <div className="min-w-0 rounded-2xl border border-[#FFD7BA] bg-[#FFF8F2] p-3">
+                      <p className="text-[10px] font-black uppercase tracking-[0.14em] text-[#C95A08]">오늘 외출 시간</p>
+                      <p className="mt-2 truncate text-base font-black text-[#14295F]">{selectedFocusOperationsSummary.latestAwayStartLabel}</p>
+                    </div>
+                    <div className="min-w-0 rounded-2xl border border-emerald-200 bg-emerald-50 p-3">
+                      <p className="text-[10px] font-black uppercase tracking-[0.14em] text-emerald-700">오늘 복귀 시간</p>
+                      <p className="mt-2 truncate text-base font-black text-[#14295F]">{selectedFocusOperationsSummary.latestAwayEndLabel}</p>
                     </div>
                     <div className="min-w-0 rounded-2xl border border-[#DCE7FF] bg-[#F7FAFF] p-3">
                       <p className="text-[10px] font-black uppercase tracking-[0.14em] text-[#5C6E97]">문자 발송 현황</p>
                       <p className="mt-2 truncate text-sm font-black text-[#14295F]">{selectedFocusOperationsSummary.smsStatusSummary}</p>
+                    </div>
+                    <div className="min-w-0 rounded-2xl border border-[#FFD7BA] bg-[#FFF8F2] p-3 sm:col-span-3">
+                      <p className="text-[10px] font-black uppercase tracking-[0.14em] text-[#C95A08]">오늘 외출 일정</p>
+                      <p className="mt-2 line-clamp-2 text-sm font-black leading-5 text-[#14295F]">{selectedFocusOperationsSummary.outingLabel}</p>
+                      <p className="mt-1 truncate text-[11px] font-bold text-[#6E7EA3]">{selectedFocusOperationsSummary.scheduleLabel}</p>
                     </div>
                     <div className="min-w-0 rounded-2xl border border-[#DCE7FF] bg-white p-3">
                       <div className="flex items-center gap-1.5 text-[#5C6E97]">
