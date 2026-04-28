@@ -45,10 +45,16 @@ const signupRoleAliases: Record<string, AllowedRole> = {
   kioskaccount: "kiosk",
   kioskmode: "kiosk",
   tabletkiosk: "kiosk",
+  tablet: "kiosk",
+  tabletaccount: "kiosk",
   attendancekiosk: "kiosk",
+  attendancekioskaccount: "kiosk",
   "키오스크": "kiosk",
   "키오스크계정": "kiosk",
   "태블릿키오스크": "kiosk",
+  "태블릿": "kiosk",
+  "태블릿계정": "kiosk",
+  "출결키오스크": "kiosk",
 };
 
 function normalizeSignupRole(value: unknown): AllowedRole | null {
@@ -7006,7 +7012,8 @@ export const completeSignupWithInvite = functions.region(region).https.onCall(as
   }
 
   const uid = context.auth.uid;
-  const role = normalizeSignupRole(data?.role);
+  const roleInput = data?.role ?? data?.selectedRole ?? data?.intendedRole ?? data?.accountRole;
+  let role = normalizeSignupRole(roleInput);
   const code = String(data?.code || "").trim();
   const schoolName = String(data?.schoolName || "").trim();
   const grade = String(data?.grade || "고등학생").trim();
@@ -7044,15 +7051,6 @@ export const completeSignupWithInvite = functions.region(region).https.onCall(as
   const age14ConsentInput = normalizeConsentInput(legalConsentsInput.age14, "signup");
   const marketingEmailConsentInput = normalizeConsentInput(legalConsentsInput.marketingEmail, "signup");
 
-  if (!role) {
-    console.warn("[completeSignupWithInvite] invalid signup role", {
-      uid,
-      requestedRole: asTrimmedString(data?.role),
-    });
-    throw new functions.https.HttpsError("invalid-argument", "선택한 역할이 유효하지 않습니다.", {
-      userMessage: "선택한 역할이 유효하지 않습니다. 화면을 새로고침한 뒤 다시 시도해 주세요.",
-    });
-  }
   if (!termsConsentInput.agreed || !termsConsentInput.version) {
     throw new functions.https.HttpsError("invalid-argument", "Terms consent is required.", {
       userMessage: "이용약관 동의가 필요합니다.",
@@ -7076,6 +7074,31 @@ export const completeSignupWithInvite = functions.region(region).https.onCall(as
   if (!code) {
     throw new functions.https.HttpsError("invalid-argument", "초대 코드가 누락되었습니다.", {
       userMessage: "초대 코드를 입력해주세요.",
+    });
+  }
+
+  if (!role) {
+    const inviteSnapForRole = await db.doc(`inviteCodes/${code}`).get();
+    const inviteRole = inviteSnapForRole.exists
+      ? normalizeSignupRole((inviteSnapForRole.data() as Partial<InviteDoc> | undefined)?.intendedRole)
+      : null;
+    if (inviteRole) {
+      role = inviteRole;
+      console.info("[completeSignupWithInvite] recovered signup role from invite", {
+        uid,
+        requestedRole: asTrimmedString(roleInput),
+        inviteRole,
+      });
+    }
+  }
+
+  if (!role) {
+    console.warn("[completeSignupWithInvite] invalid signup role", {
+      uid,
+      requestedRole: asTrimmedString(roleInput),
+    });
+    throw new functions.https.HttpsError("invalid-argument", "선택한 역할이 유효하지 않습니다.", {
+      userMessage: "선택한 역할이 유효하지 않습니다. 화면을 새로고침한 뒤 다시 시도해 주세요.",
     });
   }
 

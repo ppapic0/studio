@@ -343,6 +343,8 @@ export function SignupForm() {
       await completeSignupFn({
         code: inviteCode,
         role: values.role,
+        selectedRole: values.role,
+        intendedRole: values.role,
         displayName: finalDisplayName,
         schoolName: values.schoolName || '',
         grade: '고등학생',
