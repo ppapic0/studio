@@ -62,6 +62,12 @@ type KioskSuccessFeedback = {
   iconClass: string;
 };
 
+const KIOSK_LOOKUP_RETRY_DELAYS_MS = [0, 700, 1600, 2800];
+
+function wait(ms: number) {
+  return new Promise((resolve) => window.setTimeout(resolve, ms));
+}
+
 const getKioskErrorMessage = (error: unknown) => {
   const raw = error as {
     code?: unknown;
@@ -77,7 +83,7 @@ const getKioskErrorMessage = (error: unknown) => {
     }
   }
   if (isInternalKioskLookupError(error)) {
-    return '학생 조회가 일시적으로 지연되고 있습니다. 다시 입력해 주세요.';
+    return '백엔드에서 학생 정보를 확인 중입니다. 번호는 유지되니 잠시 후 다시 확인해 주세요.';
   }
   if (typeof raw.message === 'string' && raw.message.trim()) return raw.message.trim();
   return '잠시 후 다시 시도해 주세요. 문제가 계속되면 관리자에게 알려주세요.';
@@ -158,6 +164,7 @@ export default function KioskPage() {
   const [isSearching, setIsSearching] = useState(false);
   const [showResults, setShowResults] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
+  const [lookupMessage, setLookupMessage] = useState('학생 정보를 확인 중...');
   const [successFeedback, setSuccessFeedback] = useState<KioskSuccessFeedback | null>(null);
   const pendingActionRef = useRef(false);
 
@@ -306,34 +313,58 @@ export default function KioskPage() {
     return { ok: true, students, seats };
   };
 
+  const lookupStudentFromBackendWithRetry = async (code: string): Promise<KioskStudentLookupResult | null> => {
+    if (!lookupKioskStudentsByPin || !centerId) return null;
+
+    let lastError: unknown = null;
+    for (const [attemptIndex, delayMs] of KIOSK_LOOKUP_RETRY_DELAYS_MS.entries()) {
+      if (delayMs > 0) {
+        setLookupMessage('백엔드에서 학생 정보를 다시 확인 중...');
+        await wait(delayMs);
+      } else {
+        setLookupMessage('백엔드에서 학생 정보를 확인 중...');
+      }
+
+      try {
+        const result = await lookupKioskStudentsByPin({ centerId, pin: code });
+        return result.data || null;
+      } catch (error) {
+        lastError = error;
+        if (!isInternalKioskLookupError(error)) throw error;
+        console.warn(`[kiosk] backend lookup internal retry ${attemptIndex + 1}/${KIOSK_LOOKUP_RETRY_DELAYS_MS.length}`, error);
+      }
+    }
+
+    throw lastError || new Error('Kiosk student lookup failed.');
+  };
+
   const searchStudent = async (code: string) => {
     if ((!lookupKioskStudentsByPin && !firestore) || !centerId) return;
     setIsSearching(true);
+    setLookupMessage('학생 번호를 백엔드로 확인 중...');
     try {
       let lookupData: KioskStudentLookupResult | null = null;
+      const backendLookupPromise = lookupKioskStudentsByPin
+        ? lookupStudentFromBackendWithRetry(code)
+            .then((data) => ({ data, error: null as unknown }))
+            .catch((error) => ({ data: null, error }))
+        : null;
 
       if (firestore) {
         try {
+          setLookupMessage('학생 정보를 빠르게 확인 중...');
           lookupData = await lookupStudentFromFirestore(code);
         } catch (firestoreError) {
           console.warn('[kiosk] Firestore lookup failed; trying callable fallback', firestoreError);
         }
       }
 
-      if ((!lookupData || !lookupData.students?.length) && lookupKioskStudentsByPin) {
-        try {
-          const result = await lookupKioskStudentsByPin({ centerId, pin: code });
-          lookupData = result.data || lookupData;
-        } catch (callableError) {
-          if (lookupData?.students?.length) {
-            console.warn('[kiosk] callable lookup failed after Firestore result; continuing', callableError);
-          } else if (isInternalKioskLookupError(callableError)) {
-            console.warn('[kiosk] callable lookup failed with internal; retrying Firestore fallback', callableError);
-            lookupData = await lookupStudentFromFirestore(code);
-            if (!lookupData) throw callableError;
-          } else {
-            throw callableError;
-          }
+      if ((!lookupData || !lookupData.students?.length) && backendLookupPromise) {
+        const backendLookup = await backendLookupPromise;
+        if (backendLookup.data) {
+          lookupData = backendLookup.data;
+        } else if (backendLookup.error) {
+          throw backendLookup.error;
         }
       }
 
@@ -359,13 +390,16 @@ export default function KioskPage() {
     } catch (e) {
       console.error(e);
       toast({
-        variant: "destructive",
+        variant: isInternalKioskLookupError(e) ? "default" : "destructive",
         title: "조회 실패",
         description: getKioskErrorMessage(e),
       });
-      setPin('');
+      if (!isInternalKioskLookupError(e)) {
+        setPin('');
+      }
     } finally {
       setIsSearching(false);
+      setLookupMessage('학생 정보를 확인 중...');
     }
   };
 
@@ -446,6 +480,7 @@ export default function KioskPage() {
     setMatchedStudents([]);
     setLookupAttendanceList([]);
     setShowResults(false);
+    setLookupMessage('학생 정보를 확인 중...');
   };
 
   const getStatusInfo = (status?: string) => {
@@ -518,7 +553,7 @@ export default function KioskPage() {
               {isSearching && (
                 <div className="absolute inset-0 z-10 bg-white/80 backdrop-blur-sm flex flex-col items-center justify-center gap-4">
                   <Loader2 className="h-12 w-12 animate-spin text-primary" />
-                  <p className="font-black text-primary">학생 정보를 확인 중...</p>
+                  <p className="font-black text-primary">{lookupMessage}</p>
                 </div>
               )}
               <div className="space-y-4">
