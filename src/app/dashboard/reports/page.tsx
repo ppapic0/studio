@@ -1,7 +1,7 @@
 
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useCollection, useFirestore, useUser } from '@/firebase';
 import { useAppContext } from '@/contexts/app-context';
 import { useMemoFirebase } from '@/hooks/use-memo-firebase';
@@ -359,6 +359,32 @@ export default function DailyReportsPage() {
   const [isSaving, setIsSaving] = useState(false);
   const [trustReviewWarnings, setTrustReviewWarnings] = useState<ReportTrustReviewWarning[]>([]);
   const [isTrustReviewOpen, setIsTrustReviewOpen] = useState(false);
+  const pageRootRef = useRef<HTMLDivElement | null>(null);
+
+  const moveReportDialogFocusToPage = () => {
+    const activeElement = document.activeElement;
+    if (activeElement instanceof HTMLElement) {
+      activeElement.blur();
+    }
+    window.requestAnimationFrame(() => {
+      pageRootRef.current?.focus({ preventScroll: true });
+    });
+  };
+
+  const handleWriteModalOpenChange = (open: boolean) => {
+    if (!open) {
+      moveReportDialogFocusToPage();
+      setIsTrustReviewOpen(false);
+    }
+    setIsWriteModalOpen(open);
+  };
+
+  const handleTrustReviewOpenChange = (open: boolean) => {
+    if (!open) {
+      moveReportDialogFocusToPage();
+    }
+    setIsTrustReviewOpen(open);
+  };
 
   const formatTimestampLabel = (value: unknown, fallback: string) => {
     const parsed = toDateSafe(value);
@@ -843,8 +869,11 @@ export default function DailyReportsPage() {
 
       toast({ title: status === 'sent' ? "발송 완료" : "저장 완료" });
       setTrustReviewWarnings([]);
+      moveReportDialogFocusToPage();
       setIsTrustReviewOpen(false);
-      setIsWriteModalOpen(false);
+      window.requestAnimationFrame(() => {
+        setIsWriteModalOpen(false);
+      });
     } catch (e: any) {
       toast({ variant: "destructive", title: "저장 실패" });
     } finally {
@@ -867,7 +896,7 @@ export default function DailyReportsPage() {
     : false;
 
   return (
-    <div className={cn("flex flex-col gap-6 max-w-5xl mx-auto pb-20 px-1", isMobile ? "gap-4" : "gap-8")}>
+    <div ref={pageRootRef} tabIndex={-1} className={cn("flex flex-col gap-6 max-w-5xl mx-auto pb-20 px-1 outline-none", isMobile ? "gap-4" : "gap-8")}>
       <header className={cn("flex justify-between gap-4", isMobile ? "flex-col" : "flex-row items-center")}>
         <div className="flex flex-col gap-1">
           <h1 className={cn("font-black tracking-tighter flex items-center gap-2", isMobile ? "text-2xl" : "text-4xl")}>
@@ -1101,8 +1130,14 @@ export default function DailyReportsPage() {
         </div>
       </div>
 
-      <Dialog open={isWriteModalOpen} onOpenChange={setIsWriteModalOpen}>
-        <DialogContent className={cn("rounded-[3rem] p-0 overflow-hidden border-none shadow-2xl flex flex-col transition-all duration-500", isMobile ? "fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-[95vw] h-[85vh] max-w-[450px] rounded-[2rem]" : "max-w-4xl h-[90vh]")}>
+      <Dialog open={isWriteModalOpen} onOpenChange={handleWriteModalOpenChange}>
+        <DialogContent
+          onCloseAutoFocus={(event) => {
+            event.preventDefault();
+            moveReportDialogFocusToPage();
+          }}
+          className={cn("rounded-[3rem] p-0 overflow-hidden border-none shadow-2xl flex flex-col transition-all duration-500", isMobile ? "fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-[95vw] h-[85vh] max-w-[450px] rounded-[2rem]" : "max-w-4xl h-[90vh]")}
+        >
           <div className={cn("bg-primary text-white relative overflow-hidden shrink-0", isMobile ? "p-6" : "p-12")}>
             <div className="absolute top-0 right-0 p-12 opacity-10 rotate-12">
               <Sparkles className={cn(isMobile ? "h-20 w-20" : "h-48 w-48")} />
@@ -1279,8 +1314,14 @@ export default function DailyReportsPage() {
         </DialogContent>
       </Dialog>
 
-      <AlertDialog open={isTrustReviewOpen} onOpenChange={setIsTrustReviewOpen}>
-        <AlertDialogContent className="rounded-[2rem] border-none bg-white p-0 shadow-2xl sm:max-w-xl">
+      <AlertDialog open={isTrustReviewOpen} onOpenChange={handleTrustReviewOpenChange}>
+        <AlertDialogContent
+          onCloseAutoFocus={(event) => {
+            event.preventDefault();
+            moveReportDialogFocusToPage();
+          }}
+          className="rounded-[2rem] border-none bg-white p-0 shadow-2xl sm:max-w-xl"
+        >
           <div className="bg-[#14295F] px-6 py-5 text-white">
             <AlertDialogHeader className="space-y-2 text-left">
               <AlertDialogTitle className="font-black tracking-tight text-white">
@@ -1319,12 +1360,18 @@ export default function DailyReportsPage() {
             </p>
           </div>
           <AlertDialogFooter className="gap-2 border-t border-slate-100 bg-slate-50 px-6 py-4 sm:space-x-0">
-            <AlertDialogCancel className="mt-0 h-11 rounded-xl border-slate-200 bg-white px-5 font-black text-slate-700">
+            <AlertDialogCancel
+              onClick={moveReportDialogFocusToPage}
+              className="mt-0 h-11 rounded-xl border-slate-200 bg-white px-5 font-black text-slate-700"
+            >
               다시 확인할게요
             </AlertDialogCancel>
             <Button
               type="button"
-              onClick={() => void handleSaveReport('sent', { skipTrustReview: true })}
+              onClick={() => {
+                moveReportDialogFocusToPage();
+                void handleSaveReport('sent', { skipTrustReview: true });
+              }}
               disabled={isSaving}
               className="h-11 rounded-xl bg-[#14295F] px-5 font-black text-white hover:bg-[#1c397a]"
             >
