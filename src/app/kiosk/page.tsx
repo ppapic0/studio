@@ -1,7 +1,7 @@
 
 'use client';
 
-import { useEffect, useState, useMemo } from 'react';
+import { useEffect, useRef, useState, useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -159,6 +159,7 @@ export default function KioskPage() {
   const [showResults, setShowResults] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
   const [successFeedback, setSuccessFeedback] = useState<KioskSuccessFeedback | null>(null);
+  const pendingActionRef = useRef(false);
 
   const lookupKioskStudentsByPin = useMemo(() => {
     if (!functions) return null;
@@ -306,18 +307,38 @@ export default function KioskPage() {
   };
 
   const searchStudent = async (code: string) => {
-    if (!lookupKioskStudentsByPin || !centerId) return;
+    if ((!lookupKioskStudentsByPin && !firestore) || !centerId) return;
     setIsSearching(true);
     try {
       let lookupData: KioskStudentLookupResult | null = null;
-      try {
-        const result = await lookupKioskStudentsByPin({ centerId, pin: code });
-        lookupData = result.data || null;
-      } catch (callableError) {
-        if (!isInternalKioskLookupError(callableError)) throw callableError;
-        console.warn('[kiosk] callable lookup failed with internal; trying Firestore fallback', callableError);
+
+      if (firestore) {
+        try {
+          lookupData = await lookupStudentFromFirestore(code);
+        } catch (firestoreError) {
+          console.warn('[kiosk] Firestore lookup failed; trying callable fallback', firestoreError);
+        }
+      }
+
+      if ((!lookupData || !lookupData.students?.length) && lookupKioskStudentsByPin) {
+        try {
+          const result = await lookupKioskStudentsByPin({ centerId, pin: code });
+          lookupData = result.data || lookupData;
+        } catch (callableError) {
+          if (lookupData?.students?.length) {
+            console.warn('[kiosk] callable lookup failed after Firestore result; continuing', callableError);
+          } else if (isInternalKioskLookupError(callableError)) {
+            console.warn('[kiosk] callable lookup failed with internal; retrying Firestore fallback', callableError);
+            lookupData = await lookupStudentFromFirestore(code);
+            if (!lookupData) throw callableError;
+          } else {
+            throw callableError;
+          }
+        }
+      }
+
+      if (!lookupData) {
         lookupData = await lookupStudentFromFirestore(code);
-        if (!lookupData) throw callableError;
       }
 
       const results = lookupData?.students || [];
@@ -348,8 +369,8 @@ export default function KioskPage() {
     }
   };
 
-  const handleStatusUpdate = async (student: StudentProfile, nextStatus: AttendanceCurrent['status']) => {
-    if (isProcessing || !centerId) return;
+  const handleStatusUpdate = (student: StudentProfile, nextStatus: AttendanceCurrent['status']) => {
+    if (pendingActionRef.current || !centerId) return;
     
     const seat = resolveSeatForStudent(student);
     if (!seat) {
@@ -369,53 +390,55 @@ export default function KioskPage() {
       return;
     }
 
+    pendingActionRef.current = true;
     setIsProcessing(true);
-    try {
-      const nowDate = new Date();
-      await setStudentAttendanceStatusSecure({
+
+    const nowDate = new Date();
+    const feedback = getKioskSuccessFeedback(student.name, prevStatus, nextStatus);
+    setSuccessFeedback(feedback);
+    toast({
+      title: feedback.title,
+      description: '요청을 접수했습니다. 실제 저장과 문자 처리는 백엔드에서 이어서 진행됩니다.',
+    });
+
+    window.setTimeout(() => {
+      resetKiosk();
+      setIsProcessing(false);
+      pendingActionRef.current = false;
+    }, 350);
+
+    void setStudentAttendanceStatusSecure({
+      centerId,
+      studentId: student.id,
+      nextStatus,
+      source: 'kiosk',
+      seatId: seat.id,
+      seatHint: {
+        seatNo: seat.seatNo,
+        roomId: seat.roomId || null,
+        roomSeatNo: seat.roomSeatNo || null,
+      },
+    }).then(() => {
+      if (nextStatus !== 'studying' || !firestore) return;
+
+      void syncAutoAttendanceRecord({
+        firestore,
         centerId,
         studentId: student.id,
-        nextStatus,
-        source: 'kiosk',
-        seatId: seat.id,
-        seatHint: {
-          seatNo: seat.seatNo,
-          roomId: seat.roomId || null,
-          roomSeatNo: seat.roomSeatNo || null,
-        },
+        studentName: student.name,
+        targetDate: nowDate,
+        checkInAt: nowDate,
+      }).catch((syncError: any) => {
+        console.warn('[kiosk] auto attendance sync skipped', syncError?.message || syncError);
       });
-
-      if (nextStatus === 'studying' && firestore) {
-        void syncAutoAttendanceRecord({
-          firestore,
-          centerId,
-          studentId: student.id,
-          studentName: student.name,
-          targetDate: nowDate,
-          checkInAt: nowDate,
-        }).catch((syncError: any) => {
-          console.warn('[kiosk] auto attendance sync skipped', syncError?.message || syncError);
-        });
-      }
-
-      const feedback = getKioskSuccessFeedback(student.name, prevStatus, nextStatus);
-      setSuccessFeedback(feedback);
-      toast({ 
-        title: feedback.title,
-        description: feedback.description
-      });
-      
-      resetKiosk();
-    } catch (e) {
+    }).catch((e) => {
       console.error(e);
       toast({
         variant: "destructive",
-        title: "처리 실패",
+        title: "백엔드 처리 실패",
         description: getKioskErrorMessage(e),
       });
-    } finally {
-      setIsProcessing(false);
-    }
+    });
   };
 
   const resetKiosk = () => {
