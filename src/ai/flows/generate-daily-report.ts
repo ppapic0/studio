@@ -138,6 +138,14 @@ function normalizeWhitespace(text?: string | null) {
   return (text || '').replace(/\s+/g, ' ').trim();
 }
 
+function normalizeTeacherReportNote(text?: string | null) {
+  return (text || '')
+    .split(/\r?\n/u)
+    .map((line) => line.trim())
+    .filter(Boolean)
+    .join(' ');
+}
+
 function toCompactSentence(text?: string | null, maxLength = 84) {
   const normalized = normalizeWhitespace(text);
   if (!normalized) return '';
@@ -389,6 +397,7 @@ function buildFallbackTeacherOneLiner(input: DailyReportInput) {
 
 function composeReportContent(input: DailyReportInput, draft: DailyReportDraft) {
   const compactCoachingFocus = sanitizeCompactLabel(input.coachingFocus, 46) || input.coachingFocus;
+  const teacherReportNote = normalizeTeacherReportNote(input.teacherNote);
   const numericObservation = [
     `${input.studentName} 학생은 오늘 ${formatDailyReportStudyTime(input.totalStudyMinutes)}, 완료율 ${Math.round(input.completionRate)}%, 평균 대비 ${formatSignedMinutes(input.metrics.deltaMinutesFromAvg)} 흐름이었습니다.`,
     `출결은 ${input.attendanceLabel}입니다.`,
@@ -399,6 +408,7 @@ function composeReportContent(input: DailyReportInput, draft: DailyReportDraft) 
   return [
     '🕒 오늘 관찰',
     `${numericObservation} ${draft.observation}`.trim(),
+    ...(teacherReportNote ? ['', '✅ 선생님 코멘트', teacherReportNote] : []),
     '',
     '📊 교육학적 해석',
     `${input.pedagogyLens} 중심 해석입니다. ${draft.interpretation}`.trim(),
@@ -529,7 +539,8 @@ const dailyReportPrompt = ai.definePrompt({
 12. 내부 스테이지는 절대 학생/학부모에게 직접 드러내지 말고, 코칭 깊이를 조절하는 참고 정보로만 사용하세요.
 13. 계획 목록이나 생활 루틴에 구체적인 단서가 있으면 observation, coaching, homeConnection 중 최소 한 곳에는 실제 과제/루틴 요소를 한 번 반영하세요.
 14. homeConnection은 학부모가 오늘 바로 써볼 수 있는 자연스러운 말투로 작성하세요.
-15. JSON만 반환하세요.`,
+15. 선생님 메모가 있으면 리포트 화면에서 원문을 별도 한 줄로 표시합니다. AI 문장에는 원문을 따옴표처럼 그대로 반복하지 말고, 필요한 맥락만 참고하세요.
+16. JSON만 반환하세요.`,
   config: {
     temperature: 0.8,
     safetySettings: [

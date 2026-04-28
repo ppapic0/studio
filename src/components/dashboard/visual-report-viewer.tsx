@@ -34,6 +34,14 @@ function readString(value: unknown) {
   return typeof value === 'string' ? value.trim() : '';
 }
 
+function normalizeVisibleTeacherNote(value?: string | null) {
+  return (value || '')
+    .split(/\r?\n/u)
+    .map((line) => line.trim())
+    .filter(Boolean)
+    .join(' ');
+}
+
 function readNumber(value: unknown) {
   const parsed = Number(value);
   return Number.isFinite(parsed) ? parsed : 0;
@@ -245,7 +253,7 @@ function buildContentSummarySnippet(content: string) {
     .split('\n')
     .map((line) => line.trim())
     .filter(Boolean)
-    .filter((line) => !['오늘 관찰', '교육학적 해석', '내일 코칭', '가정 연계 팁'].includes(line));
+    .filter((line) => !['오늘 관찰', '선생님 코멘트', '교사 코멘트', '선생님 메모', '교육학적 해석', '내일 코칭', '가정 연계 팁'].includes(line));
 
   const flattened = cleaned
     .join(' ')
@@ -266,6 +274,18 @@ function buildContentSummarySnippet(content: string) {
 
   const joined = deduped.slice(0, 2).join(' ').trim() || deduped[0] || flattened;
   return joined.length > 72 ? `${joined.slice(0, 71).trimEnd()}…` : joined;
+}
+
+function isTeacherNoteSection(section: string) {
+  const title = section.split('\n')[0]?.replace(/^[^\s]+\s/u, '').trim() || '';
+  return title.includes('선생님 코멘트') || title.includes('교사 코멘트') || title.includes('선생님 메모');
+}
+
+function extractTeacherNoteFromSections(sections: string[]) {
+  const section = sections.find(isTeacherNoteSection);
+  if (!section) return '';
+
+  return normalizeVisibleTeacherNote(section.split('\n').slice(1).join('\n'));
 }
 
 function toCompactCopy(value?: string | null, maxLength = 92) {
@@ -673,6 +693,38 @@ function ReportActionBoard({
   );
 }
 
+function TeacherWrittenNoteCard({
+  note,
+  displayHeadingsOnly = false,
+  compactMode = false,
+}: {
+  note: string;
+  displayHeadingsOnly?: boolean;
+  compactMode?: boolean;
+}) {
+  if (!note) return null;
+
+  return (
+    <Card className="overflow-hidden rounded-[1.5rem] border border-amber-100 bg-amber-50/70 shadow-sm">
+      <CardHeader className={cn('border-b border-amber-100/70 pb-3', compactMode ? 'p-4 pb-2' : 'p-5 pb-3')}>
+        <div className="flex items-center gap-2">
+          <div className="rounded-2xl bg-white p-2 text-amber-600 shadow-sm">
+            <MessageCircle className="h-4 w-4" />
+          </div>
+          <span className={cn('text-sm font-black tracking-tight text-amber-900', displayHeadingsOnly && 'font-aggro-display')}>
+            선생님 코멘트
+          </span>
+        </div>
+      </CardHeader>
+      <CardContent className={cn(compactMode ? 'p-4 pt-3' : 'p-5 pt-4')}>
+        <p className="whitespace-pre-wrap break-keep text-sm font-black leading-relaxed text-slate-900">
+          {note}
+        </p>
+      </CardContent>
+    </Card>
+  );
+}
+
 function MiniTrendChart({
   aiMeta,
   displayHeadingsOnly = false,
@@ -1052,6 +1104,7 @@ export function VisualReportViewer({
   aiMeta,
   dateKey,
   studentName,
+  teacherNote,
   displayHeadingsOnly = false,
   compactMode = false,
 }: {
@@ -1059,6 +1112,7 @@ export function VisualReportViewer({
   aiMeta?: DailyReport['aiMeta'] | null;
   dateKey?: string;
   studentName?: string;
+  teacherNote?: string | null;
   displayHeadingsOnly?: boolean;
   compactMode?: boolean;
 }) {
@@ -1069,6 +1123,14 @@ export function VisualReportViewer({
     const parts = content.split(/(?=🕒|✅|📊|💬|🧠)/g);
     return parts.map((part) => part.trim()).filter(Boolean);
   }, [content]);
+  const contentHasTeacherNoteSection = useMemo(
+    () => sections.some(isTeacherNoteSection),
+    [sections]
+  );
+  const visibleTeacherNote = useMemo(
+    () => normalizeVisibleTeacherNote(teacherNote) || extractTeacherNoteFromSections(sections),
+    [teacherNote, sections]
+  );
 
   const overallSummary = useMemo(
     () => buildOverallSummary({ aiMeta: normalizedAiMeta, studentName, dateKey, content }),
@@ -1137,6 +1199,14 @@ export function VisualReportViewer({
             )}
           </CardContent>
         </Card>
+      )}
+
+      {visibleTeacherNote && (compactMode || !contentHasTeacherNoteSection) && (
+        <TeacherWrittenNoteCard
+          note={visibleTeacherNote}
+          displayHeadingsOnly={displayHeadingsOnly}
+          compactMode={compactMode}
+        />
       )}
 
       {normalizedAiMeta && (

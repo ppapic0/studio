@@ -91,6 +91,7 @@ export function ReportNotifier() {
             aiMeta={notification.aiMeta || null}
             dateKey={typeof notification.dateKey === 'string' ? notification.dateKey : undefined}
             studentName={typeof notification.studentName === 'string' ? notification.studentName : undefined}
+            teacherNote={typeof notification.teacherNote === 'string' ? notification.teacherNote : null}
             compactMode
           />
         </div>

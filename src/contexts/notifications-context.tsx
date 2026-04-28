@@ -14,6 +14,7 @@ export type ReportItem = {
   studentName?: string;
   status?: string;
   content?: string;
+  teacherNote?: string | null;
   aiMeta?: DailyReport['aiMeta'] | null;
   viewedAt?: { toDate?: () => Date } | null;
   viewedByUid?: string;

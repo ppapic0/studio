@@ -3832,6 +3832,7 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
                       aiMeta={selectedTeacherReport.aiMeta}
                       dateKey={selectedTeacherReport.dateKey}
                       studentName={selectedTeacherReport.studentName}
+                      teacherNote={selectedTeacherReport.teacherNote}
                       compactMode
                     />
                   </div>

@@ -1583,6 +1583,7 @@ export default function StudyHistoryPage() {
                       aiMeta={dailyReport.aiMeta}
                       dateKey={dailyReport.dateKey}
                       studentName={dailyReport.studentName}
+                      teacherNote={dailyReport?.teacherNote}
                       compactMode
                     />
                   ) : (
@@ -1928,6 +1929,7 @@ export default function StudyHistoryPage() {
                       aiMeta={legacyReportAiMeta}
                       dateKey={legacyReportDateKey}
                       studentName={legacyReportStudentName}
+                      teacherNote={dailyReport?.teacherNote}
                       compactMode
                     />
                   ) : (

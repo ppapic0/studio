@@ -5827,6 +5827,7 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
                     aiMeta={selectedRecentReport.aiMeta}
                     dateKey={selectedRecentReport.dateKey}
                     studentName={selectedRecentReport.studentName}
+                    teacherNote={selectedRecentReport.teacherNote}
                   />
                 </div>
               </div>
@@ -6814,6 +6815,7 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
                                           aiMeta={selectedReportPreview.aiMeta}
                                           dateKey={selectedReportPreview.dateKey}
                                           studentName={selectedStudentName}
+                                          teacherNote={selectedReportPreview.teacherNote}
                                         />
                                       </div>
                                     </div>

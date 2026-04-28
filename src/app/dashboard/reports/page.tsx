@@ -73,7 +73,7 @@ type AttendanceRecordDoc = {
 };
 
 const MAX_RECENT_REPORT_HISTORY = 7;
-const REPORT_SECTION_HEADINGS = new Set(['오늘 관찰', '교육학적 해석', '내일 코칭', '가정 연계 팁']);
+const REPORT_SECTION_HEADINGS = new Set(['오늘 관찰', '선생님 코멘트', '교사 코멘트', '선생님 메모', '교육학적 해석', '내일 코칭', '가정 연계 팁']);
 
 type ReportStudyLogSummary = {
   hasStudyRecord: boolean;
@@ -1009,6 +1009,7 @@ export default function DailyReportsPage() {
                         aiMeta={aiReportMeta}
                         dateKey={dateKey}
                         studentName={selectedStudent?.name}
+                        teacherNote={teacherNote}
                         compactMode
                       />
                     ) : (

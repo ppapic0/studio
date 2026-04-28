@@ -5082,6 +5082,7 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
                       aiMeta={selectedChildReport.aiMeta}
                       dateKey={selectedChildReport.dateKey}
                       studentName={selectedChildReport.studentName}
+                      teacherNote={selectedChildReport.teacherNote}
                       displayHeadingsOnly
                       compactMode
                     />
