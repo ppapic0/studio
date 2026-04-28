@@ -6894,6 +6894,10 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
       adminEditedAt: savedAt,
       adminEditedByUid: editorUid,
       adminEditedByName: editorName,
+      adminDirectEditNoPenalty: true,
+      penaltyApplied: false,
+      penaltyPointsDelta: 0,
+      penaltyWaived: true,
       sameDayAdminEditPenaltyWaived: true,
       updatedAt: savedAt,
     };
@@ -6924,6 +6928,10 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
           scheduleEditedByAdminAt: savedAt,
           scheduleEditedByAdminUid: editorUid,
           scheduleEditPenaltyWaived: true,
+          adminDirectEditNoPenalty: true,
+          penaltyApplied: false,
+          penaltyPointsDelta: 0,
+          penaltyWaived: true,
           routineMissingAtCheckIn: deleteField(),
           routineMissingPenaltyApplied: deleteField(),
           updatedAt: savedAt,
@@ -6945,6 +6953,10 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
           scheduleEditedByAdminAt: savedAt,
           scheduleEditedByAdminUid: editorUid,
           scheduleEditPenaltyWaived: true,
+          adminDirectEditNoPenalty: true,
+          penaltyApplied: false,
+          penaltyPointsDelta: 0,
+          penaltyWaived: true,
           updatedAt: savedAt,
         },
         { merge: true }
@@ -6979,7 +6991,7 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
         title: '오늘 일정을 저장했습니다.',
         description: waivedRoutinePenaltyPoints > 0
           ? `${studentName} 학생 일정과 루틴 미작성 벌점 ${waivedRoutinePenaltyPoints}점을 함께 정리했습니다.`
-          : `${studentName} 학생의 등하원·외출 일정을 반영했습니다.`,
+          : `${studentName} 학생의 등하원·외출 일정을 벌점 없이 반영했습니다.`,
       });
     } catch (error) {
       logHandledClientIssue('[admin-dashboard] focus schedule save failed', error);
@@ -10192,6 +10204,11 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
                       </Button>
                     </div>
                   </div>
+                  {canEditFocusSchedule ? (
+                    <div className="mt-3 rounded-[1.15rem] border border-[#CDEFD9] bg-emerald-50 px-3 py-2 text-[11px] font-black leading-5 text-emerald-800">
+                      아래 오늘 등원 일정/하원 일정 카드를 눌러 바로 수정할 수 있습니다. 센터관리자 직접 수정은 벌점을 부여하지 않습니다.
+                    </div>
+                  ) : null}
 
                   <div className="mt-4 rounded-2xl border border-[#DCE7FF] bg-[#F7FAFF] p-3">
                     <div className="flex flex-wrap items-center justify-between gap-2">
@@ -10321,18 +10338,40 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
                   </div>
 
                   <div className="mt-4 grid gap-3 sm:grid-cols-3">
-                    <div className="min-w-0 rounded-2xl border border-[#DCE7FF] bg-[#F7FAFF] p-3">
-                      <p className="text-[10px] font-black uppercase tracking-[0.14em] text-[#5C6E97]">오늘 등원 일정</p>
+                    <button
+                      type="button"
+                      disabled={!canEditFocusSchedule || isFocusScheduleSaving}
+                      onClick={openFocusScheduleDialog}
+                      className="group min-w-0 rounded-2xl border border-[#DCE7FF] bg-[#F7FAFF] p-3 text-left transition hover:border-[#FF7A16]/45 hover:bg-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#FF7A16]/30 disabled:cursor-not-allowed disabled:opacity-70"
+                    >
+                      <div className="flex items-center justify-between gap-2">
+                        <p className="text-[10px] font-black uppercase tracking-[0.14em] text-[#5C6E97]">오늘 등원 일정</p>
+                        {canEditFocusSchedule ? <Settings2 className="h-3.5 w-3.5 shrink-0 text-[#FF7A16]" /> : null}
+                      </div>
                       <p className="mt-2 truncate text-base font-black text-[#14295F]">{selectedFocusOperationsSummary.plannedArrival}</p>
-                    </div>
+                      {canEditFocusSchedule ? (
+                        <p className="mt-1 truncate text-[10px] font-black text-[#C95A08]">눌러서 수정 · 벌점 없음</p>
+                      ) : null}
+                    </button>
                     <div className="min-w-0 rounded-2xl border border-[#DCE7FF] bg-[#F7FAFF] p-3">
                       <p className="text-[10px] font-black uppercase tracking-[0.14em] text-[#5C6E97]">오늘 최초입실</p>
                       <p className="mt-2 truncate text-base font-black text-[#14295F]">{selectedFocusOperationsSummary.firstCheckInLabel}</p>
                     </div>
-                    <div className="min-w-0 rounded-2xl border border-[#DCE7FF] bg-[#F7FAFF] p-3">
-                      <p className="text-[10px] font-black uppercase tracking-[0.14em] text-[#5C6E97]">오늘 하원 일정</p>
+                    <button
+                      type="button"
+                      disabled={!canEditFocusSchedule || isFocusScheduleSaving}
+                      onClick={openFocusScheduleDialog}
+                      className="group min-w-0 rounded-2xl border border-[#DCE7FF] bg-[#F7FAFF] p-3 text-left transition hover:border-[#FF7A16]/45 hover:bg-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#FF7A16]/30 disabled:cursor-not-allowed disabled:opacity-70"
+                    >
+                      <div className="flex items-center justify-between gap-2">
+                        <p className="text-[10px] font-black uppercase tracking-[0.14em] text-[#5C6E97]">오늘 하원 일정</p>
+                        {canEditFocusSchedule ? <Settings2 className="h-3.5 w-3.5 shrink-0 text-[#FF7A16]" /> : null}
+                      </div>
                       <p className="mt-2 truncate text-base font-black text-[#14295F]">{selectedFocusOperationsSummary.plannedDeparture}</p>
-                    </div>
+                      {canEditFocusSchedule ? (
+                        <p className="mt-1 truncate text-[10px] font-black text-[#C95A08]">눌러서 수정 · 벌점 없음</p>
+                      ) : null}
+                    </button>
                     <div className="min-w-0 rounded-2xl border border-[#FFD7BA] bg-[#FFF8F2] p-3">
                       <p className="text-[10px] font-black uppercase tracking-[0.14em] text-[#C95A08]">오늘 외출 시간</p>
                       <p className="mt-2 truncate text-base font-black text-[#14295F]">{selectedFocusOperationsSummary.latestAwayStartLabel}</p>
