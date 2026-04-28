@@ -8464,9 +8464,45 @@ async function rejectKioskQueueItemAsStale(params) {
         staleReason: params.reason,
         currentStatus: params.currentStatus,
         expectedStatus: params.expectedStatus,
+        confirmedStatus: params.currentStatus,
         completedAt: admin.firestore.FieldValue.serverTimestamp(),
         updatedAt: admin.firestore.FieldValue.serverTimestamp(),
     }, { merge: true });
+}
+async function completeKioskQueueItemAsAlreadyApplied(params) {
+    const verification = await verifyKioskAttendanceQueueResult({
+        db: params.db,
+        centerId: params.centerId,
+        studentId: params.studentId,
+        seatId: params.seatId,
+        expectedStatus: params.nextStatus,
+    });
+    if (!verification.verified) {
+        return false;
+    }
+    await params.db.doc(`centers/${params.centerId}/kioskAttendanceQueue/${params.actionId}`).set({
+        status: "completed",
+        verified: true,
+        confirmedSeatId: verification.confirmedSeatId,
+        confirmedStatus: verification.confirmedStatus,
+        confirmedStudentId: verification.confirmedStudentId,
+        completedAt: admin.firestore.FieldValue.serverTimestamp(),
+        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        result: {
+            alreadyApplied: true,
+            action: params.action,
+            previousStatus: params.currentStatus,
+            expectedStatus: params.expectedStatus,
+            nextStatus: params.nextStatus,
+            eventType: null,
+            eventId: null,
+            eventAtMillis: null,
+            sessionDateKey: null,
+            sessionMinutes: 0,
+        },
+        verification,
+    }, { merge: true });
+    return true;
 }
 async function verifyKioskAttendanceQueueResult(params) {
     const seatDoc = await resolveAttendanceSeatDocForTransition({
@@ -8591,8 +8627,25 @@ async function processKioskAttendanceQueueItem(db, centerId, actionId) {
         if (!action || !expectedStatus) {
             throw new functions.https.HttpsError("invalid-argument", "Invalid kiosk queue action payload.");
         }
+        const nextStatus = getKioskActionNextStatus(action);
         const current = await resolveKioskQueueSeatStatus({ db, centerId, studentId, seatId });
         if (current.status !== expectedStatus) {
+            if (current.status === nextStatus) {
+                const alreadyApplied = await completeKioskQueueItemAsAlreadyApplied({
+                    db,
+                    centerId,
+                    actionId,
+                    studentId,
+                    seatId: current.seatId || seatId,
+                    action,
+                    expectedStatus,
+                    nextStatus,
+                    currentStatus: current.status,
+                });
+                if (alreadyApplied) {
+                    return;
+                }
+            }
             await rejectKioskQueueItemAsStale({
                 db,
                 centerId,
@@ -8614,7 +8667,6 @@ async function processKioskAttendanceQueueItem(db, centerId, actionId) {
             });
             return;
         }
-        const nextStatus = getKioskActionNextStatus(action);
         const result = await applyAttendanceStatusTransition({
             db,
             centerId,

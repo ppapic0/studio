@@ -251,41 +251,77 @@ async function verifyKioskSeatStatus(params: {
   firestore: Firestore | null;
   payload: EnqueueKioskAttendanceActionInput;
   expectedStatus: AttendanceStatus;
+  seatId?: string | null;
 }): Promise<{
   verified: boolean;
   confirmedStatus?: AttendanceStatus;
   confirmedSeatId?: string;
 }> {
-  if (!params.firestore || !params.payload.seatId) {
+  if (!params.firestore) {
     return { verified: false };
   }
 
-  const seatSnap = await getDoc(doc(
-    params.firestore,
-    'centers',
-    params.payload.centerId,
-    'attendanceCurrent',
-    params.payload.seatId
-  ));
-  if (!seatSnap.exists()) {
-    return { verified: false, confirmedSeatId: params.payload.seatId };
+  const readSeatStatus = async (seatId: string) => {
+    const seatSnap = await getDoc(doc(
+      params.firestore!,
+      'centers',
+      params.payload.centerId,
+      'attendanceCurrent',
+      seatId
+    ));
+    if (!seatSnap.exists()) {
+      return { verified: false, confirmedSeatId: seatId };
+    }
+
+    const seatData = seatSnap.data() as Partial<AttendanceCurrent>;
+    if (seatData.studentId && seatData.studentId !== params.payload.studentId) {
+      return {
+        verified: false,
+        confirmedSeatId: seatSnap.id,
+        confirmedStatus: normalizeStatus(seatData.status),
+      };
+    }
+
+    const confirmedStatus = normalizeStatus(seatData.status);
+    return {
+      verified: confirmedStatus === params.expectedStatus,
+      confirmedSeatId: seatSnap.id,
+      confirmedStatus,
+    };
+  };
+
+  const candidateSeatId = params.seatId || params.payload.seatId || '';
+  if (candidateSeatId) {
+    const directResult = await readSeatStatus(candidateSeatId);
+    if (directResult.verified) {
+      return directResult;
+    }
   }
 
-  const seatData = seatSnap.data() as Partial<AttendanceCurrent>;
-  if (seatData.studentId && seatData.studentId !== params.payload.studentId) {
+  const seatsSnap = await getDocs(query(
+    collection(params.firestore, 'centers', params.payload.centerId, 'attendanceCurrent'),
+    where('studentId', '==', params.payload.studentId),
+    limit(10)
+  ));
+  const seats = seatsSnap.docs.map((docSnap) => {
+    const data = docSnap.data() as AttendanceCurrent;
     return {
-      verified: false,
-      confirmedSeatId: seatSnap.id,
-      confirmedStatus: normalizeStatus(seatData.status),
+      ...data,
+      id: docSnap.id,
+      studentId: data.studentId || params.payload.studentId,
+      status: normalizeStatus(data.status),
+    };
+  });
+  const matchingSeat = seats.find((seat) => seat.status === params.expectedStatus) || pickPreferredSeat(seats);
+  if (matchingSeat) {
+    return {
+      verified: matchingSeat.status === params.expectedStatus,
+      confirmedSeatId: matchingSeat.id,
+      confirmedStatus: matchingSeat.status,
     };
   }
 
-  const confirmedStatus = normalizeStatus(seatData.status);
-  return {
-    verified: confirmedStatus === params.expectedStatus,
-    confirmedSeatId: seatSnap.id,
-    confirmedStatus,
-  };
+  return { verified: false, confirmedSeatId: candidateSeatId || undefined };
 }
 
 export default function KioskPage() {
@@ -599,10 +635,13 @@ export default function KioskPage() {
         seatHint: payload.seatHint || undefined,
         source: 'kiosk',
       });
+      const directResultData = directResult.data as { seatId?: unknown };
+      const directResultSeatId = typeof directResultData?.seatId === 'string' ? directResultData.seatId : null;
       const verified = await verifyKioskSeatStatus({
         firestore,
         payload,
         expectedStatus: nextStatus,
+        seatId: directResultSeatId || payload.seatId,
       });
 
       if (!verified.verified) {
@@ -701,6 +740,7 @@ export default function KioskPage() {
     }
 
     const config = ACTIONS[action];
+    const nextStatus = getNextStatusForAction(action);
     pendingActionRef.current = true;
     setActionProcessingLabel(`${config.label} 처리 중`);
 
@@ -722,7 +762,9 @@ export default function KioskPage() {
 
     try {
       const result = await sendActionToBackend(payload);
-      if (result.status !== 'completed') {
+      const confirmedStatus = result.confirmedStatus ? normalizeStatus(result.confirmedStatus) : undefined;
+      const isAlreadyApplied = Boolean(confirmedStatus && confirmedStatus === nextStatus);
+      if (result.status !== 'completed' && !isAlreadyApplied) {
         toast({
           variant: result.status === 'failed' || result.status === 'rejected_stale' ? 'destructive' : 'default',
           title: result.status === 'failed' || result.status === 'rejected_stale' ? '처리 실패' : '전송 대기 중',
