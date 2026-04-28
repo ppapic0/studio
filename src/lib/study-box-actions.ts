@@ -17,12 +17,26 @@ type OpenStudyRewardBoxSecureInput = {
 };
 
 type OpenStudyRewardBoxCallableInput = Pick<OpenStudyRewardBoxSecureInput, 'centerId' | 'dateKey' | 'hour'>;
+type OpenStudyRewardBoxesCallableInput = {
+  centerId: string;
+  dateKey: string;
+  hours: number[];
+};
 
 export type OpenStudyRewardBoxSecureResult = {
   ok?: boolean;
   opened?: boolean;
   alreadyOpened?: boolean;
   reward?: StudyBoxReward;
+  openedStudyBoxes?: number[];
+  claimedStudyBoxes?: number[];
+  pointsBalance?: number;
+  totalPointsEarned?: number;
+};
+
+export type OpenStudyRewardBoxesSecureResult = {
+  ok?: boolean;
+  rewards?: StudyBoxReward[];
   openedStudyBoxes?: number[];
   claimedStudyBoxes?: number[];
   pointsBalance?: number;
@@ -41,6 +55,25 @@ export async function openStudyRewardBoxSecure(
     centerId: input.centerId,
     dateKey: input.dateKey,
     hour: input.hour,
+  });
+  return result.data || {};
+}
+
+export async function openStudyRewardBoxesSecure(input: {
+  centerId: string;
+  studentId: string;
+  dateKey: string;
+  hours: number[];
+}): Promise<OpenStudyRewardBoxesSecureResult> {
+  const { functions } = initializeFirebase();
+  const callable = httpsCallable<OpenStudyRewardBoxesCallableInput, OpenStudyRewardBoxesSecureResult>(
+    functions,
+    'openStudyRewardBoxesSecure'
+  );
+  const result = await callable({
+    centerId: input.centerId,
+    dateKey: input.dateKey,
+    hours: input.hours,
   });
   return result.data || {};
 }

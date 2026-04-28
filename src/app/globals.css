@@ -4785,7 +4785,7 @@ select {
 }
 
 .point-box-reward.is-visible {
-  animation: point-box-reward-pop 420ms cubic-bezier(0.22, 1, 0.36, 1) forwards;
+  animation: point-box-reward-pop 560ms cubic-bezier(0.22, 1, 0.36, 1) forwards;
 }
 
 .point-box-reward-value {
@@ -4842,20 +4842,20 @@ select {
 
 .point-box-scene.is-opening .point-box {
   animation:
-    point-box-tap 180ms ease-out forwards,
-    point-box-burst-rise 760ms cubic-bezier(0.16, 1, 0.3, 1) 180ms forwards;
+    point-box-tap 240ms ease-out forwards,
+    point-box-burst-rise 960ms cubic-bezier(0.16, 1, 0.3, 1) 240ms forwards;
 }
 
 .point-box-scene.is-opening .point-box-lid {
-  animation: point-box-lid-open 760ms cubic-bezier(0.18, 1, 0.3, 1) 180ms forwards;
+  animation: point-box-lid-open 960ms cubic-bezier(0.18, 1, 0.3, 1) 240ms forwards;
 }
 
 .point-box-scene.is-opening .point-box-light {
-  animation: point-box-light-bloom 760ms ease-out 200ms forwards;
+  animation: point-box-light-bloom 960ms ease-out 260ms forwards;
 }
 
 .point-box-scene.is-opening .point-box-particle {
-  animation: point-box-particle-rise 760ms cubic-bezier(0.18, 1, 0.3, 1) 220ms forwards;
+  animation: point-box-particle-rise 960ms cubic-bezier(0.18, 1, 0.3, 1) 280ms forwards;
 }
 
 .point-box-scene.is-revealed .point-box-light {
@@ -5908,24 +5908,24 @@ select {
 }
 
 .point-track-hero-box--shake .point-track-box-figure__shell {
-  animation: point-track-box-shake 0.42s ease-in-out both;
+  animation: point-track-box-shake 0.52s ease-in-out both;
 }
 
 .point-track-hero-box--shake .point-track-box-figure__shadow {
-  animation: point-track-box-shadow-shake 0.42s ease-in-out both;
+  animation: point-track-box-shadow-shake 0.52s ease-in-out both;
 }
 
 .point-track-hero-box--burst .point-track-box-figure__glow {
-  animation: point-track-box-burst 0.62s ease-out both;
+  animation: point-track-box-burst 0.78s ease-out both;
 }
 
 .point-track-hero-box--burst .point-track-box-figure__lid {
-  animation: point-track-box-lid-open 0.65s ease-out forwards;
+  animation: point-track-box-lid-open 0.82s ease-out forwards;
   transform-origin: center top;
 }
 
 .point-track-hero-box--revealed .point-track-box-figure__glow {
-  animation: point-track-box-revealed 0.5s ease-out forwards;
+  animation: point-track-box-revealed 0.64s ease-out forwards;
 }
 
 .point-track-slot {
@@ -6352,7 +6352,7 @@ select {
 }
 
 .point-track-modal-particle--visible {
-  animation: point-track-particle-burst 0.78s ease-out both;
+  animation: point-track-particle-burst 0.96s ease-out both;
 }
 
 .point-track-modal-particle:nth-child(1) { transform: translate(-50%, -50%) rotate(0deg) translateY(-3.3rem); }
@@ -6364,7 +6364,7 @@ select {
 .point-track-modal-particle:nth-child(7) { transform: translate(-50%, -50%) rotate(315deg) translateY(-3.35rem); }
 
 .point-track-reward-burst {
-  animation: point-track-reward-pop 0.22s ease-out both;
+  animation: point-track-reward-pop 0.34s ease-out both;
 }
 
 @keyframes point-track-box-float {

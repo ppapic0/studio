@@ -72,12 +72,12 @@ import {
 } from '@/lib/student-rewards';
 import { getCurrentStudyDayLiveSeconds, getStudyDayContext, hasStudyBoxCarryoverExpired } from '@/lib/study-day';
 import { readStudyBoxOpenedCache, writeStudyBoxOpenedCache } from '@/lib/study-box-opened-cache';
-import { openStudyRewardBoxSecure } from '@/lib/study-box-actions';
+import { openStudyRewardBoxesSecure } from '@/lib/study-box-actions';
 import { GiftishowOrder, GiftishowProduct, GiftishowSettings, GrowthProgress, PointBoostEvent, StudyLogDay } from '@/lib/types';
 import { cn } from '@/lib/utils';
 
-const REWARD_BOX_BURST_DELAY_MS = 120;
-const REWARD_TEXT_REVEAL_DELAY_MS = 220;
+const REWARD_BOX_BURST_DELAY_MS = 420;
+const REWARD_TEXT_REVEAL_DELAY_MS = 620;
 const POINT_BREAKDOWN_CHIP_CLASS = {
   box: 'bg-[#FFF3E2] text-[#915A1E]',
   rank: 'bg-[#EAF1FF] text-[#3357A5]',
@@ -446,6 +446,8 @@ export default function GrowthPage() {
   const liveClaimKeyRef = useRef<string | null>(null);
   const activeRevealTokenRef = useRef(0);
   const openingBoxHoursRef = useRef<Set<number>>(new Set());
+  const pendingBoxOpenHoursRef = useRef<Map<string, Set<number>>>(new Map());
+  const isFlushingBoxOpensRef = useRef(false);
   const [hydratedClaimCacheKey, setHydratedClaimCacheKey] = useState<string | null>(null);
 
   const progressRef = useMemoFirebase(() => {
@@ -935,10 +937,6 @@ export default function GrowthPage() {
     : renderableTodayStudyBoxState.openedHours.length;
   const activeVaultDateKey = hasCarryoverReadyBoxes ? previousStudyDayKey : activeStudyDayKey;
   const activeRewardByHour = hasCarryoverReadyBoxes ? carryoverRewardByHour : rewardByHour;
-  const activeRewardEntries = hasCarryoverReadyBoxes ? persistedCarryoverRewardEntries : rewardEntries;
-  const activeClaimedBoxes = hasCarryoverReadyBoxes ? persistedCarryoverClaimedBoxes : claimedBoxes;
-  const activeOpenedBoxes = hasCarryoverReadyBoxes ? carryoverOpenedBoxes : openedBoxes;
-  const activeDayStatus = hasCarryoverReadyBoxes ? previousStudyDayStatus : todayStatus;
 
   const heroMode = totalAvailableBoxes > 0 ? 'ready' : isTimerActive ? 'studying' : 'idle';
   const heroPrimaryLabel =
@@ -1063,6 +1061,85 @@ export default function GrowthPage() {
     studentUid,
   ]);
 
+  const queuePendingBoxOpen = (dateKey: string, hour: number) => {
+    if (!dateKey || !Number.isFinite(hour)) return;
+    const normalizedHour = Math.max(1, Math.min(8, Math.round(hour)));
+    const pendingHours = pendingBoxOpenHoursRef.current.get(dateKey) ?? new Set<number>();
+    pendingHours.add(normalizedHour);
+    pendingBoxOpenHoursRef.current.set(dateKey, pendingHours);
+  };
+
+  const flushPendingBoxOpens = async () => {
+    if (isFlushingBoxOpensRef.current || !activeMembership?.id || !studentUid) return;
+    const batches = Array.from(pendingBoxOpenHoursRef.current.entries())
+      .map(([dateKey, hourSet]) => ({
+        dateKey,
+        hours: normalizeStudyBoxHours(Array.from(hourSet)),
+      }))
+      .filter((batch) => batch.dateKey && batch.hours.length > 0);
+
+    if (batches.length === 0) return;
+
+    isFlushingBoxOpensRef.current = true;
+    try {
+      for (const batch of batches) {
+        const result = await openStudyRewardBoxesSecure({
+          centerId: activeMembership.id,
+          studentId: studentUid,
+          dateKey: batch.dateKey,
+          hours: batch.hours,
+        });
+        const nextOpenedBoxes = Array.isArray(result.openedStudyBoxes)
+          ? normalizeStudyBoxHours(result.openedStudyBoxes)
+          : null;
+        const nextClaimedBoxes = Array.isArray(result.claimedStudyBoxes)
+          ? normalizeStudyBoxHours(result.claimedStudyBoxes)
+          : null;
+        const rewardEntries = Array.isArray(result.rewards) ? result.rewards : [];
+
+        if (batch.dateKey === activeStudyDayKey) {
+          if (nextOpenedBoxes) {
+            setOpenedBoxes(nextOpenedBoxes);
+            writeStudyBoxOpenedCache(studyBoxCacheUid, batch.dateKey, nextOpenedBoxes);
+          }
+          if (nextClaimedBoxes) {
+            setClaimedBoxes(nextClaimedBoxes);
+            writeStudyBoxHoursCache(claimCacheKey, nextClaimedBoxes);
+          }
+          if (rewardEntries.length > 0) {
+            setRewardEntries((prev) =>
+              rewardEntries.reduce((entries, reward) => upsertStudyBoxRewardEntry(entries, reward), prev)
+            );
+          }
+        } else if (nextOpenedBoxes) {
+          setCarryoverOpenedBoxes(nextOpenedBoxes);
+          writeStudyBoxOpenedCache(studyBoxCacheUid, batch.dateKey, nextOpenedBoxes);
+        }
+
+        if (typeof result.pointsBalance === 'number') {
+          setPointBalance((current) => Math.max(current, result.pointsBalance || 0));
+        }
+
+        const currentPendingHours = pendingBoxOpenHoursRef.current.get(batch.dateKey);
+        if (currentPendingHours) {
+          batch.hours.forEach((hour) => currentPendingHours.delete(hour));
+          if (currentPendingHours.size === 0) {
+            pendingBoxOpenHoursRef.current.delete(batch.dateKey);
+          }
+        }
+      }
+    } catch (error) {
+      console.error('[point-track] reward box batch open failed', error);
+      toast({
+        variant: 'destructive',
+        title: '상자 보상 저장 실패',
+        description: '화면에서는 열렸지만 서버 저장이 실패했어요. 잠시 후 보관함을 다시 열어 확인해 주세요.',
+      });
+    } finally {
+      isFlushingBoxOpensRef.current = false;
+    }
+  };
+
   const openVault = (hour?: number) => {
     if (totalAvailableBoxes <= 0) return;
     const targetHour = hour || readyBoxes[0]?.hour;
@@ -1086,6 +1163,7 @@ export default function GrowthPage() {
   const handleVaultChange = (open: boolean) => {
     setIsVaultOpen(open);
     if (!open) {
+      void flushPendingBoxOpens();
       resetRevealState();
       setSelectedBoxHour(null);
     }
@@ -1108,29 +1186,12 @@ export default function GrowthPage() {
     setRevealedReward(null);
     setBoxStage('shake');
 
-    const currentDayStatus = {
-      ...activeDayStatus,
-      claimedStudyBoxes: activeClaimedBoxes,
-      openedStudyBoxes: activeOpenedBoxes,
-      studyBoxRewards: activeRewardEntries,
-    };
-    const rewardOpenPromise = openStudyRewardBoxSecure({
+    const optimisticRewardEntry = activeRewardByHour.get(targetHour) || buildDeterministicStudyBoxReward({
       centerId: activeMembership.id,
       studentId: studentUid,
       dateKey: activeVaultDateKey,
-      hour: targetHour,
-      reward: activeRewardByHour.get(targetHour) || buildDeterministicStudyBoxReward({
-        centerId: activeMembership.id,
-        studentId: studentUid,
-        dateKey: activeVaultDateKey,
-        milestone: targetHour,
-      }),
-      dayStatus: currentDayStatus,
-      currentPointsBalance: pointBalance,
-      currentTotalPointsEarned: Number(progress?.totalPointsEarned || 0),
-    })
-      .then((result) => ({ ok: true as const, result }))
-      .catch((error) => ({ ok: false as const, error }));
+      milestone: targetHour,
+    });
 
     const shakeTimeout = setTimeout(() => {
       if (activeRevealTokenRef.current === revealToken) {
@@ -1140,7 +1201,8 @@ export default function GrowthPage() {
     timeoutsRef.current.push(shakeTimeout);
 
     const revealTimeout = setTimeout(() => {
-      const optimisticReward = activeRewardByHour.get(targetHour)?.awardedPoints ?? targetBox.reward ?? 0;
+      const optimisticReward = optimisticRewardEntry.awardedPoints ?? targetBox.reward ?? 0;
+      queuePendingBoxOpen(activeVaultDateKey, targetHour);
 
       if (activeVaultDateKey === activeStudyDayKey) {
         setOpenedBoxes((prev) => {
@@ -1148,6 +1210,12 @@ export default function GrowthPage() {
           writeStudyBoxOpenedCache(studyBoxCacheUid, activeStudyDayKey, nextOpenedBoxes);
           return nextOpenedBoxes;
         });
+        setClaimedBoxes((prev) => {
+          const nextClaimedBoxes = normalizeStudyBoxHours([...prev, targetHour]);
+          writeStudyBoxHoursCache(claimCacheKey, nextClaimedBoxes);
+          return nextClaimedBoxes;
+        });
+        setRewardEntries((prev) => upsertStudyBoxRewardEntry(prev, optimisticRewardEntry));
       } else {
         setCarryoverOpenedBoxes((prev) => {
           const nextOpenedBoxes = normalizeStudyBoxHours([...prev, targetHour]);
@@ -1169,68 +1237,6 @@ export default function GrowthPage() {
         }, 1800);
         timeoutsRef.current.push(clearFloating);
       }
-
-      void rewardOpenPromise.then((rewardResult) => {
-        if (!rewardResult.ok) throw rewardResult.error;
-        const result = rewardResult.result;
-        if (!Array.isArray(result.openedStudyBoxes) || !Array.isArray(result.claimedStudyBoxes)) {
-          throw new Error('Missing canonical study box state.');
-        }
-
-        const nextOpenedBoxes = result.openedStudyBoxes;
-        const nextClaimedBoxes = result.claimedStudyBoxes;
-        const nextRewardEntry = result.reward;
-        const reward =
-          nextRewardEntry?.awardedPoints
-          ?? activeRewardByHour.get(targetHour)?.awardedPoints
-          ?? targetBox.reward
-          ?? 0;
-
-        if (activeVaultDateKey === activeStudyDayKey) {
-          setOpenedBoxes(nextOpenedBoxes);
-          setClaimedBoxes(nextClaimedBoxes);
-          writeStudyBoxOpenedCache(studyBoxCacheUid, activeStudyDayKey, nextOpenedBoxes);
-          if (nextRewardEntry) {
-            setRewardEntries((prev) => upsertStudyBoxRewardEntry(prev, nextRewardEntry));
-          }
-        } else {
-          setCarryoverOpenedBoxes(nextOpenedBoxes);
-          writeStudyBoxOpenedCache(studyBoxCacheUid, activeVaultDateKey, nextOpenedBoxes);
-        }
-        if (typeof result.pointsBalance === 'number') {
-          setPointBalance((current) => Math.max(current, result.pointsBalance || 0));
-        }
-
-        if (activeRevealTokenRef.current === revealToken) {
-          setRevealedReward(reward);
-          setFloatingGain((current) => current ? { ...current, amount: reward } : current);
-        }
-      }).catch((error) => {
-        console.error('[point-track] reward box open failed', error);
-
-        if (activeVaultDateKey === activeStudyDayKey) {
-          setOpenedBoxes((prev) => {
-            const nextOpenedBoxes = normalizeStudyBoxHours(prev.filter((hour) => hour !== targetHour));
-            writeStudyBoxOpenedCache(studyBoxCacheUid, activeStudyDayKey, nextOpenedBoxes);
-            return nextOpenedBoxes;
-          });
-        } else {
-          setCarryoverOpenedBoxes((prev) => {
-            const nextOpenedBoxes = normalizeStudyBoxHours(prev.filter((hour) => hour !== targetHour));
-            writeStudyBoxOpenedCache(studyBoxCacheUid, activeVaultDateKey, nextOpenedBoxes);
-            return nextOpenedBoxes;
-          });
-        }
-
-        if (activeRevealTokenRef.current === revealToken) {
-          setBoxStage('idle');
-          setRevealedReward(null);
-          setFloatingGain(null);
-        }
-      }).finally(() => {
-        openingBoxHoursRef.current.delete(targetHour);
-        setOpeningBoxHours(Array.from(openingBoxHoursRef.current).sort((a, b) => a - b));
-      });
     }, REWARD_TEXT_REVEAL_DELAY_MS);
 
     timeoutsRef.current.push(revealTimeout);

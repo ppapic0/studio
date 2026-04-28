@@ -12316,6 +12316,278 @@ export const openStudyRewardBoxSecure = functions.region(region).https.onCall(as
   };
 });
 
+export const openStudyRewardBoxesSecure = functions.region(region).https.onCall(async (data, context) => {
+  const db = admin.firestore();
+
+  if (!context.auth?.uid) {
+    throw new functions.https.HttpsError("unauthenticated", "로그인이 필요합니다.");
+  }
+  const authUid = context.auth.uid;
+
+  const centerId = asTrimmedString(data?.centerId);
+  const dateKey = asTrimmedString(data?.dateKey);
+  const hours = normalizeStudyBoxHoursFromUnknown(data?.hours);
+
+  if (!centerId) {
+    throw new functions.https.HttpsError("invalid-argument", "centerId is required.", {
+      userMessage: "센터 정보를 다시 확인해 주세요.",
+    });
+  }
+  if (!isValidDateKey(dateKey)) {
+    throw new functions.https.HttpsError("invalid-argument", "Invalid dateKey.", {
+      userMessage: "상자 날짜 정보가 올바르지 않습니다.",
+    });
+  }
+  if (hours.length === 0) {
+    throw new functions.https.HttpsError("invalid-argument", "Invalid hours.", {
+      userMessage: "저장할 상자 정보를 다시 확인해 주세요.",
+    });
+  }
+
+  const membership = await resolveCenterMembershipRole(db, centerId, authUid);
+  if (membership.role !== "student" || !isActiveMembershipStatus(membership.status)) {
+    throw new functions.https.HttpsError("permission-denied", "Only active students can open study boxes.", {
+      userMessage: "학생 본인만 보상 상자를 열 수 있습니다.",
+    });
+  }
+
+  const studentIdentity = await resolveCenterStudentIdentity(db, centerId, authUid);
+  if (!studentIdentity) {
+    throw new functions.https.HttpsError("failed-precondition", "Student profile not found.", {
+      userMessage: "학생 정보를 찾지 못했습니다.",
+    });
+  }
+
+  const studentId = studentIdentity.studentId;
+  const studyDayRef = db.doc(`centers/${centerId}/studyLogs/${studentId}/days/${dateKey}`);
+  const progressRef = db.doc(`centers/${centerId}/growthProgress/${studentId}`);
+
+  const [studyDaySnap, attendanceSnap, progressSnap, sessionsSnap] = await Promise.all([
+    studyDayRef.get(),
+    db.collection(`centers/${centerId}/attendanceCurrent`).where("studentId", "==", studentId).limit(10).get(),
+    progressRef.get(),
+    studyDayRef.collection("sessions").orderBy("startTime", "asc").get(),
+  ]);
+
+  const studyDayData = (studyDaySnap.data() || {}) as Record<string, unknown>;
+  const persistedBaseDayMinutes = Math.max(
+    0,
+    Math.floor(
+      parseFiniteNumber(studyDayData.totalMinutes)
+      ?? parseFiniteNumber(studyDayData.totalStudyMinutes)
+      ?? 0
+    )
+  );
+  const persistedAdjustmentMinutes = Math.floor(parseFiniteNumber(studyDayData.manualAdjustmentMinutes) ?? 0);
+  const persistedDayMinutes = Math.max(0, persistedBaseDayMinutes + persistedAdjustmentMinutes);
+  const nowMs = Date.now();
+  const nowDate = new Date(nowMs);
+  const currentStudyDayKey = toStudyDayKey(nowDate);
+  const isCarryoverDate = dateKey !== currentStudyDayKey;
+  if (isCarryoverDate && hasStudyBoxCarryoverExpired(dateKey, nowDate)) {
+    throw new functions.https.HttpsError("failed-precondition", "Study box carryover expired.", {
+      userMessage: "전날 상자는 새벽 1시 30분까지만 열 수 있습니다. 오늘 상자를 새로 모아 주세요.",
+    });
+  }
+
+  const { startMs: studyDayStartMs, endMs: studyDayEndMs } = getStudyDayWindowBounds(dateKey);
+  let liveSessionDurationSeconds = 0;
+  let liveSessionStartMs = 0;
+
+  if (dateKey === currentStudyDayKey && !attendanceSnap.empty) {
+    const preferredAttendanceDoc = pickPreferredAttendanceSeatDoc(attendanceSnap.docs);
+    const attendanceData = preferredAttendanceDoc?.data() as Record<string, unknown> | undefined;
+    const attendanceStatus = asTrimmedString(attendanceData?.status);
+    const liveStartedAtMs = toMillisSafe(attendanceData?.lastCheckInAt);
+
+    if (
+      ACTIVE_STUDY_ATTENDANCE_STATUSES.has(attendanceStatus) &&
+      liveStartedAtMs > 0 &&
+      Number.isFinite(studyDayStartMs) &&
+      nowMs > liveStartedAtMs
+    ) {
+      const overlapMs = getTimeRangeOverlapMs(liveStartedAtMs, nowMs, studyDayStartMs, studyDayEndMs);
+      if (overlapMs > 0) {
+        liveSessionStartMs = Math.max(liveStartedAtMs, studyDayStartMs);
+        liveSessionDurationSeconds = Math.max(0, Math.floor(overlapMs / SECOND_MS));
+      }
+    }
+  }
+
+  const effectiveDaySeconds = Math.max(0, persistedDayMinutes * 60 + liveSessionDurationSeconds);
+  const earnedHours = Math.min(8, Math.floor(effectiveDaySeconds / 3600));
+  const preExistingProgress = progressSnap.exists ? (progressSnap.data() as Record<string, unknown>) : {};
+  const preExistingDailyPointStatus = isPlainObject(preExistingProgress.dailyPointStatus)
+    ? (preExistingProgress.dailyPointStatus as Record<string, unknown>)
+    : {};
+  const preExistingDayStatus = isPlainObject(preExistingDailyPointStatus[dateKey])
+    ? (preExistingDailyPointStatus[dateKey] as Record<string, unknown>)
+    : {};
+  const preExistingClaimedStudyBoxes = normalizeStudyBoxHoursFromUnknown(preExistingDayStatus.claimedStudyBoxes);
+  const preExistingOpenedStudyBoxes = resolveOpenedStudyBoxHoursFromDayStatus(preExistingDayStatus);
+
+  for (const hour of hours) {
+    const hasClaimedBoxRecord = preExistingClaimedStudyBoxes.includes(hour);
+    const alreadyOpenedByRecord = preExistingOpenedStudyBoxes.includes(hour);
+    const canOpenCarryoverByRecord = isCarryoverDate && hasClaimedBoxRecord;
+
+    if (!alreadyOpenedByRecord && !canOpenCarryoverByRecord && earnedHours < hour) {
+      throw new functions.https.HttpsError("failed-precondition", "Study time milestone not reached.", {
+        userMessage: "아직 이 상자를 열 수 있는 공부시간이 채워지지 않았습니다.",
+      });
+    }
+  }
+
+  const rewardPlans = hours.map((hour) => ({
+    hour,
+    baseReward: buildDeterministicStudyBoxReward({
+      centerId,
+      studentId,
+      dateKey,
+      milestone: hour,
+    }),
+    earnedAtMs: resolveStudyBoxMilestoneEarnedAtMs({
+      milestone: hour,
+      persistedDayMinutes,
+      sessionDocs: sessionsSnap.docs,
+      liveSessionStartMs,
+      liveSessionDurationSeconds,
+    }),
+  }));
+  const shouldCheckPointBoost = rewardPlans.some((plan) => typeof plan.earnedAtMs === "number" && plan.earnedAtMs > 0);
+  const pointBoostDocs = shouldCheckPointBoost ? await listPointBoostEventDocs(db, centerId) : [];
+  const resolvedRewardPlans = rewardPlans.map((plan) => {
+    const earnedAtMs = typeof plan.earnedAtMs === "number" && plan.earnedAtMs > 0 ? plan.earnedAtMs : null;
+    const matchedBoostDoc = earnedAtMs
+      ? pointBoostDocs.find((docSnap) => isPointBoostEventActiveAt(docSnap.data(), earnedAtMs)) ?? null
+      : null;
+    const matchedBoostEvent = matchedBoostDoc?.data() as PointBoostEventDoc | undefined;
+    const boostMultiplier = matchedBoostEvent ? matchedBoostEvent.multiplier : 1;
+    const boostEventId = matchedBoostEvent ? matchedBoostDoc?.id ?? null : null;
+    const reward = {
+      ...plan.baseReward,
+      awardedPoints: Math.max(0, Math.round(plan.baseReward.basePoints * boostMultiplier)),
+      multiplier: boostMultiplier,
+      earnedAt: earnedAtMs ? new Date(earnedAtMs).toISOString() : null,
+      boostEventId,
+    };
+
+    return {
+      ...plan,
+      earnedAtMs,
+      boostMultiplier,
+      boostEventId,
+      reward,
+    };
+  });
+
+  const result = await db.runTransaction(async (transaction) => {
+    const latestProgressSnap = await transaction.get(progressRef);
+    const progressData = latestProgressSnap.exists ? (latestProgressSnap.data() as Record<string, unknown>) : {};
+    const dailyPointStatus = isPlainObject(progressData.dailyPointStatus)
+      ? (progressData.dailyPointStatus as Record<string, unknown>)
+      : {};
+    const currentDayStatus = isPlainObject(dailyPointStatus[dateKey])
+      ? (dailyPointStatus[dateKey] as Record<string, unknown>)
+      : {};
+
+    let nextOpenedStudyBoxes = resolveOpenedStudyBoxHoursFromDayStatus(currentDayStatus);
+    let nextClaimedStudyBoxes = normalizeStudyBoxHoursFromUnknown(currentDayStatus.claimedStudyBoxes);
+    let nextRewardEntries = normalizeStudyBoxRewardEntries(currentDayStatus.studyBoxRewards);
+    let nextPointEvents = normalizeDailyPointEvents(currentDayStatus.pointEvents);
+    const initialAwardedTotal = getDailyAwardedPointTotal(currentDayStatus);
+    let awardedTotalDelta = 0;
+    const creditedRewards: SecureStudyBoxReward[] = [];
+
+    for (const plan of resolvedRewardPlans) {
+      const storedReward = nextRewardEntries.find((entry) => entry.milestone === plan.hour) ?? null;
+      const alreadyOpened = nextOpenedStudyBoxes.includes(plan.hour);
+      const rewardBase = storedReward ?? plan.baseReward;
+      const resolvedReward = alreadyOpened
+        ? (storedReward ?? plan.reward)
+        : {
+            ...rewardBase,
+            awardedPoints: Math.max(
+              0,
+              Math.round(Math.max(0, Math.floor(rewardBase.basePoints)) * plan.boostMultiplier)
+            ),
+            multiplier: plan.boostMultiplier,
+            earnedAt: plan.earnedAtMs ? new Date(plan.earnedAtMs).toISOString() : null,
+            boostEventId: plan.boostEventId,
+          };
+      const remainingDailyPoints = alreadyOpened
+        ? 0
+        : Math.max(0, DAILY_POINT_EARN_CAP - initialAwardedTotal - awardedTotalDelta);
+      const awardedDelta = alreadyOpened
+        ? 0
+        : Math.min(Math.max(0, Math.floor(resolvedReward.awardedPoints)), remainingDailyPoints);
+      const creditedReward = alreadyOpened
+        ? resolvedReward
+        : {
+            ...resolvedReward,
+            awardedPoints: awardedDelta,
+          };
+
+      nextOpenedStudyBoxes = normalizeStudyBoxHoursFromUnknown([...nextOpenedStudyBoxes, plan.hour]);
+      nextClaimedStudyBoxes = normalizeStudyBoxHoursFromUnknown([...nextClaimedStudyBoxes, plan.hour]);
+      nextRewardEntries = upsertStudyBoxRewardEntries(nextRewardEntries, creditedReward);
+      if (awardedDelta > 0) {
+        nextPointEvents = upsertDailyPointEvent(nextPointEvents, {
+          id: `study_box:${dateKey}:${plan.hour}`,
+          source: "study_box",
+          label: `${plan.hour}시간 상자`,
+          points: awardedDelta,
+          createdAt: new Date(nowMs).toISOString(),
+          hour: plan.hour,
+        });
+      }
+      awardedTotalDelta += awardedDelta;
+      creditedRewards.push(creditedReward);
+    }
+
+    const currentPointsBalance = Math.max(0, Math.floor(parseFiniteNumber(progressData.pointsBalance) ?? 0));
+    const currentTotalPointsEarned = Math.max(0, Math.floor(parseFiniteNumber(progressData.totalPointsEarned) ?? 0));
+
+    transaction.set(
+      progressRef,
+      {
+        pointsBalance: admin.firestore.FieldValue.increment(awardedTotalDelta),
+        totalPointsEarned: admin.firestore.FieldValue.increment(awardedTotalDelta),
+        dailyPointStatus: {
+          [dateKey]: {
+            ...currentDayStatus,
+            claimedStudyBoxes: nextClaimedStudyBoxes,
+            studyBoxRewards: nextRewardEntries,
+            openedStudyBoxes: nextOpenedStudyBoxes,
+            pointEvents: nextPointEvents,
+            dailyPointAmount: admin.firestore.FieldValue.increment(awardedTotalDelta),
+            updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+          },
+        },
+        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      },
+      { merge: true }
+    );
+
+    return {
+      claimedStudyBoxes: nextClaimedStudyBoxes,
+      openedStudyBoxes: nextOpenedStudyBoxes,
+      rewards: creditedRewards,
+      pointsBalance: currentPointsBalance + awardedTotalDelta,
+      totalPointsEarned: currentTotalPointsEarned + awardedTotalDelta,
+    };
+  });
+
+  return {
+    ok: true,
+    rewards: result.rewards,
+    claimedStudyBoxes: result.claimedStudyBoxes,
+    openedStudyBoxes: result.openedStudyBoxes,
+    pointsBalance: result.pointsBalance,
+    totalPointsEarned: result.totalPointsEarned,
+  };
+});
+
 function buildExpiredStudyBoxCarryoverStatusUpdate(dayStatus: Record<string, unknown>) {
   const claimedStudyBoxes = normalizeStudyBoxHoursFromUnknown(dayStatus.claimedStudyBoxes);
   if (claimedStudyBoxes.length === 0) return null;

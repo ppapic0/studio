@@ -33,8 +33,8 @@ var __importStar = (this && this.__importStar) || (function () {
     };
 })();
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.approveGiftishowOrderSecure = exports.reissueDailyRankingRewardV2Secure = exports.scheduledRankingRewardSettlement = exports.ensureCurrentUserMemberships = exports.scheduledOpenClawSnapshotExport = exports.generateOpenClawSnapshot = exports.refreshClassroomSignals = exports.stopStudentStudySessionSecure = exports.scheduledStudyBoxCarryoverExpiry = exports.openStudyRewardBoxSecure = exports.claimPlannerCompletionRewardSecure = exports.submitAttendanceRequestSecure = exports.applyPenaltyEventSecure = exports.adjustStudentPenaltyBalanceSecure = exports.adjustStudentPointBalanceSecure = exports.cancelPointBoostEventSecure = exports.createPointBoostEventSecure = exports.scheduledClassroomSignalsRefresh = exports.scheduledDailyRiskAlert = exports.repairRecentStudySessionTotals = exports.deleteManualStudySessionSecure = exports.updateManualStudySessionSecure = exports.createManualStudySessionSecure = exports.lookupKioskStudentsByPin = exports.setStudentAttendanceStatusSecure = exports.onSessionWritten = exports.onSessionCreated = exports.scheduledWeeklyReport = exports.cleanupOldDocuments = exports.scheduledAttendanceCheck = exports.runLateArrivalCheck = exports.sendPaymentReminderBatch = exports.notifyDailyReportReady = exports.notifyAttendanceSms = exports.scheduledSmsQueueDispatcher = exports.sendManualStudentSms = exports.updateSmsRecipientPreference = exports.cancelSmsQueueItem = exports.retrySmsQueueItem = exports.saveNotificationSettingsSecure = exports.confirmInvoicePayment = exports.completeSignupWithInvite = exports.redeemInviteCode = exports.createCounselingDemoBundle = exports.registerStudent = exports.updateStudentAccount = exports.deleteTeacherAccount = exports.deleteStudentAccount = exports.repairTodayAttendanceSmsQueue = exports.onAttendanceEventCreated = void 0;
-exports.generateStudyPlan = exports.syncGiftishowCatalogSecure = exports.scheduledGiftishowCatalogSync = exports.saveGiftishowSettingsSecure = exports.resendGiftishowOrderSecure = exports.rejectGiftishowOrderSecure = exports.reconcilePendingGiftishowOrders = exports.getGiftishowBizmoneySecure = exports.createGiftishowOrderRequestSecure = exports.cancelGiftishowOrderSecure = exports.cancelGiftishowSendFailSecure = void 0;
+exports.reissueDailyRankingRewardV2Secure = exports.scheduledRankingRewardSettlement = exports.ensureCurrentUserMemberships = exports.scheduledOpenClawSnapshotExport = exports.generateOpenClawSnapshot = exports.refreshClassroomSignals = exports.stopStudentStudySessionSecure = exports.scheduledStudyBoxCarryoverExpiry = exports.openStudyRewardBoxesSecure = exports.openStudyRewardBoxSecure = exports.claimPlannerCompletionRewardSecure = exports.submitAttendanceRequestSecure = exports.applyPenaltyEventSecure = exports.adjustStudentPenaltyBalanceSecure = exports.adjustStudentPointBalanceSecure = exports.cancelPointBoostEventSecure = exports.createPointBoostEventSecure = exports.scheduledClassroomSignalsRefresh = exports.scheduledDailyRiskAlert = exports.repairRecentStudySessionTotals = exports.deleteManualStudySessionSecure = exports.updateManualStudySessionSecure = exports.createManualStudySessionSecure = exports.lookupKioskStudentsByPin = exports.setStudentAttendanceStatusSecure = exports.onSessionWritten = exports.onSessionCreated = exports.scheduledWeeklyReport = exports.cleanupOldDocuments = exports.scheduledAttendanceCheck = exports.runLateArrivalCheck = exports.sendPaymentReminderBatch = exports.notifyDailyReportReady = exports.notifyAttendanceSms = exports.scheduledSmsQueueDispatcher = exports.sendManualStudentSms = exports.updateSmsRecipientPreference = exports.cancelSmsQueueItem = exports.retrySmsQueueItem = exports.saveNotificationSettingsSecure = exports.confirmInvoicePayment = exports.completeSignupWithInvite = exports.redeemInviteCode = exports.createCounselingDemoBundle = exports.registerStudent = exports.updateStudentAccount = exports.deleteTeacherAccount = exports.deleteStudentAccount = exports.repairTodayAttendanceSmsQueue = exports.onAttendanceEventCreated = void 0;
+exports.generateStudyPlan = exports.syncGiftishowCatalogSecure = exports.scheduledGiftishowCatalogSync = exports.saveGiftishowSettingsSecure = exports.resendGiftishowOrderSecure = exports.rejectGiftishowOrderSecure = exports.reconcilePendingGiftishowOrders = exports.getGiftishowBizmoneySecure = exports.createGiftishowOrderRequestSecure = exports.cancelGiftishowOrderSecure = exports.cancelGiftishowSendFailSecure = exports.approveGiftishowOrderSecure = void 0;
 const params_1 = require("firebase-functions/params");
 const functions = __importStar(require("firebase-functions"));
 const admin = __importStar(require("firebase-admin"));
@@ -9896,6 +9896,214 @@ exports.openStudyRewardBoxSecure = functions.region(region).https.onCall(async (
         opened: !result.alreadyOpened,
         alreadyOpened: result.alreadyOpened,
         reward: result.reward,
+        claimedStudyBoxes: result.claimedStudyBoxes,
+        openedStudyBoxes: result.openedStudyBoxes,
+        pointsBalance: result.pointsBalance,
+        totalPointsEarned: result.totalPointsEarned,
+    };
+});
+exports.openStudyRewardBoxesSecure = functions.region(region).https.onCall(async (data, context) => {
+    var _a, _b, _c, _d;
+    const db = admin.firestore();
+    if (!((_a = context.auth) === null || _a === void 0 ? void 0 : _a.uid)) {
+        throw new functions.https.HttpsError("unauthenticated", "로그인이 필요합니다.");
+    }
+    const authUid = context.auth.uid;
+    const centerId = asTrimmedString(data === null || data === void 0 ? void 0 : data.centerId);
+    const dateKey = asTrimmedString(data === null || data === void 0 ? void 0 : data.dateKey);
+    const hours = normalizeStudyBoxHoursFromUnknown(data === null || data === void 0 ? void 0 : data.hours);
+    if (!centerId) {
+        throw new functions.https.HttpsError("invalid-argument", "centerId is required.", {
+            userMessage: "센터 정보를 다시 확인해 주세요.",
+        });
+    }
+    if (!isValidDateKey(dateKey)) {
+        throw new functions.https.HttpsError("invalid-argument", "Invalid dateKey.", {
+            userMessage: "상자 날짜 정보가 올바르지 않습니다.",
+        });
+    }
+    if (hours.length === 0) {
+        throw new functions.https.HttpsError("invalid-argument", "Invalid hours.", {
+            userMessage: "저장할 상자 정보를 다시 확인해 주세요.",
+        });
+    }
+    const membership = await resolveCenterMembershipRole(db, centerId, authUid);
+    if (membership.role !== "student" || !isActiveMembershipStatus(membership.status)) {
+        throw new functions.https.HttpsError("permission-denied", "Only active students can open study boxes.", {
+            userMessage: "학생 본인만 보상 상자를 열 수 있습니다.",
+        });
+    }
+    const studentIdentity = await resolveCenterStudentIdentity(db, centerId, authUid);
+    if (!studentIdentity) {
+        throw new functions.https.HttpsError("failed-precondition", "Student profile not found.", {
+            userMessage: "학생 정보를 찾지 못했습니다.",
+        });
+    }
+    const studentId = studentIdentity.studentId;
+    const studyDayRef = db.doc(`centers/${centerId}/studyLogs/${studentId}/days/${dateKey}`);
+    const progressRef = db.doc(`centers/${centerId}/growthProgress/${studentId}`);
+    const [studyDaySnap, attendanceSnap, progressSnap, sessionsSnap] = await Promise.all([
+        studyDayRef.get(),
+        db.collection(`centers/${centerId}/attendanceCurrent`).where("studentId", "==", studentId).limit(10).get(),
+        progressRef.get(),
+        studyDayRef.collection("sessions").orderBy("startTime", "asc").get(),
+    ]);
+    const studyDayData = (studyDaySnap.data() || {});
+    const persistedBaseDayMinutes = Math.max(0, Math.floor((_c = (_b = parseFiniteNumber(studyDayData.totalMinutes)) !== null && _b !== void 0 ? _b : parseFiniteNumber(studyDayData.totalStudyMinutes)) !== null && _c !== void 0 ? _c : 0));
+    const persistedAdjustmentMinutes = Math.floor((_d = parseFiniteNumber(studyDayData.manualAdjustmentMinutes)) !== null && _d !== void 0 ? _d : 0);
+    const persistedDayMinutes = Math.max(0, persistedBaseDayMinutes + persistedAdjustmentMinutes);
+    const nowMs = Date.now();
+    const nowDate = new Date(nowMs);
+    const currentStudyDayKey = toStudyDayKey(nowDate);
+    const isCarryoverDate = dateKey !== currentStudyDayKey;
+    if (isCarryoverDate && hasStudyBoxCarryoverExpired(dateKey, nowDate)) {
+        throw new functions.https.HttpsError("failed-precondition", "Study box carryover expired.", {
+            userMessage: "전날 상자는 새벽 1시 30분까지만 열 수 있습니다. 오늘 상자를 새로 모아 주세요.",
+        });
+    }
+    const { startMs: studyDayStartMs, endMs: studyDayEndMs } = getStudyDayWindowBounds(dateKey);
+    let liveSessionDurationSeconds = 0;
+    let liveSessionStartMs = 0;
+    if (dateKey === currentStudyDayKey && !attendanceSnap.empty) {
+        const preferredAttendanceDoc = pickPreferredAttendanceSeatDoc(attendanceSnap.docs);
+        const attendanceData = preferredAttendanceDoc === null || preferredAttendanceDoc === void 0 ? void 0 : preferredAttendanceDoc.data();
+        const attendanceStatus = asTrimmedString(attendanceData === null || attendanceData === void 0 ? void 0 : attendanceData.status);
+        const liveStartedAtMs = toMillisSafe(attendanceData === null || attendanceData === void 0 ? void 0 : attendanceData.lastCheckInAt);
+        if (ACTIVE_STUDY_ATTENDANCE_STATUSES.has(attendanceStatus) &&
+            liveStartedAtMs > 0 &&
+            Number.isFinite(studyDayStartMs) &&
+            nowMs > liveStartedAtMs) {
+            const overlapMs = getTimeRangeOverlapMs(liveStartedAtMs, nowMs, studyDayStartMs, studyDayEndMs);
+            if (overlapMs > 0) {
+                liveSessionStartMs = Math.max(liveStartedAtMs, studyDayStartMs);
+                liveSessionDurationSeconds = Math.max(0, Math.floor(overlapMs / SECOND_MS));
+            }
+        }
+    }
+    const effectiveDaySeconds = Math.max(0, persistedDayMinutes * 60 + liveSessionDurationSeconds);
+    const earnedHours = Math.min(8, Math.floor(effectiveDaySeconds / 3600));
+    const preExistingProgress = progressSnap.exists ? progressSnap.data() : {};
+    const preExistingDailyPointStatus = isPlainObject(preExistingProgress.dailyPointStatus)
+        ? preExistingProgress.dailyPointStatus
+        : {};
+    const preExistingDayStatus = isPlainObject(preExistingDailyPointStatus[dateKey])
+        ? preExistingDailyPointStatus[dateKey]
+        : {};
+    const preExistingClaimedStudyBoxes = normalizeStudyBoxHoursFromUnknown(preExistingDayStatus.claimedStudyBoxes);
+    const preExistingOpenedStudyBoxes = resolveOpenedStudyBoxHoursFromDayStatus(preExistingDayStatus);
+    for (const hour of hours) {
+        const hasClaimedBoxRecord = preExistingClaimedStudyBoxes.includes(hour);
+        const alreadyOpenedByRecord = preExistingOpenedStudyBoxes.includes(hour);
+        const canOpenCarryoverByRecord = isCarryoverDate && hasClaimedBoxRecord;
+        if (!alreadyOpenedByRecord && !canOpenCarryoverByRecord && earnedHours < hour) {
+            throw new functions.https.HttpsError("failed-precondition", "Study time milestone not reached.", {
+                userMessage: "아직 이 상자를 열 수 있는 공부시간이 채워지지 않았습니다.",
+            });
+        }
+    }
+    const rewardPlans = hours.map((hour) => ({
+        hour,
+        baseReward: buildDeterministicStudyBoxReward({
+            centerId,
+            studentId,
+            dateKey,
+            milestone: hour,
+        }),
+        earnedAtMs: resolveStudyBoxMilestoneEarnedAtMs({
+            milestone: hour,
+            persistedDayMinutes,
+            sessionDocs: sessionsSnap.docs,
+            liveSessionStartMs,
+            liveSessionDurationSeconds,
+        }),
+    }));
+    const shouldCheckPointBoost = rewardPlans.some((plan) => typeof plan.earnedAtMs === "number" && plan.earnedAtMs > 0);
+    const pointBoostDocs = shouldCheckPointBoost ? await listPointBoostEventDocs(db, centerId) : [];
+    const resolvedRewardPlans = rewardPlans.map((plan) => {
+        var _a, _b;
+        const earnedAtMs = typeof plan.earnedAtMs === "number" && plan.earnedAtMs > 0 ? plan.earnedAtMs : null;
+        const matchedBoostDoc = earnedAtMs
+            ? (_a = pointBoostDocs.find((docSnap) => isPointBoostEventActiveAt(docSnap.data(), earnedAtMs))) !== null && _a !== void 0 ? _a : null
+            : null;
+        const matchedBoostEvent = matchedBoostDoc === null || matchedBoostDoc === void 0 ? void 0 : matchedBoostDoc.data();
+        const boostMultiplier = matchedBoostEvent ? matchedBoostEvent.multiplier : 1;
+        const boostEventId = matchedBoostEvent ? (_b = matchedBoostDoc === null || matchedBoostDoc === void 0 ? void 0 : matchedBoostDoc.id) !== null && _b !== void 0 ? _b : null : null;
+        const reward = Object.assign(Object.assign({}, plan.baseReward), { awardedPoints: Math.max(0, Math.round(plan.baseReward.basePoints * boostMultiplier)), multiplier: boostMultiplier, earnedAt: earnedAtMs ? new Date(earnedAtMs).toISOString() : null, boostEventId });
+        return Object.assign(Object.assign({}, plan), { earnedAtMs,
+            boostMultiplier,
+            boostEventId,
+            reward });
+    });
+    const result = await db.runTransaction(async (transaction) => {
+        var _a, _b, _c;
+        const latestProgressSnap = await transaction.get(progressRef);
+        const progressData = latestProgressSnap.exists ? latestProgressSnap.data() : {};
+        const dailyPointStatus = isPlainObject(progressData.dailyPointStatus)
+            ? progressData.dailyPointStatus
+            : {};
+        const currentDayStatus = isPlainObject(dailyPointStatus[dateKey])
+            ? dailyPointStatus[dateKey]
+            : {};
+        let nextOpenedStudyBoxes = resolveOpenedStudyBoxHoursFromDayStatus(currentDayStatus);
+        let nextClaimedStudyBoxes = normalizeStudyBoxHoursFromUnknown(currentDayStatus.claimedStudyBoxes);
+        let nextRewardEntries = normalizeStudyBoxRewardEntries(currentDayStatus.studyBoxRewards);
+        let nextPointEvents = normalizeDailyPointEvents(currentDayStatus.pointEvents);
+        const initialAwardedTotal = getDailyAwardedPointTotal(currentDayStatus);
+        let awardedTotalDelta = 0;
+        const creditedRewards = [];
+        for (const plan of resolvedRewardPlans) {
+            const storedReward = (_a = nextRewardEntries.find((entry) => entry.milestone === plan.hour)) !== null && _a !== void 0 ? _a : null;
+            const alreadyOpened = nextOpenedStudyBoxes.includes(plan.hour);
+            const rewardBase = storedReward !== null && storedReward !== void 0 ? storedReward : plan.baseReward;
+            const resolvedReward = alreadyOpened
+                ? (storedReward !== null && storedReward !== void 0 ? storedReward : plan.reward)
+                : Object.assign(Object.assign({}, rewardBase), { awardedPoints: Math.max(0, Math.round(Math.max(0, Math.floor(rewardBase.basePoints)) * plan.boostMultiplier)), multiplier: plan.boostMultiplier, earnedAt: plan.earnedAtMs ? new Date(plan.earnedAtMs).toISOString() : null, boostEventId: plan.boostEventId });
+            const remainingDailyPoints = alreadyOpened
+                ? 0
+                : Math.max(0, DAILY_POINT_EARN_CAP - initialAwardedTotal - awardedTotalDelta);
+            const awardedDelta = alreadyOpened
+                ? 0
+                : Math.min(Math.max(0, Math.floor(resolvedReward.awardedPoints)), remainingDailyPoints);
+            const creditedReward = alreadyOpened
+                ? resolvedReward
+                : Object.assign(Object.assign({}, resolvedReward), { awardedPoints: awardedDelta });
+            nextOpenedStudyBoxes = normalizeStudyBoxHoursFromUnknown([...nextOpenedStudyBoxes, plan.hour]);
+            nextClaimedStudyBoxes = normalizeStudyBoxHoursFromUnknown([...nextClaimedStudyBoxes, plan.hour]);
+            nextRewardEntries = upsertStudyBoxRewardEntries(nextRewardEntries, creditedReward);
+            if (awardedDelta > 0) {
+                nextPointEvents = upsertDailyPointEvent(nextPointEvents, {
+                    id: `study_box:${dateKey}:${plan.hour}`,
+                    source: "study_box",
+                    label: `${plan.hour}시간 상자`,
+                    points: awardedDelta,
+                    createdAt: new Date(nowMs).toISOString(),
+                    hour: plan.hour,
+                });
+            }
+            awardedTotalDelta += awardedDelta;
+            creditedRewards.push(creditedReward);
+        }
+        const currentPointsBalance = Math.max(0, Math.floor((_b = parseFiniteNumber(progressData.pointsBalance)) !== null && _b !== void 0 ? _b : 0));
+        const currentTotalPointsEarned = Math.max(0, Math.floor((_c = parseFiniteNumber(progressData.totalPointsEarned)) !== null && _c !== void 0 ? _c : 0));
+        transaction.set(progressRef, {
+            pointsBalance: admin.firestore.FieldValue.increment(awardedTotalDelta),
+            totalPointsEarned: admin.firestore.FieldValue.increment(awardedTotalDelta),
+            dailyPointStatus: {
+                [dateKey]: Object.assign(Object.assign({}, currentDayStatus), { claimedStudyBoxes: nextClaimedStudyBoxes, studyBoxRewards: nextRewardEntries, openedStudyBoxes: nextOpenedStudyBoxes, pointEvents: nextPointEvents, dailyPointAmount: admin.firestore.FieldValue.increment(awardedTotalDelta), updatedAt: admin.firestore.FieldValue.serverTimestamp() }),
+            },
+            updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        }, { merge: true });
+        return {
+            claimedStudyBoxes: nextClaimedStudyBoxes,
+            openedStudyBoxes: nextOpenedStudyBoxes,
+            rewards: creditedRewards,
+            pointsBalance: currentPointsBalance + awardedTotalDelta,
+            totalPointsEarned: currentTotalPointsEarned + awardedTotalDelta,
+        };
+    });
+    return {
+        ok: true,
+        rewards: result.rewards,
         claimedStudyBoxes: result.claimedStudyBoxes,
         openedStudyBoxes: result.openedStudyBoxes,
         pointsBalance: result.pointsBalance,
