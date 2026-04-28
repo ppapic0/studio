@@ -61,6 +61,7 @@ import { getStudyDayKey } from '@/lib/study-day';
 import { buildAttendanceRoutineInfo, deriveAttendanceDisplayState, toDateSafe } from '@/lib/attendance-auto';
 import { deriveDailyReportSignals, normalizeDailyReportContentFingerprint } from '@/lib/daily-report-ai';
 import { VisualReportViewer } from '@/components/dashboard/visual-report-viewer';
+import { logHandledClientIssue } from '@/lib/handled-client-log';
 
 type StudyLogDayDoc = StudyLogDay & {
   updatedAt?: unknown;
@@ -123,6 +124,34 @@ function uniqueStrings(items: Array<string | null | undefined>) {
         .filter((item): item is string => Boolean(item))
     )
   );
+}
+
+function unwrapReportGenerationLoad<T>(
+  result: PromiseSettledResult<T>,
+  fallback: T,
+  label: string
+) {
+  if (result.status === 'fulfilled') return result.value;
+  logHandledClientIssue(`[daily-report] ${label} load failed`, result.reason);
+  return fallback;
+}
+
+function readFiniteNumber(value: unknown, fallback = 0) {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : fallback;
+}
+
+function readReportPlanTitle(value: unknown, fallback: string) {
+  return typeof value === 'string' && value.trim().length > 0 ? value.trim() : fallback;
+}
+
+function buildReportSchedulePreviewItem(item: Partial<StudyPlanItem>, index: number) {
+  const rawTitle = readReportPlanTitle(item.title, `일정 ${index + 1}`);
+  const [title, ...timeParts] = rawTitle.split(': ');
+  return {
+    title: title.trim() || `일정 ${index + 1}`,
+    time: timeParts.join(': ').trim() || '-',
+  };
 }
 
 function getReportVariationSignature(report?: DailyReport | null) {
@@ -541,15 +570,15 @@ export default function DailyReportsPage() {
       );
 
       const [
-        plansSnap,
-        logSnap,
-        historySnap,
-        dailyStatSnap,
-        attendanceDailyStatSnap,
-        attendanceRecordSnap,
-        liveSeatSnap,
-        recentReportsSnap,
-      ] = await Promise.all([
+        plansResult,
+        logResult,
+        historyResult,
+        dailyStatResult,
+        attendanceDailyStatResult,
+        attendanceRecordResult,
+        liveSeatResult,
+        recentReportsResult,
+      ] = await Promise.allSettled([
         getDocs(query(plansRef, where('dateKey', '==', dateKey))),
         getDoc(logRef),
         getDocs(query(lastLogsRef, orderBy('dateKey', 'desc'), limit(14))),
@@ -558,46 +587,58 @@ export default function DailyReportsPage() {
         getDoc(attendanceRecordRef),
         isTodayTarget ? getDocs(liveSeatQuery) : Promise.resolve(null),
         getDocs(recentReportsQuery),
-      ]);
+      ] as const);
 
-      const plans = plansSnap.docs.map(d => d.data() as StudyPlanItem);
-      const todayLog = logSnap.exists() ? (logSnap.data() as StudyLogDayDoc) : null;
-      const dailyStat = dailyStatSnap.exists() ? (dailyStatSnap.data() as DailyStudentStatDoc) : null;
-      const attendanceDailyStat = attendanceDailyStatSnap.exists() ? (attendanceDailyStatSnap.data() as AttendanceDailyStatDoc) : null;
-      const attendanceRecord = attendanceRecordSnap.exists() ? (attendanceRecordSnap.data() as AttendanceRecordDoc) : null;
+      const plansSnap = unwrapReportGenerationLoad(plansResult, null, 'plans');
+      const logSnap = unwrapReportGenerationLoad(logResult, null, 'study log');
+      const historySnap = unwrapReportGenerationLoad(historyResult, null, 'study history');
+      const dailyStatSnap = unwrapReportGenerationLoad(dailyStatResult, null, 'daily stats');
+      const attendanceDailyStatSnap = unwrapReportGenerationLoad(attendanceDailyStatResult, null, 'attendance stats');
+      const attendanceRecordSnap = unwrapReportGenerationLoad(attendanceRecordResult, null, 'attendance record');
+      const liveSeatSnap = unwrapReportGenerationLoad(liveSeatResult, null, 'live seat');
+      const recentReportsSnap = unwrapReportGenerationLoad(recentReportsResult, null, 'recent reports');
+
+      const plans = plansSnap?.docs.map(d => d.data() as StudyPlanItem) || [];
+      const todayLog = logSnap?.exists() ? (logSnap.data() as StudyLogDayDoc) : null;
+      const dailyStat = dailyStatSnap?.exists() ? (dailyStatSnap.data() as DailyStudentStatDoc) : null;
+      const attendanceDailyStat = attendanceDailyStatSnap?.exists() ? (attendanceDailyStatSnap.data() as AttendanceDailyStatDoc) : null;
+      const attendanceRecord = attendanceRecordSnap?.exists() ? (attendanceRecordSnap.data() as AttendanceRecordDoc) : null;
       const liveSeatDoc = liveSeatSnap?.docs?.[0];
       const liveSeat = liveSeatDoc
         ? ({ id: liveSeatDoc.id, ...liveSeatDoc.data() } as AttendanceCurrent)
         : null;
 
-      const history7Days = historySnap.docs
+      const history7Days = (historySnap?.docs || [])
         .map(d => ({
-          date: d.data().dateKey,
-          minutes: d.data().totalMinutes || 0
+          date: readReportPlanTitle(d.data().dateKey, d.id),
+          minutes: getEffectiveStudyLogMinutes(d.data() as StudyLogDayDoc)
         }))
         .filter(h => h.date < dateKey)
         .slice(0, 7);
 
       const studyTasks = plans.filter(p => p.category === 'study' || !p.category);
       const completionFromPlans = studyTasks.length > 0
-        ? Math.round((studyTasks.filter(t => t.done).length / studyTasks.length) * 100)
+        ? Math.round((studyTasks.filter(t => t.done === true).length / studyTasks.length) * 100)
         : 0;
+      const dailyCompletionRate = readFiniteNumber(dailyStat?.todayPlanCompletionRate, NaN);
       const hasPlanRecords =
         studyTasks.length > 0 ||
-        (typeof dailyStat?.todayPlanCompletionRate === 'number' && dailyStat.todayPlanCompletionRate > 0);
-      const completionRate = hasPlanRecords && typeof dailyStat?.todayPlanCompletionRate === 'number'
-        ? Math.round(dailyStat.todayPlanCompletionRate)
+        (Number.isFinite(dailyCompletionRate) && dailyCompletionRate > 0);
+      const completionRate = hasPlanRecords && Number.isFinite(dailyCompletionRate)
+        ? Math.round(dailyCompletionRate)
         : completionFromPlans;
       const completionLabel = hasPlanRecords ? `${completionRate}%` : '러닝시스템 계획 기록 X';
       const scheduleItems = plans.filter(p => p.category === 'schedule');
-      const routineInfo = buildAttendanceRoutineInfo(scheduleItems.map((item) => item.title));
+      const routineInfo = buildAttendanceRoutineInfo(
+        scheduleItems.map((item, index) => readReportPlanTitle(item.title, `일정 ${index + 1}`))
+      );
 
       const attendanceStatCheckInAt = toDateSafe(attendanceDailyStat?.checkInAt);
       const attendanceStatCheckOutAt = toDateSafe(attendanceDailyStat?.checkOutAt);
       const recordCheckedAt = toDateSafe(attendanceRecord?.checkInAt || attendanceRecord?.updatedAt);
       const liveCheckedAt = toDateSafe(liveSeat?.lastCheckInAt || liveSeat?.updatedAt);
       const studyCheckedAt = toDateSafe(todayLog?.updatedAt || todayLog?.createdAt);
-      const studyMinutes = getEffectiveStudyLogMinutes(todayLog);
+      const studyMinutes = getEffectiveStudyLogMinutes(todayLog) || studyLogSummaryByStudentId[selectedStudent.id]?.minutes || 0;
       const hasAttendanceEvidence = Boolean(attendanceStatCheckInAt || attendanceStatCheckOutAt || recordCheckedAt || liveCheckedAt || studyCheckedAt || studyMinutes > 0);
       const attendanceSummaryLabel = buildDailyReportAttendanceSummary({
         checkInAt: attendanceStatCheckInAt || recordCheckedAt || liveCheckedAt || studyCheckedAt,
@@ -622,7 +663,7 @@ export default function DailyReportsPage() {
         hasStudyLog: studyMinutes > 0,
       });
 
-      const sortedRecentReports = recentReportsSnap.docs
+      const sortedRecentReports = (recentReportsSnap?.docs || [])
         .map((snapshot) => snapshot.data() as DailyReport)
         .filter((report) => report.dateKey && report.dateKey !== dateKey)
         .sort((a, b) => (b.dateKey || '').localeCompare(a.dateKey || ''));
@@ -680,11 +721,11 @@ export default function DailyReportsPage() {
         completionRate,
         hasPlanRecords,
         completionLabel,
-        plans: studyTasks.map(p => ({ title: p.title, done: p.done })),
-        schedule: scheduleItems.map(p => {
-            const parts = p.title.split(': ');
-            return { title: parts[0], time: parts[1] || '-' };
-          }),
+        plans: studyTasks.map((p, index) => ({
+          title: readReportPlanTitle(p.title, `학습 계획 ${index + 1}`),
+          done: p.done === true,
+        })),
+        schedule: scheduleItems.map((p, index) => buildReportSchedulePreviewItem(p, index)),
         history7Days,
         teacherNote: teacherNote.trim() || undefined,
         attendanceLabel: signals.attendanceLabel,

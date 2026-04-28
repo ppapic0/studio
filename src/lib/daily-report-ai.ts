@@ -702,7 +702,7 @@ export function deriveDailyReportSignals({
   excludedContentFingerprints = [],
 }: DeriveDailyReportSignalsInput): DailyReportAiSignals {
   const safeMinutes = clampMinutes(totalStudyMinutes);
-  const safeCompletionRate = Math.max(0, Math.min(100, Math.round(completionRate)));
+  const safeCompletionRate = clampNumber(Math.round(completionRate), 0, 100);
   const hasLearningPlanRecords = typeof hasPlanRecords === 'boolean' ? hasPlanRecords : safeCompletionRate > 0;
   const completionRateForStage = hasLearningPlanRecords ? safeCompletionRate : 100;
   const sortedHistory = [...history7Days]

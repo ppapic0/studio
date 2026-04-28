@@ -22,6 +22,7 @@ fs.writeFileSync(tempPath, compiled.outputText, 'utf8');
 const {
   resolveDailyReportLevel,
   selectDailyReportVariation,
+  deriveDailyReportSignals,
   normalizeDailyReportContentFingerprint,
   isDailyReportFingerprintBlocked,
 } = require(tempPath);
@@ -41,6 +42,20 @@ try {
   assert.equal(resolveDailyReportLevel(301, 100).internalStage, 11, '301분은 내부 11단계여야 합니다.');
   assert.equal(resolveDailyReportLevel(570, 100).internalStage, 19, '570분은 내부 19단계여야 합니다.');
   assert.equal(resolveDailyReportLevel(600, 100).internalStage, 20, '600분은 내부 20단계여야 합니다.');
+
+  const invalidCompletionSignals = deriveDailyReportSignals({
+    studentId: 'student-alpha',
+    dateKey: '2026-04-07',
+    totalStudyMinutes: 180,
+    completionRate: Number.NaN,
+    hasPlanRecords: true,
+    history7Days: [],
+  });
+  assert.equal(
+    invalidCompletionSignals.completionBand,
+    '낮음',
+    '완료율이 유효하지 않아도 NaN 대신 안전한 낮음 구간으로 정리해야 합니다.',
+  );
 
   const firstVariation = selectDailyReportVariation({
     ...variationBaseInput,
