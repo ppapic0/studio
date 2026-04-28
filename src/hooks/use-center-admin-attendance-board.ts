@@ -7,6 +7,7 @@ import { collection, collectionGroup, doc, getDoc, getDocs, limit, query, where 
 import { useCollection, useFirestore } from '@/firebase';
 import { useMemoFirebase } from '@/hooks/use-memo-firebase';
 import { logHandledClientIssue } from '@/lib/handled-client-log';
+import { getStudyDayKey } from '@/lib/study-day';
 import { getLiveStudySessionDurationMinutes, getStudySessionDurationMinutes } from '@/lib/study-session-time';
 import {
   buildAttendanceRoutineInfo,
@@ -719,8 +720,9 @@ export function useCenterAdminAttendanceBoard({
         };
 
         const lastCheckInAt = toDateSafe(seat.lastCheckInAt);
+        const liveStudyDayKey = seat.activeStudyDayKey || (lastCheckInAt ? getStudyDayKey(lastCheckInAt) : '');
         const sameDayLiveCheckInAt =
-          lastCheckInAt && format(lastCheckInAt, 'yyyy-MM-dd') === todayKey
+          lastCheckInAt && liveStudyDayKey === todayKey
             ? lastCheckInAt
             : null;
         const todayStatCheckInAt = toDateSafe(todayStat?.checkInAt);

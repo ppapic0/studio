@@ -24,7 +24,7 @@ import { useAppContext } from '@/contexts/app-context';
 import { useToast } from '@/hooks/use-toast';
 import { shouldExcludeFromSmsQueries } from '@/lib/counseling-demo';
 import { canManageSettings } from '@/lib/dashboard-access';
-import { getStudyDayDate, getStudyDayKey } from '@/lib/study-day';
+import { getStudyDayContext, getStudyDayKey } from '@/lib/study-day';
 import type { AttendanceCurrent, NotificationSettings } from '@/lib/types';
 import { cn } from '@/lib/utils';
 import { AdminWorkbenchCommandBar } from '@/components/dashboard/admin-workbench-command-bar';
@@ -54,6 +54,7 @@ import {
 const SMS_BYTE_LIMIT = 90;
 const MANUAL_PARENT_SMS_UID = '__manual_parent__';
 const TRACK_MANAGED_STUDY_CENTER_NAME = '트랙 관리형 스터디센터';
+const OPERATIONAL_DAY_TICK_MS = 60 * 1000;
 
 type ParentSmsEventType =
   | 'study_start'
@@ -285,10 +286,10 @@ const DEFAULT_FORM: Required<Pick<NotificationSettings,
   smsSender: '',
   smsUserId: '',
   smsEndpointUrl: '',
-  smsTemplateStudyStart: `[${TRACK_MANAGED_STUDY_CENTER_NAME}] {studentName} 학생 {time} 공부시작. 오늘 학습 흐름 확인 부탁드립니다.`,
+  smsTemplateStudyStart: `[${TRACK_MANAGED_STUDY_CENTER_NAME}] {studentName} 학생 {time} 공부시작. 운영일 학습 흐름 확인 부탁드립니다.`,
   smsTemplateAwayStart: `[${TRACK_MANAGED_STUDY_CENTER_NAME}] {studentName} 학생 {time} 외출. 복귀 후 다시 공부를 이어갑니다.`,
   smsTemplateAwayEnd: `[${TRACK_MANAGED_STUDY_CENTER_NAME}] {studentName} 학생 {time} 복귀. 다시 공부를 시작했습니다.`,
-  smsTemplateStudyEnd: `[${TRACK_MANAGED_STUDY_CENTER_NAME}] {studentName} 학생 {time} 공부종료. 오늘 학습 마무리했습니다.`,
+  smsTemplateStudyEnd: `[${TRACK_MANAGED_STUDY_CENTER_NAME}] {studentName} 학생 {time} 공부종료. 운영일 학습 마무리했습니다.`,
   smsTemplateLateAlert: `[${TRACK_MANAGED_STUDY_CENTER_NAME}] {studentName} 학생 {expectedTime} 미등원. 확인 부탁드립니다.`,
   lateAlertEnabled: true,
   lateAlertGraceMinutes: 20,
@@ -403,6 +404,16 @@ function formatDateLabel(value?: { toDate?: () => Date }) {
 function formatDateLabelFromDate(date?: Date | null) {
   if (!date) return '-';
   return `${date.getMonth() + 1}.${String(date.getDate()).padStart(2, '0')} ${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`;
+}
+
+function formatOperationalWindowLabel(startAt: Date, endAt: Date) {
+  const formatPart = (date: Date) =>
+    `${String(date.getMonth() + 1).padStart(2, '0')}/${String(date.getDate()).padStart(2, '0')} ${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`;
+  return `${formatPart(startAt)} ~ ${formatPart(endAt)}`;
+}
+
+function formatOperationalDateKeyLabel(dateKey: string) {
+  return dateKey ? `${dateKey} 기준` : '운영일 기준';
 }
 
 function formatPhone(value?: string) {
@@ -699,6 +710,21 @@ export default function NotificationSettingsPage() {
   }, [firestore, centerId, isAdmin]);
   const { data: settingsDoc, isLoading } = useDoc<NotificationSettings>(settingsRef, { enabled: isAdmin });
 
+  const [operationalNowMs, setOperationalNowMs] = useState(() => Date.now());
+
+  useEffect(() => {
+    const timer = window.setInterval(() => setOperationalNowMs(Date.now()), OPERATIONAL_DAY_TICK_MS);
+    return () => window.clearInterval(timer);
+  }, []);
+
+  const operationalDayContext = useMemo(() => getStudyDayContext(new Date(operationalNowMs)), [operationalNowMs]);
+  const operationalToday = operationalDayContext.studyDayDate;
+  const todayDateKey = operationalDayContext.dateKey;
+  const operationalWindowLabel = useMemo(
+    () => formatOperationalWindowLabel(operationalDayContext.windowStartAt, operationalDayContext.windowEndAt),
+    [operationalDayContext.windowEndAt, operationalDayContext.windowStartAt]
+  );
+
   const smsQueueQuery = useMemoFirebase(() => {
     if (!firestore || !centerId || !isAdmin) return null;
     return query(collection(firestore, 'centers', centerId, 'smsQueue'), orderBy('createdAt', 'desc'), limit(400));
@@ -713,6 +739,30 @@ export default function NotificationSettingsPage() {
   const smsDeliveryLogsFinalRows = useMemo(
     () => collapseSmsDeliveryLogAttempts(smsDeliveryLogsRaw || []),
     [smsDeliveryLogsRaw]
+  );
+
+  const todaySmsQueueQuery = useMemoFirebase(() => {
+    if (!firestore || !centerId || !isAdmin || !todayDateKey) return null;
+    return query(
+      collection(firestore, 'centers', centerId, 'smsQueue'),
+      where('dateKey', '==', todayDateKey),
+      limit(1500)
+    );
+  }, [firestore, centerId, isAdmin, todayDateKey]);
+  const { data: todaySmsQueueRaw } = useCollection<SmsQueueRow>(todaySmsQueueQuery, { enabled: isAdmin });
+
+  const todaySmsDeliveryLogsQuery = useMemoFirebase(() => {
+    if (!firestore || !centerId || !isAdmin || !todayDateKey) return null;
+    return query(
+      collection(firestore, 'centers', centerId, 'smsDeliveryLogs'),
+      where('dateKey', '==', todayDateKey),
+      limit(2000)
+    );
+  }, [firestore, centerId, isAdmin, todayDateKey]);
+  const { data: todaySmsDeliveryLogsRaw } = useCollection<SmsDeliveryLogRow>(todaySmsDeliveryLogsQuery, { enabled: isAdmin });
+  const todaySmsDeliveryLogsFinalRows = useMemo(
+    () => collapseSmsDeliveryLogAttempts(todaySmsDeliveryLogsRaw || []),
+    [todaySmsDeliveryLogsRaw]
   );
 
   const legacySmsLogsQuery = useMemoFirebase(() => {
@@ -738,9 +788,6 @@ export default function NotificationSettingsPage() {
     return query(collection(firestore, 'centers', centerId, 'smsRecipientPreferences'), limit(800));
   }, [firestore, centerId, isAdmin]);
   const { data: preferencesRaw } = useCollection<SmsRecipientPreferenceDoc>(preferencesQuery, { enabled: isAdmin });
-
-  const operationalToday = useMemo(() => getStudyDayDate(new Date()), []);
-  const todayDateKey = useMemo(() => getStudyDayKey(operationalToday), [operationalToday]);
 
   const attendanceRecordsTodayQuery = useMemoFirebase(() => {
     if (!firestore || !centerId || !isAdmin) return null;
@@ -913,7 +960,7 @@ export default function NotificationSettingsPage() {
     });
     const todayKey = range[range.length - 1]?.key;
     const pendingTodayCount = (smsQueueRaw || []).filter((row) => {
-      const key = toDateKeyFromValue(row.createdAt) || toDateKeyFromValue(row.updatedAt) || toDateKeyFromValue(row.nextAttemptAt);
+      const key = row.dateKey || toDateKeyFromValue(row.createdAt) || toDateKeyFromValue(row.updatedAt) || toDateKeyFromValue(row.nextAttemptAt);
       return key === todayKey && ['queued', 'processing', 'pending_provider'].includes(String(row.status || ''));
     }).length;
     return {
@@ -1030,8 +1077,8 @@ export default function NotificationSettingsPage() {
 
   const todayBoardRows = useMemo<StudentSmsBoardRow[]>(() => {
     const todayKey = todayDateKey;
-    const queueRows = smsQueueRaw || [];
-    const deliveryRows = smsDeliveryLogsFinalRows;
+    const queueRows = todaySmsQueueRaw || [];
+    const deliveryRows = todaySmsDeliveryLogsFinalRows;
     const keyword = studentBoardSearchTerm.trim().toLowerCase();
     return recipientRows
       .map((student) => {
@@ -1040,11 +1087,12 @@ export default function NotificationSettingsPage() {
         const liveAttendance = attendanceCurrentByStudentId.get(student.studentId);
         const attendanceEvents = attendanceEventsByStudentId.get(student.studentId) || [];
         const liveCheckInAt = toDateSafe(liveAttendance?.lastCheckInAt);
+        const liveStudyDayKey = liveAttendance?.activeStudyDayKey || (liveCheckInAt ? getStudyDayKey(liveCheckInAt) : '');
         const liveCheckInToday =
           liveAttendance &&
           ['studying', 'away', 'break'].includes(liveAttendance.status) &&
           liveCheckInAt &&
-          getStudyDayKey(liveCheckInAt) === todayKey
+          liveStudyDayKey === todayKey
             ? liveCheckInAt
             : null;
         const resolveAttendanceTime = (eventType: TodayBoardEventType) => {
@@ -1229,9 +1277,9 @@ export default function NotificationSettingsPage() {
     attendanceEventsByStudentId,
     attendanceRecordsByStudentId,
     recipientRows,
-    smsDeliveryLogsFinalRows,
-    smsQueueRaw,
     studentBoardSearchTerm,
+    todaySmsDeliveryLogsFinalRows,
+    todaySmsQueueRaw,
     todayDateKey,
   ]);
 
@@ -1301,6 +1349,7 @@ export default function NotificationSettingsPage() {
       renderedMessage: row.renderedMessage || '-',
       messageBytes: row.messageBytes || calculateSmsBytes(row.renderedMessage || '-'),
       attemptNo: row.attemptNo || 0,
+      dateKey: row.dateKey || '',
       createdAt: row.createdAt,
       errorMessage: row.errorMessage || row.suppressedReason || '',
       source: 'delivery',
@@ -1318,6 +1367,7 @@ export default function NotificationSettingsPage() {
       renderedMessage: row.renderedMessage || row.message || '-',
       messageBytes: row.messageBytes || calculateSmsBytes(row.renderedMessage || row.message || '-'),
       attemptNo: 1,
+      dateKey: '',
       createdAt: row.createdAt,
       errorMessage: '',
       source: 'legacy',
@@ -1330,7 +1380,7 @@ export default function NotificationSettingsPage() {
       .filter((row) => {
         if (historyEventFilter !== 'all' && row.eventType !== historyEventFilter) return false;
         if (historyStatusFilter !== 'all' && row.status !== historyStatusFilter) return false;
-        if (historyTab === 'by-date' && selectedHistoryDate && toDateKeyFromValue(row.createdAt) !== selectedHistoryDate) return false;
+        if (historyTab === 'by-date' && selectedHistoryDate && (row.dateKey || toDateKeyFromValue(row.createdAt)) !== selectedHistoryDate) return false;
         if (historyTab === 'by-student' && selectedHistoryStudentId !== 'all' && row.studentId !== selectedHistoryStudentId) return false;
         if (!keyword) return true;
         const haystack = [row.studentName, row.parentName, row.phoneNumber, row.renderedMessage].join(' ').toLowerCase();
@@ -1485,14 +1535,14 @@ export default function NotificationSettingsPage() {
         targetCount?: number;
       };
       toast({
-        title: '오늘 누락 문자 복구 완료',
+        title: '운영일 누락 문자 복구 완료',
         description: `큐 ${data.queuedCount || 0}건 · 수신제외 ${data.suppressedCount || 0}건 · 기존접수 ${data.skippedCount || 0}건 · 번호없음 ${data.noRecipientCount || 0}건`,
       });
     } catch (error: any) {
       toast({
         variant: 'destructive',
         title: '누락 문자 복구 실패',
-        description: error?.message || '오늘 출결 문자 접수 복구 중 오류가 발생했습니다.',
+        description: error?.message || '운영일 출결 문자 접수 복구 중 오류가 발생했습니다.',
       });
     } finally {
       setIsRepairingTodaySms(false);
@@ -1630,7 +1680,7 @@ export default function NotificationSettingsPage() {
         studentId,
         eventType,
         force: true,
-        ...(eventDate ? { eventAt: eventDate.toISOString(), dateKey: toDateInputValue(eventDate) } : { dateKey: todayDateKey }),
+        ...(eventDate ? { eventAt: eventDate.toISOString(), dateKey: todayDateKey } : { dateKey: todayDateKey }),
       });
       toast({
         title: '문자 재발송 요청 완료',
@@ -1752,12 +1802,12 @@ export default function NotificationSettingsPage() {
               <div>
                 <p className="text-[11px] font-black uppercase tracking-[0.24em] text-slate-500">최근 7일 문자 전송 현황</p>
                 <h3 className="mt-2 text-xl font-black tracking-tight text-slate-900">센터 문자 흐름을 선그래프로 빠르게 확인합니다.</h3>
-                <p className="mt-2 text-sm font-bold text-slate-500">발송완료와 실패·보류 흐름을 함께 보고, 오늘 대기 건수까지 같이 확인합니다.</p>
+                <p className="mt-2 text-sm font-bold text-slate-500">발송완료와 실패·보류 흐름을 함께 보고, 운영일 대기 건수까지 같이 확인합니다.</p>
               </div>
               <div className="flex flex-wrap gap-2">
                 <Badge className="border-none bg-emerald-100 text-emerald-700 font-black">발송완료 {smsTrendSummary.totalSent}건</Badge>
                 <Badge className="border-none bg-rose-100 text-rose-700 font-black">실패·보류 {smsTrendSummary.totalIssue}건</Badge>
-                <Badge className="border-none bg-blue-100 text-blue-700 font-black">오늘 대기 {smsTrendSummary.pendingTodayCount}건</Badge>
+                <Badge className="border-none bg-blue-100 text-blue-700 font-black">운영일 대기 {smsTrendSummary.pendingTodayCount}건</Badge>
               </div>
             </div>
             <div className="mt-5 overflow-hidden rounded-[1.5rem] border border-slate-100 bg-slate-50/80 p-4">
@@ -1908,8 +1958,12 @@ export default function NotificationSettingsPage() {
             <div className="min-w-0">
               <CardTitle className="text-xl font-black tracking-tight">발송 현황</CardTitle>
               <CardDescription className="font-bold text-sm">
-                학생별로 오늘 등원·외출·복귀·하원 문자 시각만 먼저 보고, 상세는 팝업에서 확인합니다.
+                학생별로 운영일 등원·외출·복귀·하원 문자 시각을 먼저 보고, 상세는 팝업에서 확인합니다.
               </CardDescription>
+              <div className="mt-3 flex flex-wrap gap-2">
+                <Badge className="border-none bg-primary/10 text-primary font-black">{formatOperationalDateKeyLabel(todayDateKey)}</Badge>
+                <Badge className="border-none bg-slate-100 text-slate-700 font-black">{operationalWindowLabel}</Badge>
+              </div>
             </div>
             <Button
               type="button"
@@ -1919,13 +1973,13 @@ export default function NotificationSettingsPage() {
               disabled={isRepairingTodaySms || isLoading}
             >
               {isRepairingTodaySms ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCcw className="h-4 w-4" />}
-              오늘 누락 문자 복구
+              운영일 누락 문자 복구
             </Button>
           </div>
         </CardHeader>
         <CardContent className="space-y-5 p-6">
           <div className="grid gap-3 sm:grid-cols-3 xl:grid-cols-6">
-            <div className="rounded-xl border border-emerald-100 bg-emerald-50/60 p-4"><p className="text-[10px] font-black uppercase tracking-widest text-emerald-700">오늘 발송완료 학생</p><p className="mt-2 text-3xl font-black text-emerald-800">{todayBoardSummary.sentStudents}</p></div>
+            <div className="rounded-xl border border-emerald-100 bg-emerald-50/60 p-4"><p className="text-[10px] font-black uppercase tracking-widest text-emerald-700">운영일 발송완료 학생</p><p className="mt-2 text-3xl font-black text-emerald-800">{todayBoardSummary.sentStudents}</p></div>
             <div className="rounded-xl border border-rose-100 bg-rose-50/60 p-4"><p className="text-[10px] font-black uppercase tracking-widest text-rose-700">실패 학생</p><p className="mt-2 text-3xl font-black text-rose-800">{todayBoardSummary.failedStudents}</p></div>
             <div className="rounded-xl border border-slate-200 bg-slate-50/70 p-4"><p className="text-[10px] font-black uppercase tracking-widest text-slate-500">번호 미등록</p><p className="mt-2 text-3xl font-black text-slate-700">{todayBoardSummary.missingPhoneStudents}</p></div>
             <div className="rounded-xl border border-orange-100 bg-orange-50/60 p-4"><p className="text-[10px] font-black uppercase tracking-widest text-orange-700">재확인 필요</p><p className="mt-2 text-3xl font-black text-orange-800">{todayBoardSummary.retryStudents}</p></div>
@@ -1968,7 +2022,7 @@ export default function NotificationSettingsPage() {
                         </Badge>
                       </div>
                       <p className="mt-1 text-xs font-bold text-slate-500">
-                        수신 대상 {student.recipients.filter((row) => !row.isPhoneMissing).length}명 · 오늘 발송 {student.todaySentCount}건
+                        수신 대상 {student.recipients.filter((row) => !row.isPhoneMissing).length}명 · 운영일 발송 {student.todaySentCount}건
                       </p>
                     </div>
                     {TODAY_BOARD_EVENTS.map((event) => {
@@ -2012,12 +2066,12 @@ export default function NotificationSettingsPage() {
                     {selectedBoardStudent.studentName}
                   </DialogTitle>
                   <DialogDescription className="text-sm font-bold text-white/80">
-                    {selectedBoardStudent.className} · 오늘 문자 발송 흐름과 수신 번호를 함께 확인합니다.
+                    {selectedBoardStudent.className} · 운영일 문자 발송 흐름과 수신 번호를 함께 확인합니다.
                   </DialogDescription>
                 </DialogHeader>
                 <div className="mt-4 flex flex-wrap gap-2">
                   <Badge className="border-none bg-white/20 text-white font-black">수신 대상 {selectedBoardStudent.recipients.filter((row) => !row.isPhoneMissing).length}명</Badge>
-                  <Badge className="border-none bg-white/20 text-white font-black">오늘 발송 {selectedBoardStudent.todaySentCount}건</Badge>
+                  <Badge className="border-none bg-white/20 text-white font-black">운영일 발송 {selectedBoardStudent.todaySentCount}건</Badge>
                   <Badge className={cn('border-none font-black', selectedBoardStudent.hasMissingPhone ? 'bg-white text-slate-700' : 'bg-emerald-100 text-emerald-700')}>
                     {selectedBoardStudent.recipientLabel}
                   </Badge>
@@ -2155,8 +2209,8 @@ export default function NotificationSettingsPage() {
 
                 <section className="min-w-0 space-y-4">
                   <div>
-                    <h3 className="text-sm font-black text-slate-900">오늘 발송 로그</h3>
-                    <p className="mt-1 text-xs font-bold text-slate-500">등원·외출·복귀·하원 문자 기준으로 오늘 접수된 내용과 출결 기록을 함께 보여줍니다.</p>
+                    <h3 className="text-sm font-black text-slate-900">운영일 발송 로그</h3>
+                    <p className="mt-1 text-xs font-bold text-slate-500">등원·외출·복귀·하원 문자 기준으로 운영일에 접수된 내용과 출결 기록을 함께 보여줍니다.</p>
                   </div>
                   <div className="rounded-2xl border border-slate-200 bg-slate-50/70 p-4">
                     <div className="flex flex-wrap items-center justify-between gap-2">
@@ -2169,7 +2223,7 @@ export default function NotificationSettingsPage() {
                     <Textarea
                       value={manualSmsMessage}
                       onChange={(e) => setManualSmsMessage(e.target.value)}
-                      placeholder="예: 오늘은 자습 시작이 늦어져 19시부터 학습을 시작했습니다. 귀가 전 다시 안내드리겠습니다."
+                      placeholder="예: 운영일 자습 시작이 늦어져 19시부터 학습을 시작했습니다. 귀가 전 다시 안내드리겠습니다."
                       className="mt-3 min-h-[104px] rounded-2xl border-2 font-bold leading-6"
                     />
                     <div className="mt-3 flex flex-wrap justify-between gap-2">
@@ -2246,8 +2300,8 @@ export default function NotificationSettingsPage() {
                                 .find(Boolean) || '',
                             message:
                               summary.status === 'missing_phone'
-                                ? '오늘 출결 기록은 확인되지만 발송 가능한 번호가 없어 문자 접수가 되지 않았습니다.'
-                                : '오늘 출결 기록은 확인되지만 문자 접수 로그가 없어 다시 보내기가 필요합니다.',
+                                ? '운영일 출결 기록은 확인되지만 발송 가능한 번호가 없어 문자 접수가 되지 않았습니다.'
+                                : '운영일 출결 기록은 확인되지만 문자 접수 로그가 없어 다시 보내기가 필요합니다.',
                             statusLabel: summary.status === 'missing_phone' ? '번호없음' : '미접수',
                             statusTone:
                               summary.status === 'missing_phone'
@@ -2280,7 +2334,7 @@ export default function NotificationSettingsPage() {
                             <Badge className={cn('border-none font-black', getTodayBoardCellTone(summary.status))}>{summary.status === 'sent' || summary.status === 'recorded' || summary.status === 'missing_phone' ? summary.timeLabel : summary.badgeLabel}</Badge>
                           </div>
                           <div className="flex items-center gap-2">
-                            <p className="text-xs font-bold text-slate-500">오늘 {detailRows.length}건</p>
+                            <p className="text-xs font-bold text-slate-500">운영일 {detailRows.length}건</p>
                             <Button
                               type="button"
                               variant="outline"
@@ -2295,7 +2349,7 @@ export default function NotificationSettingsPage() {
                         </div>
                         <div className="mt-3 grid gap-3">
                           {detailRows.length === 0 ? (
-                            <div className="rounded-xl border border-dashed py-6 text-center text-sm font-bold text-muted-foreground">오늘 기록이 없습니다.</div>
+                            <div className="rounded-xl border border-dashed py-6 text-center text-sm font-bold text-muted-foreground">운영일 기록이 없습니다.</div>
                           ) : detailRows.map((row) => (
                             <div key={row.id} className="rounded-xl border border-slate-100 bg-slate-50/70 p-3">
                               <div className="flex flex-wrap items-start justify-between gap-2">

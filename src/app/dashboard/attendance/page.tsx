@@ -27,7 +27,7 @@ import {
 } from '@/components/ui/select';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { differenceInMinutes, format, isSameDay } from 'date-fns';
+import { differenceInMinutes, format } from 'date-fns';
 import { useCollection, useFirestore, useUser, useMemoFirebase } from '@/firebase';
 import { useAppContext } from '@/contexts/app-context';
 import { collection, collectionGroup, deleteDoc, deleteField, doc, getDoc, getDocs, limit, serverTimestamp, query, where, orderBy, Timestamp, writeBatch, setDoc } from 'firebase/firestore';
@@ -771,8 +771,9 @@ export default function AttendancePage() {
       const liveAttendance = attendanceCurrentMap.get(student.id);
       const studyLog = studyLogMap[student.id];
       const liveCheckInAt = isTodaySelected ? toDateSafe(liveAttendance?.lastCheckInAt) : null;
+      const liveStudyDayKey = liveAttendance?.activeStudyDayKey || (liveCheckInAt ? getStudyDayKey(liveCheckInAt) : '');
       const accessCheckedAt =
-        liveCheckInAt && isSameDay(liveCheckInAt, selectedDate)
+        liveCheckInAt && liveStudyDayKey === dateKey
           ? liveCheckInAt
           : null;
       const derived = deriveAttendanceDisplayState({
@@ -795,7 +796,7 @@ export default function AttendancePage() {
       });
 
       const normalizedCheckedAt =
-        derived.checkedAt && isSameDay(derived.checkedAt, selectedDate)
+        derived.checkedAt && getStudyDayKey(derived.checkedAt) === dateKey
           ? derived.checkedAt
           : null;
 
@@ -1139,7 +1140,7 @@ export default function AttendancePage() {
                 )}
                 <div className="grid gap-3 px-8 pb-2 pt-6 sm:grid-cols-2 xl:grid-cols-4">
                   <div className="rounded-[1.45rem] border border-slate-200 bg-white px-4 py-4 shadow-sm">
-                    <p className="text-[11px] font-black uppercase tracking-[0.18em] text-slate-400">오늘 일정 등록</p>
+                    <p className="text-[11px] font-black uppercase tracking-[0.18em] text-slate-400">운영일 일정 등록</p>
                     <p className="mt-2 text-2xl font-black tracking-tight text-[#14295F]">{attendanceScheduleSummary.scheduled}명</p>
                   </div>
                   <div className="rounded-[1.45rem] border border-rose-200 bg-rose-50/70 px-4 py-4 shadow-sm">
@@ -1391,7 +1392,7 @@ export default function AttendancePage() {
 
                 <div className="grid gap-3 border-b border-muted/10 bg-slate-50/40 p-6 sm:grid-cols-2 xl:grid-cols-4">
                   <div className="rounded-[1.5rem] border border-slate-200 bg-white px-4 py-4">
-                    <p className="text-[11px] font-black uppercase tracking-[0.18em] text-slate-400">오늘 대기 건수</p>
+                    <p className="text-[11px] font-black uppercase tracking-[0.18em] text-slate-400">운영일 대기 건수</p>
                     <p className="mt-2 text-2xl font-black tracking-tight text-[#14295F]">{requestOpsSummary.pendingTodayCount}</p>
                   </div>
                   <div className="rounded-[1.5rem] border border-slate-200 bg-white px-4 py-4">

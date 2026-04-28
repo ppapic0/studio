@@ -209,10 +209,10 @@ const SENSITIVE_USER_MESSAGE_PATTERNS = [
 ];
 
 const DEFAULT_SMS_TEMPLATES: Record<"study_start" | "away_start" | "away_end" | "study_end" | "late_alert", string> = {
-  study_start: `[${TRACK_MANAGED_STUDY_CENTER_NAME}] {studentName} 학생 {time} 공부시작. 오늘 학습 흐름 확인 부탁드립니다.`,
+  study_start: `[${TRACK_MANAGED_STUDY_CENTER_NAME}] {studentName} 학생 {time} 공부시작. 운영일 학습 흐름 확인 부탁드립니다.`,
   away_start: `[${TRACK_MANAGED_STUDY_CENTER_NAME}] {studentName} 학생 {time} 외출. 복귀 후 다시 공부를 이어갑니다.`,
   away_end: `[${TRACK_MANAGED_STUDY_CENTER_NAME}] {studentName} 학생 {time} 복귀. 다시 공부를 시작했습니다.`,
-  study_end: `[${TRACK_MANAGED_STUDY_CENTER_NAME}] {studentName} 학생 {time} 공부종료. 오늘 학습 마무리했습니다.`,
+  study_end: `[${TRACK_MANAGED_STUDY_CENTER_NAME}] {studentName} 학생 {time} 공부종료. 운영일 학습 마무리했습니다.`,
   late_alert: `[${TRACK_MANAGED_STUDY_CENTER_NAME}] {studentName} 학생 {expectedTime} 미등원. 확인 부탁드립니다.`,
 };
 
@@ -291,6 +291,7 @@ type FinalizeStudySessionParams = {
   studentId: string;
   startMs: number;
   endMs: number;
+  dateKeyOverride?: string | null;
   closeSeatRef?: FirebaseFirestore.DocumentReference | null;
   shouldCloseSeat?: boolean;
   closeAttendanceEvent?: {
@@ -967,9 +968,12 @@ async function finalizeStudySession(params: FinalizeStudySessionParams): Promise
   const startMs = Math.max(0, Math.floor(params.startMs));
   const rawEndMs = Math.max(startMs, Math.floor(params.endMs));
   const effectiveEndMs = Math.min(rawEndMs, startMs + MAX_STUDY_SESSION_MINUTES * MINUTE_MS);
-  const segments = splitRangeByStudyDayBoundary(startMs, effectiveEndMs);
+  const sessionDateKey = isValidDateKey(asTrimmedString(params.dateKeyOverride))
+    ? asTrimmedString(params.dateKeyOverride)
+    : toStudyDayKey(new Date(startMs));
+  const segments = buildStartAnchoredStudyDaySegment(startMs, effectiveEndMs, sessionDateKey);
   const progressRef = db.doc(`centers/${centerId}/growthProgress/${studentId}`);
-  const activeSessionDateKey = toStudyDayKey(new Date(effectiveEndMs));
+  const activeSessionDateKey = sessionDateKey;
   const sessionEntries = segments.map((segment) => {
     const sessionId = `session_${startMs}_${segment.startMs}`;
     const dayRef = db.doc(`centers/${centerId}/studyLogs/${studentId}/days/${segment.dateKey}`);
@@ -1448,6 +1452,12 @@ function getStudyDayWindowBounds(dateKey: string): { startMs: number; endMs: num
   };
 }
 
+function getPreviousDateKey(dateKey: string): string {
+  const date = new Date(`${dateKey}T00:00:00+09:00`);
+  date.setDate(date.getDate() - 1);
+  return toDateKey(date);
+}
+
 function getStudyBoxCarryoverExpiresAtMs(dateKey: string): number {
   return getStudyDayWindowBounds(dateKey).endMs + STUDY_BOX_CARRYOVER_GRACE_MINUTES * MINUTE_MS;
 }
@@ -1501,6 +1511,28 @@ function splitRangeByStudyDayBoundary(startMs: number, endMs: number): StudyDayR
   }
 
   return segments;
+}
+
+function buildStartAnchoredStudyDaySegment(startMs: number, endMs: number, dateKeyOverride?: string | null): StudyDayRangeSegment[] {
+  if (!Number.isFinite(startMs) || !Number.isFinite(endMs) || endMs <= startMs) return [];
+
+  const durationMs = endMs - startMs;
+  const dateKey = asTrimmedString(dateKeyOverride);
+  return [{
+    dateKey: isValidDateKey(dateKey) ? dateKey : toStudyDayKey(new Date(startMs)),
+    startMs,
+    endMs,
+    durationMs,
+    durationMinutes: Math.max(1, Math.ceil(durationMs / MINUTE_MS)),
+    durationSeconds: Math.max(1, Math.ceil(durationMs / SECOND_MS)),
+  }];
+}
+
+function buildStudySessionOverlapDateKeys(startMs: number, endMs: number): string[] {
+  const segmentKeys = splitRangeByStudyDayBoundary(startMs, endMs).map((segment) => segment.dateKey);
+  const startDateKey = Number.isFinite(startMs) && startMs > 0 ? toStudyDayKey(new Date(startMs)) : "";
+  const keys = Array.from(new Set([...segmentKeys, startDateKey].filter(Boolean)));
+  return Array.from(new Set(keys.flatMap((dateKey) => [dateKey, getPreviousDateKey(dateKey)])));
 }
 
 function toTimeLabel(date: Date): string {
@@ -2433,12 +2465,14 @@ async function resolveAttendanceSmsEventAt(
   const eventType = normalizeSmsEventType(params.eventType);
   if (eventType === "late_alert") return params.fallbackEventAt;
 
-  const dateKey = asTrimmedString(params.dateKeyOverride) || toStudyDayKey(params.fallbackEventAt);
+  const overrideDateKey = asTrimmedString(params.dateKeyOverride);
+  const hasDateKeyOverride = isValidDateKey(overrideDateKey);
+  const dateKey = hasDateKeyOverride ? overrideDateKey : toStudyDayKey(params.fallbackEventAt);
   const candidates: Date[] = [];
-  const addCandidate = (value: unknown) => {
+  const addCandidate = (value: unknown, allowOutsideStudyDay = false) => {
     const candidate = toKstDateFromUnknownTimestamp(value);
     if (!candidate) return;
-    if (toStudyDayKey(candidate) !== dateKey) return;
+    if (!allowOutsideStudyDay && toStudyDayKey(candidate) !== dateKey) return;
     candidates.push(candidate);
   };
   addCandidate(params.fallbackEventAt);
@@ -2454,20 +2488,21 @@ async function resolveAttendanceSmsEventAt(
   const attendanceRecordData = attendanceRecordSnap.exists ? attendanceRecordSnap.data() || {} : {};
 
   if (eventType === "study_start") {
-    addCandidate(dailyStatData.checkInAt);
-    addCandidate(attendanceRecordData.checkInAt);
+    addCandidate(dailyStatData.checkInAt, hasDateKeyOverride);
+    addCandidate(attendanceRecordData.checkInAt, hasDateKeyOverride);
     liveAttendanceSnap.docs.forEach((docSnap) => {
       const data = docSnap.data() || {};
       const status = asTrimmedString(data.status);
       if (ACTIVE_STUDY_ATTENDANCE_STATUSES.has(status)) {
-        addCandidate(data.lastCheckInAt);
+        const activeStudyDayKey = asTrimmedString(data.activeStudyDayKey);
+        addCandidate(data.lastCheckInAt, isValidDateKey(activeStudyDayKey) && activeStudyDayKey === dateKey);
       }
     });
   }
 
   if (eventType === "study_end") {
-    addCandidate(dailyStatData.checkOutAt);
-    addCandidate(attendanceRecordData.checkOutAt);
+    addCandidate(dailyStatData.checkOutAt, hasDateKeyOverride);
+    addCandidate(attendanceRecordData.checkOutAt, hasDateKeyOverride);
   }
 
   const matchingAttendanceEventTypes: Record<
@@ -2484,7 +2519,7 @@ async function resolveAttendanceSmsEventAt(
     const data = docSnap.data() || {};
     if (asTrimmedString(data.studentId) !== params.studentId) return;
     if (!targetEventTypes.includes(asTrimmedString(data.eventType))) return;
-    addCandidate(data.occurredAt || data.createdAt);
+    addCandidate(data.occurredAt || data.createdAt, true);
   });
 
   const picked = pickSmsEventDate(candidates, eventType === "study_start" ? "earliest" : "latest");
@@ -2765,6 +2800,7 @@ async function appendSmsDeliveryLog(
     provider?: string | null;
     attemptNo?: number | null;
     status: SmsDeliveryLogStatus;
+    dateKey?: string | null;
     createdAt?: admin.firestore.Timestamp;
     eventAt?: admin.firestore.Timestamp | null;
     sentAt?: admin.firestore.Timestamp | null;
@@ -2776,6 +2812,9 @@ async function appendSmsDeliveryLog(
 ): Promise<void> {
   const createdAt = params.createdAt || admin.firestore.Timestamp.now();
   const eventAt = params.eventAt || null;
+  const dateKey = isValidDateKey(asTrimmedString(params.dateKey))
+    ? asTrimmedString(params.dateKey)
+    : toStudyDayKey((eventAt || createdAt).toDate());
   const logRef = db.collection(`centers/${params.centerId}/smsDeliveryLogs`).doc();
   await logRef.set({
     centerId: params.centerId,
@@ -2793,7 +2832,7 @@ async function appendSmsDeliveryLog(
     provider: params.provider || null,
     attemptNo: params.attemptNo || 0,
     status: params.status,
-    dateKey: toStudyDayKey((eventAt || createdAt).toDate()),
+    dateKey,
     eventAt,
     createdAt,
     sentAt: params.sentAt || null,
@@ -3085,6 +3124,8 @@ async function queueParentSmsNotification(
 
   const eventTimeLabel = toTimeLabel(smsEventAt);
   const eventAtTs = admin.firestore.Timestamp.fromDate(smsEventAt);
+  const overrideDateKey = asTrimmedString(params.dateKeyOverride);
+  const smsDateKey = isValidDateKey(overrideDateKey) ? overrideDateKey : toStudyDayKey(smsEventAt);
   const expectedTimeLabel = expectedTime || "학생이 정한 시간";
   const message = buildParentSmsTemplateMessage(template, {
     studentName,
@@ -3163,7 +3204,7 @@ async function queueParentSmsNotification(
       messageBytes,
       dedupeKey,
       eventType,
-      dateKey: toStudyDayKey(smsEventAt),
+      dateKey: smsDateKey,
       eventAt: eventAtTs,
       status: shouldDispatchImmediately ? "processing" : initialStatus.status,
       providerStatus: shouldDispatchImmediately ? "processing" : initialStatus.providerStatus,
@@ -3226,6 +3267,7 @@ async function queueParentSmsNotification(
         status: "suppressed_opt_out",
         createdAt: ts,
         eventAt: eventAtTs,
+        dateKey: smsDateKey,
         suppressedReason: recipient.suppressedReason,
         dedupeKey,
         sourceEventId: asTrimmedString(params.sourceEventId) || null,
@@ -3393,6 +3435,7 @@ async function queueCustomParentSmsNotification(
         attemptNo: 0,
         status: "suppressed_opt_out",
         createdAt: ts,
+        dateKey: toStudyDayKey(params.date),
         suppressedReason: recipient.suppressedReason,
         dedupeKey: params.dedupeKey || null,
       })
@@ -3517,6 +3560,7 @@ async function queueAttendanceEventSmsV2(
       eventAt,
       settings,
       force: params.force === true,
+      dateKeyOverride: asTrimmedString(eventData.dateKey) || null,
       useExactEventAt: true,
       dedupeKeyOverride: dedupeKey,
       sourceEventId: eventId,
@@ -3939,7 +3983,7 @@ export const repairTodayAttendanceSmsQueue = smsDispatcherFunctions.https.onCall
   const todayKey = toStudyDayKey(toKstDate());
   const requestedDateKey = asTrimmedString(data?.dateKey, todayKey);
   if (requestedDateKey !== todayKey) {
-    throw new functions.https.HttpsError("invalid-argument", "오늘 날짜의 문자 접수만 복구할 수 있습니다.");
+    throw new functions.https.HttpsError("invalid-argument", "현재 운영일의 문자 접수만 복구할 수 있습니다.");
   }
 
   const result = await repairAttendanceSmsQueueForCenter(db, centerId, todayKey);
@@ -4179,6 +4223,7 @@ async function dispatchSmsQueueItem(
   const receiver = normalizePhoneNumber(queueData.phoneNumber || queueData.to || "");
   const queueId = queueRef.id;
   const queueEventAt = toTimestampOrNow(queueData.eventAt || queueData?.metadata?.eventAt);
+  const queueDateKey = asTrimmedString(queueData.dateKey);
   const queueDedupeKey = asTrimmedString(queueData.dedupeKey);
   const queueSourceEventId = asTrimmedString(queueData.sourceEventId || queueData?.metadata?.sourceEventId);
   const studentId = asTrimmedString(queueData.studentId);
@@ -4221,6 +4266,7 @@ async function dispatchSmsQueueItem(
       status: "suppressed_opt_out",
       createdAt: nowTs,
       eventAt: queueEventAt,
+      dateKey: queueDateKey,
       suppressedReason: "student_fallback_blocked",
       dedupeKey: queueDedupeKey || null,
       sourceEventId: queueSourceEventId || null,
@@ -4255,6 +4301,7 @@ async function dispatchSmsQueueItem(
       status: "failed",
       createdAt: nowTs,
       eventAt: queueEventAt,
+      dateKey: queueDateKey,
       failedAt: nowTs,
       errorCode: "INVALID_QUEUE_ITEM",
       errorMessage: "수신번호 또는 문자 본문이 비어 있습니다.",
@@ -4378,6 +4425,7 @@ async function dispatchSmsQueueItem(
       status: "sent",
       createdAt: nowTs,
       eventAt: queueEventAt,
+      dateKey: queueDateKey,
       sentAt: nowTs,
       dedupeKey: queueDedupeKey || null,
       sourceEventId: queueSourceEventId || null,
@@ -4442,6 +4490,7 @@ async function dispatchSmsQueueItem(
     status: "failed",
     createdAt: nowTs,
     eventAt: queueEventAt,
+    dateKey: queueDateKey,
     failedAt: nowTs,
     errorCode: lastErrorCode,
     errorMessage: lastErrorMessage,
@@ -7445,7 +7494,9 @@ export const retrySmsQueueItem = functions.region(region).https.onCall(async (da
       retryPayload.message = message;
       retryPayload.renderedMessage = message;
       retryPayload.messageBytes = calculateSmsBytes(message);
-      retryPayload.dateKey = toStudyDayKey(smsEventAt);
+      retryPayload.dateKey = isValidDateKey(asTrimmedString(queueData.dateKey))
+        ? asTrimmedString(queueData.dateKey)
+        : toStudyDayKey(smsEventAt);
       retryPayload.metadata = {
         studentName,
         centerName,
@@ -8735,6 +8786,8 @@ function buildAttendanceSeatPatch(params: {
   seatData: Record<string, unknown>;
   seatHint?: AttendanceSeatHint | null;
   nowTs: admin.firestore.Timestamp;
+  activeStudyDayKey?: string | null;
+  activeStudyStartedAtMs?: number | null;
 }): Record<string, unknown> {
   const seatNo = Math.max(
     0,
@@ -8774,7 +8827,100 @@ function buildAttendanceSeatPatch(params: {
     patch.lastCheckInAt = admin.firestore.FieldValue.delete();
   }
 
+  if (params.nextStatus === "absent") {
+    patch.activeStudyDayKey = admin.firestore.FieldValue.delete();
+    patch.activeStudyStartedAt = admin.firestore.FieldValue.delete();
+  } else {
+    const activeStudyDayKey = asTrimmedString(params.activeStudyDayKey);
+    const activeStudyStartedAtMs = Math.max(0, Math.floor(params.activeStudyStartedAtMs ?? 0));
+    patch.activeStudyDayKey = isValidDateKey(activeStudyDayKey)
+      ? activeStudyDayKey
+      : toStudyDayKey(params.nowTs.toDate());
+    patch.activeStudyStartedAt = activeStudyStartedAtMs > 0
+      ? admin.firestore.Timestamp.fromMillis(activeStudyStartedAtMs)
+      : params.nowTs;
+  }
+
   return patch;
+}
+
+async function resolveActiveAttendanceFlowContext(params: {
+  db: admin.firestore.Firestore;
+  centerId: string;
+  studentId: string;
+  currentDateKey: string;
+  nowMs: number;
+  seatData: Record<string, unknown>;
+}): Promise<{ dateKey: string; startedAtMs: number }> {
+  const fieldDateKey = asTrimmedString(params.seatData.activeStudyDayKey);
+  const fieldStartedAtMs = toMillisSafe(params.seatData.activeStudyStartedAt);
+  const seatStartedAtMs = fieldStartedAtMs || toMillisSafe(params.seatData.lastCheckInAt);
+  if (isValidDateKey(fieldDateKey)) {
+    return { dateKey: fieldDateKey, startedAtMs: seatStartedAtMs };
+  }
+
+  if (seatStartedAtMs > 0 && seatStartedAtMs < params.nowMs + MINUTE_MS) {
+    return { dateKey: toStudyDayKey(new Date(seatStartedAtMs)), startedAtMs: seatStartedAtMs };
+  }
+
+  const evidenceDateKeys = Array.from(new Set([params.currentDateKey, getPreviousDateKey(params.currentDateKey)]));
+  const eventSnaps = await Promise.all(
+    evidenceDateKeys.map((dateKey) =>
+      params.db
+        .collection(`centers/${params.centerId}/attendanceEvents`)
+        .where("studentId", "==", params.studentId)
+        .where("dateKey", "==", dateKey)
+        .limit(160)
+        .get()
+    )
+  );
+
+  let activeFlowStartMs = 0;
+  eventSnaps
+    .flatMap((snap) => snap.docs)
+    .map((docSnap) => {
+      const data = (docSnap.data() || {}) as Record<string, unknown>;
+      return {
+        eventType: asTrimmedString(data.eventType),
+        occurredAtMs: toMillisSafe(data.occurredAt) || toMillisSafe(data.createdAt),
+      };
+    })
+    .filter((event) => event.occurredAtMs > 0 && event.occurredAtMs < params.nowMs + MINUTE_MS)
+    .sort((left, right) => left.occurredAtMs - right.occurredAtMs)
+    .forEach((event) => {
+      if (event.eventType === "check_in" && event.occurredAtMs > 0) {
+        activeFlowStartMs = event.occurredAtMs;
+        return;
+      }
+      if (event.eventType === "check_out") {
+        activeFlowStartMs = 0;
+      }
+    });
+
+  if (activeFlowStartMs > 0) {
+    return { dateKey: toStudyDayKey(new Date(activeFlowStartMs)), startedAtMs: activeFlowStartMs };
+  }
+
+  const statSnaps = await Promise.all(
+    evidenceDateKeys.map((dateKey) =>
+      params.db.doc(`centers/${params.centerId}/attendanceDailyStats/${dateKey}/students/${params.studentId}`).get()
+    )
+  );
+  let statCheckInMs = 0;
+  statSnaps.forEach((statSnap) => {
+    const statData = statSnap.exists ? ((statSnap.data() || {}) as Record<string, unknown>) : {};
+    const checkInMs = toMillisSafe(statData.checkInAt);
+    const checkOutMs = toMillisSafe(statData.checkOutAt);
+    if (checkInMs > 0 && checkInMs < params.nowMs + MINUTE_MS && checkInMs > statCheckInMs && (!checkOutMs || checkOutMs < checkInMs)) {
+      statCheckInMs = checkInMs;
+    }
+  });
+
+  if (statCheckInMs > 0) {
+    return { dateKey: toStudyDayKey(new Date(statCheckInMs)), startedAtMs: statCheckInMs };
+  }
+
+  return { dateKey: params.currentDateKey, startedAtMs: 0 };
 }
 
 async function resolveOpenStudyStartMsFromAttendanceEvidence(params: {
@@ -8875,7 +9021,7 @@ async function applyAttendanceStatusTransition(
   const nextStatus = params.nextStatus;
   const nowMs = Math.max(0, Math.floor(params.nowMs ?? Date.now()));
   const nowTs = admin.firestore.Timestamp.fromMillis(nowMs);
-  const attendanceDateKey = toStudyDayKey(new Date(nowMs));
+  const currentDateKey = toStudyDayKey(new Date(nowMs));
   const seatDoc = await resolveAttendanceSeatDocForTransition({
     db,
     centerId,
@@ -8892,6 +9038,7 @@ async function applyAttendanceStatusTransition(
         studentId,
         startMs: fallbackStartTimeMs,
         endMs: nowMs,
+        dateKeyOverride: toStudyDayKey(new Date(fallbackStartTimeMs)),
         sessionMetadata: {
           closedReason: "fallback_no_seat",
           closedBySource: params.source,
@@ -8933,6 +9080,21 @@ async function applyAttendanceStatusTransition(
   }
 
   const preflightStatus = normalizeAttendanceSeatStatus(preflightSeatData.status);
+  const preflightFlowContext =
+    preflightStatus === "absent" && nextStatus === "studying"
+      ? { dateKey: currentDateKey, startedAtMs: nowMs }
+      : await resolveActiveAttendanceFlowContext({
+          db,
+          centerId,
+          studentId,
+          currentDateKey,
+          nowMs,
+          seatData: preflightSeatData,
+        });
+  const attendanceDateKey = preflightFlowContext.dateKey;
+  const activeStudyStartedAtMs = preflightFlowContext.startedAtMs > 0
+    ? preflightFlowContext.startedAtMs
+    : (preflightStatus === "absent" && nextStatus === "studying" ? nowMs : 0);
   if (
     (nextStatus === "away" || nextStatus === "break") &&
     preflightStatus !== "studying" &&
@@ -8979,6 +9141,7 @@ async function applyAttendanceStatusTransition(
       studentId,
       startMs: preflightStartMs,
       endMs: nowMs,
+      dateKeyOverride: attendanceDateKey,
       sessionMetadata: {
         closedReason: nextStatus === "absent" ? "check_out" : "away_start",
         closedBySource: params.source,
@@ -9063,12 +9226,23 @@ async function applyAttendanceStatusTransition(
           repeatStatPatch.hasCheckOutRecord = true;
         }
 
-        transaction.set(repeatStatRef, repeatStatPatch, { merge: true });
-        transaction.set(seatDoc.ref, {
+        const repeatSeatPatch: Record<string, unknown> = {
           studentId,
           status: nextStatus,
           updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-        }, { merge: true });
+        };
+        if (nextStatus === "absent") {
+          repeatSeatPatch.activeStudyDayKey = admin.firestore.FieldValue.delete();
+          repeatSeatPatch.activeStudyStartedAt = admin.firestore.FieldValue.delete();
+        } else {
+          repeatSeatPatch.activeStudyDayKey = attendanceDateKey;
+          repeatSeatPatch.activeStudyStartedAt = activeStudyStartedAtMs > 0
+            ? admin.firestore.Timestamp.fromMillis(activeStudyStartedAtMs)
+            : nowTs;
+        }
+
+        transaction.set(repeatStatRef, repeatStatPatch, { merge: true });
+        transaction.set(seatDoc.ref, repeatSeatPatch, { merge: true });
         transaction.set(repeatEventRef, {
           studentId,
           dateKey: attendanceDateKey,
@@ -9135,6 +9309,8 @@ async function applyAttendanceStatusTransition(
       seatData: freshSeatData,
       seatHint: params.seatHint,
       nowTs,
+      activeStudyDayKey: attendanceDateKey,
+      activeStudyStartedAtMs,
     });
     transaction.set(seatDoc.ref, seatPatch, { merge: true });
 
@@ -9418,10 +9594,9 @@ function assertManualSessionTimeInput(params: {
       });
     }
     const startDateKey = toStudyDayKey(new Date(params.startMs));
-    const endDateKey = toStudyDayKey(new Date(params.endMs - 1));
-    if (startDateKey !== params.dateKey || endDateKey !== params.dateKey) {
+    if (startDateKey !== params.dateKey) {
       throw new functions.https.HttpsError("invalid-argument", "Manual session must stay inside the selected study day.", {
-        userMessage: "현재 선택한 날짜 안의 시작/종료 시간만 입력해 주세요.",
+        userMessage: "현재 선택한 날짜에 시작한 세션만 입력해 주세요.",
       });
     }
   }
@@ -9471,26 +9646,17 @@ async function assertNoOverlappingStudySessions(params: {
 }): Promise<void> {
   const { db, centerId, studentId, startMs, endMs } = params;
   const ignoredSessionIds = new Set((params.ignoreSessionIds || []).map((value) => asTrimmedString(value)).filter(Boolean));
-  const segments = splitRangeByStudyDayBoundary(startMs, endMs);
-  const dateKeys = Array.from(new Set(segments.map((segment) => segment.dateKey)));
+  const dateKeys = buildStudySessionOverlapDateKeys(startMs, endMs);
   const fallbackOpenEndMs = Math.max(Date.now(), endMs);
 
   for (const dateKey of dateKeys) {
-    const bounds = getStudyDayWindowBounds(dateKey);
-    const relevantSegments = segments.filter((segment) => segment.dateKey === dateKey);
     const sessionsSnap = await db.collection(`centers/${centerId}/studyLogs/${studentId}/days/${dateKey}/sessions`).get();
 
     for (const sessionSnap of sessionsSnap.docs) {
       if (ignoredSessionIds.has(sessionSnap.id)) continue;
       const range = getExistingStudySessionRangeMs((sessionSnap.data() || {}) as Record<string, unknown>, fallbackOpenEndMs);
       if (!range) continue;
-      const existingStartMs = Math.max(range.startMs, bounds.startMs);
-      const existingEndMs = Math.min(range.endMs, bounds.endMs);
-
-      const isOverlapping = relevantSegments.some((segment) => {
-        return existingStartMs < segment.endMs && existingEndMs > segment.startMs;
-      });
-      if (isOverlapping) {
+      if (range.startMs < endMs && range.endMs > startMs) {
         throw new functions.https.HttpsError("failed-precondition", "Manual session overlaps with an existing session.", {
           userMessage: "이미 저장된 세션 시간과 겹칩니다. 시작/종료 시간을 다시 확인해 주세요.",
           sessionId: sessionSnap.id,
@@ -9766,6 +9932,7 @@ export const deleteManualStudySessionSecure = functions
 type RepairAttendanceEvent = {
   eventType: "check_in" | "away_start" | "away_end" | "check_out";
   occurredAtMs: number;
+  dateKey?: string;
 };
 
 async function repairMissingStudySessionsFromAttendanceEvents(params: {
@@ -9783,9 +9950,13 @@ async function repairMissingStudySessionsFromAttendanceEvents(params: {
     .map((sessionSnap) => getExistingStudySessionRangeMs((sessionSnap.data() || {}) as Record<string, unknown>, Date.now()))
     .filter((range): range is { startMs: number; endMs: number } => Boolean(range));
 
-  const bounds = getStudyDayWindowBounds(dateKey);
   const dayEvents = params.events
-    .filter((event) => event.occurredAtMs >= bounds.startMs && event.occurredAtMs < bounds.endMs)
+    .filter((event) => {
+      const eventDateKey = asTrimmedString(event.dateKey);
+      if (isValidDateKey(eventDateKey)) return eventDateKey === dateKey;
+      const bounds = getStudyDayWindowBounds(dateKey);
+      return event.occurredAtMs >= bounds.startMs && event.occurredAtMs < bounds.endMs;
+    })
     .sort((left, right) => left.occurredAtMs - right.occurredAtMs);
 
   let openStartMs: number | null = null;
@@ -9903,6 +10074,7 @@ export const repairRecentStudySessionTotals = functions
           return {
             eventType,
             occurredAtMs,
+            dateKey: asTrimmedString(eventData.dateKey),
           };
         })
         .filter((event): event is RepairAttendanceEvent => Boolean(event));

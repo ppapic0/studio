@@ -36,6 +36,7 @@ import {
   type AttendanceStudentKpiRow,
 } from '@/lib/attendance-kpi';
 import { getRoomLabel } from '@/lib/seat-layout';
+import { getStudyDayKey } from '@/lib/study-day';
 import { getLiveStudySessionDurationMinutes, getStudySessionDurationMinutes } from '@/lib/study-session-time';
 import { AttendanceCurrent, AttendanceRequest, CenterMembership } from '@/lib/types';
 
@@ -707,7 +708,9 @@ export function useAttendanceKpi({
         const dayRequests = requestHistory.filter((request) => resolveRequestDateKey(request) === dateKey);
         const latestRequest = dayRequests[0] || null;
 
-        const liveCheckedAt = dateKey === todayKey ? toDateSafe(liveSeat?.lastCheckInAt) : null;
+        const rawLiveCheckedAt = dateKey === todayKey ? toDateSafe(liveSeat?.lastCheckInAt) : null;
+        const liveStudyDayKey = liveSeat?.activeStudyDayKey || (rawLiveCheckedAt ? getStudyDayKey(rawLiveCheckedAt) : '');
+        const liveCheckedAt = rawLiveCheckedAt && liveStudyDayKey === dateKey ? rawLiveCheckedAt : null;
         const sessionStudyMinutes = sessions.reduce((sum, session) => sum + getStudySessionDurationMinutes(session), 0);
         const eventClosedStudyMinutes = calculateClosedStudyMinutesFromAttendanceEvents(dayEvents);
         const firstCheckInAt = pickDateByMode(

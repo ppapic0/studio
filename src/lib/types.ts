@@ -907,6 +907,8 @@ export interface AttendanceCurrent {
   manualOccupantName?: string | null;
   updatedAt: Timestamp;
   lastCheckInAt?: Timestamp;
+  activeStudyDayKey?: string;
+  activeStudyStartedAt?: Timestamp;
   studentId?: string; 
 }
 
