@@ -25,6 +25,9 @@ export type EnqueueKioskAttendanceActionResult = {
   actionId: string;
   optimisticStatus: AttendanceCurrent['status'];
   status?: 'queued' | 'processing' | 'completed' | 'failed' | 'rejected_stale';
+  userMessage?: string;
+  failedReason?: string;
+  staleReason?: string;
 };
 
 export async function enqueueKioskAttendanceActionSecure(

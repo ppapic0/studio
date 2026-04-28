@@ -29,6 +29,7 @@ import type { AttendanceCurrent, StudentProfile } from '@/lib/types';
 import {
   enqueueKioskAttendanceActionSecure,
   type EnqueueKioskAttendanceActionInput,
+  type EnqueueKioskAttendanceActionResult,
   type KioskAttendanceAction,
 } from '@/lib/kiosk-attendance-actions';
 import type { LucideIcon } from 'lucide-react';
@@ -152,6 +153,12 @@ function getAllowedActions(status: AttendanceStatus): KioskAttendanceAction[] {
   return ['check_in'];
 }
 
+function getNextStatusForAction(action: KioskAttendanceAction): AttendanceStatus {
+  if (action === 'check_in' || action === 'away_end') return 'studying';
+  if (action === 'away_start') return 'away';
+  return 'absent';
+}
+
 function getSeatActivityRank(status?: AttendanceStatus) {
   if (status === 'studying') return 0;
   if (status === 'away' || status === 'break') return 1;
@@ -234,6 +241,7 @@ export default function KioskPage() {
   const [isSearching, setIsSearching] = useState(false);
   const [lookupMessage, setLookupMessage] = useState('번호 확인 중');
   const [successFeedback, setSuccessFeedback] = useState<KioskSuccessFeedback | null>(null);
+  const [actionProcessingLabel, setActionProcessingLabel] = useState<string | null>(null);
   const lookupVersionRef = useRef(0);
   const pendingActionRef = useRef(false);
   const flushingOutboxRef = useRef(false);
@@ -424,9 +432,13 @@ export default function KioskPage() {
       let items = readOutbox();
       for (const item of items) {
         try {
-          await enqueueKioskAttendanceActionSecure(functions, item.payload);
-          items = readOutbox().filter((candidate) => candidate.id !== item.id);
-          writeOutbox(items);
+          const result = await enqueueKioskAttendanceActionSecure(functions, item.payload);
+          if (result.status === 'completed' || result.status === 'failed' || result.status === 'rejected_stale') {
+            items = readOutbox().filter((candidate) => candidate.id !== item.id);
+            writeOutbox(items);
+          } else {
+            break;
+          }
         } catch (error) {
           const nextItems = readOutbox().map((candidate) =>
             candidate.id === item.id
@@ -443,7 +455,7 @@ export default function KioskPage() {
     }
   }, [functions]);
 
-  const queueActionForDelivery = useCallback((payload: EnqueueKioskAttendanceActionInput) => {
+  const saveActionForRetry = useCallback((payload: EnqueueKioskAttendanceActionInput) => {
     const items = readOutbox().filter((item) => item.id !== payload.idempotencyKey);
     writeOutbox([
       ...items,
@@ -454,8 +466,32 @@ export default function KioskPage() {
         createdAt: Date.now(),
       },
     ]);
-    void flushOutbox();
-  }, [flushOutbox]);
+  }, []);
+
+  const removeActionFromRetry = useCallback((idempotencyKey: string) => {
+    writeOutbox(readOutbox().filter((item) => item.id !== idempotencyKey));
+  }, []);
+
+  const sendActionToBackend = useCallback(async (payload: EnqueueKioskAttendanceActionInput): Promise<EnqueueKioskAttendanceActionResult> => {
+    saveActionForRetry(payload);
+    if (!functions) {
+      void flushOutbox();
+      return {
+        ok: true,
+        queued: true,
+        actionId: payload.idempotencyKey,
+        optimisticStatus: getNextStatusForAction(payload.action),
+        status: 'queued',
+        userMessage: '네트워크가 연결되면 자동으로 다시 전송합니다.',
+      };
+    }
+
+    const result = await enqueueKioskAttendanceActionSecure(functions, payload);
+    if (result.status === 'completed' || result.status === 'failed' || result.status === 'rejected_stale') {
+      removeActionFromRetry(payload.idempotencyKey);
+    }
+    return result;
+  }, [flushOutbox, functions, removeActionFromRetry, saveActionForRetry]);
 
   useEffect(() => {
     void flushOutbox();
@@ -491,7 +527,7 @@ export default function KioskPage() {
     setPin((previous) => previous.slice(0, -1));
   }, [isSearching, step]);
 
-  const handleAction = useCallback((action: KioskAttendanceAction) => {
+  const handleAction = useCallback(async (action: KioskAttendanceAction) => {
     if (!centerId || !selectedStudent || pendingActionRef.current) return;
     const seat = resolveSeatForStudent(selectedStudent);
     if (!seat) {
@@ -517,16 +553,9 @@ export default function KioskPage() {
 
     const config = ACTIONS[action];
     pendingActionRef.current = true;
-    setSuccessFeedback({
-      title: config.completeTitle,
-      description: config.completeDescription(selectedStudent.name),
-      label: config.label,
-      Icon: config.Icon,
-      overlayClass: config.overlayClass,
-      iconClass: config.iconClass,
-    });
+    setActionProcessingLabel(`${config.label} 처리 중`);
 
-    queueActionForDelivery({
+    const payload: EnqueueKioskAttendanceActionInput = {
       centerId,
       studentId: selectedStudent.id,
       pin,
@@ -540,13 +569,49 @@ export default function KioskPage() {
       },
       idempotencyKey: createIdempotencyKey(),
       clientActionAtMillis: Date.now(),
-    });
+    };
 
-    window.setTimeout(() => {
-      pendingActionRef.current = false;
+    try {
+      const result = await sendActionToBackend(payload);
+      if (result.status !== 'completed') {
+        toast({
+          variant: result.status === 'failed' || result.status === 'rejected_stale' ? 'destructive' : 'default',
+          title: result.status === 'failed' || result.status === 'rejected_stale' ? '처리 실패' : '전송 대기 중',
+          description:
+            result.userMessage ||
+            result.failedReason ||
+            (result.status === 'rejected_stale'
+              ? '출결 상태가 바뀌었습니다. 번호를 다시 입력해 현재 상태를 확인해 주세요.'
+              : '백엔드 처리가 완료되면 자동 반영됩니다.'),
+        });
+        resetKiosk();
+        return;
+      }
+
+      setSuccessFeedback({
+        title: config.completeTitle,
+        description: config.completeDescription(selectedStudent.name),
+        label: config.label,
+        Icon: config.Icon,
+        overlayClass: config.overlayClass,
+        iconClass: config.iconClass,
+      });
+      window.setTimeout(() => {
+        resetKiosk();
+      }, 260);
+    } catch (error) {
+      toast({
+        variant: 'destructive',
+        title: '처리 실패',
+        description: getKioskErrorMessage(error),
+      });
+      void flushOutbox();
       resetKiosk();
-    }, 260);
-  }, [centerId, pin, queueActionForDelivery, resetKiosk, resolveSeatForStudent, selectedStudent, toast]);
+    } finally {
+      setActionProcessingLabel(null);
+      pendingActionRef.current = false;
+    }
+  }, [centerId, flushOutbox, pin, resetKiosk, resolveSeatForStudent, selectedStudent, sendActionToBackend, toast]);
 
   const canGoBack = activeMembership?.role === 'teacher' || activeMembership?.role === 'centerAdmin';
   const selectedSeat = selectedStudent ? resolveSeatForStudent(selectedStudent) : null;
@@ -582,6 +647,15 @@ export default function KioskPage() {
             </div>
             <p className="mt-4 text-xl font-black text-white">{successFeedback.label}</p>
             <p className="mt-3 text-base font-bold leading-6 text-white/86">{successFeedback.description}</p>
+          </div>
+        </div>
+      )}
+
+      {actionProcessingLabel && (
+        <div className="fixed inset-0 z-[115] flex items-center justify-center bg-[#061330]/45 p-5 backdrop-blur-sm">
+          <div className="w-full max-w-sm rounded-[2rem] border border-[#D7E4FF] bg-white p-8 text-center shadow-[0_34px_70px_-34px_rgba(6,19,48,0.75)]">
+            <Loader2 className="mx-auto h-12 w-12 animate-spin text-[#FF7A16]" />
+            <p className="mt-5 text-xl font-black text-[#14295F]">{actionProcessingLabel}</p>
           </div>
         </div>
       )}
@@ -761,6 +835,7 @@ export default function KioskPage() {
                         key={action}
                         type="button"
                         onClick={() => handleAction(action)}
+                        disabled={Boolean(actionProcessingLabel)}
                         className={cn(
                           'h-36 rounded-[1.65rem] text-white transition active:scale-[0.98] sm:h-44',
                           'flex flex-col items-center justify-center gap-4 border-0 text-2xl font-black',

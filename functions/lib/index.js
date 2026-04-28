@@ -8532,6 +8532,43 @@ async function processKioskAttendanceQueueItem(db, centerId, actionId) {
         });
     }
 }
+function sleepKioskQueueMs(ms) {
+    return new Promise((resolve) => setTimeout(resolve, ms));
+}
+function getKioskQueueCallableUserMessage(status) {
+    if (status === "completed")
+        return null;
+    if (status === "failed") {
+        return "키오스크 출결을 실제 처리하지 못했습니다. 잠시 후 다시 시도해 주세요.";
+    }
+    if (status === "rejected_stale") {
+        return "출결 상태가 이미 바뀌었습니다. 번호를 다시 입력해 현재 상태를 확인해 주세요.";
+    }
+    return "키오스크 출결 처리가 아직 대기 중입니다. 잠시 후 출결 현황을 확인해 주세요.";
+}
+async function readKioskAttendanceQueueCallableResult(params) {
+    const queueSnap = await params.db.doc(`centers/${params.centerId}/kioskAttendanceQueue/${params.actionId}`).get();
+    const queueData = queueSnap.exists ? (queueSnap.data() || {}) : {};
+    const status = parseKioskAttendanceQueueStatus(queueData.status);
+    const optimisticStatus = parseAttendanceSeatStatus(queueData.nextStatus) || params.fallbackOptimisticStatus;
+    const failedReason = asTrimmedString(queueData.failedReason);
+    const staleReason = asTrimmedString(queueData.staleReason);
+    const userMessage = getKioskQueueCallableUserMessage(status);
+    return Object.assign(Object.assign(Object.assign({ ok: true, queued: status === "queued" || status === "processing", actionId: params.actionId, optimisticStatus,
+        status }, (userMessage ? { userMessage } : {})), (failedReason ? { failedReason } : {})), (staleReason ? { staleReason } : {}));
+}
+async function waitForKioskAttendanceQueueCallableResult(params) {
+    let latest = await readKioskAttendanceQueueCallableResult(params);
+    for (let attempt = 0; attempt < 5; attempt += 1) {
+        const status = parseKioskAttendanceQueueStatus(latest.status);
+        if (status === "completed" || status === "failed" || status === "rejected_stale") {
+            return latest;
+        }
+        await sleepKioskQueueMs(160);
+        latest = await readKioskAttendanceQueueCallableResult(params);
+    }
+    return latest;
+}
 exports.enqueueKioskAttendanceActionSecure = functions.region(region).https.onCall(async (data, context) => {
     var _a;
     const db = admin.firestore();
@@ -8590,13 +8627,26 @@ exports.enqueueKioskAttendanceActionSecure = functions.region(region).https.onCa
             optimisticStatus: getKioskActionNextStatus(action),
         };
     });
-    return {
-        ok: true,
-        queued: enqueueResult.status === "queued" || enqueueResult.status === "processing",
+    if (enqueueResult.status === "queued" || enqueueResult.status === "processing") {
+        try {
+            await processKioskAttendanceQueueItem(db, centerId, enqueueResult.actionId);
+        }
+        catch (error) {
+            console.error("[kiosk-attendance-queue] inline processing failed", {
+                centerId,
+                actionId: enqueueResult.actionId,
+                studentId,
+                code: getKioskQueueErrorCode(error),
+                message: getKioskQueueErrorMessage(error),
+            });
+        }
+    }
+    return waitForKioskAttendanceQueueCallableResult({
+        db,
+        centerId,
         actionId: enqueueResult.actionId,
-        optimisticStatus: enqueueResult.optimisticStatus,
-        status: enqueueResult.status,
-    };
+        fallbackOptimisticStatus: parseAttendanceSeatStatus(enqueueResult.optimisticStatus) || getKioskActionNextStatus(action),
+    });
 });
 exports.onKioskAttendanceQueueCreated = functions
     .region(region)
