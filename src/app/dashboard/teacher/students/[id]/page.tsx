@@ -1784,7 +1784,9 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
       key: 'sms',
       title: '문자 발송량',
       value: `${smsAcceptedCount30d}건`,
-      helper: `최근 30일 비용 약 ${smsCost30d.toLocaleString()}원`,
+      helper: canViewFinance
+        ? `최근 30일 비용 약 ${smsCost30d.toLocaleString()}원`
+        : `최근 30일 보호자 안내 ${smsAcceptedCount30d}건`,
       tone: 'border-sky-100 bg-sky-50/70 text-sky-700',
     },
     {
@@ -3209,7 +3211,7 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
                   <div>
                     <p className="text-[10px] font-black uppercase tracking-[0.22em] text-white/60">운영 리스크 보드</p>
                     <h2 className="mt-2 break-keep font-aggro-display text-[1.45rem] font-black tracking-[-0.04em] text-white">
-                      금융 포함 운영 신호
+                      {canViewFinance ? '금융 포함 운영 신호' : '학습·소통 운영 신호'}
                     </h2>
                   </div>
                   <Badge className="rounded-full border border-white/14 bg-white/8 px-3 py-1 text-[10px] font-black text-white">
@@ -3217,7 +3219,9 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
                   </Badge>
                 </div>
                 <p className="mt-2 text-xs font-semibold leading-5 text-white/80">
-                  문자, 상담, 리포트, 출결, 수납 흐름을 한 패널에서 빠르게 읽습니다.
+                  {canViewFinance
+                    ? '문자, 상담, 리포트, 출결, 수납 흐름을 한 패널에서 빠르게 읽습니다.'
+                    : '상담, 리포트, 출결, 보호자 반응을 한 패널에서 빠르게 읽습니다.'}
                 </p>
 
                 <div className="mt-4 space-y-3">

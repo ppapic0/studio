@@ -234,10 +234,10 @@ export default function StudentListPage() {
 
   useEffect(() => {
     const showRisk = searchParams.get('showRisk');
-    if (showRisk === '1' || showRisk === 'true') {
+    if ((showRisk === '1' || showRisk === 'true') && canOpenFinance) {
       router.replace('/dashboard/revenue?showRisk=1#risk-analysis');
     }
-  }, [searchParams, router]);
+  }, [canOpenFinance, searchParams, router]);
 
   // 1. 센터 멤버 중 '학생' 역할인 사용자들 조회
   const membersQuery = useMemoFirebase(() => {
@@ -997,7 +997,9 @@ export default function StudentListPage() {
           { label: '외출', value: `${operationalSummary.awayCount}명`, sub: '복귀 확인 필요', tone: 'text-amber-700 bg-amber-50' },
           { label: '미입실', value: `${operationalSummary.absentCount}명`, sub: '도착 전 / 퇴실 포함', tone: 'text-rose-700 bg-rose-50' },
           { label: '좌석 연동', value: `${operationalSummary.assignedSeatCount}명`, sub: '도면 연동 가능', tone: 'text-sky-700 bg-sky-50' },
-          { label: '리스크 분석', value: canOpenFinance ? '이동' : '-', sub: canOpenFinance ? '비즈니스 분석에서 확인' : '센터관리자 권한 필요', tone: 'text-violet-700 bg-violet-50' },
+          ...(canOpenFinance
+            ? [{ label: '리스크 분석', value: '이동', sub: '비즈니스 분석에서 확인', tone: 'text-violet-700 bg-violet-50' }]
+            : []),
         ].map((item) => (
           <Card key={item.label} className="rounded-[1.75rem] border border-[#dbe7ff] bg-white shadow-[0_22px_52px_-46px_rgba(20,41,95,0.32)]">
             <CardContent className="p-4">
