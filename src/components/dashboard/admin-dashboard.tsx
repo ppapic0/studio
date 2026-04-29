@@ -256,6 +256,14 @@ const normalizePhoneNumber = (value?: string | null): string => {
   return String(value || '').replace(/\D/g, '').trim();
 };
 
+const normalizePhoneDraft = (value: string): string => {
+  return value.replace(/\D/g, '').slice(0, 11);
+};
+
+const isValidKoreanMobilePhone = (value: string): boolean => {
+  return /^01\d{8,9}$/.test(value);
+};
+
 const toTimestampDateSafe = (value: unknown): Date | null => {
   if (!value) return null;
   if (value instanceof Date) {
@@ -969,6 +977,10 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
   const [focusScheduleAwayEndDraft, setFocusScheduleAwayEndDraft] = useState('');
   const [focusScheduleAwayReasonDraft, setFocusScheduleAwayReasonDraft] = useState('');
   const [isFocusScheduleSaving, setIsFocusScheduleSaving] = useState(false);
+  const [focusPhoneEditMode, setFocusPhoneEditMode] = useState<'student' | 'parent' | null>(null);
+  const [focusStudentPhoneDraft, setFocusStudentPhoneDraft] = useState('');
+  const [focusParentPhoneDraft, setFocusParentPhoneDraft] = useState('');
+  const [focusPhoneSaving, setFocusPhoneSaving] = useState<'student' | 'parent' | null>(null);
   const [focusStudyTotalsRepairing, setFocusStudyTotalsRepairing] = useState(false);
   const [isManualStudySessionDialogOpen, setIsManualStudySessionDialogOpen] = useState(false);
   const [manualStudySessionStartDraft, setManualStudySessionStartDraft] = useState('');
@@ -1129,6 +1141,10 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
     setFocusScheduleAwayEndDraft('');
     setFocusScheduleAwayReasonDraft('');
     setIsFocusScheduleSaving(false);
+    setFocusPhoneEditMode(null);
+    setFocusStudentPhoneDraft('');
+    setFocusParentPhoneDraft('');
+    setFocusPhoneSaving(null);
   }, [selectedFocusStudentId, todayKey]);
 
   useEffect(() => {
@@ -3302,6 +3318,8 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
         manualParentPhone
           ? manualParentPreference?.parentName || '어머님'
           : parentPreference?.parentName || parentMember?.displayName || '어머님',
+      parentUid: parentMember?.id || MANUAL_PARENT_SMS_UID,
+      hasManualParentPhone: Boolean(manualParentPhone),
       parentPhone,
       studentPhone,
       smsLogs: todaysSmsLogs,
@@ -3324,6 +3342,16 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
     () => (selectedFocusStudentId ? (todayStats || []).find((row) => row.studentId === selectedFocusStudentId) || null : null),
     [todayStats, selectedFocusStudentId]
   );
+
+  useEffect(() => {
+    if (focusPhoneEditMode !== null) return;
+    setFocusStudentPhoneDraft(normalizePhoneNumber(selectedFocusOperationsSummary?.studentPhone).slice(0, 11));
+    setFocusParentPhoneDraft(normalizePhoneNumber(selectedFocusOperationsSummary?.parentPhone).slice(0, 11));
+  }, [
+    focusPhoneEditMode,
+    selectedFocusOperationsSummary?.parentPhone,
+    selectedFocusOperationsSummary?.studentPhone,
+  ]);
 
   const selectedFocusProgress = useMemo(
     () => (selectedFocusStudentId ? (progressList || []).find((row) => row.id === selectedFocusStudentId) || null : null),
@@ -6840,6 +6868,127 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
     setFocusScheduleAwayStartDraft('');
     setFocusScheduleAwayEndDraft('');
     setFocusScheduleAwayReasonDraft('');
+  };
+  const openFocusPhoneEditor = (mode: 'student' | 'parent') => {
+    if (!canAccessAdminOnlyOperations) {
+      toast({
+        variant: 'destructive',
+        title: '번호 수정 권한이 없습니다.',
+        description: '센터관리자 계정에서만 학생/학부모 번호를 수정할 수 있습니다.',
+      });
+      return;
+    }
+    setFocusStudentPhoneDraft(normalizePhoneNumber(selectedFocusOperationsSummary?.studentPhone).slice(0, 11));
+    setFocusParentPhoneDraft(normalizePhoneNumber(selectedFocusOperationsSummary?.parentPhone).slice(0, 11));
+    setFocusPhoneEditMode(mode);
+  };
+  const closeFocusPhoneEditor = () => {
+    setFocusPhoneEditMode(null);
+    setFocusStudentPhoneDraft(normalizePhoneNumber(selectedFocusOperationsSummary?.studentPhone).slice(0, 11));
+    setFocusParentPhoneDraft(normalizePhoneNumber(selectedFocusOperationsSummary?.parentPhone).slice(0, 11));
+  };
+  const handleSaveFocusStudentPhone = async () => {
+    if (!functions || !centerId || !selectedFocusStudentId) return;
+    if (!canAccessAdminOnlyOperations) {
+      toast({
+        variant: 'destructive',
+        title: '번호 수정 권한이 없습니다.',
+        description: '센터관리자 계정에서만 학생 번호를 수정할 수 있습니다.',
+      });
+      return;
+    }
+
+    const phoneNumber = normalizePhoneNumber(focusStudentPhoneDraft).slice(0, 11);
+    if (phoneNumber && !isValidKoreanMobilePhone(phoneNumber)) {
+      toast({
+        variant: 'destructive',
+        title: '학생 번호 확인',
+        description: '학생 번호는 01012345678 형식으로 입력해 주세요.',
+      });
+      return;
+    }
+
+    setFocusPhoneSaving('student');
+    try {
+      const updateStudentAccount = httpsCallable(functions, 'updateStudentAccount', { timeout: 600000 });
+      await updateStudentAccount({
+        centerId,
+        studentId: selectedFocusStudentId,
+        phoneNumber: phoneNumber || null,
+      });
+      toast({
+        title: '학생 번호 저장 완료',
+        description: `${selectedFocusStudent?.name || '학생'} 학생 번호를 수정했습니다.`,
+      });
+      setFocusPhoneEditMode(null);
+    } catch (error) {
+      toast({
+        variant: 'destructive',
+        title: '학생 번호 저장 실패',
+        description: getCallableErrorMessage(error, '학생 번호 저장 중 오류가 발생했습니다.'),
+      });
+    } finally {
+      setFocusPhoneSaving(null);
+    }
+  };
+  const handleSaveFocusParentPhone = async () => {
+    if (!functions || !centerId || !selectedFocusStudentId) return;
+    if (!canAccessAdminOnlyOperations) {
+      toast({
+        variant: 'destructive',
+        title: '번호 수정 권한이 없습니다.',
+        description: '센터관리자 계정에서만 학부모 번호를 수정할 수 있습니다.',
+      });
+      return;
+    }
+
+    const phoneNumber = normalizePhoneNumber(focusParentPhoneDraft).slice(0, 11);
+    if (phoneNumber && !isValidKoreanMobilePhone(phoneNumber)) {
+      toast({
+        variant: 'destructive',
+        title: '학부모 번호 확인',
+        description: '학부모 번호는 01012345678 형식으로 입력해 주세요.',
+      });
+      return;
+    }
+    if (!phoneNumber && !selectedFocusOperationsSummary?.hasManualParentPhone) {
+      toast({
+        variant: 'destructive',
+        title: '학부모 번호 확인',
+        description: '저장할 학부모 번호를 입력해 주세요.',
+      });
+      return;
+    }
+
+    setFocusPhoneSaving('parent');
+    try {
+      const updateSmsRecipientPreference = httpsCallable(functions, 'updateSmsRecipientPreference', { timeout: 600000 });
+      await updateSmsRecipientPreference({
+        centerId,
+        studentId: selectedFocusStudentId,
+        parentUid: MANUAL_PARENT_SMS_UID,
+        isManualRecipient: true,
+        parentNameOverride: selectedFocusOperationsSummary?.parentName || '어머님',
+        phoneNumberOverride: phoneNumber,
+        enabled: true,
+        ...(phoneNumber ? {} : { deleteManualRecipient: true }),
+      });
+      toast({
+        title: phoneNumber ? '학부모 번호 저장 완료' : '학부모 번호 직접 입력 해제',
+        description: phoneNumber
+          ? `${selectedFocusStudent?.name || '학생'} 학생의 학부모 문자 수신 번호를 수정했습니다.`
+          : '직접 입력한 학부모 번호를 해제했습니다.',
+      });
+      setFocusPhoneEditMode(null);
+    } catch (error) {
+      toast({
+        variant: 'destructive',
+        title: '학부모 번호 저장 실패',
+        description: getCallableErrorMessage(error, '학부모 번호 저장 중 오류가 발생했습니다.'),
+      });
+    } finally {
+      setFocusPhoneSaving(null);
+    }
   };
   const openFocusScheduleDialog = () => {
     if (!selectedFocusStudentId || !selectedFocusOperationsSummary) return;
@@ -10471,19 +10620,120 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
                       <p className="mt-1 truncate text-[11px] font-bold text-[#6E7EA3]">{selectedFocusOperationsSummary.scheduleLabel}</p>
                     </div>
                     <div className="min-w-0 rounded-2xl border border-[#DCE7FF] bg-white p-3">
-                      <div className="flex items-center gap-1.5 text-[#5C6E97]">
-                        <Phone className="h-3.5 w-3.5" />
-                        <p className="text-[10px] font-black uppercase tracking-[0.14em]">학생 번호</p>
+                      <div className="flex items-center justify-between gap-2">
+                        <div className="flex items-center gap-1.5 text-[#5C6E97]">
+                          <Phone className="h-3.5 w-3.5" />
+                          <p className="text-[10px] font-black uppercase tracking-[0.14em]">학생 번호</p>
+                        </div>
+                        {canAccessAdminOnlyOperations && focusPhoneEditMode !== 'student' ? (
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="ghost"
+                            className="h-7 rounded-full px-2 text-[10px] font-black text-[#2554D7] hover:bg-[#EEF4FF]"
+                            onClick={() => openFocusPhoneEditor('student')}
+                          >
+                            수정
+                          </Button>
+                        ) : null}
                       </div>
-                      <p className="mt-2 truncate text-base font-black text-[#14295F]">{selectedFocusOperationsSummary.studentPhone}</p>
+                      {focusPhoneEditMode === 'student' ? (
+                        <div className="mt-2 space-y-2">
+                          <Input
+                            value={focusStudentPhoneDraft}
+                            onChange={(event) => setFocusStudentPhoneDraft(normalizePhoneDraft(event.target.value))}
+                            inputMode="tel"
+                            maxLength={11}
+                            placeholder="01012345678"
+                            className="h-10 rounded-xl border-[#DCE7FF] bg-[#F7FAFF] font-black text-[#14295F]"
+                            disabled={focusPhoneSaving === 'student'}
+                          />
+                          <div className="grid grid-cols-2 gap-2">
+                            <Button
+                              type="button"
+                              size="sm"
+                              className="h-8 rounded-xl bg-[#14295F] text-[11px] font-black text-white hover:bg-[#173D8B]"
+                              disabled={focusPhoneSaving === 'student'}
+                              onClick={() => void handleSaveFocusStudentPhone()}
+                            >
+                              {focusPhoneSaving === 'student' ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> : <Save className="mr-1.5 h-3.5 w-3.5" />}
+                              저장
+                            </Button>
+                            <Button
+                              type="button"
+                              size="sm"
+                              variant="outline"
+                              className="h-8 rounded-xl border-[#DCE7FF] text-[11px] font-black text-[#14295F]"
+                              disabled={focusPhoneSaving === 'student'}
+                              onClick={closeFocusPhoneEditor}
+                            >
+                              취소
+                            </Button>
+                          </div>
+                        </div>
+                      ) : (
+                        <p className="mt-2 truncate text-base font-black text-[#14295F]">{selectedFocusOperationsSummary.studentPhone}</p>
+                      )}
                     </div>
                     <div className="min-w-0 rounded-2xl border border-[#DCE7FF] bg-white p-3 sm:col-span-2">
-                      <div className="flex items-center gap-1.5 text-[#5C6E97]">
-                        <Phone className="h-3.5 w-3.5" />
-                        <p className="text-[10px] font-black uppercase tracking-[0.14em]">어머님 번호</p>
+                      <div className="flex items-center justify-between gap-2">
+                        <div className="flex items-center gap-1.5 text-[#5C6E97]">
+                          <Phone className="h-3.5 w-3.5" />
+                          <p className="text-[10px] font-black uppercase tracking-[0.14em]">어머님 번호</p>
+                        </div>
+                        {canAccessAdminOnlyOperations && focusPhoneEditMode !== 'parent' ? (
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="ghost"
+                            className="h-7 rounded-full px-2 text-[10px] font-black text-[#2554D7] hover:bg-[#EEF4FF]"
+                            onClick={() => openFocusPhoneEditor('parent')}
+                          >
+                            수정
+                          </Button>
+                        ) : null}
                       </div>
-                      <p className="mt-2 truncate text-base font-black text-[#14295F]">{selectedFocusOperationsSummary.parentPhone}</p>
-                      <p className="mt-1 truncate text-[11px] font-bold text-[#6E7EA3]">{selectedFocusOperationsSummary.parentName}</p>
+                      {focusPhoneEditMode === 'parent' ? (
+                        <div className="mt-2 space-y-2">
+                          <Input
+                            value={focusParentPhoneDraft}
+                            onChange={(event) => setFocusParentPhoneDraft(normalizePhoneDraft(event.target.value))}
+                            inputMode="tel"
+                            maxLength={11}
+                            placeholder="01012345678"
+                            className="h-10 rounded-xl border-[#DCE7FF] bg-[#F7FAFF] font-black text-[#14295F]"
+                            disabled={focusPhoneSaving === 'parent'}
+                          />
+                          <div className="flex flex-wrap gap-2">
+                            <Button
+                              type="button"
+                              size="sm"
+                              className="h-8 rounded-xl bg-[#14295F] px-3 text-[11px] font-black text-white hover:bg-[#173D8B]"
+                              disabled={focusPhoneSaving === 'parent'}
+                              onClick={() => void handleSaveFocusParentPhone()}
+                            >
+                              {focusPhoneSaving === 'parent' ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> : <Save className="mr-1.5 h-3.5 w-3.5" />}
+                              저장
+                            </Button>
+                            <Button
+                              type="button"
+                              size="sm"
+                              variant="outline"
+                              className="h-8 rounded-xl border-[#DCE7FF] px-3 text-[11px] font-black text-[#14295F]"
+                              disabled={focusPhoneSaving === 'parent'}
+                              onClick={closeFocusPhoneEditor}
+                            >
+                              취소
+                            </Button>
+                          </div>
+                          <p className="text-[10px] font-bold text-[#6E7EA3]">저장한 번호가 학부모 문자 수신 번호로 우선 적용됩니다.</p>
+                        </div>
+                      ) : (
+                        <>
+                          <p className="mt-2 truncate text-base font-black text-[#14295F]">{selectedFocusOperationsSummary.parentPhone}</p>
+                          <p className="mt-1 truncate text-[11px] font-bold text-[#6E7EA3]">{selectedFocusOperationsSummary.parentName}</p>
+                        </>
+                      )}
                     </div>
                   </div>
 
