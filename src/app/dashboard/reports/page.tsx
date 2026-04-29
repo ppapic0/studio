@@ -335,6 +335,33 @@ function formatReportStudyMinutes(minutes: number) {
   return `${hours}시간 ${mins}분`;
 }
 
+function stripUndefinedReportValue(value: unknown): unknown {
+  if (value === undefined) return undefined;
+
+  if (Array.isArray(value)) {
+    return value
+      .map((item) => stripUndefinedReportValue(item))
+      .filter((item) => item !== undefined);
+  }
+
+  if (value && typeof value === 'object') {
+    return Object.entries(value as Record<string, unknown>).reduce<Record<string, unknown>>((acc, [key, entryValue]) => {
+      const nextValue = stripUndefinedReportValue(entryValue);
+      if (nextValue !== undefined) {
+        acc[key] = nextValue;
+      }
+      return acc;
+    }, {});
+  }
+
+  return value;
+}
+
+function compactDailyReportAiMeta(aiMeta?: DailyReport['aiMeta'] | null) {
+  if (!aiMeta) return null;
+  return stripUndefinedReportValue(aiMeta) as DailyReport['aiMeta'];
+}
+
 export default function DailyReportsPage() {
   const { user } = useUser();
   const firestore = useFirestore();
@@ -899,6 +926,14 @@ export default function DailyReportsPage() {
     options: { skipTrustReview?: boolean } = {}
   ) => {
     if (!selectedStudent || !firestore || !centerId || !user || !dateKey) return;
+    if (status === 'sent' && !reportContent.trim()) {
+      toast({
+        variant: 'destructive',
+        title: '발송할 수 없습니다.',
+        description: '리포트 내용을 작성한 뒤 발송해 주세요.',
+      });
+      return;
+    }
     if (status === 'sent' && !studyLogSummaryByStudentId[selectedStudent.id]?.hasStudyRecord) {
       toast({
         variant: 'destructive',
@@ -924,6 +959,7 @@ export default function DailyReportsPage() {
     try {
       const reportId = `${dateKey}_${selectedStudent.id}`;
       const reportRef = doc(firestore, 'centers', centerId, 'dailyReports', reportId);
+      const compactAiMeta = compactDailyReportAiMeta(aiReportMeta);
       
       await setDoc(reportRef, {
         studentId: selectedStudent.id,
@@ -932,7 +968,7 @@ export default function DailyReportsPage() {
         dateKey,
         content: reportContent,
         teacherNote: teacherNote.trim() || null,
-        aiMeta: aiReportMeta || null,
+        aiMeta: compactAiMeta,
         status,
         updatedAt: serverTimestamp(),
         createdAt: serverTimestamp(),
@@ -945,7 +981,12 @@ export default function DailyReportsPage() {
       setIsWriteModalOpen(false);
       moveReportDialogFocusToPage();
     } catch (e: any) {
-      toast({ variant: "destructive", title: "저장 실패" });
+      logHandledClientIssue('[daily-report] save report failed', e);
+      toast({
+        variant: "destructive",
+        title: "저장 실패",
+        description: e?.message || "리포트 저장 중 오류가 발생했습니다. 잠시 후 다시 시도해 주세요.",
+      });
     } finally {
       setIsSaving(false);
     }
