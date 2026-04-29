@@ -1,3 +1,4 @@
+import type { Viewport } from 'next';
 import { redirect } from 'next/navigation';
 
 import { isMissingAdminCredentialsError } from '@/lib/firebase-admin';
@@ -6,6 +7,14 @@ import {
   canAccessDashboardPath,
   getServerDashboardMemberships,
 } from '@/lib/server-dashboard-access';
+
+export const viewport: Viewport = {
+  width: 'device-width',
+  initialScale: 1,
+  maximumScale: 1,
+  userScalable: false,
+  themeColor: '#14295f',
+};
 
 export default async function KioskLayout({
   children,

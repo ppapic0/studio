@@ -1,7 +1,7 @@
 'use client';
 
 import Image from 'next/image';
-import { useCallback, useEffect, useMemo, useRef, useState, type PointerEvent } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type MouseEvent, type PointerEvent } from 'react';
 import { useRouter } from 'next/navigation';
 import {
   ArrowLeft,
@@ -94,7 +94,8 @@ const MAX_OUTBOX_ITEMS = 40;
 const SUCCESS_FEEDBACK_VISIBLE_MS = 620;
 const RESET_AFTER_SUCCESS_MS = 70;
 const PROCESSING_FEEDBACK_DELAY_MS = 80;
-const kioskTouchClass = 'touch-manipulation select-none [-webkit-tap-highlight-color:transparent] [touch-action:manipulation]';
+const KIOSK_TOUCH_CLICK_SUPPRESS_MS = 1000;
+const kioskTouchClass = 'touch-manipulation select-none [-webkit-tap-highlight-color:transparent] [-webkit-touch-callout:none] [touch-action:manipulation]';
 
 const ACTIONS: Record<KioskAttendanceAction, KioskActionConfig> = {
   check_in: {
@@ -195,12 +196,6 @@ function createIdempotencyKey() {
     return crypto.randomUUID();
   }
   return `kiosk_${Date.now()}_${Math.random().toString(36).slice(2, 12)}`;
-}
-
-function handleKioskPointerPress(event: PointerEvent<HTMLElement>, action: () => void) {
-  if (event.pointerType === 'mouse') return;
-  event.preventDefault();
-  action();
 }
 
 function readOutbox(): KioskOutboxItem[] {
@@ -355,6 +350,30 @@ export default function KioskPage() {
   const pendingActionRef = useRef(false);
   const flushingOutboxRef = useRef(false);
   const actionProcessingTimerRef = useRef<number | null>(null);
+  const suppressNextClickUntilRef = useRef(0);
+
+  const handleKioskPointerPress = useCallback((event: PointerEvent<HTMLElement>, action: () => void) => {
+    if (event.pointerType === 'mouse') return;
+    event.preventDefault();
+    event.stopPropagation();
+    suppressNextClickUntilRef.current = Date.now() + KIOSK_TOUCH_CLICK_SUPPRESS_MS;
+    action();
+  }, []);
+
+  const handleKioskClick = useCallback((event: MouseEvent<HTMLElement>, action: () => void) => {
+    if (Date.now() < suppressNextClickUntilRef.current) {
+      event.preventDefault();
+      event.stopPropagation();
+      return;
+    }
+    action();
+  }, []);
+
+  const handleKioskClickCapture = useCallback((event: MouseEvent<HTMLElement>) => {
+    if (Date.now() >= suppressNextClickUntilRef.current) return;
+    event.preventDefault();
+    event.stopPropagation();
+  }, []);
 
   const lookupKioskStudentsByPin = useMemo(() => {
     if (!functions) return null;
@@ -842,7 +861,10 @@ export default function KioskPage() {
   const selectedActions = selectedSeat ? getAllowedActions(selectedStatus) : [];
 
   return (
-    <div className={cn('min-h-screen overflow-hidden bg-[#F7FAFF] text-[#14295F]', kioskTouchClass)}>
+    <div
+      className={cn('min-h-screen overflow-hidden bg-[#F7FAFF] text-[#14295F]', kioskTouchClass)}
+      onClickCapture={handleKioskClickCapture}
+    >
       <div className="pointer-events-none fixed inset-0 overflow-hidden">
         <Image
           src="/track-logo-mark-transparent.png"
@@ -951,7 +973,7 @@ export default function KioskPage() {
                       variant="outline"
                       disabled={isSearching}
                       onPointerDown={(event) => handleKioskPointerPress(event, () => handleNumberClick(num))}
-                      onClick={() => handleNumberClick(num)}
+                      onClick={(event) => handleKioskClick(event, () => handleNumberClick(num))}
                       className={cn(kioskTouchClass, 'h-20 rounded-[1.35rem] border-2 border-[#D7E4FF] bg-white text-3xl font-black text-[#14295F] shadow-sm active:scale-[0.99] active:bg-[#F1F6FF] sm:h-24')}
                     >
                       {num}
@@ -962,7 +984,7 @@ export default function KioskPage() {
                     variant="outline"
                     disabled={isSearching}
                     onPointerDown={(event) => handleKioskPointerPress(event, resetKiosk)}
-                    onClick={resetKiosk}
+                    onClick={(event) => handleKioskClick(event, resetKiosk)}
                     className={cn(kioskTouchClass, 'h-20 rounded-[1.35rem] border-2 border-[#D7E4FF] bg-[#F7FAFF] text-base font-black text-[#5C6E97] active:scale-[0.99] active:bg-white sm:h-24')}
                   >
                     <RotateCcw className="mr-2 h-5 w-5" />
@@ -973,7 +995,7 @@ export default function KioskPage() {
                     variant="outline"
                     disabled={isSearching}
                     onPointerDown={(event) => handleKioskPointerPress(event, () => handleNumberClick('0'))}
-                    onClick={() => handleNumberClick('0')}
+                    onClick={(event) => handleKioskClick(event, () => handleNumberClick('0'))}
                     className={cn(kioskTouchClass, 'h-20 rounded-[1.35rem] border-2 border-[#D7E4FF] bg-white text-3xl font-black text-[#14295F] shadow-sm active:scale-[0.99] active:bg-[#F1F6FF] sm:h-24')}
                   >
                     0
@@ -983,7 +1005,7 @@ export default function KioskPage() {
                     variant="outline"
                     disabled={isSearching}
                     onPointerDown={(event) => handleKioskPointerPress(event, handleDelete)}
-                    onClick={handleDelete}
+                    onClick={(event) => handleKioskClick(event, handleDelete)}
                     className={cn(kioskTouchClass, 'h-20 rounded-[1.35rem] border-2 border-[#D7E4FF] bg-[#F7FAFF] text-[#14295F] active:scale-[0.99] active:bg-white sm:h-24')}
                     aria-label="한 글자 지우기"
                   >
@@ -1010,10 +1032,10 @@ export default function KioskPage() {
                         setStep('action');
                       })
                     }
-                    onClick={() => {
+                    onClick={(event) => handleKioskClick(event, () => {
                       setSelectedStudent(student);
                       setStep('action');
-                    }}
+                    })}
                     className={cn(kioskTouchClass, 'flex min-h-20 items-center justify-between rounded-[1.35rem] border border-[#D7E4FF] bg-[#F7FAFF] px-5 py-4 text-left shadow-sm transition hover:border-[#FF7A16]/40 hover:bg-white active:scale-[0.99] active:bg-white')}
                   >
                     <div className="flex min-w-0 items-center gap-4">
@@ -1035,7 +1057,7 @@ export default function KioskPage() {
                 type="button"
                 variant="ghost"
                 onPointerDown={(event) => handleKioskPointerPress(event, resetKiosk)}
-                onClick={resetKiosk}
+                onClick={(event) => handleKioskClick(event, resetKiosk)}
                 className={cn(kioskTouchClass, 'mt-5 h-12 w-full rounded-[1rem] text-base font-black text-[#5C6E97] hover:bg-[#F1F6FF] hover:text-[#14295F]')}
               >
                 처음으로
@@ -1069,7 +1091,7 @@ export default function KioskPage() {
                          key={action}
                          type="button"
                          onPointerDown={(event) => handleKioskPointerPress(event, () => void handleAction(action))}
-                         onClick={() => handleAction(action)}
+                         onClick={(event) => handleKioskClick(event, () => void handleAction(action))}
                          disabled={Boolean(actionProcessingLabel)}
                          className={cn(
                           kioskTouchClass,
@@ -1097,7 +1119,7 @@ export default function KioskPage() {
                 type="button"
                 variant="ghost"
                 onPointerDown={(event) => handleKioskPointerPress(event, resetKiosk)}
-                onClick={resetKiosk}
+                onClick={(event) => handleKioskClick(event, resetKiosk)}
                 className={cn(kioskTouchClass, 'mt-5 h-12 w-full rounded-[1rem] text-base font-black text-[#5C6E97] hover:bg-[#F1F6FF] hover:text-[#14295F]')}
               >
                 처음으로
