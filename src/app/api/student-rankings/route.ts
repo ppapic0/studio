@@ -41,6 +41,10 @@ type StudentRankingSnapshot = Record<RankRange, RankEntry[]> & {
   generatedAt?: string | null;
 };
 type RankCompetitionWindow = ReturnType<typeof getDailyRankCompetitionWindow>;
+type CenterRankingAccess = {
+  allowed: boolean;
+  role: string;
+};
 
 const EMPTY_SNAPSHOT: StudentRankingSnapshot = {
   daily: [],
@@ -52,6 +56,10 @@ const EMPTY_SNAPSHOT: StudentRankingSnapshot = {
 };
 
 export const dynamic = 'force-dynamic';
+
+const RANKING_HISTORY_DAYS = 7;
+const DAY_MS = 24 * 60 * 60 * 1000;
+const RANKING_HISTORY_ALLOWED_ROLES = new Set(['student', 'teacher', 'centeradmin', 'owner']);
 
 function getAttendanceStatusRank(value: unknown) {
   if (value === 'studying') return 0;
@@ -252,6 +260,12 @@ function parseRankingDateKey(value: string) {
   return toKstDateKey(date) === value ? date : null;
 }
 
+function getRankingDateKeyOffset(dateKey: string, offsetDays: number) {
+  const date = parseRankingDateKey(dateKey);
+  if (!date) return dateKey;
+  return toKstDateKey(new Date(date.getTime() + offsetDays * DAY_MS));
+}
+
 function applyCompetitionRanks(entries: Omit<RankEntry, 'rank'>[]): RankEntry[] {
   const sorted = [...entries].sort((left, right) => right.value - left.value);
   let lastValue: number | null = null;
@@ -333,19 +347,35 @@ function getCoveredDateKeysFromRankWindows(rankWindows: RankCompetitionWindow[])
   return Array.from(new Set(rankWindows.flatMap((rankWindow) => rankWindow.coveredDateKeys))).sort();
 }
 
-async function hasCenterAccess(uid: string, centerId: string) {
+async function getCenterRankingAccess(uid: string, centerId: string): Promise<CenterRankingAccess> {
   const [userCenterSnap, memberSnap] = await Promise.all([
     adminDb.doc(`userCenters/${uid}/centers/${centerId}`).get(),
     adminDb.doc(`centers/${centerId}/members/${uid}`).get(),
   ]);
 
   const userCenterStatus = normalizeMembershipStatus(userCenterSnap.data()?.status);
-  if (userCenterSnap.exists && userCenterStatus === 'active') {
-    return true;
+  const userCenterRole = normalizeRole(userCenterSnap.data()?.role);
+  const memberStatus = normalizeMembershipStatus(memberSnap.data()?.status);
+  const memberRole = normalizeRole(memberSnap.data()?.role);
+
+  if (memberSnap.exists && memberStatus === 'active') {
+    return {
+      allowed: true,
+      role: memberRole || userCenterRole,
+    };
   }
 
-  const memberStatus = normalizeMembershipStatus(memberSnap.data()?.status);
-  return memberSnap.exists && memberStatus === 'active';
+  if (userCenterSnap.exists && userCenterStatus === 'active') {
+    return {
+      allowed: true,
+      role: userCenterRole || memberRole,
+    };
+  }
+
+  return {
+    allowed: false,
+    role: '',
+  };
 }
 
 export async function GET(request: NextRequest) {
@@ -381,8 +411,8 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    const allowed = await hasCenterAccess(uid, centerId);
-    if (!allowed) {
+    const access = await getCenterRankingAccess(uid, centerId);
+    if (!access.allowed) {
       return noStoreJson({ error: 'forbidden' }, { status: 403 });
     }
 
@@ -391,6 +421,15 @@ export async function GET(request: NextRequest) {
     const currentCompetitionDateKey = currentDailyRankWindow.competitionDateKey;
     if (requestedDateKey && requestedDateKey > currentCompetitionDateKey) {
       return noStoreJson({ error: 'future-dateKey' }, { status: 400 });
+    }
+    if (requestedDateKey) {
+      const minHistoryDateKey = getRankingDateKeyOffset(currentCompetitionDateKey, -RANKING_HISTORY_DAYS);
+      if (requestedDateKey < minHistoryDateKey) {
+        return noStoreJson({ error: 'dateKey-out-of-range' }, { status: 400 });
+      }
+      if (requestedDateKey !== currentCompetitionDateKey && !RANKING_HISTORY_ALLOWED_ROLES.has(access.role)) {
+        return noStoreJson({ error: 'ranking-history-forbidden' }, { status: 403 });
+      }
     }
 
     const targetDate = requestedDate || now;

@@ -144,6 +144,8 @@ const RANKING_KICKER_CLASS =
 const RANKING_STATUS_BADGE_CLASS =
   'rounded-full border border-white/12 bg-[rgba(255,255,255,0.06)] px-3 py-1.5 text-[10px] font-black tracking-[0.18em] text-[#B7C7E8]';
 const DATE_KEY_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
+const RANKING_HISTORY_DAYS = 7;
+const DAY_MS = 24 * 60 * 60 * 1000;
 
 function isValidRankingDateKey(value: string | null | undefined) {
   return Boolean(value && DATE_KEY_PATTERN.test(value));
@@ -158,7 +160,21 @@ function normalizeRankingRole(role?: string | null) {
 }
 
 function canViewRankingHistory(role?: string | null) {
-  return ['centeradmin', 'centermanager', 'admin', 'owner', 'teacher', 'staff', 'manager'].includes(normalizeRankingRole(role));
+  return ['student', 'teacher', 'centeradmin', 'owner'].includes(normalizeRankingRole(role));
+}
+
+function getRankingDateKeyOffset(dateKey: string, offsetDays: number) {
+  if (!isValidRankingDateKey(dateKey)) return dateKey;
+  const date = new Date(`${dateKey}T12:00:00+09:00`);
+  if (Number.isNaN(date.getTime())) return dateKey;
+  return toKstDateKey(new Date(date.getTime() + offsetDays * DAY_MS));
+}
+
+function clampRankingDateKey(dateKey: string, minDateKey: string, maxDateKey: string) {
+  if (!isValidRankingDateKey(dateKey)) return null;
+  if (dateKey < minDateKey) return minDateKey;
+  if (dateKey > maxDateKey) return maxDateKey;
+  return dateKey;
 }
 
 function formatRankingDateLabel(dateKey: string) {
@@ -1547,6 +1563,7 @@ function MonthlyRewardPolicyNotice({ isMobile }: { isMobile: boolean }) {
 
 function RankingHistoryControls({
   selectedDateKey,
+  minDateKey,
   maxDateKey,
   isHistorical,
   isMobile,
@@ -1554,6 +1571,7 @@ function RankingHistoryControls({
   onReset,
 }: {
   selectedDateKey: string;
+  minDateKey: string;
   maxDateKey: string;
   isHistorical: boolean;
   isMobile: boolean;
@@ -1588,6 +1606,7 @@ function RankingHistoryControls({
             <input
               type="date"
               value={selectedDateKey}
+              min={minDateKey}
               max={maxDateKey}
               onChange={(event) => onDateChange(event.target.value)}
               className="min-w-0 flex-1 bg-transparent font-black text-white outline-none [color-scheme:dark]"
@@ -1813,7 +1832,7 @@ export default function RankingBattlePage() {
   const authViewerId = user?.uid ?? 'viewer-local';
   const centerId = activeMembership?.id ?? null;
   const isStudentPerspective = activeMembership?.role === 'student';
-  const canUseRankingHistory = false;
+  const canUseRankingHistory = canViewRankingHistory(activeMembership?.role);
 
   const [snapshot, setSnapshot] = useState<StudentRankingSnapshot>(EMPTY_STUDENT_RANKING_SNAPSHOT);
   const [loading, setLoading] = useState(true);
@@ -1822,7 +1841,6 @@ export default function RankingBattlePage() {
   const [floatingEvents, setFloatingEvents] = useState<FloatingEvent[]>([]);
   const [heroIndex, setHeroIndex] = useState(0);
   const [clockNowMs, setClockNowMs] = useState(() => Date.now());
-  const selfLiveStartedAtMs = isStudentPerspective && isTimerActive && startTime ? startTime : 0;
 
   useEffect(() => {
     setClockNowMs(Date.now());
@@ -1838,15 +1856,42 @@ export default function RankingBattlePage() {
     [clockNowMs]
   );
   const currentCompetitionDateKey = dailyRankWindow.competitionDateKey;
-  const todayCalendarDateKey = useMemo(() => toKstDateKey(new Date(clockNowMs)), [clockNowMs]);
+  const minHistoryDateKey = useMemo(
+    () => getRankingDateKeyOffset(currentCompetitionDateKey, -RANKING_HISTORY_DAYS),
+    [currentCompetitionDateKey]
+  );
   const requestedDateParam = searchParams.get('date');
-  const selectedDateKey = canUseRankingHistory && isValidRankingDateKey(requestedDateParam) && requestedDateParam! <= todayCalendarDateKey
-    ? requestedDateParam as string
+  const requestedDateKey = requestedDateParam && isValidRankingDateKey(requestedDateParam)
+    ? requestedDateParam
+    : null;
+  const selectedDateKey = canUseRankingHistory && requestedDateKey && requestedDateKey >= minHistoryDateKey && requestedDateKey <= currentCompetitionDateKey
+    ? requestedDateKey
     : currentCompetitionDateKey;
   const snapshotDateKey = canUseRankingHistory && selectedDateKey !== currentCompetitionDateKey
     ? selectedDateKey
     : null;
   const isHistoricalSnapshot = Boolean(snapshotDateKey);
+  const selfLiveStartedAtMs = !isHistoricalSnapshot && isStudentPerspective && isTimerActive && startTime ? startTime : 0;
+
+  useEffect(() => {
+    if (!canUseRankingHistory || !requestedDateParam) return;
+
+    const boundedDateKey = requestedDateKey
+      ? clampRankingDateKey(requestedDateKey, minHistoryDateKey, currentCompetitionDateKey)
+      : null;
+    const nextParams = new URLSearchParams(searchParams.toString());
+
+    if (!boundedDateKey || boundedDateKey === currentCompetitionDateKey) {
+      nextParams.delete('date');
+    } else if (boundedDateKey !== requestedDateParam) {
+      nextParams.set('date', boundedDateKey);
+    } else {
+      return;
+    }
+
+    const queryString = nextParams.toString();
+    router.replace(`/dashboard/leaderboards${queryString ? `?${queryString}` : ''}`, { scroll: false });
+  }, [canUseRankingHistory, currentCompetitionDateKey, minHistoryDateKey, requestedDateKey, requestedDateParam, router, searchParams]);
 
   useEffect(() => {
     let cancelled = false;
@@ -1952,6 +1997,7 @@ export default function RankingBattlePage() {
   const mode = viewer ? getBattleMode(viewer.rank, diffAbove, diffBelow) : 'chase';
   const pressure = viewer ? getPressureLevel(viewer.rank, diffAbove, diffBelow) : 'stable';
   const isDailyWaiting = !isHistoricalSnapshot && range === 'daily' && !dailyRankWindow.isLive;
+  const shouldShowRankingHistoryBoard = canUseRankingHistory && !isStudentPerspective && !isDailyWaiting;
   const recommendations = useMemo(
     () => (viewer ? buildMainRecommendations({ viewer, top, below, logs }) : []),
     [viewer, top, below, logs]
@@ -1986,11 +2032,13 @@ export default function RankingBattlePage() {
 
   function handleRankingDateChange(nextDateKey: string) {
     if (!canUseRankingHistory || !isValidRankingDateKey(nextDateKey)) return;
+    const boundedDateKey = clampRankingDateKey(nextDateKey, minHistoryDateKey, currentCompetitionDateKey);
+    if (!boundedDateKey) return;
     const nextParams = new URLSearchParams(searchParams.toString());
-    if (nextDateKey === currentCompetitionDateKey) {
+    if (boundedDateKey === currentCompetitionDateKey) {
       nextParams.delete('date');
     } else {
-      nextParams.set('date', nextDateKey);
+      nextParams.set('date', boundedDateKey);
     }
     const queryString = nextParams.toString();
     router.replace(`/dashboard/leaderboards${queryString ? `?${queryString}` : ''}`, { scroll: false });
@@ -2044,7 +2092,8 @@ export default function RankingBattlePage() {
   const rankingHistoryControls = canUseRankingHistory ? (
     <RankingHistoryControls
       selectedDateKey={selectedDateKey}
-      maxDateKey={todayCalendarDateKey}
+      minDateKey={minHistoryDateKey}
+      maxDateKey={currentCompetitionDateKey}
       isHistorical={isHistoricalSnapshot}
       isMobile={isMobile}
       onDateChange={handleRankingDateChange}
@@ -2110,7 +2159,7 @@ export default function RankingBattlePage() {
     );
   }
 
-  if (canUseRankingHistory && !isDailyWaiting) {
+  if (shouldShowRankingHistoryBoard) {
     return (
       <main className={cn(
         'student-font-shell',
@@ -2160,9 +2209,10 @@ export default function RankingBattlePage() {
           <HeroBattleHeader
             range={range}
             onRangeChange={handleRangeChange}
-            activeMessage="실제 공부 기록이 들어오면 랭킹이 바로 반영됩니다."
-            isLive={range !== 'daily' || dailyRankWindow.isLive}
-            statusLabel="실시간 조회"
+            activeMessage={isHistoricalSnapshot ? '해당 기준일에 집계된 랭킹 기록이 없습니다.' : '실제 공부 기록이 들어오면 랭킹이 바로 반영됩니다.'}
+            isLive={!isHistoricalSnapshot && (range !== 'daily' || dailyRankWindow.isLive)}
+            statusLabel={isHistoricalSnapshot ? '과거 조회' : '실시간 조회'}
+            subtitleOverride={isHistoricalSnapshot ? `${formatRankingDateLabel(selectedDateKey)} 기록 기준으로 순위와 격차를 확인합니다.` : undefined}
             isMobile={isMobile}
           />
 
@@ -2198,9 +2248,10 @@ export default function RankingBattlePage() {
         <HeroBattleHeader
           range={range}
           onRangeChange={handleRangeChange}
-          activeMessage={heroMessages[heroIndex % Math.max(heroMessages.length, 1)]}
-          isLive
-          statusLabel="실시간 반영"
+          activeMessage={isHistoricalSnapshot ? getRankingHistorySummaryLabel(range, selectedDateKey) : heroMessages[heroIndex % Math.max(heroMessages.length, 1)]}
+          isLive={!isHistoricalSnapshot}
+          statusLabel={isHistoricalSnapshot ? '과거 조회' : '실시간 반영'}
+          subtitleOverride={isHistoricalSnapshot ? `${formatRankingDateLabel(selectedDateKey)} 기록 기준으로 순위와 격차를 확인합니다.` : undefined}
           isMobile={isMobile}
         />
 
