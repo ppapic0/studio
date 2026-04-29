@@ -2171,9 +2171,9 @@ export default function RankingBattlePage() {
             range={range}
             onRangeChange={handleRangeChange}
             activeMessage={isHistoricalSnapshot ? getRankingHistorySummaryLabel(range, selectedDateKey) : `${getHistoryRangeLabel(range)} 전체 순위`}
-            isLive={false}
-            statusLabel={isHistoricalSnapshot ? '과거 조회' : '전체 순위'}
-            subtitleOverride="학생별 순위와 누적 공부시간을 전체 목록으로 확인합니다."
+            isLive={!isHistoricalSnapshot}
+            statusLabel={isHistoricalSnapshot ? '과거 조회' : '실시간 반영'}
+            subtitleOverride={isHistoricalSnapshot ? '학생별 순위와 누적 공부시간을 전체 목록으로 확인합니다.' : '진행 중인 세션 시간을 포함해 학생별 순위와 누적 공부시간을 확인합니다.'}
             isMobile={isMobile}
           />
 
@@ -2188,7 +2188,7 @@ export default function RankingBattlePage() {
           {range === 'monthly' ? <MonthlyRewardPolicyNotice isMobile={isMobile} /> : null}
 
           <RankingHistoryBoard
-            entries={currentRangeEntries}
+            entries={battleEntries}
             range={range}
             dateKey={selectedDateKey}
             isMobile={isMobile}
