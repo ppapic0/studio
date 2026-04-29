@@ -3815,6 +3815,7 @@ async function queueAttendanceEventSmsV2(
     eventData: Record<string, unknown>;
     eventRef?: admin.firestore.DocumentReference;
     force?: boolean;
+    dispatchImmediately?: boolean;
   }
 ): Promise<AttendanceEventSmsQueueResult> {
   const centerId = asTrimmedString(params.centerId);
@@ -3868,7 +3869,7 @@ async function queueAttendanceEventSmsV2(
       useExactEventAt: true,
       dedupeKeyOverride: dedupeKey,
       sourceEventId: eventId,
-      dispatchImmediately: true,
+      dispatchImmediately: params.dispatchImmediately === true,
     });
     let smsStatus = resolveAttendanceSmsPipelineStatus(queueResult);
     if (smsStatus === "deduped" && dedupeKey) {
@@ -3959,6 +3960,7 @@ export const onAttendanceEventCreated = smsDispatcherFunctions
       eventId,
       eventData: data,
       eventRef: snap.ref,
+      dispatchImmediately: true,
     });
 
     return null;

@@ -2799,7 +2799,7 @@ async function queueAttendanceEventSmsV2(db, params) {
             useExactEventAt: true,
             dedupeKeyOverride: dedupeKey,
             sourceEventId: eventId,
-            dispatchImmediately: true,
+            dispatchImmediately: params.dispatchImmediately === true,
         });
         let smsStatus = resolveAttendanceSmsPipelineStatus(queueResult);
         if (smsStatus === "deduped" && dedupeKey) {
@@ -2885,6 +2885,7 @@ exports.onAttendanceEventCreated = smsDispatcherFunctions
         eventId,
         eventData: data,
         eventRef: snap.ref,
+        dispatchImmediately: true,
     });
     return null;
 });
