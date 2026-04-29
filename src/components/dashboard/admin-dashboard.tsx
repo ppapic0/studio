@@ -1,7 +1,7 @@
 
 'use client';
 
-import { useState, useEffect, useMemo, useRef } from 'react';
+import { useState, useEffect, useMemo, useRef, type KeyboardEvent } from 'react';
 import {
   Card,
   CardContent,
@@ -721,6 +721,14 @@ type AdjustStudentPointBalanceResult = {
 };
 
 type FocusAdjustmentKind = 'point' | 'penalty';
+type FocusExpandedChartKey =
+  | 'interventionFactors'
+  | 'counselingMatrix'
+  | 'weeklyGrowth'
+  | 'dailyGrowth'
+  | 'rhythmScore'
+  | 'studyRhythm'
+  | 'awayTime';
 
 type AdjustStudentPenaltyBalanceInput = {
   centerId: string;
@@ -920,6 +928,7 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
   const [parentTrustSearch, setParentTrustSearch] = useState('');
   const [selectedFocusStudentId, setSelectedFocusStudentId] = useState<string | null>(null);
   const [selectedFocusPlanDetailDateKey, setSelectedFocusPlanDetailDateKey] = useState<string | null>(null);
+  const [focusExpandedChartKey, setFocusExpandedChartKey] = useState<FocusExpandedChartKey | null>(null);
   const [selectedAttendanceDetailSignal, setSelectedAttendanceDetailSignal] = useState<CenterAdminAttendanceSeatSignal | null>(null);
   const [isStudyingStudentsDialogOpen, setIsStudyingStudentsDialogOpen] = useState(false);
   const [isAttendanceFullscreenOpen, setIsAttendanceFullscreenOpen] = useState(false);
@@ -3668,6 +3677,7 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
 
   useEffect(() => {
     setDailyGrowthWindowIndex(0);
+    setFocusExpandedChartKey(null);
   }, [selectedFocusStudentId]);
 
   // ── 선택 학생 통합 KPI 계산 ──
@@ -5664,8 +5674,52 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
     'rounded-[1.55rem] border border-[#D8E5FF] bg-white p-4 shadow-[0_18px_36px_-30px_rgba(20,41,95,0.2)]';
   const studioChartCardClassName =
     'rounded-[1.7rem] border border-[#D8E5FF] bg-white p-4 shadow-[0_20px_40px_-32px_rgba(20,41,95,0.2)]';
+  const studioChartExpandAreaClassName =
+    'rounded-[1.1rem] transition hover:bg-[#F7FAFF] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#2554D7]/30';
+  const studioChartExpandButtonClassName =
+    'h-7 rounded-full border-[#DCE7FF] bg-white px-2.5 text-[10px] font-black text-[#14295F] hover:bg-[#F7FAFF]';
   const studioSectionEyebrowClassName =
     'text-[10px] font-black uppercase tracking-[0.22em] text-[#5c6e97]';
+  const openFocusExpandedChart = (chartKey: FocusExpandedChartKey) => {
+    setFocusExpandedChartKey(chartKey);
+  };
+  const handleFocusChartExpandKeyDown = (event: KeyboardEvent<HTMLDivElement>, chartKey: FocusExpandedChartKey) => {
+    if (event.key !== 'Enter' && event.key !== ' ') return;
+    event.preventDefault();
+    setFocusExpandedChartKey(chartKey);
+  };
+  const focusExpandedChartCopy = focusExpandedChartKey
+    ? {
+        interventionFactors: {
+          title: '개입 원인 분해',
+          description: '오늘 먼저 확인해야 하는 개입 원인을 크게 봅니다.',
+        },
+        counselingMatrix: {
+          title: '7일 상담 매트릭스',
+          description: '공부시간, 집중점수, 계획완료율을 한 화면에서 비교합니다.',
+        },
+        weeklyGrowth: {
+          title: '주간 학습시간 성장률',
+          description: '최근 6주 누적 학습시간과 전주 대비 성장률을 확인합니다.',
+        },
+        dailyGrowth: {
+          title: '일자별 학습시간 성장률',
+          description: '선택한 7일 구간의 일 평균 학습시간과 성장률을 봅니다.',
+        },
+        rhythmScore: {
+          title: '리듬점수 변화 그래프',
+          description: '최근 14일 리듬 점수 변화 흐름을 확인합니다.',
+        },
+        studyRhythm: {
+          title: '학습 시간 분포 리듬',
+          description: '요일별 첫 공부 시작시간과 마지막 공부 종료시간을 비교합니다.',
+        },
+        awayTime: {
+          title: '학습 중간 외출시간 추이',
+          description: '최근 14일 학습 중간 외출시간 흐름을 봅니다.',
+        },
+      }[focusExpandedChartKey]
+    : null;
   const heatmapGraphSection = (
     <CenterAdminHeatmapCharts
       title="대표 운영 차트"
@@ -10403,6 +10457,7 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
         onOpenChange={(open) => {
           if (!open) {
             setSelectedFocusPlanDetailDateKey(null);
+            setFocusExpandedChartKey(null);
             setSelectedFocusStudentId(null);
           }
         }}
@@ -11351,26 +11406,49 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
                           <p className={studioSectionEyebrowClassName}>개입 원인 분해</p>
                           <p className="mt-1 text-[11px] font-bold text-[#5c6e97]">높을수록 오늘 먼저 확인해야 하는 항목입니다.</p>
                         </div>
-                        <Badge className={cn('h-7 rounded-full px-3 text-[10px] font-black', selectedFocusCounselingLens.priority.badgeClass)}>
-                          {selectedFocusCounselingLens.interventionScore}점
-                        </Badge>
+                        <div className="flex items-center gap-2">
+                          <Badge className={cn('h-7 rounded-full px-3 text-[10px] font-black', selectedFocusCounselingLens.priority.badgeClass)}>
+                            {selectedFocusCounselingLens.interventionScore}점
+                          </Badge>
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            className={studioChartExpandButtonClassName}
+                            onClick={() => openFocusExpandedChart('interventionFactors')}
+                            title="크게 보기"
+                            aria-label="개입 원인 분해 크게 보기"
+                          >
+                            <Eye className="mr-1 h-3 w-3" />
+                            확대
+                          </Button>
+                        </div>
                       </div>
-                      <ResponsiveContainer width="100%" height={190}>
-                        <ComposedChart data={selectedFocusCounselingLens.factorData} margin={{ top: 8, right: 12, left: 6, bottom: 0 }}>
-                          <CartesianGrid strokeDasharray="3 3" stroke="#E4ECFA" vertical={false} />
-                          <XAxis dataKey="label" tick={{ fontSize: 10, fontWeight: 800, fill: '#5c6e97' }} tickLine={false} axisLine={false} />
-                          <YAxis domain={[0, 100]} tick={{ fontSize: 9, fontWeight: 700, fill: '#5c6e97' }} tickLine={false} axisLine={false} width={36} tickFormatter={(v) => `${Math.round(Number(v || 0))}`} />
-                          <Tooltip
-                            formatter={(v: number) => [`${Math.round(Number(v || 0))}점`, '개입 필요']}
-                            contentStyle={{ borderRadius: '14px', border: '1px solid #DCE7FF', boxShadow: '0 14px 30px rgba(20,41,95,0.12)', fontSize: '11px', fontWeight: 700, color: '#14295F' }}
-                          />
-                          <Bar dataKey="risk" radius={[7, 7, 0, 0]} barSize={28}>
-                            {selectedFocusCounselingLens.factorData.map((entry) => (
-                              <Cell key={entry.label} fill={entry.fill} />
-                            ))}
-                          </Bar>
-                        </ComposedChart>
-                      </ResponsiveContainer>
+                      <div
+                        role="button"
+                        tabIndex={0}
+                        className={studioChartExpandAreaClassName}
+                        onClick={() => openFocusExpandedChart('interventionFactors')}
+                        onKeyDown={(event) => handleFocusChartExpandKeyDown(event, 'interventionFactors')}
+                        aria-label="개입 원인 분해 크게 보기"
+                      >
+                        <ResponsiveContainer width="100%" height={190}>
+                          <ComposedChart data={selectedFocusCounselingLens.factorData} margin={{ top: 8, right: 12, left: 6, bottom: 0 }}>
+                            <CartesianGrid strokeDasharray="3 3" stroke="#E4ECFA" vertical={false} />
+                            <XAxis dataKey="label" tick={{ fontSize: 10, fontWeight: 800, fill: '#5c6e97' }} tickLine={false} axisLine={false} />
+                            <YAxis domain={[0, 100]} tick={{ fontSize: 9, fontWeight: 700, fill: '#5c6e97' }} tickLine={false} axisLine={false} width={36} tickFormatter={(v) => `${Math.round(Number(v || 0))}`} />
+                            <Tooltip
+                              formatter={(v: number) => [`${Math.round(Number(v || 0))}점`, '개입 필요']}
+                              contentStyle={{ borderRadius: '14px', border: '1px solid #DCE7FF', boxShadow: '0 14px 30px rgba(20,41,95,0.12)', fontSize: '11px', fontWeight: 700, color: '#14295F' }}
+                            />
+                            <Bar dataKey="risk" radius={[7, 7, 0, 0]} barSize={28}>
+                              {selectedFocusCounselingLens.factorData.map((entry) => (
+                                <Cell key={entry.label} fill={entry.fill} />
+                              ))}
+                            </Bar>
+                          </ComposedChart>
+                        </ResponsiveContainer>
+                      </div>
                       <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
                         {selectedFocusCounselingLens.factorData.slice(0, 4).map((item) => (
                           <div key={`factor-${item.label}`} className="rounded-[0.9rem] border border-[#E4ECFA] bg-[#FBFCFF] px-2.5 py-2">
@@ -11387,37 +11465,60 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
                           <p className={studioSectionEyebrowClassName}>7일 상담 매트릭스</p>
                           <p className="mt-1 text-[11px] font-bold text-[#5c6e97]">막대: 공부시간 · 선: 집중점수와 계획완료율</p>
                         </div>
-                        {selectedFocusKpi ? (
-                          <Badge className="h-7 rounded-full border-none bg-[#EEF4FF] px-3 text-[10px] font-black text-[#14295F]">
-                            활동 {selectedFocusKpi.activeDaysCount}일
-                          </Badge>
-                        ) : null}
+                        <div className="flex items-center gap-2">
+                          {selectedFocusKpi ? (
+                            <Badge className="h-7 rounded-full border-none bg-[#EEF4FF] px-3 text-[10px] font-black text-[#14295F]">
+                              활동 {selectedFocusKpi.activeDaysCount}일
+                            </Badge>
+                          ) : null}
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            className={studioChartExpandButtonClassName}
+                            onClick={() => openFocusExpandedChart('counselingMatrix')}
+                            title="크게 보기"
+                            aria-label="7일 상담 매트릭스 크게 보기"
+                          >
+                            <Eye className="mr-1 h-3 w-3" />
+                            확대
+                          </Button>
+                        </div>
                       </div>
-                      {trendLoading ? (
-                        <div className="flex h-[190px] items-center justify-center"><Loader2 className="h-5 w-5 animate-spin text-[#5c6e97]" /></div>
-                      ) : !hasFocusCounselingTrendData ? (
-                        <div className="flex h-[190px] items-center justify-center text-xs font-bold text-[#5c6e97]">상담용 추세 데이터를 수집 중입니다.</div>
-                      ) : (
-                        <ResponsiveContainer width="100%" height={190}>
-                          <ComposedChart data={focusCounselingTrendData} margin={{ top: 8, right: 44, left: 8, bottom: 0 }}>
-                            <CartesianGrid strokeDasharray="3 3" stroke="#E4ECFA" vertical={false} />
-                            <XAxis dataKey="date" tick={{ fontSize: 10, fontWeight: 800, fill: '#5c6e97' }} tickLine={false} axisLine={false} />
-                            <YAxis yAxisId="min" tick={{ fontSize: 9, fontWeight: 700, fill: '#5c6e97' }} tickLine={false} axisLine={false} width={44} tickFormatter={(v) => formatChartMinutesAxisTick(Number(v))} />
-                            <YAxis yAxisId="pct" orientation="right" domain={[0, 100]} tick={{ fontSize: 9, fontWeight: 700, fill: '#5c6e97' }} tickLine={false} axisLine={false} width={40} tickFormatter={(v) => `${Math.round(Number(v || 0))}`} />
-                            <Tooltip
-                              formatter={(v: number, name: string) => {
-                                if (name === 'minutes') return [`${Math.floor(Number(v || 0) / 60)}h ${Number(v || 0) % 60}m`, '공부시간'];
-                                if (name === 'score') return [`${Math.round(Number(v || 0))}점`, '집중점수'];
-                                return [`${Math.round(Number(v || 0))}%`, '계획완료'];
-                              }}
-                              contentStyle={{ borderRadius: '14px', border: '1px solid #DCE7FF', boxShadow: '0 14px 30px rgba(20,41,95,0.12)', fontSize: '11px', fontWeight: 700, color: '#14295F' }}
-                            />
-                            <Bar yAxisId="min" dataKey="minutes" fill="#C7D8FF" radius={[6, 6, 0, 0]} barSize={30} />
-                            <Line yAxisId="pct" type="monotone" dataKey="score" stroke="#14295F" strokeWidth={2.5} dot={{ r: 4, fill: '#14295F', strokeWidth: 0 }} activeDot={{ r: 5 }} />
-                            <Line yAxisId="pct" type="monotone" dataKey="completion" stroke="#10B981" strokeWidth={2.5} dot={{ r: 4, fill: '#10B981', strokeWidth: 0 }} activeDot={{ r: 5 }} />
-                          </ComposedChart>
-                        </ResponsiveContainer>
-                      )}
+                      <div
+                        role="button"
+                        tabIndex={0}
+                        className={studioChartExpandAreaClassName}
+                        onClick={() => openFocusExpandedChart('counselingMatrix')}
+                        onKeyDown={(event) => handleFocusChartExpandKeyDown(event, 'counselingMatrix')}
+                        aria-label="7일 상담 매트릭스 크게 보기"
+                      >
+                        {trendLoading ? (
+                          <div className="flex h-[190px] items-center justify-center"><Loader2 className="h-5 w-5 animate-spin text-[#5c6e97]" /></div>
+                        ) : !hasFocusCounselingTrendData ? (
+                          <div className="flex h-[190px] items-center justify-center text-xs font-bold text-[#5c6e97]">상담용 추세 데이터를 수집 중입니다.</div>
+                        ) : (
+                          <ResponsiveContainer width="100%" height={190}>
+                            <ComposedChart data={focusCounselingTrendData} margin={{ top: 8, right: 44, left: 8, bottom: 0 }}>
+                              <CartesianGrid strokeDasharray="3 3" stroke="#E4ECFA" vertical={false} />
+                              <XAxis dataKey="date" tick={{ fontSize: 10, fontWeight: 800, fill: '#5c6e97' }} tickLine={false} axisLine={false} />
+                              <YAxis yAxisId="min" tick={{ fontSize: 9, fontWeight: 700, fill: '#5c6e97' }} tickLine={false} axisLine={false} width={44} tickFormatter={(v) => formatChartMinutesAxisTick(Number(v))} />
+                              <YAxis yAxisId="pct" orientation="right" domain={[0, 100]} tick={{ fontSize: 9, fontWeight: 700, fill: '#5c6e97' }} tickLine={false} axisLine={false} width={40} tickFormatter={(v) => `${Math.round(Number(v || 0))}`} />
+                              <Tooltip
+                                formatter={(v: number, name: string) => {
+                                  if (name === 'minutes') return [`${Math.floor(Number(v || 0) / 60)}h ${Number(v || 0) % 60}m`, '공부시간'];
+                                  if (name === 'score') return [`${Math.round(Number(v || 0))}점`, '집중점수'];
+                                  return [`${Math.round(Number(v || 0))}%`, '계획완료'];
+                                }}
+                                contentStyle={{ borderRadius: '14px', border: '1px solid #DCE7FF', boxShadow: '0 14px 30px rgba(20,41,95,0.12)', fontSize: '11px', fontWeight: 700, color: '#14295F' }}
+                              />
+                              <Bar yAxisId="min" dataKey="minutes" fill="#C7D8FF" radius={[6, 6, 0, 0]} barSize={30} />
+                              <Line yAxisId="pct" type="monotone" dataKey="score" stroke="#14295F" strokeWidth={2.5} dot={{ r: 4, fill: '#14295F', strokeWidth: 0 }} activeDot={{ r: 5 }} />
+                              <Line yAxisId="pct" type="monotone" dataKey="completion" stroke="#10B981" strokeWidth={2.5} dot={{ r: 4, fill: '#10B981', strokeWidth: 0 }} activeDot={{ r: 5 }} />
+                            </ComposedChart>
+                          </ResponsiveContainer>
+                        )}
+                      </div>
                       <div className="mt-2 flex flex-wrap items-center justify-end gap-4">
                         <div className="flex items-center gap-1"><div className="h-2.5 w-2.5 rounded bg-[#C7D8FF]" /><p className="text-[9px] font-bold text-[#5c6e97]">공부시간</p></div>
                         <div className="flex items-center gap-1"><div className="h-2.5 w-2.5 rounded-full bg-[#14295F]" /><p className="text-[9px] font-bold text-[#5c6e97]">집중점수</p></div>
@@ -11433,32 +11534,55 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
                       <p className={studioSectionEyebrowClassName}>주간 학습시간 성장률</p>
                       <p className="mt-1 text-[11px] font-bold text-[#5c6e97]">막대: 주간 누적 학습분 · 선: 전주 대비 성장률</p>
                     </div>
-                    {weeklyGrowthData.length > 0 && (
-                      <Badge className="h-7 rounded-full border-none bg-[#EEF4FF] px-3 text-[10px] font-black text-[#14295F]">
-                        이번 주 {(weeklyGrowthData[weeklyGrowthData.length - 1]?.growth ?? 0) >= 0 ? '+' : ''}{weeklyGrowthData[weeklyGrowthData.length - 1]?.growth ?? 0}%
-                      </Badge>
+                    <div className="flex items-center gap-2">
+                      {weeklyGrowthData.length > 0 && (
+                        <Badge className="h-7 rounded-full border-none bg-[#EEF4FF] px-3 text-[10px] font-black text-[#14295F]">
+                          이번 주 {(weeklyGrowthData[weeklyGrowthData.length - 1]?.growth ?? 0) >= 0 ? '+' : ''}{weeklyGrowthData[weeklyGrowthData.length - 1]?.growth ?? 0}%
+                        </Badge>
+                      )}
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        className={studioChartExpandButtonClassName}
+                        onClick={() => openFocusExpandedChart('weeklyGrowth')}
+                        title="크게 보기"
+                        aria-label="주간 학습시간 성장률 크게 보기"
+                      >
+                        <Eye className="mr-1 h-3 w-3" />
+                        확대
+                      </Button>
+                    </div>
+                  </div>
+                  <div
+                    role="button"
+                    tabIndex={0}
+                    className={studioChartExpandAreaClassName}
+                    onClick={() => openFocusExpandedChart('weeklyGrowth')}
+                    onKeyDown={(event) => handleFocusChartExpandKeyDown(event, 'weeklyGrowth')}
+                    aria-label="주간 학습시간 성장률 크게 보기"
+                  >
+                    {trendLoading ? (
+                      <div className="flex h-[160px] items-center justify-center"><Loader2 className="h-5 w-5 animate-spin text-[#5c6e97]" /></div>
+                    ) : !hasWeeklyGrowthData ? (
+                      <div className="flex h-[160px] items-center justify-center text-xs font-bold text-[#5c6e97]">데이터를 수집 중입니다.</div>
+                    ) : (
+                      <ResponsiveContainer width="100%" height={160}>
+                        <ComposedChart data={weeklyGrowthData} margin={{ top: 8, right: 44, left: 8, bottom: 0 }}>
+                          <CartesianGrid strokeDasharray="3 3" stroke="#E4ECFA" vertical={false} />
+                          <XAxis dataKey="label" tick={{ fontSize: 9, fontWeight: 700, fill: '#5c6e97' }} tickLine={false} axisLine={false} />
+                          <YAxis yAxisId="min" tick={{ fontSize: 9, fontWeight: 700, fill: '#5c6e97' }} tickLine={false} axisLine={false} width={46} tickFormatter={(v) => formatChartMinutesAxisTick(Number(v))} />
+                          <YAxis yAxisId="pct" orientation="right" tick={{ fontSize: 9, fontWeight: 700, fill: '#5c6e97' }} tickLine={false} axisLine={false} width={40} tickFormatter={(v) => `${Math.round(Number(v || 0))}%`} />
+                          <Tooltip
+                            formatter={(v: number, name: string) => name === 'totalMinutes' ? [`${Math.floor(v / 60)}h ${v % 60}m`, '주간 학습'] : [`${v >= 0 ? '+' : ''}${v}%`, '성장률']}
+                            contentStyle={{ borderRadius: '14px', border: '1px solid #DCE7FF', boxShadow: '0 14px 30px rgba(20,41,95,0.12)', fontSize: '11px', fontWeight: 700, color: '#14295F' }}
+                          />
+                          <Bar yAxisId="min" dataKey="totalMinutes" fill="#C7D8FF" radius={[5, 5, 0, 0]} />
+                          <Line yAxisId="pct" type="monotone" dataKey="growth" stroke="#FF7A16" strokeWidth={2.5} dot={{ r: 4, fill: '#FF7A16', strokeWidth: 0 }} activeDot={{ r: 5 }} />
+                        </ComposedChart>
+                      </ResponsiveContainer>
                     )}
                   </div>
-                  {trendLoading ? (
-                    <div className="flex h-[160px] items-center justify-center"><Loader2 className="h-5 w-5 animate-spin text-[#5c6e97]" /></div>
-                  ) : !hasWeeklyGrowthData ? (
-                    <div className="flex h-[160px] items-center justify-center text-xs font-bold text-[#5c6e97]">데이터를 수집 중입니다.</div>
-                  ) : (
-                    <ResponsiveContainer width="100%" height={160}>
-                      <ComposedChart data={weeklyGrowthData} margin={{ top: 8, right: 44, left: 8, bottom: 0 }}>
-                        <CartesianGrid strokeDasharray="3 3" stroke="#E4ECFA" vertical={false} />
-                        <XAxis dataKey="label" tick={{ fontSize: 9, fontWeight: 700, fill: '#5c6e97' }} tickLine={false} axisLine={false} />
-                        <YAxis yAxisId="min" tick={{ fontSize: 9, fontWeight: 700, fill: '#5c6e97' }} tickLine={false} axisLine={false} width={46} tickFormatter={(v) => formatChartMinutesAxisTick(Number(v))} />
-                        <YAxis yAxisId="pct" orientation="right" tick={{ fontSize: 9, fontWeight: 700, fill: '#5c6e97' }} tickLine={false} axisLine={false} width={40} tickFormatter={(v) => `${Math.round(Number(v || 0))}%`} />
-                        <Tooltip
-                          formatter={(v: number, name: string) => name === 'totalMinutes' ? [`${Math.floor(v / 60)}h ${v % 60}m`, '주간 학습'] : [`${v >= 0 ? '+' : ''}${v}%`, '성장률']}
-                          contentStyle={{ borderRadius: '14px', border: '1px solid #DCE7FF', boxShadow: '0 14px 30px rgba(20,41,95,0.12)', fontSize: '11px', fontWeight: 700, color: '#14295F' }}
-                        />
-                        <Bar yAxisId="min" dataKey="totalMinutes" fill="#C7D8FF" radius={[5, 5, 0, 0]} />
-                        <Line yAxisId="pct" type="monotone" dataKey="growth" stroke="#FF7A16" strokeWidth={2.5} dot={{ r: 4, fill: '#FF7A16', strokeWidth: 0 }} activeDot={{ r: 5 }} />
-                      </ComposedChart>
-                    </ResponsiveContainer>
-                  )}
                   <div className="mt-2 flex items-center justify-end gap-4">
                     <div className="flex items-center gap-1"><div className="h-2.5 w-2.5 rounded bg-[#C7D8FF]" /><p className="text-[9px] font-bold text-[#5c6e97]">누적 학습시간</p></div>
                     <div className="flex items-center gap-1"><div className="h-2.5 w-2.5 rounded-full bg-[#FF7A16]" /><p className="text-[9px] font-bold text-[#5c6e97]">성장률</p></div>
@@ -11481,6 +11605,18 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
                         type="button"
                         variant="outline"
                         size="sm"
+                        className={studioChartExpandButtonClassName}
+                        onClick={() => openFocusExpandedChart('dailyGrowth')}
+                        title="크게 보기"
+                        aria-label="일자별 학습시간 성장률 크게 보기"
+                      >
+                        <Eye className="mr-1 h-3 w-3" />
+                        확대
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
                         className="h-7 rounded-lg border-[#DCE7FF] px-2.5 text-[10px] font-black text-[#14295F]"
                         onClick={() => setDailyGrowthWindowIndex((prev) => Math.min(prev + 1, dailyGrowthWindowCount - 1))}
                         disabled={boundedDailyGrowthWindowIndex >= dailyGrowthWindowCount - 1}
@@ -11499,26 +11635,35 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
                       </Button>
                     </div>
                   </div>
-                  {trendLoading ? (
-                    <div className="flex h-[140px] items-center justify-center"><Loader2 className="h-5 w-5 animate-spin text-[#5c6e97]" /></div>
-                  ) : !hasDailyGrowthData ? (
-                    <div className="flex h-[140px] items-center justify-center text-xs font-bold text-[#5c6e97]">데이터를 수집 중입니다.</div>
-                  ) : (
-                    <ResponsiveContainer width="100%" height={140}>
-                      <ComposedChart data={dailyGrowthWindowData} margin={{ top: 8, right: 44, left: 8, bottom: 0 }}>
-                        <CartesianGrid strokeDasharray="3 3" stroke="#E4ECFA" vertical={false} />
-                        <XAxis dataKey="label" tick={{ fontSize: 10, fontWeight: 800, fill: '#5c6e97' }} tickLine={false} axisLine={false} />
-                        <YAxis yAxisId="min" tick={{ fontSize: 9, fontWeight: 700, fill: '#5c6e97' }} tickLine={false} axisLine={false} width={46} tickFormatter={(v) => formatChartMinutesAxisTick(Number(v))} />
-                        <YAxis yAxisId="pct" orientation="right" tick={{ fontSize: 9, fontWeight: 700, fill: '#5c6e97' }} tickLine={false} axisLine={false} width={40} tickFormatter={(v) => `${Math.round(Number(v || 0))}%`} />
-                        <Tooltip
-                          formatter={(v: number, name: string) => name === 'avgMinutes' ? [`${Math.floor(v / 60)}h ${v % 60}m`, '일 평균'] : [`${v >= 0 ? '+' : ''}${v}%`, '전월 대비']}
-                          contentStyle={{ borderRadius: '14px', border: '1px solid #DCE7FF', boxShadow: '0 14px 30px rgba(20,41,95,0.12)', fontSize: '11px', fontWeight: 700, color: '#14295F' }}
-                        />
-                        <Bar yAxisId="min" dataKey="avgMinutes" fill="#BEE4FF" radius={[5, 5, 0, 0]} barSize={40} />
-                        <Line yAxisId="pct" type="monotone" dataKey="growth" stroke="#2554D7" strokeWidth={2.5} dot={{ r: 5, fill: '#2554D7', strokeWidth: 0 }} activeDot={{ r: 6 }} />
-                      </ComposedChart>
-                    </ResponsiveContainer>
-                  )}
+                  <div
+                    role="button"
+                    tabIndex={0}
+                    className={studioChartExpandAreaClassName}
+                    onClick={() => openFocusExpandedChart('dailyGrowth')}
+                    onKeyDown={(event) => handleFocusChartExpandKeyDown(event, 'dailyGrowth')}
+                    aria-label="일자별 학습시간 성장률 크게 보기"
+                  >
+                    {trendLoading ? (
+                      <div className="flex h-[140px] items-center justify-center"><Loader2 className="h-5 w-5 animate-spin text-[#5c6e97]" /></div>
+                    ) : !hasDailyGrowthData ? (
+                      <div className="flex h-[140px] items-center justify-center text-xs font-bold text-[#5c6e97]">데이터를 수집 중입니다.</div>
+                    ) : (
+                      <ResponsiveContainer width="100%" height={140}>
+                        <ComposedChart data={dailyGrowthWindowData} margin={{ top: 8, right: 44, left: 8, bottom: 0 }}>
+                          <CartesianGrid strokeDasharray="3 3" stroke="#E4ECFA" vertical={false} />
+                          <XAxis dataKey="label" tick={{ fontSize: 10, fontWeight: 800, fill: '#5c6e97' }} tickLine={false} axisLine={false} />
+                          <YAxis yAxisId="min" tick={{ fontSize: 9, fontWeight: 700, fill: '#5c6e97' }} tickLine={false} axisLine={false} width={46} tickFormatter={(v) => formatChartMinutesAxisTick(Number(v))} />
+                          <YAxis yAxisId="pct" orientation="right" tick={{ fontSize: 9, fontWeight: 700, fill: '#5c6e97' }} tickLine={false} axisLine={false} width={40} tickFormatter={(v) => `${Math.round(Number(v || 0))}%`} />
+                          <Tooltip
+                            formatter={(v: number, name: string) => name === 'avgMinutes' ? [`${Math.floor(v / 60)}h ${v % 60}m`, '일 평균'] : [`${v >= 0 ? '+' : ''}${v}%`, '전월 대비']}
+                            contentStyle={{ borderRadius: '14px', border: '1px solid #DCE7FF', boxShadow: '0 14px 30px rgba(20,41,95,0.12)', fontSize: '11px', fontWeight: 700, color: '#14295F' }}
+                          />
+                          <Bar yAxisId="min" dataKey="avgMinutes" fill="#BEE4FF" radius={[5, 5, 0, 0]} barSize={40} />
+                          <Line yAxisId="pct" type="monotone" dataKey="growth" stroke="#2554D7" strokeWidth={2.5} dot={{ r: 5, fill: '#2554D7', strokeWidth: 0 }} activeDot={{ r: 6 }} />
+                        </ComposedChart>
+                      </ResponsiveContainer>
+                    )}
+                  </div>
                   <div className="mt-2 flex items-center justify-end gap-4">
                     <div className="flex items-center gap-1"><div className="h-2.5 w-2.5 rounded bg-[#BEE4FF]" /><p className="text-[9px] font-bold text-[#5c6e97]">일 평균 학습시간</p></div>
                     <div className="flex items-center gap-1"><div className="h-2.5 w-2.5 rounded-full bg-[#2554D7]" /><p className="text-[9px] font-bold text-[#5c6e97]">전월 대비 성장률</p></div>
@@ -11531,54 +11676,100 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
                       <p className={studioSectionEyebrowClassName}>리듬점수 변화 그래프</p>
                       <p className="mt-1 text-[11px] font-bold text-[#5c6e97]">최근 14일 기준 리듬 점수 변화 추이</p>
                     </div>
-                    <Badge className="h-7 rounded-full border-none bg-[#EEF4FF] px-3 text-[10px] font-black text-[#14295F]">
-                      평균 {averageRhythmScore}점
-                    </Badge>
+                    <div className="flex items-center gap-2">
+                      <Badge className="h-7 rounded-full border-none bg-[#EEF4FF] px-3 text-[10px] font-black text-[#14295F]">
+                        평균 {averageRhythmScore}점
+                      </Badge>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        className={studioChartExpandButtonClassName}
+                        onClick={() => openFocusExpandedChart('rhythmScore')}
+                        title="크게 보기"
+                        aria-label="리듬점수 변화 그래프 크게 보기"
+                      >
+                        <Eye className="mr-1 h-3 w-3" />
+                        확대
+                      </Button>
+                    </div>
                   </div>
-                  {trendLoading ? (
-                    <div className="flex h-[130px] items-center justify-center"><Loader2 className="h-5 w-5 animate-spin text-[#5c6e97]" /></div>
-                  ) : !hasRhythmScoreChangeData ? (
-                    <div className="flex h-[130px] items-center justify-center text-xs font-bold text-[#5c6e97]">리듬 점수 데이터를 수집 중입니다.</div>
-                  ) : (
-                    <ResponsiveContainer width="100%" height={130}>
-                      <LineChart data={rhythmScoreTrendData} margin={{ top: 6, right: 12, left: 8, bottom: 0 }}>
-                        <CartesianGrid strokeDasharray="3 3" stroke="#E4ECFA" vertical={false} />
-                        <XAxis dataKey="date" tick={{ fontSize: 9, fontWeight: 700, fill: '#5c6e97' }} tickLine={false} axisLine={false} />
-                        <YAxis domain={[0, 100]} tick={{ fontSize: 9, fontWeight: 700, fill: '#5c6e97' }} tickLine={false} axisLine={false} width={40} />
-                        <Tooltip
-                          formatter={(v: number) => [`${Math.round(v)}점`, '리듬 점수']}
-                          contentStyle={{ borderRadius: '14px', border: '1px solid #DCE7FF', boxShadow: '0 14px 30px rgba(20,41,95,0.12)', fontSize: '11px', fontWeight: 700, color: '#14295F' }}
-                        />
-                        <Line type="monotone" dataKey="score" stroke="#10B981" strokeWidth={2.5} dot={{ r: 3, fill: '#10B981', strokeWidth: 0 }} activeDot={{ r: 4 }} />
-                      </LineChart>
-                    </ResponsiveContainer>
-                  )}
+                  <div
+                    role="button"
+                    tabIndex={0}
+                    className={studioChartExpandAreaClassName}
+                    onClick={() => openFocusExpandedChart('rhythmScore')}
+                    onKeyDown={(event) => handleFocusChartExpandKeyDown(event, 'rhythmScore')}
+                    aria-label="리듬점수 변화 그래프 크게 보기"
+                  >
+                    {trendLoading ? (
+                      <div className="flex h-[130px] items-center justify-center"><Loader2 className="h-5 w-5 animate-spin text-[#5c6e97]" /></div>
+                    ) : !hasRhythmScoreChangeData ? (
+                      <div className="flex h-[130px] items-center justify-center text-xs font-bold text-[#5c6e97]">리듬 점수 데이터를 수집 중입니다.</div>
+                    ) : (
+                      <ResponsiveContainer width="100%" height={130}>
+                        <LineChart data={rhythmScoreTrendData} margin={{ top: 6, right: 12, left: 8, bottom: 0 }}>
+                          <CartesianGrid strokeDasharray="3 3" stroke="#E4ECFA" vertical={false} />
+                          <XAxis dataKey="date" tick={{ fontSize: 9, fontWeight: 700, fill: '#5c6e97' }} tickLine={false} axisLine={false} />
+                          <YAxis domain={[0, 100]} tick={{ fontSize: 9, fontWeight: 700, fill: '#5c6e97' }} tickLine={false} axisLine={false} width={40} />
+                          <Tooltip
+                            formatter={(v: number) => [`${Math.round(v)}점`, '리듬 점수']}
+                            contentStyle={{ borderRadius: '14px', border: '1px solid #DCE7FF', boxShadow: '0 14px 30px rgba(20,41,95,0.12)', fontSize: '11px', fontWeight: 700, color: '#14295F' }}
+                          />
+                          <Line type="monotone" dataKey="score" stroke="#10B981" strokeWidth={2.5} dot={{ r: 3, fill: '#10B981', strokeWidth: 0 }} activeDot={{ r: 4 }} />
+                        </LineChart>
+                      </ResponsiveContainer>
+                    )}
+                  </div>
                 </div>
 
                 <div className={studioChartCardClassName}>
-                  <div className="mb-3">
-                    <p className={studioSectionEyebrowClassName}>학습 시간 분포 리듬</p>
-                    <p className="mt-1 text-[11px] font-bold text-[#5c6e97]">최근 7일 기준 첫 공부 시작시간과 마지막 공부 종료시간</p>
+                  <div className="mb-3 flex items-center justify-between gap-3">
+                    <div>
+                      <p className={studioSectionEyebrowClassName}>학습 시간 분포 리듬</p>
+                      <p className="mt-1 text-[11px] font-bold text-[#5c6e97]">최근 7일 기준 첫 공부 시작시간과 마지막 공부 종료시간</p>
+                    </div>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className={studioChartExpandButtonClassName}
+                      onClick={() => openFocusExpandedChart('studyRhythm')}
+                      title="크게 보기"
+                      aria-label="학습 시간 분포 리듬 크게 보기"
+                    >
+                      <Eye className="mr-1 h-3 w-3" />
+                      확대
+                    </Button>
                   </div>
-                  {trendLoading ? (
-                    <div className="flex h-[130px] items-center justify-center"><Loader2 className="h-5 w-5 animate-spin text-[#5c6e97]" /></div>
-                  ) : !hasRhythmData ? (
-                    <div className="flex h-[130px] items-center justify-center text-xs font-bold text-[#5c6e97]">데이터를 수집 중입니다.</div>
-                  ) : (
-                    <ResponsiveContainer width="100%" height={130}>
-                      <ComposedChart data={rhythmData} margin={{ top: 6, right: 12, left: 8, bottom: 0 }}>
-                        <CartesianGrid strokeDasharray="3 3" stroke="#E4ECFA" vertical={false} />
-                        <XAxis dataKey="label" tick={{ fontSize: 11, fontWeight: 800, fill: '#5c6e97' }} tickLine={false} axisLine={false} />
-                        <YAxis domain={[0, 24]} tick={{ fontSize: 9, fontWeight: 700, fill: '#5c6e97' }} tickLine={false} axisLine={false} width={44} tickFormatter={(v) => `${Math.round(Number(v || 0))}h`} />
-                        <Tooltip
-                          formatter={(v: number, name: string) => [`${Math.floor(v)}:${Math.round((v % 1) * 60).toString().padStart(2, '0')}`, name === 'startHour' ? '시작시간' : '종료시간']}
-                          contentStyle={{ borderRadius: '14px', border: '1px solid #DCE7FF', boxShadow: '0 14px 30px rgba(20,41,95,0.12)', fontSize: '11px', fontWeight: 700, color: '#14295F' }}
-                        />
-                        <Line type="monotone" dataKey="startHour" stroke="#0EA5E9" strokeWidth={2.5} dot={{ r: 3, fill: '#0EA5E9', strokeWidth: 0 }} activeDot={{ r: 4 }} />
-                        <Line type="monotone" dataKey="endHour" stroke="#8B5CF6" strokeWidth={2.5} dot={{ r: 3, fill: '#8B5CF6', strokeWidth: 0 }} activeDot={{ r: 4 }} />
-                      </ComposedChart>
-                    </ResponsiveContainer>
-                  )}
+                  <div
+                    role="button"
+                    tabIndex={0}
+                    className={studioChartExpandAreaClassName}
+                    onClick={() => openFocusExpandedChart('studyRhythm')}
+                    onKeyDown={(event) => handleFocusChartExpandKeyDown(event, 'studyRhythm')}
+                    aria-label="학습 시간 분포 리듬 크게 보기"
+                  >
+                    {trendLoading ? (
+                      <div className="flex h-[130px] items-center justify-center"><Loader2 className="h-5 w-5 animate-spin text-[#5c6e97]" /></div>
+                    ) : !hasRhythmData ? (
+                      <div className="flex h-[130px] items-center justify-center text-xs font-bold text-[#5c6e97]">데이터를 수집 중입니다.</div>
+                    ) : (
+                      <ResponsiveContainer width="100%" height={130}>
+                        <ComposedChart data={rhythmData} margin={{ top: 6, right: 12, left: 8, bottom: 0 }}>
+                          <CartesianGrid strokeDasharray="3 3" stroke="#E4ECFA" vertical={false} />
+                          <XAxis dataKey="label" tick={{ fontSize: 11, fontWeight: 800, fill: '#5c6e97' }} tickLine={false} axisLine={false} />
+                          <YAxis domain={[0, 24]} tick={{ fontSize: 9, fontWeight: 700, fill: '#5c6e97' }} tickLine={false} axisLine={false} width={44} tickFormatter={(v) => `${Math.round(Number(v || 0))}h`} />
+                          <Tooltip
+                            formatter={(v: number, name: string) => [`${Math.floor(v)}:${Math.round((v % 1) * 60).toString().padStart(2, '0')}`, name === 'startHour' ? '시작시간' : '종료시간']}
+                            contentStyle={{ borderRadius: '14px', border: '1px solid #DCE7FF', boxShadow: '0 14px 30px rgba(20,41,95,0.12)', fontSize: '11px', fontWeight: 700, color: '#14295F' }}
+                          />
+                          <Line type="monotone" dataKey="startHour" stroke="#0EA5E9" strokeWidth={2.5} dot={{ r: 3, fill: '#0EA5E9', strokeWidth: 0 }} activeDot={{ r: 4 }} />
+                          <Line type="monotone" dataKey="endHour" stroke="#8B5CF6" strokeWidth={2.5} dot={{ r: 3, fill: '#8B5CF6', strokeWidth: 0 }} activeDot={{ r: 4 }} />
+                        </ComposedChart>
+                      </ResponsiveContainer>
+                    )}
+                  </div>
                   <div className="mt-2 flex items-center justify-end gap-4">
                     <div className="flex items-center gap-1"><div className="h-2.5 w-2.5 rounded-full bg-sky-500" /><p className="text-[9px] font-bold text-[#5c6e97]">첫 시작시간</p></div>
                     <div className="flex items-center gap-1"><div className="h-2.5 w-2.5 rounded-full bg-violet-500" /><p className="text-[9px] font-bold text-[#5c6e97]">마지막 종료시간</p></div>
@@ -11591,28 +11782,51 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
                       <p className={studioSectionEyebrowClassName}>학습 중간 외출시간 추이</p>
                       <p className="mt-1 text-[11px] font-bold text-[#5c6e97]">외출시간이 늘어날수록 집중 흐름 이탈을 점검해야 합니다.</p>
                     </div>
-                    {dayDataLoading ? <Loader2 className="h-4 w-4 animate-spin text-[#5c6e97]" /> : null}
-                  </div>
-                  {awayTimeData.every((d) => d.awayMinutes === 0) ? (
-                    <div className="flex h-[130px] flex-col items-center justify-center gap-1 text-xs font-bold text-[#5c6e97]">
-                      <p>세션 기록이 없습니다.</p>
-                      <p className="text-[9px] font-bold text-[#8EA0C4]">6시간 이상 연속 학습 세션부터 외출 데이터가 수집됩니다.</p>
+                    <div className="flex items-center gap-2">
+                      {dayDataLoading ? <Loader2 className="h-4 w-4 animate-spin text-[#5c6e97]" /> : null}
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        className={studioChartExpandButtonClassName}
+                        onClick={() => openFocusExpandedChart('awayTime')}
+                        title="크게 보기"
+                        aria-label="학습 중간 외출시간 추이 크게 보기"
+                      >
+                        <Eye className="mr-1 h-3 w-3" />
+                        확대
+                      </Button>
                     </div>
-                  ) : (
-                    <ResponsiveContainer width="100%" height={130}>
-                      <ComposedChart data={awayTimeData} margin={{ top: 6, right: 12, left: 8, bottom: 0 }}>
-                        <CartesianGrid strokeDasharray="3 3" stroke="#E4ECFA" vertical={false} />
-                        <XAxis dataKey="date" tick={{ fontSize: 9, fontWeight: 700, fill: '#5c6e97' }} tickLine={false} axisLine={false} />
-                        <YAxis tick={{ fontSize: 9, fontWeight: 700, fill: '#5c6e97' }} tickLine={false} axisLine={false} width={42} tickFormatter={(v) => `${Math.max(0, Math.round(Number(v || 0)))}m`} />
-                        <Tooltip
-                          formatter={(v: number) => [`${v}분`, '외출시간']}
-                          contentStyle={{ borderRadius: '14px', border: '1px solid #DCE7FF', boxShadow: '0 14px 30px rgba(20,41,95,0.12)', fontSize: '11px', fontWeight: 700, color: '#14295F' }}
-                        />
-                        <Bar dataKey="awayMinutes" fill="#FFD0B0" radius={[4, 4, 0, 0]} />
-                        <Line type="monotone" dataKey="awayMinutes" stroke="#FF7A16" strokeWidth={2} dot={{ r: 3, fill: '#FF7A16', strokeWidth: 0 }} activeDot={{ r: 4 }} />
-                      </ComposedChart>
-                    </ResponsiveContainer>
-                  )}
+                  </div>
+                  <div
+                    role="button"
+                    tabIndex={0}
+                    className={studioChartExpandAreaClassName}
+                    onClick={() => openFocusExpandedChart('awayTime')}
+                    onKeyDown={(event) => handleFocusChartExpandKeyDown(event, 'awayTime')}
+                    aria-label="학습 중간 외출시간 추이 크게 보기"
+                  >
+                    {awayTimeData.every((d) => d.awayMinutes === 0) ? (
+                      <div className="flex h-[130px] flex-col items-center justify-center gap-1 text-xs font-bold text-[#5c6e97]">
+                        <p>세션 기록이 없습니다.</p>
+                        <p className="text-[9px] font-bold text-[#8EA0C4]">6시간 이상 연속 학습 세션부터 외출 데이터가 수집됩니다.</p>
+                      </div>
+                    ) : (
+                      <ResponsiveContainer width="100%" height={130}>
+                        <ComposedChart data={awayTimeData} margin={{ top: 6, right: 12, left: 8, bottom: 0 }}>
+                          <CartesianGrid strokeDasharray="3 3" stroke="#E4ECFA" vertical={false} />
+                          <XAxis dataKey="date" tick={{ fontSize: 9, fontWeight: 700, fill: '#5c6e97' }} tickLine={false} axisLine={false} />
+                          <YAxis tick={{ fontSize: 9, fontWeight: 700, fill: '#5c6e97' }} tickLine={false} axisLine={false} width={42} tickFormatter={(v) => `${Math.max(0, Math.round(Number(v || 0)))}m`} />
+                          <Tooltip
+                            formatter={(v: number) => [`${v}분`, '외출시간']}
+                            contentStyle={{ borderRadius: '14px', border: '1px solid #DCE7FF', boxShadow: '0 14px 30px rgba(20,41,95,0.12)', fontSize: '11px', fontWeight: 700, color: '#14295F' }}
+                          />
+                          <Bar dataKey="awayMinutes" fill="#FFD0B0" radius={[4, 4, 0, 0]} />
+                          <Line type="monotone" dataKey="awayMinutes" stroke="#FF7A16" strokeWidth={2} dot={{ r: 3, fill: '#FF7A16', strokeWidth: 0 }} activeDot={{ r: 4 }} />
+                        </ComposedChart>
+                      </ResponsiveContainer>
+                    )}
+                  </div>
                 </div>
               </div>
 
@@ -11642,6 +11856,235 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
 
           {/* ── FOOTER ── */}
           <DialogFooter className="border-t border-[#DCE7FF] bg-white p-4 flex-shrink-0">
+            <DialogClose asChild>
+              <Button type="button" className="h-10 rounded-xl bg-[#14295F] px-5 font-black text-white hover:bg-[#10224C]">닫기</Button>
+            </DialogClose>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={!!focusExpandedChartKey}
+        onOpenChange={(open) => {
+          if (!open) setFocusExpandedChartKey(null);
+        }}
+      >
+        <DialogContent motionPreset="dashboard-premium" className={cn(studioDialogContentClassName, 'max-h-[90vh] flex flex-col sm:max-w-6xl')}>
+          <div className={cn(studioDialogHeaderClassName, 'flex-shrink-0')}>
+            <DialogHeader className="text-left">
+              <div className="flex flex-wrap items-center gap-2">
+                <Badge className="border-none bg-white/18 px-2.5 py-1 text-[10px] font-black text-white">
+                  그래프 확대
+                </Badge>
+                {selectedFocusStudent?.name ? (
+                  <Badge className="border-none bg-white px-2.5 py-1 text-[10px] font-black text-[#14295F]">
+                    {selectedFocusStudent.name}
+                  </Badge>
+                ) : null}
+              </div>
+              <DialogTitle className="mt-3 font-aggro-display text-[1.8rem] font-black tracking-tight text-white">
+                {focusExpandedChartCopy?.title || '그래프'}
+              </DialogTitle>
+              <DialogDescription className="mt-2 text-sm font-bold leading-6 text-white/76">
+                {focusExpandedChartCopy?.description || '선택한 그래프를 크게 확인합니다.'}
+              </DialogDescription>
+            </DialogHeader>
+          </div>
+          <div className="min-h-0 flex-1 bg-[linear-gradient(180deg,#F7FAFF_0%,#EEF4FF_100%)] p-5">
+            <div className="flex h-[62vh] min-h-[360px] flex-col rounded-[1.7rem] border border-[#D8E5FF] bg-white p-4 shadow-[0_20px_40px_-32px_rgba(20,41,95,0.2)]">
+              {focusExpandedChartKey === 'dailyGrowth' ? (
+                <div className="mb-3 flex flex-wrap items-center justify-end gap-2">
+                  {dailyGrowthWindowData.length > 0 ? (
+                    <Badge className="h-8 rounded-full border-none bg-[#EEF4FF] px-3 text-[11px] font-black text-[#14295F]">
+                      최근 7일 {(dailyGrowthWindowData[dailyGrowthWindowData.length - 1]?.growth ?? 0) >= 0 ? '+' : ''}{dailyGrowthWindowData[dailyGrowthWindowData.length - 1]?.growth ?? 0}%
+                    </Badge>
+                  ) : null}
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="h-8 rounded-lg border-[#DCE7FF] px-3 text-[11px] font-black text-[#14295F]"
+                    onClick={() => setDailyGrowthWindowIndex((prev) => Math.min(prev + 1, dailyGrowthWindowCount - 1))}
+                    disabled={boundedDailyGrowthWindowIndex >= dailyGrowthWindowCount - 1}
+                  >
+                    이전 7일
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="h-8 rounded-lg border-[#DCE7FF] px-3 text-[11px] font-black text-[#14295F]"
+                    onClick={() => setDailyGrowthWindowIndex((prev) => Math.max(prev - 1, 0))}
+                    disabled={boundedDailyGrowthWindowIndex <= 0}
+                  >
+                    다음 7일
+                  </Button>
+                </div>
+              ) : null}
+
+              <div className="min-h-0 flex-1">
+                {focusExpandedChartKey === 'interventionFactors' && selectedFocusCounselingLens ? (
+                  <ResponsiveContainer width="100%" height="100%">
+                    <ComposedChart data={selectedFocusCounselingLens.factorData} margin={{ top: 16, right: 24, left: 12, bottom: 8 }}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="#E4ECFA" vertical={false} />
+                      <XAxis dataKey="label" tick={{ fontSize: 13, fontWeight: 800, fill: '#5c6e97' }} tickLine={false} axisLine={false} />
+                      <YAxis domain={[0, 100]} tick={{ fontSize: 12, fontWeight: 700, fill: '#5c6e97' }} tickLine={false} axisLine={false} width={48} tickFormatter={(v) => `${Math.round(Number(v || 0))}`} />
+                      <Tooltip
+                        formatter={(v: number) => [`${Math.round(Number(v || 0))}점`, '개입 필요']}
+                        contentStyle={{ borderRadius: '14px', border: '1px solid #DCE7FF', boxShadow: '0 14px 30px rgba(20,41,95,0.12)', fontSize: '12px', fontWeight: 700, color: '#14295F' }}
+                      />
+                      <Bar dataKey="risk" radius={[10, 10, 0, 0]} barSize={46}>
+                        {selectedFocusCounselingLens.factorData.map((entry) => (
+                          <Cell key={`expanded-factor-${entry.label}`} fill={entry.fill} />
+                        ))}
+                      </Bar>
+                    </ComposedChart>
+                  </ResponsiveContainer>
+                ) : null}
+
+                {focusExpandedChartKey === 'counselingMatrix' ? (
+                  trendLoading ? (
+                    <div className="flex h-full items-center justify-center"><Loader2 className="h-6 w-6 animate-spin text-[#5c6e97]" /></div>
+                  ) : !hasFocusCounselingTrendData ? (
+                    <div className="flex h-full items-center justify-center text-sm font-bold text-[#5c6e97]">상담용 추세 데이터를 수집 중입니다.</div>
+                  ) : (
+                    <ResponsiveContainer width="100%" height="100%">
+                      <ComposedChart data={focusCounselingTrendData} margin={{ top: 16, right: 62, left: 16, bottom: 8 }}>
+                        <CartesianGrid strokeDasharray="3 3" stroke="#E4ECFA" vertical={false} />
+                        <XAxis dataKey="date" tick={{ fontSize: 13, fontWeight: 800, fill: '#5c6e97' }} tickLine={false} axisLine={false} />
+                        <YAxis yAxisId="min" tick={{ fontSize: 12, fontWeight: 700, fill: '#5c6e97' }} tickLine={false} axisLine={false} width={58} tickFormatter={(v) => formatChartMinutesAxisTick(Number(v))} />
+                        <YAxis yAxisId="pct" orientation="right" domain={[0, 100]} tick={{ fontSize: 12, fontWeight: 700, fill: '#5c6e97' }} tickLine={false} axisLine={false} width={48} tickFormatter={(v) => `${Math.round(Number(v || 0))}`} />
+                        <Tooltip
+                          formatter={(v: number, name: string) => {
+                            if (name === 'minutes') return [`${Math.floor(Number(v || 0) / 60)}h ${Number(v || 0) % 60}m`, '공부시간'];
+                            if (name === 'score') return [`${Math.round(Number(v || 0))}점`, '집중점수'];
+                            return [`${Math.round(Number(v || 0))}%`, '계획완료'];
+                          }}
+                          contentStyle={{ borderRadius: '14px', border: '1px solid #DCE7FF', boxShadow: '0 14px 30px rgba(20,41,95,0.12)', fontSize: '12px', fontWeight: 700, color: '#14295F' }}
+                        />
+                        <Bar yAxisId="min" dataKey="minutes" fill="#C7D8FF" radius={[8, 8, 0, 0]} barSize={42} />
+                        <Line yAxisId="pct" type="monotone" dataKey="score" stroke="#14295F" strokeWidth={3} dot={{ r: 5, fill: '#14295F', strokeWidth: 0 }} activeDot={{ r: 6 }} />
+                        <Line yAxisId="pct" type="monotone" dataKey="completion" stroke="#10B981" strokeWidth={3} dot={{ r: 5, fill: '#10B981', strokeWidth: 0 }} activeDot={{ r: 6 }} />
+                      </ComposedChart>
+                    </ResponsiveContainer>
+                  )
+                ) : null}
+
+                {focusExpandedChartKey === 'weeklyGrowth' ? (
+                  trendLoading ? (
+                    <div className="flex h-full items-center justify-center"><Loader2 className="h-6 w-6 animate-spin text-[#5c6e97]" /></div>
+                  ) : !hasWeeklyGrowthData ? (
+                    <div className="flex h-full items-center justify-center text-sm font-bold text-[#5c6e97]">데이터를 수집 중입니다.</div>
+                  ) : (
+                    <ResponsiveContainer width="100%" height="100%">
+                      <ComposedChart data={weeklyGrowthData} margin={{ top: 16, right: 62, left: 16, bottom: 8 }}>
+                        <CartesianGrid strokeDasharray="3 3" stroke="#E4ECFA" vertical={false} />
+                        <XAxis dataKey="label" tick={{ fontSize: 12, fontWeight: 700, fill: '#5c6e97' }} tickLine={false} axisLine={false} />
+                        <YAxis yAxisId="min" tick={{ fontSize: 12, fontWeight: 700, fill: '#5c6e97' }} tickLine={false} axisLine={false} width={58} tickFormatter={(v) => formatChartMinutesAxisTick(Number(v))} />
+                        <YAxis yAxisId="pct" orientation="right" tick={{ fontSize: 12, fontWeight: 700, fill: '#5c6e97' }} tickLine={false} axisLine={false} width={50} tickFormatter={(v) => `${Math.round(Number(v || 0))}%`} />
+                        <Tooltip
+                          formatter={(v: number, name: string) => name === 'totalMinutes' ? [`${Math.floor(v / 60)}h ${v % 60}m`, '주간 학습'] : [`${v >= 0 ? '+' : ''}${v}%`, '성장률']}
+                          contentStyle={{ borderRadius: '14px', border: '1px solid #DCE7FF', boxShadow: '0 14px 30px rgba(20,41,95,0.12)', fontSize: '12px', fontWeight: 700, color: '#14295F' }}
+                        />
+                        <Bar yAxisId="min" dataKey="totalMinutes" fill="#C7D8FF" radius={[8, 8, 0, 0]} />
+                        <Line yAxisId="pct" type="monotone" dataKey="growth" stroke="#FF7A16" strokeWidth={3} dot={{ r: 5, fill: '#FF7A16', strokeWidth: 0 }} activeDot={{ r: 6 }} />
+                      </ComposedChart>
+                    </ResponsiveContainer>
+                  )
+                ) : null}
+
+                {focusExpandedChartKey === 'dailyGrowth' ? (
+                  trendLoading ? (
+                    <div className="flex h-full items-center justify-center"><Loader2 className="h-6 w-6 animate-spin text-[#5c6e97]" /></div>
+                  ) : !hasDailyGrowthData ? (
+                    <div className="flex h-full items-center justify-center text-sm font-bold text-[#5c6e97]">데이터를 수집 중입니다.</div>
+                  ) : (
+                    <ResponsiveContainer width="100%" height="100%">
+                      <ComposedChart data={dailyGrowthWindowData} margin={{ top: 16, right: 62, left: 16, bottom: 8 }}>
+                        <CartesianGrid strokeDasharray="3 3" stroke="#E4ECFA" vertical={false} />
+                        <XAxis dataKey="label" tick={{ fontSize: 13, fontWeight: 800, fill: '#5c6e97' }} tickLine={false} axisLine={false} />
+                        <YAxis yAxisId="min" tick={{ fontSize: 12, fontWeight: 700, fill: '#5c6e97' }} tickLine={false} axisLine={false} width={58} tickFormatter={(v) => formatChartMinutesAxisTick(Number(v))} />
+                        <YAxis yAxisId="pct" orientation="right" tick={{ fontSize: 12, fontWeight: 700, fill: '#5c6e97' }} tickLine={false} axisLine={false} width={50} tickFormatter={(v) => `${Math.round(Number(v || 0))}%`} />
+                        <Tooltip
+                          formatter={(v: number, name: string) => name === 'avgMinutes' ? [`${Math.floor(v / 60)}h ${v % 60}m`, '일 평균'] : [`${v >= 0 ? '+' : ''}${v}%`, '전월 대비']}
+                          contentStyle={{ borderRadius: '14px', border: '1px solid #DCE7FF', boxShadow: '0 14px 30px rgba(20,41,95,0.12)', fontSize: '12px', fontWeight: 700, color: '#14295F' }}
+                        />
+                        <Bar yAxisId="min" dataKey="avgMinutes" fill="#BEE4FF" radius={[8, 8, 0, 0]} barSize={52} />
+                        <Line yAxisId="pct" type="monotone" dataKey="growth" stroke="#2554D7" strokeWidth={3} dot={{ r: 6, fill: '#2554D7', strokeWidth: 0 }} activeDot={{ r: 7 }} />
+                      </ComposedChart>
+                    </ResponsiveContainer>
+                  )
+                ) : null}
+
+                {focusExpandedChartKey === 'rhythmScore' ? (
+                  trendLoading ? (
+                    <div className="flex h-full items-center justify-center"><Loader2 className="h-6 w-6 animate-spin text-[#5c6e97]" /></div>
+                  ) : !hasRhythmScoreChangeData ? (
+                    <div className="flex h-full items-center justify-center text-sm font-bold text-[#5c6e97]">리듬 점수 데이터를 수집 중입니다.</div>
+                  ) : (
+                    <ResponsiveContainer width="100%" height="100%">
+                      <LineChart data={rhythmScoreTrendData} margin={{ top: 16, right: 28, left: 16, bottom: 8 }}>
+                        <CartesianGrid strokeDasharray="3 3" stroke="#E4ECFA" vertical={false} />
+                        <XAxis dataKey="date" tick={{ fontSize: 12, fontWeight: 700, fill: '#5c6e97' }} tickLine={false} axisLine={false} />
+                        <YAxis domain={[0, 100]} tick={{ fontSize: 12, fontWeight: 700, fill: '#5c6e97' }} tickLine={false} axisLine={false} width={52} />
+                        <Tooltip
+                          formatter={(v: number) => [`${Math.round(v)}점`, '리듬 점수']}
+                          contentStyle={{ borderRadius: '14px', border: '1px solid #DCE7FF', boxShadow: '0 14px 30px rgba(20,41,95,0.12)', fontSize: '12px', fontWeight: 700, color: '#14295F' }}
+                        />
+                        <Line type="monotone" dataKey="score" stroke="#10B981" strokeWidth={3} dot={{ r: 5, fill: '#10B981', strokeWidth: 0 }} activeDot={{ r: 6 }} />
+                      </LineChart>
+                    </ResponsiveContainer>
+                  )
+                ) : null}
+
+                {focusExpandedChartKey === 'studyRhythm' ? (
+                  trendLoading ? (
+                    <div className="flex h-full items-center justify-center"><Loader2 className="h-6 w-6 animate-spin text-[#5c6e97]" /></div>
+                  ) : !hasRhythmData ? (
+                    <div className="flex h-full items-center justify-center text-sm font-bold text-[#5c6e97]">데이터를 수집 중입니다.</div>
+                  ) : (
+                    <ResponsiveContainer width="100%" height="100%">
+                      <ComposedChart data={rhythmData} margin={{ top: 16, right: 28, left: 16, bottom: 8 }}>
+                        <CartesianGrid strokeDasharray="3 3" stroke="#E4ECFA" vertical={false} />
+                        <XAxis dataKey="label" tick={{ fontSize: 14, fontWeight: 800, fill: '#5c6e97' }} tickLine={false} axisLine={false} />
+                        <YAxis domain={[0, 24]} tick={{ fontSize: 12, fontWeight: 700, fill: '#5c6e97' }} tickLine={false} axisLine={false} width={54} tickFormatter={(v) => `${Math.round(Number(v || 0))}h`} />
+                        <Tooltip
+                          formatter={(v: number, name: string) => [`${Math.floor(v)}:${Math.round((v % 1) * 60).toString().padStart(2, '0')}`, name === 'startHour' ? '시작시간' : '종료시간']}
+                          contentStyle={{ borderRadius: '14px', border: '1px solid #DCE7FF', boxShadow: '0 14px 30px rgba(20,41,95,0.12)', fontSize: '12px', fontWeight: 700, color: '#14295F' }}
+                        />
+                        <Line type="monotone" dataKey="startHour" stroke="#0EA5E9" strokeWidth={3} dot={{ r: 5, fill: '#0EA5E9', strokeWidth: 0 }} activeDot={{ r: 6 }} />
+                        <Line type="monotone" dataKey="endHour" stroke="#8B5CF6" strokeWidth={3} dot={{ r: 5, fill: '#8B5CF6', strokeWidth: 0 }} activeDot={{ r: 6 }} />
+                      </ComposedChart>
+                    </ResponsiveContainer>
+                  )
+                ) : null}
+
+                {focusExpandedChartKey === 'awayTime' ? (
+                  awayTimeData.every((d) => d.awayMinutes === 0) ? (
+                    <div className="flex h-full flex-col items-center justify-center gap-1 text-sm font-bold text-[#5c6e97]">
+                      <p>세션 기록이 없습니다.</p>
+                      <p className="text-[11px] font-bold text-[#8EA0C4]">6시간 이상 연속 학습 세션부터 외출 데이터가 수집됩니다.</p>
+                    </div>
+                  ) : (
+                    <ResponsiveContainer width="100%" height="100%">
+                      <ComposedChart data={awayTimeData} margin={{ top: 16, right: 28, left: 16, bottom: 8 }}>
+                        <CartesianGrid strokeDasharray="3 3" stroke="#E4ECFA" vertical={false} />
+                        <XAxis dataKey="date" tick={{ fontSize: 12, fontWeight: 700, fill: '#5c6e97' }} tickLine={false} axisLine={false} />
+                        <YAxis tick={{ fontSize: 12, fontWeight: 700, fill: '#5c6e97' }} tickLine={false} axisLine={false} width={52} tickFormatter={(v) => `${Math.max(0, Math.round(Number(v || 0)))}m`} />
+                        <Tooltip
+                          formatter={(v: number) => [`${v}분`, '외출시간']}
+                          contentStyle={{ borderRadius: '14px', border: '1px solid #DCE7FF', boxShadow: '0 14px 30px rgba(20,41,95,0.12)', fontSize: '12px', fontWeight: 700, color: '#14295F' }}
+                        />
+                        <Bar dataKey="awayMinutes" fill="#FFD0B0" radius={[8, 8, 0, 0]} />
+                        <Line type="monotone" dataKey="awayMinutes" stroke="#FF7A16" strokeWidth={3} dot={{ r: 5, fill: '#FF7A16', strokeWidth: 0 }} activeDot={{ r: 6 }} />
+                      </ComposedChart>
+                    </ResponsiveContainer>
+                  )
+                ) : null}
+              </div>
+            </div>
+          </div>
+          <DialogFooter className="flex-shrink-0 border-t border-[#DCE7FF] bg-white p-4">
             <DialogClose asChild>
               <Button type="button" className="h-10 rounded-xl bg-[#14295F] px-5 font-black text-white hover:bg-[#10224C]">닫기</Button>
             </DialogClose>
