@@ -29,14 +29,16 @@ import {
   Megaphone,
   TrendingUp,
   Mail,
+  Gift,
 } from 'lucide-react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { StudentProfile, AttendanceCurrent, CenterMembership } from '@/lib/types';
+import { StudentProfile, AttendanceCurrent, CenterMembership, GrowthProgress } from '@/lib/types';
 import { cn } from '@/lib/utils';
 import { formatSeatLabel, resolveSeatIdentity } from '@/lib/seat-layout';
 import { AdminWorkbenchCommandBar } from '@/components/dashboard/admin-workbench-command-bar';
 import { syncAutoAttendanceRecord } from '@/lib/attendance-auto';
 import { setStudentAttendanceStatusSecure } from '@/lib/study-session-actions';
+import { getClaimedStudyBoxes, getOpenedStudyBoxes } from '@/lib/student-rewards';
 import {
   Dialog,
   DialogContent,
@@ -215,6 +217,16 @@ function getStudentAccountStatusLabel(status?: CenterMembership['status']) {
   return '재학생';
 }
 
+function getUnopenedStudyBoxCount(progress?: GrowthProgress | null): number {
+  const dailyPointStatus = progress?.dailyPointStatus || {};
+  return Object.values(dailyPointStatus).reduce((total, dayStatus) => {
+    if (!dayStatus || typeof dayStatus !== 'object') return total;
+    const claimedBoxes = getClaimedStudyBoxes(dayStatus as Record<string, any>);
+    const openedBoxes = new Set(getOpenedStudyBoxes(dayStatus as Record<string, any>));
+    return total + claimedBoxes.filter((hour) => !openedBoxes.has(hour)).length;
+  }, 0);
+}
+
 export default function StudentListPage() {
   const { activeMembership, membershipsLoading, viewMode } = useAppContext();
   const { user: currentUser } = useUser();
@@ -298,6 +310,22 @@ export default function StudentListPage() {
   }, [firestore, centerId, isTeacherOrAdmin]);
   
   const { data: attendanceList } = useCollection<AttendanceCurrent>(attendanceQuery, { enabled: isTeacherOrAdmin });
+
+  // 4. 학생별 포인트 상자 개봉 상태 조회
+  const growthProgressQuery = useMemoFirebase(() => {
+    if (!firestore || !centerId || !isTeacherOrAdmin) return null;
+    return collection(firestore, 'centers', centerId, 'growthProgress');
+  }, [firestore, centerId, isTeacherOrAdmin]);
+
+  const { data: growthProgressList } = useCollection<GrowthProgress>(growthProgressQuery, { enabled: isTeacherOrAdmin });
+
+  const unopenedBoxCountByStudentId = useMemo(() => {
+    const countsByStudentId = new Map<string, number>();
+    (growthProgressList || []).forEach((progress) => {
+      countsByStudentId.set(progress.id, getUnopenedStudyBoxCount(progress));
+    });
+    return countsByStudentId;
+  }, [growthProgressList]);
 
   useEffect(() => {
     if (!functions || !centerId || !canManageStudentAccounts) return;
@@ -403,8 +431,9 @@ export default function StudentListPage() {
       email: canManageStudentAccounts ? resolveStudentEmail(member, profile) : '',
       attendanceLabel,
       attendanceTone,
+      unopenedBoxCount: unopenedBoxCountByStudentId.get(selectedStudentId) || 0,
     };
-  }, [selectedStudentId, studentMembers, studentsProfiles, attendanceList, canManageStudentAccounts]);
+  }, [selectedStudentId, studentMembers, studentsProfiles, attendanceList, canManageStudentAccounts, unopenedBoxCountByStudentId]);
 
   useEffect(() => {
     if (!selectedStudentPreview) return;
@@ -434,6 +463,9 @@ export default function StudentListPage() {
       const identity = resolveSeatIdentity(profile || {});
       return identity.roomSeatNo > 0 || identity.seatNo > 0;
     }).length;
+    const unopenedBoxCounts = Array.from(activeIds, (studentId) => unopenedBoxCountByStudentId.get(studentId) || 0);
+    const unopenedBoxTotal = unopenedBoxCounts.reduce((sum, count) => sum + count, 0);
+    const unopenedBoxStudentCount = unopenedBoxCounts.filter((count) => count > 0).length;
 
     return {
       activeStudents: counts.active,
@@ -441,8 +473,10 @@ export default function StudentListPage() {
       awayCount,
       absentCount,
       assignedSeatCount,
+      unopenedBoxTotal,
+      unopenedBoxStudentCount,
     };
-  }, [attendanceList, counts.active, studentMembers, studentsProfiles]);
+  }, [attendanceList, counts.active, studentMembers, studentsProfiles, unopenedBoxCountByStudentId]);
 
   const handleAddStudent = async () => {
     if (!centerId || !functions) return;
@@ -1073,13 +1107,19 @@ export default function StudentListPage() {
         </DialogContent>
       </Dialog>
 
-      <section className={cn('grid gap-4', isMobile ? 'grid-cols-2' : 'md:grid-cols-3 xl:grid-cols-6')}>
+      <section className={cn('grid gap-4', isMobile ? 'grid-cols-2' : 'md:grid-cols-3 xl:grid-cols-6 2xl:grid-cols-7')}>
         {[
           { label: '관리 규모', value: `${operationalSummary.activeStudents}명`, sub: '현재 관리 대상', tone: 'text-[#14295F] bg-[#eef4ff]' },
           { label: '공부중', value: `${operationalSummary.studyingCount}명`, sub: '실시간 좌석 기준', tone: 'text-emerald-700 bg-emerald-50' },
           { label: '외출', value: `${operationalSummary.awayCount}명`, sub: '복귀 확인 필요', tone: 'text-amber-700 bg-amber-50' },
           { label: '미입실', value: `${operationalSummary.absentCount}명`, sub: '도착 전 / 퇴실 포함', tone: 'text-rose-700 bg-rose-50' },
           { label: '좌석 연동', value: `${operationalSummary.assignedSeatCount}명`, sub: '도면 연동 가능', tone: 'text-sky-700 bg-sky-50' },
+          {
+            label: '미개봉 상자',
+            value: `${operationalSummary.unopenedBoxTotal}개`,
+            sub: `${operationalSummary.unopenedBoxStudentCount}명 확인 필요`,
+            tone: 'text-orange-700 bg-orange-50',
+          },
           ...(canOpenFinance
             ? [{ label: '리스크 분석', value: '보기', sub: '팝업으로 바로 확인', tone: 'text-violet-700 bg-violet-50', onClick: () => setIsRiskAnalysisDialogOpen(true) }]
             : []),
@@ -1171,6 +1211,7 @@ export default function StudentListPage() {
               const attendance = attendanceList?.find(a => a.studentId === member.id);
               const seatLabel = formatSeatLabel(profile);
               const studentEmail = canManageStudentAccounts ? resolveStudentEmail(member, profile) : '';
+              const unopenedBoxCount = unopenedBoxCountByStudentId.get(member.id) || 0;
               const attendanceLabel = attendance?.status === 'studying'
                 ? '공부중'
                 : attendance?.status === 'away' || attendance?.status === 'break'
@@ -1205,6 +1246,17 @@ export default function StudentListPage() {
                                 <Badge className="h-5 rounded-full border border-[#dbe7ff] bg-[#f8fbff] px-2 text-[10px] font-black text-[#14295F]">{member.className}</Badge>
                               ) : null}
                               {member.status === 'active' && getStatusBadge(attendance?.status)}
+                              <Badge
+                                className={cn(
+                                  "h-5 rounded-full border px-2 text-[10px] font-black",
+                                  unopenedBoxCount > 0
+                                    ? "border-orange-200 bg-orange-50 text-orange-700"
+                                    : "border-[#dbe7ff] bg-[#f8fbff] text-[#7b8db3]"
+                                )}
+                              >
+                                <Gift className="mr-1 h-3 w-3" />
+                                미개봉 {unopenedBoxCount}개
+                              </Badge>
                             </div>
                             <div className="flex flex-wrap gap-2">
                               <Badge className="h-6 rounded-full border-none bg-[#eef4ff] px-2.5 text-[10px] font-black text-[#244b90]">
@@ -1235,8 +1287,15 @@ export default function StudentListPage() {
                                 </p>
                               </div>
                               <div className="rounded-xl border border-[#dbe7ff] bg-[#f8fbff] px-3 py-2">
-                                <p className="text-[9px] font-black uppercase tracking-[0.18em] text-[#9aa9c7]">운영 이동</p>
-                                <p className="mt-1 text-sm font-black text-[#14295F]">운영 그래프 확인하기</p>
+                                <p className="text-[9px] font-black uppercase tracking-[0.18em] text-[#9aa9c7]">미개봉 상자</p>
+                                <p
+                                  className={cn(
+                                    "mt-1 text-sm font-black",
+                                    unopenedBoxCount > 0 ? "text-orange-700" : "text-[#14295F]"
+                                  )}
+                                >
+                                  {unopenedBoxCount}개
+                                </p>
                               </div>
                             </div>
                           </div>
@@ -1335,6 +1394,10 @@ export default function StudentListPage() {
                     <Badge className="border border-white/14 bg-white/8 text-white/80 font-black">
                       {selectedStudentPreview.seatLabel}
                     </Badge>
+                    <Badge className="border border-white/14 bg-white/8 text-white font-black">
+                      <Gift className="mr-1 h-3.5 w-3.5" />
+                      미개봉 {selectedStudentPreview.unopenedBoxCount}개
+                    </Badge>
                   </div>
                   <SheetTitle className="text-2xl font-black tracking-tight text-white">
                     {selectedStudentPreview.member.displayName}
@@ -1349,7 +1412,7 @@ export default function StudentListPage() {
                     </p>
                   ) : null}
                 </SheetHeader>
-                <div className="mt-4 grid gap-3 sm:grid-cols-3">
+                <div className="mt-4 grid gap-3 sm:grid-cols-4">
                   <div className="rounded-[1.2rem] border border-white/14 bg-white/8 px-4 py-3">
                     <p className="text-[10px] font-black uppercase tracking-[0.18em] text-white/60">현재 상태</p>
                     <p className="mt-2 text-base font-black text-white">{selectedStudentPreview.attendanceLabel}</p>
@@ -1358,6 +1421,12 @@ export default function StudentListPage() {
                     <p className="text-[10px] font-black uppercase tracking-[0.18em] text-white/60">학교 / 학년</p>
                     <p className="mt-2 text-base font-black text-white">{selectedStudentPreview.profile?.schoolName || '학교 미등록'}</p>
                     <p className="mt-1 text-xs font-semibold text-white/80">{selectedStudentPreview.profile?.grade || '학년 미등록'}</p>
+                  </div>
+                  <div className="rounded-[1.2rem] border border-white/14 bg-white/8 px-4 py-3">
+                    <p className="text-[10px] font-black uppercase tracking-[0.18em] text-white/60">미개봉 상자</p>
+                    <p className="mt-2 text-base font-black text-white">
+                      {selectedStudentPreview.unopenedBoxCount}개
+                    </p>
                   </div>
                   <div className="rounded-[1.2rem] border border-white/14 bg-white/8 px-4 py-3">
                     <p className="text-[10px] font-black uppercase tracking-[0.18em] text-white/60">계정 상태</p>
@@ -1603,6 +1672,18 @@ export default function StudentListPage() {
                             {selectedStudentPreview.attendanceLabel}
                           </p>
                           <p className="mt-1 text-xs font-bold text-[#5c6e97]">{selectedStudentPreview.seatLabel}</p>
+                        </div>
+                        <div className="rounded-[1rem] bg-orange-50 px-3.5 py-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.96)]">
+                          <p className="flex items-center gap-1.5 text-[11px] font-black text-orange-700">
+                            <Gift className="h-3.5 w-3.5" />
+                            미개봉 상자
+                          </p>
+                          <p className="mt-1 text-sm font-black text-[#14295F]">
+                            {selectedStudentPreview.unopenedBoxCount}개
+                          </p>
+                          <p className="mt-1 text-xs font-bold text-[#5c6e97]">
+                            학생 앱에서 상자를 열면 자동으로 0개로 줄어듭니다.
+                          </p>
                         </div>
                         <div className="rounded-[1rem] bg-[#14295F] px-3.5 py-3 text-white shadow-[0_16px_28px_-22px_rgba(20,41,95,0.75)]">
                           <p className="text-[11px] font-black text-white/60">바로 처리 포인트</p>
