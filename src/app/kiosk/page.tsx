@@ -930,7 +930,10 @@ export default function KioskPage() {
           ) : null}
         </div>
 
-        <section className="mx-auto flex w-full max-w-3xl flex-1 flex-col justify-center py-8">
+        <section className={cn(
+          'mx-auto flex w-full max-w-3xl flex-1 flex-col',
+          step === 'action' ? 'justify-start py-5 sm:py-6' : 'justify-center py-8'
+        )}>
           {step === 'pin' ? (
             <div className="rounded-[2rem] border border-[#D7E4FF] bg-white p-6 shadow-[0_34px_80px_-54px_rgba(20,41,95,0.52)] sm:p-8">
               <div className="text-center">
@@ -1066,24 +1069,9 @@ export default function KioskPage() {
           ) : null}
 
           {step === 'action' && selectedStudent ? (
-            <div className="rounded-[2rem] border border-[#D7E4FF] bg-white p-6 shadow-[0_34px_80px_-54px_rgba(20,41,95,0.52)] sm:p-8">
-              <div className="text-center">
-                <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-[1.35rem] bg-[#F7FAFF] text-[#14295F] ring-1 ring-[#D7E4FF]">
-                  <UserRound className="h-8 w-8" />
-                </div>
-                <p className="mt-5 font-aggro-display text-5xl leading-none text-[#14295F] sm:text-6xl">
-                  {selectedStudent.name}
-                </p>
-                <p className="mt-3 text-base font-black text-[#5C6E97]">
-                  {[selectedStudent.schoolName, selectedStudent.grade, selectedStudent.className].filter(Boolean).join(' · ') || '학생 정보'}
-                </p>
-                <div className="mt-5 inline-flex rounded-full border border-[#D7E4FF] bg-[#F7FAFF] px-4 py-2 text-sm font-black text-[#14295F]">
-                  현재 {selectedSeat ? statusLabel[selectedStatus] : '좌석 미배정'}
-                </div>
-              </div>
-
+            <div className="rounded-[2rem] border border-[#D7E4FF] bg-white p-5 shadow-[0_34px_80px_-54px_rgba(20,41,95,0.52)] sm:p-6">
               {selectedSeat ? (
-                <div className={cn('mt-8 grid gap-4', selectedActions.length === 1 ? 'grid-cols-1' : 'grid-cols-1 sm:grid-cols-2')}>
+                <div className={cn('grid gap-4', selectedActions.length === 1 ? 'grid-cols-1' : 'grid-cols-1 sm:grid-cols-2')}>
                   {selectedActions.map((action) => {
                     const config = ACTIONS[action];
                     return (
@@ -1109,11 +1097,26 @@ export default function KioskPage() {
                   })}
                 </div>
               ) : (
-                <div className="mt-8 rounded-[1.35rem] border border-[#FFD7B0] bg-[#FFF8F1] p-5 text-center">
+                <div className="rounded-[1.35rem] border border-[#FFD7B0] bg-[#FFF8F1] p-5 text-center">
                   <p className="text-lg font-black text-[#14295F]">좌석 배정 확인 필요</p>
                   <p className="mt-2 text-sm font-bold text-[#8A5A2B]">관리자에게 좌석 배정을 요청해 주세요.</p>
                 </div>
               )}
+
+              <div className="mt-5 flex items-center gap-4 rounded-[1.35rem] border border-[#D7E4FF] bg-[#F7FAFF] px-5 py-4">
+                <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-[1rem] bg-white text-[#14295F] shadow-[0_12px_24px_-20px_rgba(20,41,95,0.45)]">
+                  <UserRound className="h-6 w-6" />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-2xl font-black text-[#14295F]">{selectedStudent.name}</p>
+                  <p className="mt-1 truncate text-sm font-bold text-[#5C6E97]">
+                    {[selectedStudent.schoolName, selectedStudent.grade, selectedStudent.className].filter(Boolean).join(' · ') || '학생 정보'}
+                  </p>
+                </div>
+                <div className="shrink-0 rounded-full border border-[#D7E4FF] bg-white px-4 py-2 text-sm font-black text-[#14295F]">
+                  {selectedSeat ? statusLabel[selectedStatus] : '좌석 미배정'}
+                </div>
+              </div>
 
               <Button
                 type="button"
