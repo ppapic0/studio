@@ -33,8 +33,8 @@ var __importStar = (this && this.__importStar) || (function () {
     };
 })();
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.refreshClassroomSignals = exports.stopStudentStudySessionSecure = exports.scheduledStudyBoxCarryoverExpiry = exports.openStudyRewardBoxesSecure = exports.openStudyRewardBoxSecure = exports.claimPlannerCompletionRewardSecure = exports.submitAttendanceRequestSecure = exports.applyPenaltyEventSecure = exports.adjustStudentPenaltyBalanceSecure = exports.adjustStudentPointBalanceSecure = exports.cancelPointBoostEventSecure = exports.createPointBoostEventSecure = exports.scheduledClassroomSignalsRefresh = exports.scheduledDailyRiskAlert = exports.repairRecentStudySessionTotals = exports.deleteManualStudySessionSecure = exports.updateManualStudySessionSecure = exports.createManualStudySessionSecure = exports.scheduledKioskAttendanceQueueWorker = exports.onKioskAttendanceQueueCreated = exports.enqueueKioskAttendanceActionSecure = exports.lookupKioskStudentsByPin = exports.setStudentAttendanceStatusSecure = exports.onSessionWritten = exports.onSessionCreated = exports.scheduledWeeklyReport = exports.cleanupOldDocuments = exports.scheduledAttendanceCheck = exports.runLateArrivalCheck = exports.sendPaymentReminderBatch = exports.notifyDailyReportReady = exports.notifyAttendanceSms = exports.scheduledSmsQueueDispatcher = exports.sendBulkManualSms = exports.sendManualStudentSms = exports.updateSmsRecipientPreference = exports.cancelSmsQueueItem = exports.retrySmsQueueItem = exports.saveNotificationSettingsSecure = exports.confirmInvoicePayment = exports.completeSignupWithInvite = exports.redeemInviteCode = exports.createCounselingDemoBundle = exports.syncStudentEmailsForCenter = exports.registerStudent = exports.updateStudentAccount = exports.deleteTeacherAccount = exports.deleteStudentAccount = exports.repairTodayAttendanceSmsQueue = exports.onAttendanceEventCreated = void 0;
-exports.generateStudyPlan = exports.syncGiftishowCatalogSecure = exports.scheduledGiftishowCatalogSync = exports.saveGiftishowSettingsSecure = exports.resendGiftishowOrderSecure = exports.rejectGiftishowOrderSecure = exports.reconcilePendingGiftishowOrders = exports.getGiftishowBizmoneySecure = exports.createGiftishowOrderRequestSecure = exports.cancelGiftishowOrderSecure = exports.cancelGiftishowSendFailSecure = exports.approveGiftishowOrderSecure = exports.reissueDailyRankingRewardV2Secure = exports.scheduledRankingRewardSettlement = exports.ensureCurrentUserMemberships = exports.scheduledOpenClawSnapshotExport = exports.generateOpenClawSnapshot = void 0;
+exports.stopStudentStudySessionSecure = exports.scheduledStudyBoxCarryoverExpiry = exports.openStudyRewardBoxesSecure = exports.openStudyRewardBoxSecure = exports.claimPlannerCompletionRewardSecure = exports.submitAttendanceRequestSecure = exports.applyPenaltyEventSecure = exports.adjustStudentPenaltyBalanceSecure = exports.adjustStudentPointBalanceSecure = exports.cancelPointBoostEventSecure = exports.createPointBoostEventSecure = exports.scheduledClassroomSignalsRefresh = exports.scheduledDailyRiskAlert = exports.repairRecentStudySessionTotals = exports.deleteManualStudySessionSecure = exports.updateManualStudySessionSecure = exports.createManualStudySessionSecure = exports.scheduledKioskAttendanceQueueWorker = exports.onKioskAttendanceQueueCreated = exports.enqueueKioskAttendanceActionSecure = exports.submitKioskAttendanceActionFast = exports.lookupKioskStudentsByPin = exports.setStudentAttendanceStatusSecure = exports.onSessionWritten = exports.onSessionCreated = exports.scheduledWeeklyReport = exports.cleanupOldDocuments = exports.scheduledAttendanceCheck = exports.runLateArrivalCheck = exports.sendPaymentReminderBatch = exports.notifyDailyReportReady = exports.notifyAttendanceSms = exports.scheduledSmsQueueDispatcher = exports.sendBulkManualSms = exports.sendManualStudentSms = exports.updateSmsRecipientPreference = exports.cancelSmsQueueItem = exports.retrySmsQueueItem = exports.saveNotificationSettingsSecure = exports.confirmInvoicePayment = exports.completeSignupWithInvite = exports.redeemInviteCode = exports.createCounselingDemoBundle = exports.syncStudentEmailsForCenter = exports.registerStudent = exports.updateStudentAccount = exports.deleteTeacherAccount = exports.deleteStudentAccount = exports.repairTodayAttendanceSmsQueue = exports.onAttendanceEventCreated = void 0;
+exports.generateStudyPlan = exports.syncGiftishowCatalogSecure = exports.scheduledGiftishowCatalogSync = exports.saveGiftishowSettingsSecure = exports.resendGiftishowOrderSecure = exports.rejectGiftishowOrderSecure = exports.reconcilePendingGiftishowOrders = exports.getGiftishowBizmoneySecure = exports.createGiftishowOrderRequestSecure = exports.cancelGiftishowOrderSecure = exports.cancelGiftishowSendFailSecure = exports.approveGiftishowOrderSecure = exports.reissueDailyRankingRewardV2Secure = exports.scheduledRankingRewardSettlement = exports.ensureCurrentUserMemberships = exports.scheduledOpenClawSnapshotExport = exports.generateOpenClawSnapshot = exports.refreshClassroomSignals = void 0;
 const params_1 = require("firebase-functions/params");
 const functions = __importStar(require("firebase-functions"));
 const admin = __importStar(require("firebase-admin"));
@@ -8683,6 +8683,19 @@ function isRetryableKioskQueueError(error) {
     const code = getKioskQueueErrorCode(error);
     return code === "aborted" || code === "deadline-exceeded" || code === "internal" || code === "unavailable";
 }
+function getKioskFastUserMessage(error, fallback) {
+    const raw = error;
+    if (isPlainObject(raw.details)) {
+        const userMessage = asTrimmedString(raw.details.userMessage);
+        if (userMessage)
+            return userMessage;
+    }
+    const message = typeof raw.message === "string" ? raw.message.trim() : "";
+    return message.slice(0, 220) || fallback;
+}
+function isKioskFastStaleHttpsError(error) {
+    return error.code === "failed-precondition";
+}
 async function releaseKioskAttendanceLock(params) {
     const lockRef = params.db.doc(`centers/${params.centerId}/kioskAttendanceLocks/${params.studentId}`);
     await params.db.runTransaction(async (transaction) => {
@@ -9259,6 +9272,304 @@ async function processKioskAttendanceQueueItemInlineFast(params) {
         });
     }
 }
+function buildKioskFastResult(params) {
+    return Object.assign(Object.assign(Object.assign(Object.assign(Object.assign({ ok: true, actionId: params.actionId, state: params.state, nextStatus: params.nextStatus }, (params.previousStatus ? { previousStatus: params.previousStatus } : {})), (params.confirmedStatus ? { confirmedStatus: params.confirmedStatus } : {})), (params.confirmedSeatId ? { confirmedSeatId: params.confirmedSeatId } : {})), (params.eventId ? { eventId: params.eventId } : {})), (params.userMessage ? { userMessage: params.userMessage } : {}));
+}
+async function readKioskFastResultFromQueue(params) {
+    const queueSnap = await params.db.doc(`centers/${params.centerId}/kioskAttendanceQueue/${params.actionId}`).get();
+    const queueData = queueSnap.exists ? (queueSnap.data() || {}) : {};
+    const status = parseKioskAttendanceQueueStatus(queueData.status);
+    const result = isPlainObject(queueData.result) ? queueData.result : {};
+    const nextStatus = parseAttendanceSeatStatus(queueData.nextStatus) || params.fallbackNextStatus;
+    const previousStatus = parseAttendanceSeatStatus(result.previousStatus);
+    const confirmedStatus = parseAttendanceSeatStatus(queueData.confirmedStatus);
+    const confirmedSeatId = asTrimmedString(queueData.confirmedSeatId);
+    const eventId = asTrimmedString(result.eventId);
+    const alreadyApplied = result.alreadyApplied === true;
+    const state = status === "completed"
+        ? alreadyApplied ? "already_applied" : "applied"
+        : status === "rejected_stale"
+            ? "stale"
+            : "queued";
+    return buildKioskFastResult({
+        actionId: params.actionId,
+        state,
+        nextStatus,
+        previousStatus,
+        confirmedStatus,
+        confirmedSeatId,
+        eventId,
+        userMessage: state === "stale"
+            ? asTrimmedString(queueData.staleReason) || "출결 상태가 이미 바뀌었습니다. 번호를 다시 입력해 현재 상태를 확인해 주세요."
+            : state === "queued"
+                ? "출결 동기화를 이어서 처리하고 있습니다."
+                : null,
+    });
+}
+exports.submitKioskAttendanceActionFast = functions.region(region).runWith({
+    timeoutSeconds: 30,
+    memory: "512MB",
+}).https.onCall(async (data, context) => {
+    var _a, _b, _c;
+    const db = admin.firestore();
+    if (!((_a = context.auth) === null || _a === void 0 ? void 0 : _a.uid)) {
+        throw new functions.https.HttpsError("unauthenticated", "로그인이 필요합니다.");
+    }
+    const centerId = asTrimmedString(data === null || data === void 0 ? void 0 : data.centerId);
+    const studentId = asTrimmedString(data === null || data === void 0 ? void 0 : data.studentId);
+    const pin = asTrimmedString(data === null || data === void 0 ? void 0 : data.pin).replace(/\D/g, "");
+    const action = parseKioskAttendanceQueueAction(data === null || data === void 0 ? void 0 : data.action);
+    const expectedStatusInput = parseAttendanceSeatStatus(data === null || data === void 0 ? void 0 : data.expectedStatus);
+    const idempotencyKey = sanitizeKioskIdempotencyKey(data === null || data === void 0 ? void 0 : data.idempotencyKey);
+    if (!centerId || !studentId || !/^\d{6}$/.test(pin) || !action || !idempotencyKey) {
+        throw new functions.https.HttpsError("invalid-argument", "Invalid fast kiosk attendance input.", {
+            userMessage: "키오스크 출결 정보를 다시 확인해 주세요.",
+        });
+    }
+    const nextStatus = getKioskActionNextStatus(action);
+    const actionId = idempotencyKey;
+    const queueRef = db.doc(`centers/${centerId}/kioskAttendanceQueue/${actionId}`);
+    try {
+        await assertKioskAttendanceQueueCaller({ db, centerId, authUid: context.auth.uid });
+        await assertKioskPinMatchesStudent({ db, centerId, studentId, pin });
+        const existingQueueSnap = await queueRef.get();
+        if (existingQueueSnap.exists) {
+            return readKioskFastResultFromQueue({ db, centerId, actionId, fallbackNextStatus: nextStatus });
+        }
+        const acceptedAtMs = Date.now();
+        const acceptedAtTs = admin.firestore.Timestamp.fromMillis(acceptedAtMs);
+        const actionTime = resolveKioskActionTime({
+            clientActionAtMillis: data === null || data === void 0 ? void 0 : data.clientActionAtMillis,
+            acceptedAtMs,
+        });
+        const seatHint = normalizeKioskSeatHint(data === null || data === void 0 ? void 0 : data.seatHint);
+        const requestedSeatId = asTrimmedString(data === null || data === void 0 ? void 0 : data.seatId) || null;
+        const current = await resolveKioskQueueSeatStatus({ db, centerId, studentId, seatId: requestedSeatId });
+        const expectedStatus = expectedStatusInput || current.status;
+        const baseQueuePayload = Object.assign(Object.assign({ centerId,
+            studentId,
+            pin,
+            action,
+            expectedStatus, statusAtEnqueue: current.status, nextStatus, seatId: current.seatId || requestedSeatId, seatHint,
+            idempotencyKey, inlinePreferred: true, status: "processing", attemptCount: 1, processingMode: "fast_direct", requestedByUid: context.auth.uid, source: "kiosk", clientActionAt: admin.firestore.Timestamp.fromMillis(actionTime.actionAtMs), clientActionAtMillis: Math.max(0, Math.floor((_b = parseFiniteNumber(data === null || data === void 0 ? void 0 : data.clientActionAtMillis)) !== null && _b !== void 0 ? _b : 0)), acceptedAt: acceptedAtTs, effectiveActionAt: admin.firestore.Timestamp.fromMillis(actionTime.actionAtMs), effectiveActionAtMillis: actionTime.actionAtMs, actionTimeSource: actionTime.source }, (actionTime.correctionReason ? { actionTimeCorrectionReason: actionTime.correctionReason } : {})), { processingStartedAt: acceptedAtTs, leaseExpiresAt: admin.firestore.Timestamp.fromMillis(acceptedAtMs + KIOSK_ATTENDANCE_LOCK_TTL_MS), createdAt: admin.firestore.FieldValue.serverTimestamp(), updatedAt: admin.firestore.FieldValue.serverTimestamp() });
+        await queueRef.set(baseQueuePayload, { merge: false });
+        if (current.status !== expectedStatus) {
+            if (current.status === nextStatus) {
+                await queueRef.set({
+                    status: "completed",
+                    verified: true,
+                    confirmedSeatId: current.seatId,
+                    confirmedStatus: current.status,
+                    confirmedStudentId: studentId,
+                    completedAt: admin.firestore.FieldValue.serverTimestamp(),
+                    updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+                    result: {
+                        alreadyApplied: true,
+                        action,
+                        previousStatus: current.status,
+                        expectedStatus,
+                        nextStatus,
+                        eventType: null,
+                        eventId: null,
+                        eventAtMillis: null,
+                        sessionDateKey: null,
+                        sessionMinutes: 0,
+                    },
+                }, { merge: true });
+                return buildKioskFastResult({
+                    actionId,
+                    state: "already_applied",
+                    nextStatus,
+                    previousStatus: current.status,
+                    confirmedStatus: current.status,
+                    confirmedSeatId: current.seatId,
+                });
+            }
+            await rejectKioskQueueItemAsStale({
+                db,
+                centerId,
+                actionId,
+                reason: "status_changed_before_fast_processing",
+                currentStatus: current.status,
+                expectedStatus,
+            });
+            return buildKioskFastResult({
+                actionId,
+                state: "stale",
+                nextStatus,
+                confirmedStatus: current.status,
+                confirmedSeatId: current.seatId,
+                userMessage: "출결 상태가 이미 바뀌었습니다. 번호를 다시 입력해 현재 상태를 확인해 주세요.",
+            });
+        }
+        if (!isKioskActionAllowedFromStatus(action, current.status)) {
+            await rejectKioskQueueItemAsStale({
+                db,
+                centerId,
+                actionId,
+                reason: "action_not_allowed_from_fast_status",
+                currentStatus: current.status,
+                expectedStatus,
+            });
+            return buildKioskFastResult({
+                actionId,
+                state: "stale",
+                nextStatus,
+                confirmedStatus: current.status,
+                confirmedSeatId: current.seatId,
+                userMessage: "현재 상태에서는 선택한 출결 처리를 할 수 없습니다. 번호를 다시 입력해 주세요.",
+            });
+        }
+        const result = await applyAttendanceStatusTransition({
+            db,
+            centerId,
+            studentId,
+            nextStatus,
+            source: "kiosk",
+            actorUid: context.auth.uid,
+            seatId: current.seatId || requestedSeatId,
+            seatHint,
+            nowMs: actionTime.actionAtMs,
+        });
+        const verification = await verifyKioskAttendanceQueueResult({
+            db,
+            centerId,
+            studentId,
+            seatId: result.seatId || current.seatId || requestedSeatId,
+            expectedStatus: nextStatus,
+        });
+        const resultPayload = {
+            previousStatus: result.previousStatus,
+            nextStatus: result.nextStatus,
+            eventType: result.eventType,
+            eventId: result.eventId,
+            eventAtMillis: result.eventAtMillis,
+            sessionDateKey: result.sessionDateKey,
+            sessionMinutes: result.sessionMinutes,
+        };
+        if (!verification.verified) {
+            await queueRef.set({
+                status: "queued",
+                inlinePreferred: false,
+                verified: false,
+                failedReason: "fast_verification_pending",
+                failedCode: verification.failedReason || "verification_pending",
+                confirmedSeatId: verification.confirmedSeatId,
+                confirmedStatus: verification.confirmedStatus,
+                confirmedStudentId: verification.confirmedStudentId,
+                result: resultPayload,
+                verification,
+                nextAttemptAt: admin.firestore.Timestamp.fromMillis(Date.now() + 1000),
+                updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+            }, { merge: true });
+            return buildKioskFastResult({
+                actionId,
+                state: "queued",
+                nextStatus,
+                previousStatus: result.previousStatus,
+                confirmedStatus: verification.confirmedStatus,
+                confirmedSeatId: verification.confirmedSeatId,
+                eventId: result.eventId,
+                userMessage: "출결 동기화를 이어서 처리하고 있습니다.",
+            });
+        }
+        await queueRef.set({
+            status: "completed",
+            verified: true,
+            confirmedSeatId: verification.confirmedSeatId,
+            confirmedStatus: verification.confirmedStatus,
+            confirmedStudentId: verification.confirmedStudentId,
+            completedAt: admin.firestore.FieldValue.serverTimestamp(),
+            updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+            result: resultPayload,
+            verification,
+        }, { merge: true });
+        void queueAttendanceTransitionSmsAfterCommit(db, { centerId, result }).catch((error) => {
+            console.error("[attendance-sms-v2] kiosk fast queue failed", {
+                centerId,
+                eventId: result.eventId || null,
+                eventType: result.eventType || null,
+                message: error instanceof Error ? error.message : String(error),
+            });
+        });
+        return buildKioskFastResult({
+            actionId,
+            state: result.noop ? "already_applied" : "applied",
+            nextStatus,
+            previousStatus: result.previousStatus,
+            confirmedStatus: verification.confirmedStatus,
+            confirmedSeatId: verification.confirmedSeatId,
+            eventId: result.eventId,
+        });
+    }
+    catch (error) {
+        if (isRetryableKioskQueueError(error)) {
+            await queueRef.set({
+                centerId,
+                studentId,
+                pin,
+                action,
+                expectedStatus: expectedStatusInput || "absent",
+                nextStatus,
+                idempotencyKey,
+                inlinePreferred: false,
+                status: "queued",
+                attemptCount: admin.firestore.FieldValue.increment(1),
+                requestedByUid: context.auth.uid,
+                source: "kiosk",
+                clientActionAtMillis: Math.max(0, Math.floor((_c = parseFiniteNumber(data === null || data === void 0 ? void 0 : data.clientActionAtMillis)) !== null && _c !== void 0 ? _c : 0)),
+                acceptedAt: admin.firestore.FieldValue.serverTimestamp(),
+                nextAttemptAt: admin.firestore.Timestamp.fromMillis(Date.now() + 1000),
+                failedReason: getKioskQueueErrorMessage(error),
+                failedCode: getKioskQueueErrorCode(error) || null,
+                updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+                createdAt: admin.firestore.FieldValue.serverTimestamp(),
+            }, { merge: true });
+            return buildKioskFastResult({
+                actionId,
+                state: "queued",
+                nextStatus,
+                userMessage: "네트워크가 안정되면 출결 동기화를 자동으로 이어서 처리합니다.",
+            });
+        }
+        if (error instanceof functions.https.HttpsError) {
+            if (!isKioskFastStaleHttpsError(error)) {
+                throw error;
+            }
+            await queueRef.set({
+                centerId,
+                studentId,
+                pin,
+                action,
+                expectedStatus: expectedStatusInput || null,
+                nextStatus,
+                idempotencyKey,
+                status: "rejected_stale",
+                staleReason: getKioskFastUserMessage(error, "출결 상태를 다시 확인해 주세요."),
+                completedAt: admin.firestore.FieldValue.serverTimestamp(),
+                updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+                createdAt: admin.firestore.FieldValue.serverTimestamp(),
+            }, { merge: true });
+            return buildKioskFastResult({
+                actionId,
+                state: "stale",
+                nextStatus,
+                userMessage: getKioskFastUserMessage(error, "출결 상태를 다시 확인해 주세요."),
+            });
+        }
+        console.error("[kiosk-attendance-fast] callable failed", {
+            centerId,
+            studentId,
+            action,
+            idempotencyKey,
+            code: getKioskQueueErrorCode(error),
+            message: getKioskQueueErrorMessage(error),
+        });
+        throw new functions.https.HttpsError("internal", "Fast kiosk attendance failed.", {
+            userMessage: "키오스크 출결 동기화를 이어서 처리하고 있습니다.",
+        });
+    }
+});
 exports.enqueueKioskAttendanceActionSecure = functions.region(region).runWith({
     timeoutSeconds: 120,
     memory: "512MB",

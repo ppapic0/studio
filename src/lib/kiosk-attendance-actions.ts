@@ -34,6 +34,34 @@ export type EnqueueKioskAttendanceActionResult = {
   staleReason?: string;
 };
 
+export type SubmitKioskAttendanceActionFastInput = {
+  centerId: string;
+  studentId: string;
+  pin: string;
+  action: KioskAttendanceAction;
+  expectedStatus: AttendanceCurrent['status'];
+  seatId?: string | null;
+  seatHint?: {
+    seatNo?: number | null;
+    roomId?: string | null;
+    roomSeatNo?: number | null;
+  } | null;
+  idempotencyKey: string;
+  clientActionAtMillis: number;
+};
+
+export type SubmitKioskAttendanceActionFastResult = {
+  ok: true;
+  actionId: string;
+  state: 'applied' | 'already_applied' | 'queued' | 'stale';
+  nextStatus: AttendanceCurrent['status'];
+  previousStatus?: AttendanceCurrent['status'];
+  confirmedStatus?: AttendanceCurrent['status'];
+  confirmedSeatId?: string;
+  eventId?: string;
+  userMessage?: string;
+};
+
 export async function enqueueKioskAttendanceActionSecure(
   functions: Functions,
   input: EnqueueKioskAttendanceActionInput
@@ -41,6 +69,18 @@ export async function enqueueKioskAttendanceActionSecure(
   const callable = httpsCallable<EnqueueKioskAttendanceActionInput, EnqueueKioskAttendanceActionResult>(
     functions,
     'enqueueKioskAttendanceActionSecure'
+  );
+  const result = await callable(input);
+  return result.data;
+}
+
+export async function submitKioskAttendanceActionFast(
+  functions: Functions,
+  input: SubmitKioskAttendanceActionFastInput
+): Promise<SubmitKioskAttendanceActionFastResult> {
+  const callable = httpsCallable<SubmitKioskAttendanceActionFastInput, SubmitKioskAttendanceActionFastResult>(
+    functions,
+    'submitKioskAttendanceActionFast'
   );
   const result = await callable(input);
   return result.data;

@@ -10901,6 +10901,20 @@ function isRetryableKioskQueueError(error: unknown): boolean {
   return code === "aborted" || code === "deadline-exceeded" || code === "internal" || code === "unavailable";
 }
 
+function getKioskFastUserMessage(error: unknown, fallback: string): string {
+  const raw = error as { details?: unknown; message?: unknown };
+  if (isPlainObject(raw.details)) {
+    const userMessage = asTrimmedString((raw.details as Record<string, unknown>).userMessage);
+    if (userMessage) return userMessage;
+  }
+  const message = typeof raw.message === "string" ? raw.message.trim() : "";
+  return message.slice(0, 220) || fallback;
+}
+
+function isKioskFastStaleHttpsError(error: functions.https.HttpsError): boolean {
+  return error.code === "failed-precondition";
+}
+
 async function releaseKioskAttendanceLock(params: {
   db: admin.firestore.Firestore;
   centerId: string;
@@ -11575,6 +11589,391 @@ async function processKioskAttendanceQueueItemInlineFast(params: {
     });
   }
 }
+
+type KioskAttendanceFastState = "applied" | "already_applied" | "queued" | "stale";
+
+type SubmitKioskAttendanceActionFastResult = {
+  ok: true;
+  actionId: string;
+  state: KioskAttendanceFastState;
+  nextStatus: AttendanceSeatStatus;
+  previousStatus?: AttendanceSeatStatus;
+  confirmedStatus?: AttendanceSeatStatus;
+  confirmedSeatId?: string;
+  eventId?: string;
+  userMessage?: string;
+};
+
+function buildKioskFastResult(params: {
+  actionId: string;
+  state: KioskAttendanceFastState;
+  nextStatus: AttendanceSeatStatus;
+  previousStatus?: AttendanceSeatStatus | null;
+  confirmedStatus?: AttendanceSeatStatus | null;
+  confirmedSeatId?: string | null;
+  eventId?: string | null;
+  userMessage?: string | null;
+}): SubmitKioskAttendanceActionFastResult {
+  return {
+    ok: true,
+    actionId: params.actionId,
+    state: params.state,
+    nextStatus: params.nextStatus,
+    ...(params.previousStatus ? { previousStatus: params.previousStatus } : {}),
+    ...(params.confirmedStatus ? { confirmedStatus: params.confirmedStatus } : {}),
+    ...(params.confirmedSeatId ? { confirmedSeatId: params.confirmedSeatId } : {}),
+    ...(params.eventId ? { eventId: params.eventId } : {}),
+    ...(params.userMessage ? { userMessage: params.userMessage } : {}),
+  };
+}
+
+async function readKioskFastResultFromQueue(params: {
+  db: admin.firestore.Firestore;
+  centerId: string;
+  actionId: string;
+  fallbackNextStatus: AttendanceSeatStatus;
+}): Promise<SubmitKioskAttendanceActionFastResult> {
+  const queueSnap = await params.db.doc(`centers/${params.centerId}/kioskAttendanceQueue/${params.actionId}`).get();
+  const queueData = queueSnap.exists ? ((queueSnap.data() || {}) as Record<string, unknown>) : {};
+  const status = parseKioskAttendanceQueueStatus(queueData.status);
+  const result = isPlainObject(queueData.result) ? (queueData.result as Record<string, unknown>) : {};
+  const nextStatus = parseAttendanceSeatStatus(queueData.nextStatus) || params.fallbackNextStatus;
+  const previousStatus = parseAttendanceSeatStatus(result.previousStatus);
+  const confirmedStatus = parseAttendanceSeatStatus(queueData.confirmedStatus);
+  const confirmedSeatId = asTrimmedString(queueData.confirmedSeatId);
+  const eventId = asTrimmedString(result.eventId);
+  const alreadyApplied = result.alreadyApplied === true;
+  const state: KioskAttendanceFastState =
+    status === "completed"
+      ? alreadyApplied ? "already_applied" : "applied"
+      : status === "rejected_stale"
+        ? "stale"
+        : "queued";
+
+  return buildKioskFastResult({
+    actionId: params.actionId,
+    state,
+    nextStatus,
+    previousStatus,
+    confirmedStatus,
+    confirmedSeatId,
+    eventId,
+    userMessage: state === "stale"
+      ? asTrimmedString(queueData.staleReason) || "출결 상태가 이미 바뀌었습니다. 번호를 다시 입력해 현재 상태를 확인해 주세요."
+      : state === "queued"
+        ? "출결 동기화를 이어서 처리하고 있습니다."
+        : null,
+  });
+}
+
+export const submitKioskAttendanceActionFast = functions.region(region).runWith({
+  timeoutSeconds: 30,
+  memory: "512MB",
+}).https.onCall(async (data, context): Promise<SubmitKioskAttendanceActionFastResult> => {
+  const db = admin.firestore();
+  if (!context.auth?.uid) {
+    throw new functions.https.HttpsError("unauthenticated", "로그인이 필요합니다.");
+  }
+
+  const centerId = asTrimmedString(data?.centerId);
+  const studentId = asTrimmedString(data?.studentId);
+  const pin = asTrimmedString(data?.pin).replace(/\D/g, "");
+  const action = parseKioskAttendanceQueueAction(data?.action);
+  const expectedStatusInput = parseAttendanceSeatStatus(data?.expectedStatus);
+  const idempotencyKey = sanitizeKioskIdempotencyKey(data?.idempotencyKey);
+  if (!centerId || !studentId || !/^\d{6}$/.test(pin) || !action || !idempotencyKey) {
+    throw new functions.https.HttpsError("invalid-argument", "Invalid fast kiosk attendance input.", {
+      userMessage: "키오스크 출결 정보를 다시 확인해 주세요.",
+    });
+  }
+
+  const nextStatus = getKioskActionNextStatus(action);
+  const actionId = idempotencyKey;
+  const queueRef = db.doc(`centers/${centerId}/kioskAttendanceQueue/${actionId}`);
+
+  try {
+    await assertKioskAttendanceQueueCaller({ db, centerId, authUid: context.auth.uid });
+    await assertKioskPinMatchesStudent({ db, centerId, studentId, pin });
+
+    const existingQueueSnap = await queueRef.get();
+    if (existingQueueSnap.exists) {
+      return readKioskFastResultFromQueue({ db, centerId, actionId, fallbackNextStatus: nextStatus });
+    }
+
+    const acceptedAtMs = Date.now();
+    const acceptedAtTs = admin.firestore.Timestamp.fromMillis(acceptedAtMs);
+    const actionTime = resolveKioskActionTime({
+      clientActionAtMillis: data?.clientActionAtMillis,
+      acceptedAtMs,
+    });
+    const seatHint = normalizeKioskSeatHint(data?.seatHint);
+    const requestedSeatId = asTrimmedString(data?.seatId) || null;
+    const current = await resolveKioskQueueSeatStatus({ db, centerId, studentId, seatId: requestedSeatId });
+    const expectedStatus = expectedStatusInput || current.status;
+    const baseQueuePayload = {
+      centerId,
+      studentId,
+      pin,
+      action,
+      expectedStatus,
+      statusAtEnqueue: current.status,
+      nextStatus,
+      seatId: current.seatId || requestedSeatId,
+      seatHint,
+      idempotencyKey,
+      inlinePreferred: true,
+      status: "processing",
+      attemptCount: 1,
+      processingMode: "fast_direct",
+      requestedByUid: context.auth.uid,
+      source: "kiosk",
+      clientActionAt: admin.firestore.Timestamp.fromMillis(actionTime.actionAtMs),
+      clientActionAtMillis: Math.max(0, Math.floor(parseFiniteNumber(data?.clientActionAtMillis) ?? 0)),
+      acceptedAt: acceptedAtTs,
+      effectiveActionAt: admin.firestore.Timestamp.fromMillis(actionTime.actionAtMs),
+      effectiveActionAtMillis: actionTime.actionAtMs,
+      actionTimeSource: actionTime.source,
+      ...(actionTime.correctionReason ? { actionTimeCorrectionReason: actionTime.correctionReason } : {}),
+      processingStartedAt: acceptedAtTs,
+      leaseExpiresAt: admin.firestore.Timestamp.fromMillis(acceptedAtMs + KIOSK_ATTENDANCE_LOCK_TTL_MS),
+      createdAt: admin.firestore.FieldValue.serverTimestamp(),
+      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+    };
+
+    await queueRef.set(baseQueuePayload, { merge: false });
+
+    if (current.status !== expectedStatus) {
+      if (current.status === nextStatus) {
+        await queueRef.set({
+          status: "completed",
+          verified: true,
+          confirmedSeatId: current.seatId,
+          confirmedStatus: current.status,
+          confirmedStudentId: studentId,
+          completedAt: admin.firestore.FieldValue.serverTimestamp(),
+          updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+          result: {
+            alreadyApplied: true,
+            action,
+            previousStatus: current.status,
+            expectedStatus,
+            nextStatus,
+            eventType: null,
+            eventId: null,
+            eventAtMillis: null,
+            sessionDateKey: null,
+            sessionMinutes: 0,
+          },
+        }, { merge: true });
+
+        return buildKioskFastResult({
+          actionId,
+          state: "already_applied",
+          nextStatus,
+          previousStatus: current.status,
+          confirmedStatus: current.status,
+          confirmedSeatId: current.seatId,
+        });
+      }
+
+      await rejectKioskQueueItemAsStale({
+        db,
+        centerId,
+        actionId,
+        reason: "status_changed_before_fast_processing",
+        currentStatus: current.status,
+        expectedStatus,
+      });
+
+      return buildKioskFastResult({
+        actionId,
+        state: "stale",
+        nextStatus,
+        confirmedStatus: current.status,
+        confirmedSeatId: current.seatId,
+        userMessage: "출결 상태가 이미 바뀌었습니다. 번호를 다시 입력해 현재 상태를 확인해 주세요.",
+      });
+    }
+
+    if (!isKioskActionAllowedFromStatus(action, current.status)) {
+      await rejectKioskQueueItemAsStale({
+        db,
+        centerId,
+        actionId,
+        reason: "action_not_allowed_from_fast_status",
+        currentStatus: current.status,
+        expectedStatus,
+      });
+
+      return buildKioskFastResult({
+        actionId,
+        state: "stale",
+        nextStatus,
+        confirmedStatus: current.status,
+        confirmedSeatId: current.seatId,
+        userMessage: "현재 상태에서는 선택한 출결 처리를 할 수 없습니다. 번호를 다시 입력해 주세요.",
+      });
+    }
+
+    const result = await applyAttendanceStatusTransition({
+      db,
+      centerId,
+      studentId,
+      nextStatus,
+      source: "kiosk",
+      actorUid: context.auth.uid,
+      seatId: current.seatId || requestedSeatId,
+      seatHint,
+      nowMs: actionTime.actionAtMs,
+    });
+    const verification = await verifyKioskAttendanceQueueResult({
+      db,
+      centerId,
+      studentId,
+      seatId: result.seatId || current.seatId || requestedSeatId,
+      expectedStatus: nextStatus,
+    });
+    const resultPayload = {
+      previousStatus: result.previousStatus,
+      nextStatus: result.nextStatus,
+      eventType: result.eventType,
+      eventId: result.eventId,
+      eventAtMillis: result.eventAtMillis,
+      sessionDateKey: result.sessionDateKey,
+      sessionMinutes: result.sessionMinutes,
+    };
+
+    if (!verification.verified) {
+      await queueRef.set({
+        status: "queued",
+        inlinePreferred: false,
+        verified: false,
+        failedReason: "fast_verification_pending",
+        failedCode: verification.failedReason || "verification_pending",
+        confirmedSeatId: verification.confirmedSeatId,
+        confirmedStatus: verification.confirmedStatus,
+        confirmedStudentId: verification.confirmedStudentId,
+        result: resultPayload,
+        verification,
+        nextAttemptAt: admin.firestore.Timestamp.fromMillis(Date.now() + 1000),
+        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      }, { merge: true });
+
+      return buildKioskFastResult({
+        actionId,
+        state: "queued",
+        nextStatus,
+        previousStatus: result.previousStatus,
+        confirmedStatus: verification.confirmedStatus,
+        confirmedSeatId: verification.confirmedSeatId,
+        eventId: result.eventId,
+        userMessage: "출결 동기화를 이어서 처리하고 있습니다.",
+      });
+    }
+
+    await queueRef.set({
+      status: "completed",
+      verified: true,
+      confirmedSeatId: verification.confirmedSeatId,
+      confirmedStatus: verification.confirmedStatus,
+      confirmedStudentId: verification.confirmedStudentId,
+      completedAt: admin.firestore.FieldValue.serverTimestamp(),
+      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      result: resultPayload,
+      verification,
+    }, { merge: true });
+
+    void queueAttendanceTransitionSmsAfterCommit(db, { centerId, result }).catch((error) => {
+      console.error("[attendance-sms-v2] kiosk fast queue failed", {
+        centerId,
+        eventId: result.eventId || null,
+        eventType: result.eventType || null,
+        message: error instanceof Error ? error.message : String(error),
+      });
+    });
+
+    return buildKioskFastResult({
+      actionId,
+      state: result.noop ? "already_applied" : "applied",
+      nextStatus,
+      previousStatus: result.previousStatus,
+      confirmedStatus: verification.confirmedStatus,
+      confirmedSeatId: verification.confirmedSeatId,
+      eventId: result.eventId,
+    });
+  } catch (error) {
+    if (isRetryableKioskQueueError(error)) {
+      await queueRef.set({
+        centerId,
+        studentId,
+        pin,
+        action,
+        expectedStatus: expectedStatusInput || "absent",
+        nextStatus,
+        idempotencyKey,
+        inlinePreferred: false,
+        status: "queued",
+        attemptCount: admin.firestore.FieldValue.increment(1),
+        requestedByUid: context.auth.uid,
+        source: "kiosk",
+        clientActionAtMillis: Math.max(0, Math.floor(parseFiniteNumber(data?.clientActionAtMillis) ?? 0)),
+        acceptedAt: admin.firestore.FieldValue.serverTimestamp(),
+        nextAttemptAt: admin.firestore.Timestamp.fromMillis(Date.now() + 1000),
+        failedReason: getKioskQueueErrorMessage(error),
+        failedCode: getKioskQueueErrorCode(error) || null,
+        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        createdAt: admin.firestore.FieldValue.serverTimestamp(),
+      }, { merge: true });
+
+      return buildKioskFastResult({
+        actionId,
+        state: "queued",
+        nextStatus,
+        userMessage: "네트워크가 안정되면 출결 동기화를 자동으로 이어서 처리합니다.",
+      });
+    }
+
+    if (error instanceof functions.https.HttpsError) {
+      if (!isKioskFastStaleHttpsError(error)) {
+        throw error;
+      }
+
+      await queueRef.set({
+        centerId,
+        studentId,
+        pin,
+        action,
+        expectedStatus: expectedStatusInput || null,
+        nextStatus,
+        idempotencyKey,
+        status: "rejected_stale",
+        staleReason: getKioskFastUserMessage(error, "출결 상태를 다시 확인해 주세요."),
+        completedAt: admin.firestore.FieldValue.serverTimestamp(),
+        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        createdAt: admin.firestore.FieldValue.serverTimestamp(),
+      }, { merge: true });
+
+      return buildKioskFastResult({
+        actionId,
+        state: "stale",
+        nextStatus,
+        userMessage: getKioskFastUserMessage(error, "출결 상태를 다시 확인해 주세요."),
+      });
+    }
+
+    console.error("[kiosk-attendance-fast] callable failed", {
+      centerId,
+      studentId,
+      action,
+      idempotencyKey,
+      code: getKioskQueueErrorCode(error),
+      message: getKioskQueueErrorMessage(error),
+    });
+    throw new functions.https.HttpsError("internal", "Fast kiosk attendance failed.", {
+      userMessage: "키오스크 출결 동기화를 이어서 처리하고 있습니다.",
+    });
+  }
+});
 
 export const enqueueKioskAttendanceActionSecure = functions.region(region).runWith({
   timeoutSeconds: 120,

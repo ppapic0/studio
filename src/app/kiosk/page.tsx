@@ -1,10 +1,11 @@
 'use client';
 
 import Image from 'next/image';
-import { useCallback, useEffect, useMemo, useRef, useState, type MouseEvent, type PointerEvent } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent, type PointerEvent } from 'react';
 import { useRouter } from 'next/navigation';
 import {
   ArrowLeft,
+  Check,
   CheckCircle2,
   Coffee,
   Delete,
@@ -15,8 +16,9 @@ import {
   ShieldCheck,
   Undo2,
   UserRound,
+  WifiOff,
 } from 'lucide-react';
-import { collection, doc, getDoc, getDocs, limit, query, Timestamp, where, type Firestore } from 'firebase/firestore';
+import { collection, getDocs, limit, query, Timestamp, where, type Firestore } from 'firebase/firestore';
 import { httpsCallable } from 'firebase/functions';
 
 import { Button } from '@/components/ui/button';
@@ -27,10 +29,10 @@ import { cn } from '@/lib/utils';
 import { resolveSeatIdentity } from '@/lib/seat-layout';
 import type { AttendanceCurrent, StudentProfile } from '@/lib/types';
 import {
-  enqueueKioskAttendanceActionSecure,
-  type EnqueueKioskAttendanceActionInput,
-  type EnqueueKioskAttendanceActionResult,
+  submitKioskAttendanceActionFast,
   type KioskAttendanceAction,
+  type SubmitKioskAttendanceActionFastInput,
+  type SubmitKioskAttendanceActionFastResult,
 } from '@/lib/kiosk-attendance-actions';
 import type { LucideIcon } from 'lucide-react';
 
@@ -64,79 +66,67 @@ type KioskStudentLookupResult = {
 type KioskActionConfig = {
   action: KioskAttendanceAction;
   label: string;
-  completeTitle: string;
-  completeDescription: (studentName: string) => string;
+  title: string;
   Icon: LucideIcon;
-  buttonClass: string;
-  iconClass: string;
-  overlayClass: string;
+  accentClassName: string;
+  completeMessage: (studentName: string) => string;
 };
 
 type KioskSuccessFeedback = {
   title: string;
   description: string;
-  label: string;
+  actionLabel: string;
   Icon: LucideIcon;
-  overlayClass: string;
-  iconClass: string;
 };
 
-type KioskOutboxItem = {
+type KioskFastOutboxItem = {
   id: string;
-  payload: EnqueueKioskAttendanceActionInput;
+  payload: SubmitKioskAttendanceActionFastInput;
   attempts: number;
   createdAt: number;
   lastError?: string;
 };
 
-const OUTBOX_STORAGE_KEY = 'track:kiosk-attendance-outbox:v1';
-const MAX_OUTBOX_ITEMS = 40;
-const SUCCESS_FEEDBACK_VISIBLE_MS = 620;
-const RESET_AFTER_SUCCESS_MS = 70;
-const PROCESSING_FEEDBACK_DELAY_MS = 80;
-const KIOSK_TOUCH_CLICK_SUPPRESS_MS = 1000;
+const FAST_OUTBOX_STORAGE_KEY = 'track:kiosk-fast-attendance-outbox:v1';
+const MAX_OUTBOX_ITEMS = 48;
+const LOOKUP_LOADING_DELAY_MS = 150;
+const TOUCH_LOCK_MS = 350;
+const SUCCESS_FEEDBACK_VISIBLE_MS = 760;
+const RESET_AFTER_ACTION_MS = 420;
 const kioskTouchClass = 'touch-manipulation select-none [-webkit-tap-highlight-color:transparent] [-webkit-touch-callout:none] [touch-action:manipulation]';
 
 const ACTIONS: Record<KioskAttendanceAction, KioskActionConfig> = {
   check_in: {
     action: 'check_in',
     label: '등원',
-    completeTitle: '등원 처리 완료',
-    completeDescription: (studentName) => `${studentName} 학생 등원이 처리되었습니다.`,
+    title: '센터에 도착했어요',
     Icon: LogIn,
-    buttonClass: 'bg-[#14295F] text-white shadow-[0_24px_42px_-26px_rgba(20,41,95,0.85)] hover:bg-[#10224E]',
-    iconClass: 'bg-white text-[#14295F]',
-    overlayClass: 'bg-[#14295F] text-white border-[#D7E4FF]',
+    accentClassName: 'from-[#FF7A16] to-[#FF9E45]',
+    completeMessage: (studentName) => `${studentName} 학생 등원이 접수되었습니다.`,
   },
   away_start: {
     action: 'away_start',
     label: '외출',
-    completeTitle: '외출 처리 완료',
-    completeDescription: (studentName) => `${studentName} 학생 외출이 처리되었습니다.`,
+    title: '잠깐 나갈게요',
     Icon: Coffee,
-    buttonClass: 'bg-[#FF7A16] text-white shadow-[0_24px_42px_-26px_rgba(255,122,22,0.9)] hover:bg-[#E9680C]',
-    iconClass: 'bg-white text-[#C95A08]',
-    overlayClass: 'bg-[#FF7A16] text-white border-[#FFD7B0]',
+    accentClassName: 'from-[#FF8A1D] to-[#FFB35C]',
+    completeMessage: (studentName) => `${studentName} 학생 외출이 접수되었습니다.`,
   },
   away_end: {
     action: 'away_end',
     label: '복귀',
-    completeTitle: '복귀 처리 완료',
-    completeDescription: (studentName) => `${studentName} 학생 복귀가 처리되었습니다.`,
+    title: '다시 공부하러 왔어요',
     Icon: Undo2,
-    buttonClass: 'bg-[#0EA36A] text-white shadow-[0_24px_42px_-26px_rgba(14,163,106,0.85)] hover:bg-[#0B8C5A]',
-    iconClass: 'bg-white text-[#0B8C5A]',
-    overlayClass: 'bg-[#0EA36A] text-white border-[#C7F5E3]',
+    accentClassName: 'from-[#FF7A16] to-[#FFC06D]',
+    completeMessage: (studentName) => `${studentName} 학생 복귀가 접수되었습니다.`,
   },
   check_out: {
     action: 'check_out',
     label: '퇴실',
-    completeTitle: '퇴실 처리 완료',
-    completeDescription: (studentName) => `${studentName} 학생 퇴실이 처리되었습니다.`,
+    title: '오늘 공부를 마쳤어요',
     Icon: LogOut,
-    buttonClass: 'bg-[#F04462] text-white shadow-[0_24px_42px_-26px_rgba(240,68,98,0.86)] hover:bg-[#D93654]',
-    iconClass: 'bg-white text-[#D93654]',
-    overlayClass: 'bg-[#F04462] text-white border-[#FFD1DB]',
+    accentClassName: 'from-[#14295F] to-[#FF7A16]',
+    completeMessage: (studentName) => `${studentName} 학생 퇴실이 접수되었습니다.`,
   },
 };
 
@@ -198,28 +188,23 @@ function createIdempotencyKey() {
   return `kiosk_${Date.now()}_${Math.random().toString(36).slice(2, 12)}`;
 }
 
-function readOutbox(): KioskOutboxItem[] {
+function readFastOutbox(): KioskFastOutboxItem[] {
   if (typeof window === 'undefined') return [];
   try {
-    const parsed = JSON.parse(window.localStorage.getItem(OUTBOX_STORAGE_KEY) || '[]');
+    const parsed = JSON.parse(window.localStorage.getItem(FAST_OUTBOX_STORAGE_KEY) || '[]');
     return Array.isArray(parsed) ? parsed.slice(0, MAX_OUTBOX_ITEMS) : [];
   } catch {
     return [];
   }
 }
 
-function writeOutbox(items: KioskOutboxItem[]) {
+function writeFastOutbox(items: KioskFastOutboxItem[]) {
   if (typeof window === 'undefined') return;
-  window.localStorage.setItem(OUTBOX_STORAGE_KEY, JSON.stringify(items.slice(-MAX_OUTBOX_ITEMS)));
+  window.localStorage.setItem(FAST_OUTBOX_STORAGE_KEY, JSON.stringify(items.slice(-MAX_OUTBOX_ITEMS)));
 }
 
 function getKioskErrorMessage(error: unknown) {
-  const raw = error as {
-    code?: unknown;
-    message?: unknown;
-    details?: unknown;
-    customData?: unknown;
-  };
+  const raw = error as { code?: unknown; message?: unknown; details?: unknown; customData?: unknown };
   const detailSources = [raw.details, raw.customData];
   for (const source of detailSources) {
     if (source && typeof source === 'object') {
@@ -227,106 +212,35 @@ function getKioskErrorMessage(error: unknown) {
       if (typeof userMessage === 'string' && userMessage.trim()) return userMessage.trim();
     }
   }
-  const code = typeof raw.code === 'string' ? raw.code.toLowerCase() : '';
   const message = typeof raw.message === 'string' ? raw.message.trim() : '';
-  if (code.includes('internal') || /(^|\b)(functions\/)?internal(\b|$)/i.test(message)) {
-    return '키오스크 출결 처리 중 서버 응답이 불안정했습니다. 실제 반영 여부를 확인한 뒤 다시 처리합니다.';
-  }
-  if (message) return message;
-  return '잠시 후 다시 시도해 주세요.';
+  return message || '네트워크가 안정되면 자동으로 다시 동기화합니다.';
 }
 
-function getKioskCallableErrorCode(error: unknown): string {
-  const raw = error as { code?: unknown };
-  return typeof raw?.code === 'string' ? raw.code.toLowerCase().replace(/^functions\//, '') : '';
+function isStudentLookupResult(value: KioskStudentLookupResult | null): value is KioskStudentLookupResult {
+  return Boolean(value?.students?.length);
 }
 
-function shouldUseDirectKioskAttendanceFallback(error: unknown): boolean {
-  const code = getKioskCallableErrorCode(error);
-  const message = error instanceof Error ? error.message : String((error as { message?: unknown })?.message || '');
-  return (
-    code === 'internal' ||
-    code === 'unavailable' ||
-    code === 'deadline-exceeded' ||
-    /\b(functions\/)?(internal|unavailable|deadline-exceeded)\b/i.test(message)
+async function firstLookupWithStudents(
+  lookups: Array<Promise<KioskStudentLookupResult | null>>
+): Promise<KioskStudentLookupResult | null> {
+  const candidates = lookups.map((lookup) =>
+    lookup.then((result) => {
+      if (isStudentLookupResult(result)) return result;
+      throw new Error('empty_lookup');
+    })
   );
-}
 
-async function verifyKioskSeatStatus(params: {
-  firestore: Firestore | null;
-  payload: EnqueueKioskAttendanceActionInput;
-  expectedStatus: AttendanceStatus;
-  seatId?: string | null;
-}): Promise<{
-  verified: boolean;
-  confirmedStatus?: AttendanceStatus;
-  confirmedSeatId?: string;
-}> {
-  if (!params.firestore) {
-    return { verified: false };
-  }
-
-  const readSeatStatus = async (seatId: string) => {
-    const seatSnap = await getDoc(doc(
-      params.firestore!,
-      'centers',
-      params.payload.centerId,
-      'attendanceCurrent',
-      seatId
-    ));
-    if (!seatSnap.exists()) {
-      return { verified: false, confirmedSeatId: seatId };
+  try {
+    return await Promise.any(candidates);
+  } catch {
+    const settled = await Promise.allSettled(lookups);
+    for (const item of settled) {
+      if (item.status === 'fulfilled' && isStudentLookupResult(item.value)) {
+        return item.value;
+      }
     }
-
-    const seatData = seatSnap.data() as Partial<AttendanceCurrent>;
-    if (seatData.studentId && seatData.studentId !== params.payload.studentId) {
-      return {
-        verified: false,
-        confirmedSeatId: seatSnap.id,
-        confirmedStatus: normalizeStatus(seatData.status),
-      };
-    }
-
-    const confirmedStatus = normalizeStatus(seatData.status);
-    return {
-      verified: confirmedStatus === params.expectedStatus,
-      confirmedSeatId: seatSnap.id,
-      confirmedStatus,
-    };
-  };
-
-  const candidateSeatId = params.seatId || params.payload.seatId || '';
-  if (candidateSeatId) {
-    const directResult = await readSeatStatus(candidateSeatId);
-    if (directResult.verified) {
-      return directResult;
-    }
+    return null;
   }
-
-  const seatsSnap = await getDocs(query(
-    collection(params.firestore, 'centers', params.payload.centerId, 'attendanceCurrent'),
-    where('studentId', '==', params.payload.studentId),
-    limit(10)
-  ));
-  const seats = seatsSnap.docs.map((docSnap) => {
-    const data = docSnap.data() as AttendanceCurrent;
-    return {
-      ...data,
-      id: docSnap.id,
-      studentId: data.studentId || params.payload.studentId,
-      status: normalizeStatus(data.status),
-    };
-  });
-  const matchingSeat = seats.find((seat) => seat.status === params.expectedStatus) || pickPreferredSeat(seats);
-  if (matchingSeat) {
-    return {
-      verified: matchingSeat.status === params.expectedStatus,
-      confirmedSeatId: matchingSeat.id,
-      confirmedStatus: matchingSeat.status,
-    };
-  }
-
-  return { verified: false, confirmedSeatId: candidateSeatId || undefined };
 }
 
 export default function KioskPage() {
@@ -343,37 +257,16 @@ export default function KioskPage() {
   const [lookupSeats, setLookupSeats] = useState<KioskLookupAttendance[]>([]);
   const [selectedStudent, setSelectedStudent] = useState<KioskStudent | null>(null);
   const [isSearching, setIsSearching] = useState(false);
+  const [showLookupOverlay, setShowLookupOverlay] = useState(false);
   const [lookupMessage, setLookupMessage] = useState('번호 확인 중');
   const [successFeedback, setSuccessFeedback] = useState<KioskSuccessFeedback | null>(null);
-  const [actionProcessingLabel, setActionProcessingLabel] = useState<string | null>(null);
+  const [queuedCount, setQueuedCount] = useState(0);
   const lookupVersionRef = useRef(0);
+  const touchLocksRef = useRef<Record<string, number>>({});
+  const lookupLoadingTimerRef = useRef<number | null>(null);
   const pendingActionRef = useRef(false);
+  const actionReleaseTimerRef = useRef<number | null>(null);
   const flushingOutboxRef = useRef(false);
-  const actionProcessingTimerRef = useRef<number | null>(null);
-  const suppressNextClickUntilRef = useRef(0);
-
-  const handleKioskPointerPress = useCallback((event: PointerEvent<HTMLElement>, action: () => void) => {
-    if (event.pointerType === 'mouse') return;
-    event.preventDefault();
-    event.stopPropagation();
-    suppressNextClickUntilRef.current = Date.now() + KIOSK_TOUCH_CLICK_SUPPRESS_MS;
-    action();
-  }, []);
-
-  const handleKioskClick = useCallback((event: MouseEvent<HTMLElement>, action: () => void) => {
-    if (Date.now() < suppressNextClickUntilRef.current) {
-      event.preventDefault();
-      event.stopPropagation();
-      return;
-    }
-    action();
-  }, []);
-
-  const handleKioskClickCapture = useCallback((event: MouseEvent<HTMLElement>) => {
-    if (Date.now() >= suppressNextClickUntilRef.current) return;
-    event.preventDefault();
-    event.stopPropagation();
-  }, []);
 
   const lookupKioskStudentsByPin = useMemo(() => {
     if (!functions) return null;
@@ -394,12 +287,39 @@ export default function KioskPage() {
     return mapped;
   }, [lookupSeats]);
 
+  const syncQueuedCount = useCallback(() => {
+    setQueuedCount(readFastOutbox().length);
+  }, []);
+
+  const runLockedAction = useCallback((key: string, action: () => void) => {
+    const now = Date.now();
+    if ((touchLocksRef.current[key] || 0) > now) return;
+    touchLocksRef.current[key] = now + TOUCH_LOCK_MS;
+    action();
+  }, []);
+
+  const handleTouchPress = useCallback((event: PointerEvent<HTMLElement>, key: string, action: () => void) => {
+    event.preventDefault();
+    event.stopPropagation();
+    runLockedAction(key, action);
+  }, [runLockedAction]);
+
+  const handleKeyboardPress = useCallback((event: KeyboardEvent<HTMLElement>, key: string, action: () => void) => {
+    if (event.key !== 'Enter' && event.key !== ' ') return;
+    event.preventDefault();
+    runLockedAction(key, action);
+  }, [runLockedAction]);
+
+  const clearLookupDelay = useCallback(() => {
+    if (lookupLoadingTimerRef.current !== null) {
+      window.clearTimeout(lookupLoadingTimerRef.current);
+      lookupLoadingTimerRef.current = null;
+    }
+  }, []);
+
   const resetKiosk = useCallback(() => {
     lookupVersionRef.current += 1;
-    if (actionProcessingTimerRef.current !== null) {
-      window.clearTimeout(actionProcessingTimerRef.current);
-      actionProcessingTimerRef.current = null;
-    }
+    clearLookupDelay();
     setPin('');
     setStep('pin');
     setMatchedStudents([]);
@@ -407,8 +327,8 @@ export default function KioskPage() {
     setSelectedStudent(null);
     setLookupMessage('번호 확인 중');
     setIsSearching(false);
-    setActionProcessingLabel(null);
-  }, []);
+    setShowLookupOverlay(false);
+  }, [clearLookupDelay]);
 
   const resolveSeatForStudent = useCallback((student: KioskStudent): KioskLookupAttendance | null => {
     const liveSeat = pickPreferredSeat(lookupSeatsByStudentId.get(student.id) || []);
@@ -498,19 +418,16 @@ export default function KioskPage() {
     lookupVersionRef.current = lookupVersion;
     setIsSearching(true);
     setLookupMessage('번호 확인 중');
+    clearLookupDelay();
+    lookupLoadingTimerRef.current = window.setTimeout(() => {
+      setShowLookupOverlay(true);
+    }, LOOKUP_LOADING_DELAY_MS);
 
     try {
-      let lookupData: KioskStudentLookupResult | null = null;
-      try {
-        lookupData = await lookupStudentFromFirestore(code);
-      } catch (firestoreError) {
-        console.warn('[kiosk] fast Firestore lookup failed', firestoreError);
-      }
-
-      if ((!lookupData || !lookupData.students?.length) && lookupKioskStudentsByPin) {
-        setLookupMessage('학생 정보 확인 중');
-        lookupData = await lookupStudentFromBackend(code);
-      }
+      const lookupData = await firstLookupWithStudents([
+        lookupStudentFromFirestore(code).catch(() => null),
+        lookupStudentFromBackend(code).catch(() => null),
+      ]);
 
       if (lookupVersion !== lookupVersionRef.current) return;
 
@@ -519,8 +436,8 @@ export default function KioskPage() {
       if (!students.length) {
         toast({
           variant: 'destructive',
-          title: '일치하는 정보 없음',
-          description: '번호를 다시 입력해 주세요.',
+          title: '번호 확인 필요',
+          description: '일치하는 학생이 없습니다. 번호 6자리를 다시 입력해 주세요.',
         });
         resetKiosk();
         return;
@@ -535,22 +452,17 @@ export default function KioskPage() {
         setSelectedStudent(null);
         setStep('select');
       }
-    } catch (error) {
-      console.error('[kiosk] student lookup failed', error);
-      toast({
-        variant: 'destructive',
-        title: '조회 실패',
-        description: getKioskErrorMessage(error),
-      });
-      resetKiosk();
     } finally {
       if (lookupVersion === lookupVersionRef.current) {
+        clearLookupDelay();
         setIsSearching(false);
+        setShowLookupOverlay(false);
         setLookupMessage('번호 확인 중');
       }
     }
   }, [
     centerId,
+    clearLookupDelay,
     firestore,
     lookupKioskStudentsByPin,
     lookupStudentFromBackend,
@@ -559,173 +471,100 @@ export default function KioskPage() {
     toast,
   ]);
 
-  const flushOutbox = useCallback(async () => {
-    if (!functions || flushingOutboxRef.current) return;
-    flushingOutboxRef.current = true;
-    try {
-      let items = readOutbox();
-      for (const item of items) {
-        try {
-          const result = await enqueueKioskAttendanceActionSecure(functions, item.payload);
-          if (result.status === 'completed' || result.status === 'failed' || result.status === 'rejected_stale') {
-            items = readOutbox().filter((candidate) => candidate.id !== item.id);
-            writeOutbox(items);
-          } else {
-            break;
-          }
-        } catch (error) {
-          const nextItems = readOutbox().map((candidate) =>
-            candidate.id === item.id
-              ? { ...candidate, attempts: candidate.attempts + 1, lastError: getKioskErrorMessage(error) }
-              : candidate
-          );
-          writeOutbox(nextItems);
-          console.warn('[kiosk] queued attendance delivery pending', error);
-          break;
-        }
-      }
-    } finally {
-      flushingOutboxRef.current = false;
-    }
-  }, [functions]);
-
-  const saveActionForRetry = useCallback((payload: EnqueueKioskAttendanceActionInput) => {
-    const items = readOutbox().filter((item) => item.id !== payload.idempotencyKey);
-    writeOutbox([
+  const saveActionForRetry = useCallback((payload: SubmitKioskAttendanceActionFastInput, lastError?: string) => {
+    const items = readFastOutbox().filter((item) => item.id !== payload.idempotencyKey);
+    writeFastOutbox([
       ...items,
       {
         id: payload.idempotencyKey,
         payload,
         attempts: 0,
         createdAt: Date.now(),
+        ...(lastError ? { lastError } : {}),
       },
     ]);
-  }, []);
+    syncQueuedCount();
+  }, [syncQueuedCount]);
 
   const removeActionFromRetry = useCallback((idempotencyKey: string) => {
-    writeOutbox(readOutbox().filter((item) => item.id !== idempotencyKey));
-  }, []);
+    writeFastOutbox(readFastOutbox().filter((item) => item.id !== idempotencyKey));
+    syncQueuedCount();
+  }, [syncQueuedCount]);
 
-  const sendActionToBackend = useCallback(async (payload: EnqueueKioskAttendanceActionInput): Promise<EnqueueKioskAttendanceActionResult> => {
+  const submitFastPayload = useCallback(async (
+    payload: SubmitKioskAttendanceActionFastInput,
+    options: { quiet?: boolean } = {}
+  ): Promise<SubmitKioskAttendanceActionFastResult | null> => {
     saveActionForRetry(payload);
-    const nextStatus = getNextStatusForAction(payload.action);
     if (!functions) {
-      void flushOutbox();
-      return {
-        ok: true,
-        queued: true,
-        actionId: payload.idempotencyKey,
-        optimisticStatus: nextStatus,
-        status: 'queued',
-        userMessage: '네트워크가 연결되면 자동으로 다시 전송합니다.',
-      };
+      if (!options.quiet) {
+        toast({
+          title: '동기화 대기',
+          description: '네트워크가 연결되면 출결 기록을 자동으로 전송합니다.',
+        });
+      }
+      return null;
     }
 
-    let result: EnqueueKioskAttendanceActionResult;
     try {
-      result = await enqueueKioskAttendanceActionSecure(functions, payload);
-    } catch (error) {
-      if (!shouldUseDirectKioskAttendanceFallback(error)) {
-        throw error;
-      }
-
-      const alreadyApplied = await verifyKioskSeatStatus({
-        firestore,
-        payload,
-        expectedStatus: nextStatus,
-      });
-      if (alreadyApplied.verified) {
-        return {
-          ok: true,
-          queued: false,
-          actionId: payload.idempotencyKey,
-          optimisticStatus: nextStatus,
-          status: 'completed',
-          verified: true,
-          confirmedStatus: alreadyApplied.confirmedStatus || nextStatus,
-          confirmedSeatId: alreadyApplied.confirmedSeatId,
-          result: {
-            fallback: 'post_error_verification',
-            originalError: getKioskErrorMessage(error),
-          },
-        };
-      }
-
-      const directAttendanceFn = httpsCallable<
-        {
-          centerId: string;
-          studentId: string;
-          nextStatus: AttendanceStatus;
-          seatId?: string;
-          seatHint?: EnqueueKioskAttendanceActionInput['seatHint'];
-          source: 'kiosk';
-        },
-        Record<string, unknown>
-      >(functions, 'setStudentAttendanceStatusSecure');
-      const directResult = await directAttendanceFn({
-        centerId: payload.centerId,
-        studentId: payload.studentId,
-        nextStatus,
-        seatId: payload.seatId || undefined,
-        seatHint: payload.seatHint || undefined,
-        source: 'kiosk',
-      });
-      const directResultData = directResult.data as { seatId?: unknown };
-      const directResultSeatId = typeof directResultData?.seatId === 'string' ? directResultData.seatId : null;
-      const verified = await verifyKioskSeatStatus({
-        firestore,
-        payload,
-        expectedStatus: nextStatus,
-        seatId: directResultSeatId || payload.seatId,
-      });
-
-      if (!verified.verified) {
-        return {
-          ok: true,
-          queued: false,
-          actionId: payload.idempotencyKey,
-          optimisticStatus: nextStatus,
-          status: 'failed',
-          confirmedStatus: verified.confirmedStatus,
-          confirmedSeatId: verified.confirmedSeatId,
-          result: directResult.data,
-          userMessage: '출결 처리 요청은 보냈지만 실제 상태 확인에 실패했습니다. 번호를 다시 입력해 현재 상태를 확인해 주세요.',
-          failedReason: getKioskErrorMessage(error),
-        };
-      }
-
-      result = {
-        ok: true,
-        queued: false,
-        actionId: payload.idempotencyKey,
-        optimisticStatus: nextStatus,
-        status: 'completed',
-        verified: true,
-        confirmedStatus: verified.confirmedStatus || nextStatus,
-        confirmedSeatId: verified.confirmedSeatId,
-        result: {
-          ...directResult.data,
-          fallback: 'setStudentAttendanceStatusSecure',
-          originalError: getKioskErrorMessage(error),
-        },
-      };
-    }
-    if (result.status === 'completed' || result.status === 'failed' || result.status === 'rejected_stale') {
+      const result = await submitKioskAttendanceActionFast(functions, payload);
       removeActionFromRetry(payload.idempotencyKey);
+      if (!options.quiet && result.state === 'queued') {
+        toast({
+          title: '동기화 대기',
+          description: result.userMessage || '출결 기록을 서버에서 이어서 처리하고 있습니다.',
+        });
+      }
+      if (!options.quiet && result.state === 'stale') {
+        toast({
+          title: '상태 확인 필요',
+          description: result.userMessage || '출결 상태가 이미 바뀌었습니다. 번호를 다시 입력해 확인해 주세요.',
+        });
+      }
+      return result;
+    } catch (error) {
+      saveActionForRetry(payload, getKioskErrorMessage(error));
+      if (!options.quiet) {
+        toast({
+          title: '동기화 대기',
+          description: '화면 처리는 완료했고, 네트워크가 안정되면 자동으로 다시 전송합니다.',
+        });
+      }
+      return null;
     }
-    return result;
-  }, [firestore, flushOutbox, functions, removeActionFromRetry, saveActionForRetry]);
+  }, [functions, removeActionFromRetry, saveActionForRetry, toast]);
+
+  const flushOutbox = useCallback(async () => {
+    if (flushingOutboxRef.current) return;
+    flushingOutboxRef.current = true;
+    try {
+      const items = readFastOutbox();
+      for (const item of items) {
+        await submitFastPayload(
+          {
+            ...item.payload,
+            clientActionAtMillis: item.payload.clientActionAtMillis || item.createdAt,
+          },
+          { quiet: true }
+        );
+      }
+    } finally {
+      flushingOutboxRef.current = false;
+      syncQueuedCount();
+    }
+  }, [submitFastPayload, syncQueuedCount]);
 
   useEffect(() => {
+    syncQueuedCount();
     void flushOutbox();
-    const interval = window.setInterval(() => void flushOutbox(), 10000);
+    const interval = window.setInterval(() => void flushOutbox(), 8000);
     const handleOnline = () => void flushOutbox();
     window.addEventListener('online', handleOnline);
     return () => {
       window.clearInterval(interval);
       window.removeEventListener('online', handleOnline);
     };
-  }, [flushOutbox]);
+  }, [flushOutbox, syncQueuedCount]);
 
   useEffect(() => {
     if (!successFeedback) return;
@@ -734,10 +573,11 @@ export default function KioskPage() {
   }, [successFeedback]);
 
   useEffect(() => () => {
-    if (actionProcessingTimerRef.current !== null) {
-      window.clearTimeout(actionProcessingTimerRef.current);
+    clearLookupDelay();
+    if (actionReleaseTimerRef.current !== null) {
+      window.clearTimeout(actionReleaseTimerRef.current);
     }
-  }, []);
+  }, [clearLookupDelay]);
 
   const handleNumberClick = useCallback((num: string) => {
     if (isSearching || step !== 'pin') return;
@@ -756,14 +596,18 @@ export default function KioskPage() {
     setPin((previous) => previous.slice(0, -1));
   }, [isSearching, step]);
 
-  const handleAction = useCallback(async (action: KioskAttendanceAction) => {
+  const handleSelectStudent = useCallback((student: KioskStudent) => {
+    setSelectedStudent(student);
+    setStep('action');
+  }, []);
+
+  const handleAction = useCallback((action: KioskAttendanceAction) => {
     if (!centerId || !selectedStudent || pendingActionRef.current) return;
     const seat = resolveSeatForStudent(selectedStudent);
     if (!seat) {
       toast({
-        variant: 'destructive',
-        title: '좌석 미배정',
-        description: '관리자에게 좌석 배정을 요청해 주세요.',
+        title: '좌석 확인 필요',
+        description: '좌석이 배정된 학생만 키오스크를 사용할 수 있습니다.',
       });
       resetKiosk();
       return;
@@ -772,9 +616,8 @@ export default function KioskPage() {
     const status = normalizeStatus(seat.status);
     if (!getAllowedActions(status).includes(action)) {
       toast({
-        variant: 'destructive',
-        title: '처리할 수 없는 상태',
-        description: '번호를 다시 입력해 현재 상태를 확인해 주세요.',
+        title: '상태 확인 필요',
+        description: '현재 출결 상태가 바뀌었습니다. 번호를 다시 입력해 주세요.',
       });
       resetKiosk();
       return;
@@ -782,16 +625,8 @@ export default function KioskPage() {
 
     const config = ACTIONS[action];
     const nextStatus = getNextStatusForAction(action);
-    pendingActionRef.current = true;
-    if (actionProcessingTimerRef.current !== null) {
-      window.clearTimeout(actionProcessingTimerRef.current);
-    }
-    actionProcessingTimerRef.current = window.setTimeout(() => {
-      setActionProcessingLabel(`${config.label} 처리 중`);
-      actionProcessingTimerRef.current = null;
-    }, PROCESSING_FEEDBACK_DELAY_MS);
-
-    const payload: EnqueueKioskAttendanceActionInput = {
+    const idempotencyKey = createIdempotencyKey();
+    const payload: SubmitKioskAttendanceActionFastInput = {
       centerId,
       studentId: selectedStudent.id,
       pin,
@@ -803,57 +638,35 @@ export default function KioskPage() {
         roomId: seat.roomId || selectedStudent.roomId || null,
         roomSeatNo: seat.roomSeatNo ?? selectedStudent.roomSeatNo ?? null,
       },
-      idempotencyKey: createIdempotencyKey(),
+      idempotencyKey,
       clientActionAtMillis: Date.now(),
     };
 
-    try {
-      const result = await sendActionToBackend(payload);
-      const confirmedStatus = result.confirmedStatus ? normalizeStatus(result.confirmedStatus) : undefined;
-      const isAlreadyApplied = Boolean(confirmedStatus && confirmedStatus === nextStatus);
-      if (result.status !== 'completed' && !isAlreadyApplied) {
-        toast({
-          variant: result.status === 'failed' || result.status === 'rejected_stale' ? 'destructive' : 'default',
-          title: result.status === 'failed' || result.status === 'rejected_stale' ? '처리 실패' : '전송 대기 중',
-          description:
-            result.userMessage ||
-            result.failedReason ||
-            (result.status === 'rejected_stale'
-              ? '출결 상태가 바뀌었습니다. 번호를 다시 입력해 현재 상태를 확인해 주세요.'
-              : '백엔드 처리가 완료되면 자동 반영됩니다.'),
-        });
-        resetKiosk();
-        return;
-      }
-
-      setSuccessFeedback({
-        title: config.completeTitle,
-        description: config.completeDescription(selectedStudent.name),
-        label: config.label,
-        Icon: config.Icon,
-        overlayClass: config.overlayClass,
-        iconClass: config.iconClass,
-      });
-      window.setTimeout(() => {
-        resetKiosk();
-      }, RESET_AFTER_SUCCESS_MS);
-    } catch (error) {
-      toast({
-        variant: 'destructive',
-        title: '처리 실패',
-        description: getKioskErrorMessage(error),
-      });
-      void flushOutbox();
-      resetKiosk();
-    } finally {
-      if (actionProcessingTimerRef.current !== null) {
-        window.clearTimeout(actionProcessingTimerRef.current);
-        actionProcessingTimerRef.current = null;
-      }
-      setActionProcessingLabel(null);
-      pendingActionRef.current = false;
+    pendingActionRef.current = true;
+    if (actionReleaseTimerRef.current !== null) {
+      window.clearTimeout(actionReleaseTimerRef.current);
     }
-  }, [centerId, flushOutbox, pin, resetKiosk, resolveSeatForStudent, selectedStudent, sendActionToBackend, toast]);
+    actionReleaseTimerRef.current = window.setTimeout(() => {
+      pendingActionRef.current = false;
+      actionReleaseTimerRef.current = null;
+    }, TOUCH_LOCK_MS);
+    setLookupSeats((previous) =>
+      previous.map((item) =>
+        item.studentId === selectedStudent.id || item.id === seat.id
+          ? { ...item, status: nextStatus, updatedAtMillis: Date.now() }
+          : item
+      )
+    );
+    setSuccessFeedback({
+      title: '처리 완료',
+      description: config.completeMessage(selectedStudent.name),
+      actionLabel: config.label,
+      Icon: config.Icon,
+    });
+    window.setTimeout(resetKiosk, RESET_AFTER_ACTION_MS);
+
+    void submitFastPayload(payload);
+  }, [centerId, pin, resetKiosk, resolveSeatForStudent, selectedStudent, submitFastPayload, toast]);
 
   const canGoBack = activeMembership?.role === 'teacher' || activeMembership?.role === 'centerAdmin';
   const selectedSeat = selectedStudent ? resolveSeatForStudent(selectedStudent) : null;
@@ -861,207 +674,215 @@ export default function KioskPage() {
   const selectedActions = selectedSeat ? getAllowedActions(selectedStatus) : [];
 
   return (
-    <div
-      className={cn('min-h-screen overflow-hidden bg-[#F7FAFF] text-[#14295F]', kioskTouchClass)}
-      onClickCapture={handleKioskClickCapture}
-    >
+    <div className={cn('min-h-screen overflow-hidden bg-[#FFF7ED] text-[#14295F]', kioskTouchClass)}>
       <div className="pointer-events-none fixed inset-0 overflow-hidden">
+        <div className="absolute inset-x-0 top-0 h-3 bg-[#FF7A16]" />
+        <div className="absolute inset-x-0 top-3 h-28 bg-white/70" />
+        <div className="absolute inset-x-0 bottom-0 h-24 bg-[#FF7A16]/10" />
         <Image
           src="/track-logo-mark-transparent.png"
           alt=""
           width={720}
           height={720}
           priority
-          className="absolute -right-24 top-12 h-[34rem] w-[34rem] opacity-[0.035]"
+          className="absolute -right-14 top-20 h-[30rem] w-[30rem] opacity-[0.045]"
         />
-        <div className="absolute inset-x-0 top-0 h-1 bg-[#FF7A16]" />
       </div>
 
-      {successFeedback && (
-        <div className="pointer-events-none fixed inset-0 z-[120] flex items-center justify-center bg-[#061330]/42 p-5">
-          <div className={cn(
-            'w-full max-w-lg rounded-[2rem] border-4 p-9 text-center shadow-[0_44px_80px_-34px_rgba(6,19,48,0.9)]',
-            'animate-in zoom-in-95 fade-in duration-75 will-change-transform',
-            successFeedback.overlayClass
-          )}>
-            <div className={cn('mx-auto flex h-24 w-24 items-center justify-center rounded-[1.65rem] shadow-xl', successFeedback.iconClass)}>
+      {successFeedback ? (
+        <div className="pointer-events-none fixed inset-0 z-[120] flex items-center justify-center bg-[#14295F]/18 p-5">
+            <div className="w-full max-w-xl rounded-[2.4rem] border-4 border-white bg-[#FF7A16] p-9 text-center text-white shadow-[0_44px_90px_-34px_rgba(255,122,22,0.92)] animate-in zoom-in-95 fade-in duration-75">
+            <div className="mx-auto flex h-24 w-24 items-center justify-center rounded-[1.8rem] bg-white text-[#FF7A16] shadow-xl">
               <successFeedback.Icon className="h-12 w-12" />
             </div>
-            <div className="mt-6 font-aggro-display text-5xl leading-none text-white sm:text-6xl">
-              처리 완료
+            <div className="mt-6 font-aggro-display text-5xl leading-none sm:text-6xl">
+              {successFeedback.title}
             </div>
-            <p className="mt-4 text-xl font-black text-white">{successFeedback.label}</p>
-            <p className="mt-3 text-base font-bold leading-6 text-white/86">{successFeedback.description}</p>
+            <p className="mt-4 text-2xl font-black">{successFeedback.actionLabel}</p>
+            <p className="mt-3 text-base font-bold leading-6 text-white/90">{successFeedback.description}</p>
           </div>
         </div>
-      )}
+      ) : null}
 
-      {actionProcessingLabel && (
-        <div className="fixed inset-0 z-[115] flex items-center justify-center bg-[#061330]/38 p-5 animate-in fade-in duration-75">
-          <div className="w-full max-w-sm rounded-[2rem] border border-[#D7E4FF] bg-white p-8 text-center shadow-[0_34px_70px_-34px_rgba(6,19,48,0.75)] will-change-transform">
-            <Loader2 className="mx-auto h-12 w-12 animate-spin text-[#FF7A16]" />
-            <p className="mt-5 text-xl font-black text-[#14295F]">{actionProcessingLabel}</p>
-          </div>
-        </div>
-      )}
-
-      <main className="relative z-10 mx-auto flex min-h-screen w-full max-w-5xl flex-col px-5 py-6 sm:px-8">
-        <div className="flex items-center justify-between gap-4">
+      <main className="relative z-10 mx-auto flex min-h-screen w-full max-w-6xl flex-col px-5 py-6 sm:px-8">
+        <header className="flex items-center justify-between gap-4">
           <div className="flex items-center gap-3">
-            <div className="flex h-14 w-14 items-center justify-center rounded-[1.15rem] border border-[#D7E4FF] bg-white shadow-[0_14px_30px_-24px_rgba(20,41,95,0.42)]">
-              <Image src="/track-logo-mark-transparent.png" alt="TRACK" width={36} height={36} priority />
+            <div className="flex h-16 w-16 items-center justify-center rounded-[1.35rem] bg-white shadow-[0_18px_36px_-24px_rgba(255,122,22,0.56)] ring-2 ring-[#FF7A16]/16">
+              <Image src="/track-logo-mark-transparent.png" alt="TRACK" width={42} height={42} priority />
             </div>
             <div>
-              <p className="font-aggro-display text-2xl leading-none text-[#14295F]">출결 키오스크</p>
-              <p className="mt-1 text-xs font-black text-[#5C6E97]">TRACK Attendance</p>
+              <p className="font-aggro-display text-3xl leading-none text-[#14295F]">TRACK KIOSK</p>
+              <p className="mt-1 text-xs font-black uppercase text-[#FF7A16]">Fast attendance</p>
             </div>
           </div>
 
-          {canGoBack ? (
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => router.push('/dashboard')}
-              className="h-11 rounded-[1rem] border-[#D7E4FF] bg-white px-4 text-sm font-black text-[#14295F] shadow-sm hover:bg-[#F1F6FF]"
-            >
-              <ArrowLeft className="mr-2 h-4 w-4" />
-              대시보드
-            </Button>
-          ) : null}
-        </div>
+          <div className="flex items-center gap-2">
+            {queuedCount > 0 ? (
+              <div className="hidden items-center gap-2 rounded-full border border-[#FFD7B0] bg-white px-3 py-2 text-[11px] font-black text-[#C95A08] shadow-sm sm:flex">
+                <WifiOff className="h-4 w-4" />
+                {queuedCount}건 동기화 대기
+              </div>
+            ) : (
+              <div className="hidden items-center gap-2 rounded-full border border-[#FFD7B0] bg-white px-3 py-2 text-[11px] font-black text-[#C95A08] shadow-sm sm:flex">
+                <CheckCircle2 className="h-4 w-4" />
+                Sync ready
+              </div>
+            )}
+            {canGoBack ? (
+              <Button
+                type="button"
+                variant="outline"
+                onPointerDown={(event) => handleTouchPress(event, 'dashboard', () => router.push('/dashboard'))}
+                onKeyDown={(event) => handleKeyboardPress(event, 'dashboard', () => router.push('/dashboard'))}
+                className={cn(kioskTouchClass, 'h-12 rounded-[1rem] border-[#FFD7B0] bg-white px-4 text-sm font-black text-[#14295F] shadow-sm hover:bg-white')}
+              >
+                <ArrowLeft className="mr-2 h-4 w-4" />
+                대시보드
+              </Button>
+            ) : null}
+          </div>
+        </header>
 
-        <section className={cn(
-          'mx-auto flex w-full max-w-3xl flex-1 flex-col',
-          step === 'action' ? 'justify-start py-5 sm:py-6' : 'justify-center py-8'
-        )}>
+        <section className="flex flex-1 items-center py-6">
           {step === 'pin' ? (
-            <div className="rounded-[2rem] border border-[#D7E4FF] bg-white p-6 shadow-[0_34px_80px_-54px_rgba(20,41,95,0.52)] sm:p-8">
-              <div className="text-center">
-                <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-[1.35rem] bg-[#14295F] text-white shadow-[0_20px_36px_-24px_rgba(20,41,95,0.7)]">
-                  <ShieldCheck className="h-8 w-8" />
+            <div className="grid w-full gap-5 lg:grid-cols-[0.78fr_1.22fr]">
+              <div className="relative overflow-hidden rounded-[2.4rem] bg-[#FF7A16] p-7 text-white shadow-[0_34px_80px_-45px_rgba(255,122,22,0.9)]">
+                <div className="pointer-events-none absolute inset-x-0 top-0 h-3 bg-white/50" />
+                <div className="pointer-events-none absolute inset-x-0 bottom-0 h-16 bg-[#14295F]/10" />
+                <div className="relative z-10 flex min-h-[24rem] flex-col justify-between">
+                  <div>
+                    <div className="flex h-16 w-16 items-center justify-center rounded-[1.35rem] bg-white text-[#FF7A16] shadow-xl">
+                      <ShieldCheck className="h-8 w-8" />
+                    </div>
+                    <h1 className="mt-7 font-aggro-display text-5xl leading-[0.95] sm:text-6xl">
+                      번호 6자리
+                    </h1>
+                    <p className="mt-5 max-w-sm text-lg font-black leading-7 text-white/90">
+                      출결 확인 대기
+                    </p>
+                  </div>
+                  <div className="rounded-[1.45rem] border border-white/20 bg-white/14 p-4">
+                    <p className="text-[11px] font-black uppercase text-white/70">speed mode</p>
+                    <p className="mt-2 text-xl font-black">빠른 출결 모드</p>
+                  </div>
                 </div>
-                <h1 className="mt-6 font-aggro-display text-5xl leading-none text-[#14295F] sm:text-6xl">
-                  번호 6자리 입력
-                </h1>
               </div>
 
-              <div className="mt-8 flex justify-center gap-3 sm:gap-4">
-                {Array.from({ length: 6 }).map((_, index) => (
-                  <div
-                    key={index}
-                    className={cn(
-                      'flex h-16 w-12 items-center justify-center rounded-[1rem] border-2 text-2xl font-black transition-colors sm:h-[4.6rem] sm:w-14',
-                      pin.length > index
-                        ? 'border-[#14295F] bg-[#14295F] text-white'
-                        : 'border-[#D7E4FF] bg-[#F7FAFF] text-[#A6B5D1]'
-                    )}
-                  >
-                    {pin[index] ? '●' : ''}
-                  </div>
-                ))}
-              </div>
+              <div className="rounded-[2.4rem] border border-[#FFD7B0] bg-white p-6 shadow-[0_34px_80px_-54px_rgba(20,41,95,0.28)] sm:p-8">
+                <div className="flex justify-center gap-3 sm:gap-4">
+                  {Array.from({ length: 6 }).map((_, index) => (
+                    <div
+                      key={index}
+                      className={cn(
+                        'flex h-16 w-12 items-center justify-center rounded-[1rem] border-2 text-2xl font-black transition-colors sm:h-[4.6rem] sm:w-14',
+                        pin.length > index
+                          ? 'border-[#FF7A16] bg-[#FF7A16] text-white'
+                          : 'border-[#FFD7B0] bg-[#FFF7ED] text-[#F4B37A]'
+                      )}
+                    >
+                      {pin[index] ? '●' : ''}
+                    </div>
+                  ))}
+                </div>
 
-              <div className="relative mt-8">
-                {isSearching ? (
-                  <div className="absolute inset-0 z-10 flex flex-col items-center justify-center rounded-[1.6rem] bg-white/88 backdrop-blur-sm">
-                    <Loader2 className="h-10 w-10 animate-spin text-[#FF7A16]" />
-                    <p className="mt-3 text-base font-black text-[#14295F]">{lookupMessage}</p>
-                  </div>
-                ) : null}
-                <div className="grid grid-cols-3 gap-3 sm:gap-4">
-                  {['1', '2', '3', '4', '5', '6', '7', '8', '9'].map((num) => (
+                <div className="relative mt-8">
+                  {showLookupOverlay ? (
+                    <div className="absolute inset-0 z-10 flex flex-col items-center justify-center rounded-[1.6rem] bg-white/88 backdrop-blur-sm">
+                      <Loader2 className="h-10 w-10 animate-spin text-[#FF7A16]" />
+                      <p className="mt-3 text-base font-black text-[#14295F]">{lookupMessage}</p>
+                    </div>
+                  ) : null}
+                  <div className="grid grid-cols-3 gap-3 sm:gap-4">
+                    {['1', '2', '3', '4', '5', '6', '7', '8', '9'].map((num) => (
+                      <Button
+                        key={num}
+                        type="button"
+                        variant="outline"
+                        disabled={isSearching}
+                        onPointerDown={(event) => handleTouchPress(event, `num-${num}`, () => handleNumberClick(num))}
+                        onKeyDown={(event) => handleKeyboardPress(event, `num-${num}`, () => handleNumberClick(num))}
+                        className={cn(kioskTouchClass, 'h-24 rounded-[1.45rem] border-2 border-[#FFD7B0] bg-white text-4xl font-black text-[#14295F] shadow-sm active:scale-[0.99] active:bg-[#FFF7ED] sm:h-28')}
+                      >
+                        {num}
+                      </Button>
+                    ))}
                     <Button
-                      key={num}
                       type="button"
                       variant="outline"
                       disabled={isSearching}
-                      onPointerDown={(event) => handleKioskPointerPress(event, () => handleNumberClick(num))}
-                      onClick={(event) => handleKioskClick(event, () => handleNumberClick(num))}
-                      className={cn(kioskTouchClass, 'h-20 rounded-[1.35rem] border-2 border-[#D7E4FF] bg-white text-3xl font-black text-[#14295F] shadow-sm active:scale-[0.99] active:bg-[#F1F6FF] sm:h-24')}
+                      onPointerDown={(event) => handleTouchPress(event, 'reset', resetKiosk)}
+                      onKeyDown={(event) => handleKeyboardPress(event, 'reset', resetKiosk)}
+                      className={cn(kioskTouchClass, 'h-24 rounded-[1.45rem] border-2 border-[#FFD7B0] bg-[#FFF7ED] text-base font-black text-[#9A4E10] active:scale-[0.99] active:bg-white sm:h-28')}
                     >
-                      {num}
+                      <RotateCcw className="mr-2 h-5 w-5" />
+                      초기화
                     </Button>
-                  ))}
-                  <Button
-                    type="button"
-                    variant="outline"
-                    disabled={isSearching}
-                    onPointerDown={(event) => handleKioskPointerPress(event, resetKiosk)}
-                    onClick={(event) => handleKioskClick(event, resetKiosk)}
-                    className={cn(kioskTouchClass, 'h-20 rounded-[1.35rem] border-2 border-[#D7E4FF] bg-[#F7FAFF] text-base font-black text-[#5C6E97] active:scale-[0.99] active:bg-white sm:h-24')}
-                  >
-                    <RotateCcw className="mr-2 h-5 w-5" />
-                    초기화
-                  </Button>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    disabled={isSearching}
-                    onPointerDown={(event) => handleKioskPointerPress(event, () => handleNumberClick('0'))}
-                    onClick={(event) => handleKioskClick(event, () => handleNumberClick('0'))}
-                    className={cn(kioskTouchClass, 'h-20 rounded-[1.35rem] border-2 border-[#D7E4FF] bg-white text-3xl font-black text-[#14295F] shadow-sm active:scale-[0.99] active:bg-[#F1F6FF] sm:h-24')}
-                  >
-                    0
-                  </Button>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    disabled={isSearching}
-                    onPointerDown={(event) => handleKioskPointerPress(event, handleDelete)}
-                    onClick={(event) => handleKioskClick(event, handleDelete)}
-                    className={cn(kioskTouchClass, 'h-20 rounded-[1.35rem] border-2 border-[#D7E4FF] bg-[#F7FAFF] text-[#14295F] active:scale-[0.99] active:bg-white sm:h-24')}
-                    aria-label="한 글자 지우기"
-                  >
-                    <Delete className="h-8 w-8" />
-                  </Button>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      disabled={isSearching}
+                      onPointerDown={(event) => handleTouchPress(event, 'num-0', () => handleNumberClick('0'))}
+                      onKeyDown={(event) => handleKeyboardPress(event, 'num-0', () => handleNumberClick('0'))}
+                      className={cn(kioskTouchClass, 'h-24 rounded-[1.45rem] border-2 border-[#FFD7B0] bg-white text-4xl font-black text-[#14295F] shadow-sm active:scale-[0.99] active:bg-[#FFF7ED] sm:h-28')}
+                    >
+                      0
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      disabled={isSearching}
+                      onPointerDown={(event) => handleTouchPress(event, 'delete', handleDelete)}
+                      onKeyDown={(event) => handleKeyboardPress(event, 'delete', handleDelete)}
+                      className={cn(kioskTouchClass, 'h-24 rounded-[1.45rem] border-2 border-[#FFD7B0] bg-[#FFF7ED] text-[#14295F] active:scale-[0.99] active:bg-white sm:h-28')}
+                      aria-label="한 글자 지우기"
+                    >
+                      <Delete className="h-8 w-8" />
+                    </Button>
+                  </div>
                 </div>
               </div>
             </div>
           ) : null}
 
           {step === 'select' ? (
-            <div className="rounded-[2rem] border border-[#D7E4FF] bg-white p-6 shadow-[0_34px_80px_-54px_rgba(20,41,95,0.52)] sm:p-8">
-              <div className="text-center">
-                <p className="font-aggro-display text-4xl leading-none text-[#14295F] sm:text-5xl">학생 선택</p>
+            <div className="mx-auto w-full max-w-4xl rounded-[2.4rem] border border-[#FFD7B0] bg-white p-6 shadow-[0_34px_80px_-54px_rgba(20,41,95,0.28)] sm:p-8">
+              <div className="flex items-end justify-between gap-4">
+                <div>
+                  <p className="text-[11px] font-black uppercase text-[#FF7A16]">student match</p>
+                  <h1 className="mt-2 font-aggro-display text-5xl leading-none text-[#14295F]">학생 선택</h1>
+                </div>
+                <div className="rounded-full bg-[#FFF7ED] px-4 py-2 text-sm font-black text-[#C95A08]">{matchedStudents.length}명</div>
               </div>
               <div className="mt-7 grid gap-3">
                 {matchedStudents.map((student) => (
                   <button
                     key={student.id}
                     type="button"
-                    onPointerDown={(event) =>
-                      handleKioskPointerPress(event, () => {
-                        setSelectedStudent(student);
-                        setStep('action');
-                      })
-                    }
-                    onClick={(event) => handleKioskClick(event, () => {
-                      setSelectedStudent(student);
-                      setStep('action');
-                    })}
-                    className={cn(kioskTouchClass, 'flex min-h-20 items-center justify-between rounded-[1.35rem] border border-[#D7E4FF] bg-[#F7FAFF] px-5 py-4 text-left shadow-sm transition hover:border-[#FF7A16]/40 hover:bg-white active:scale-[0.99] active:bg-white')}
+                    onPointerDown={(event) => handleTouchPress(event, `student-${student.id}`, () => handleSelectStudent(student))}
+                    onKeyDown={(event) => handleKeyboardPress(event, `student-${student.id}`, () => handleSelectStudent(student))}
+                    className={cn(kioskTouchClass, 'flex min-h-24 items-center justify-between rounded-[1.55rem] border-2 border-[#FFD7B0] bg-[#FFF7ED] px-5 py-4 text-left shadow-sm transition active:scale-[0.99] active:bg-white')}
                   >
                     <div className="flex min-w-0 items-center gap-4">
-                      <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-[1rem] bg-white text-[#14295F] shadow-[0_12px_24px_-20px_rgba(20,41,95,0.45)]">
-                        <UserRound className="h-6 w-6" />
+                      <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-[1.15rem] bg-white text-[#FF7A16] shadow-[0_12px_24px_-20px_rgba(255,122,22,0.55)]">
+                        <UserRound className="h-7 w-7" />
                       </div>
                       <div className="min-w-0">
-                        <p className="truncate text-xl font-black text-[#14295F]">{student.name}</p>
-                        <p className="mt-1 truncate text-sm font-bold text-[#5C6E97]">
+                        <p className="truncate text-2xl font-black text-[#14295F]">{student.name}</p>
+                        <p className="mt-1 truncate text-sm font-bold text-[#7B5A43]">
                           {[student.schoolName, student.grade, student.className].filter(Boolean).join(' · ') || '학생 정보'}
                         </p>
                       </div>
                     </div>
-                    <span className="rounded-full bg-[#14295F] px-4 py-2 text-sm font-black text-white">선택</span>
+                    <span className="rounded-full bg-[#FF7A16] px-5 py-3 text-base font-black text-white">선택</span>
                   </button>
                 ))}
               </div>
               <Button
                 type="button"
                 variant="ghost"
-                onPointerDown={(event) => handleKioskPointerPress(event, resetKiosk)}
-                onClick={(event) => handleKioskClick(event, resetKiosk)}
-                className={cn(kioskTouchClass, 'mt-5 h-12 w-full rounded-[1rem] text-base font-black text-[#5C6E97] hover:bg-[#F1F6FF] hover:text-[#14295F]')}
+                onPointerDown={(event) => handleTouchPress(event, 'select-reset', resetKiosk)}
+                onKeyDown={(event) => handleKeyboardPress(event, 'select-reset', resetKiosk)}
+                className={cn(kioskTouchClass, 'mt-6 h-14 w-full rounded-[1rem] text-base font-black text-[#9A4E10] hover:bg-[#FFF7ED] hover:text-[#14295F]')}
               >
                 처음으로
               </Button>
@@ -1069,77 +890,88 @@ export default function KioskPage() {
           ) : null}
 
           {step === 'action' && selectedStudent ? (
-            <div className="rounded-[2rem] border border-[#D7E4FF] bg-white p-5 shadow-[0_34px_80px_-54px_rgba(20,41,95,0.52)] sm:p-6">
-              {selectedSeat ? (
-                <div className={cn('grid gap-4', selectedActions.length === 1 ? 'grid-cols-1' : 'grid-cols-1 sm:grid-cols-2')}>
-                  {selectedActions.map((action) => {
-                    const config = ACTIONS[action];
-                    return (
-                      <Button
-                         key={action}
-                         type="button"
-                         onPointerDown={(event) => handleKioskPointerPress(event, () => void handleAction(action))}
-                         onClick={(event) => handleKioskClick(event, () => void handleAction(action))}
-                         disabled={Boolean(actionProcessingLabel)}
-                         className={cn(
-                          kioskTouchClass,
-                          'h-36 rounded-[1.65rem] text-white transition-transform duration-75 will-change-transform active:scale-[0.985] active:brightness-95 sm:h-44',
-                          'flex flex-col items-center justify-center gap-4 border-0 text-2xl font-black',
-                          config.buttonClass
-                        )}
-                      >
-                        <span className={cn('flex h-14 w-14 items-center justify-center rounded-[1.1rem]', config.iconClass)}>
-                          <config.Icon className="h-8 w-8" />
-                        </span>
-                        {config.label}
-                      </Button>
-                    );
-                  })}
+            <div className="mx-auto w-full max-w-5xl space-y-5">
+              <div className="rounded-[2.4rem] border border-[#FFD7B0] bg-white p-5 shadow-[0_34px_80px_-54px_rgba(20,41,95,0.28)] sm:p-7">
+                <div className="mb-5 flex items-end justify-between gap-4">
+                  <div>
+                    <p className="text-[11px] font-black uppercase text-[#FF7A16]">quick action</p>
+                    <h1 className="mt-2 font-aggro-display text-5xl leading-none text-[#14295F]">바로 처리</h1>
+                  </div>
+                  <div className="rounded-full border border-[#FFD7B0] bg-[#FFF7ED] px-4 py-2 text-sm font-black text-[#C95A08]">
+                    {selectedSeat ? statusLabel[selectedStatus] : '좌석 미배정'}
+                  </div>
                 </div>
-              ) : (
-                <div className="rounded-[1.35rem] border border-[#FFD7B0] bg-[#FFF8F1] p-5 text-center">
-                  <p className="text-lg font-black text-[#14295F]">좌석 배정 확인 필요</p>
-                  <p className="mt-2 text-sm font-bold text-[#8A5A2B]">관리자에게 좌석 배정을 요청해 주세요.</p>
-                </div>
-              )}
 
-              <div className="mt-5 flex items-center gap-4 rounded-[1.35rem] border border-[#D7E4FF] bg-[#F7FAFF] px-5 py-4">
-                <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-[1rem] bg-white text-[#14295F] shadow-[0_12px_24px_-20px_rgba(20,41,95,0.45)]">
-                  <UserRound className="h-6 w-6" />
-                </div>
-                <div className="min-w-0 flex-1">
-                  <p className="truncate text-2xl font-black text-[#14295F]">{selectedStudent.name}</p>
-                  <p className="mt-1 truncate text-sm font-bold text-[#5C6E97]">
-                    {[selectedStudent.schoolName, selectedStudent.grade, selectedStudent.className].filter(Boolean).join(' · ') || '학생 정보'}
-                  </p>
-                </div>
-                <div className="shrink-0 rounded-full border border-[#D7E4FF] bg-white px-4 py-2 text-sm font-black text-[#14295F]">
-                  {selectedSeat ? statusLabel[selectedStatus] : '좌석 미배정'}
-                </div>
+                {selectedSeat ? (
+                  <div className={cn('grid gap-4', selectedActions.length === 1 ? 'grid-cols-1' : 'grid-cols-1 sm:grid-cols-2')}>
+                    {selectedActions.map((action) => {
+                      const config = ACTIONS[action];
+                      return (
+                        <button
+                          key={action}
+                          type="button"
+                          onPointerDown={(event) => handleTouchPress(event, `action-${action}`, () => handleAction(action))}
+                          onKeyDown={(event) => handleKeyboardPress(event, `action-${action}`, () => handleAction(action))}
+                          className={cn(
+                            kioskTouchClass,
+                            'group relative min-h-36 overflow-hidden rounded-[1.75rem] border-2 border-[#FFD7B0] bg-white p-5 text-left shadow-[0_24px_50px_-36px_rgba(255,122,22,0.62)] transition active:scale-[0.99] sm:min-h-44'
+                          )}
+                        >
+                          <div className={cn('absolute inset-x-0 top-0 h-3 bg-gradient-to-r', config.accentClassName)} />
+                          <div className="flex h-full items-center justify-between gap-5">
+                            <div>
+                              <div className="flex h-16 w-16 items-center justify-center rounded-[1.25rem] bg-[#FFF1E4] text-[#FF7A16] shadow-[0_14px_26px_-20px_rgba(255,122,22,0.7)]">
+                                <config.Icon className="h-8 w-8" />
+                              </div>
+                              <p className="mt-5 text-4xl font-black text-[#14295F]">{config.label}</p>
+                              <p className="mt-2 text-base font-black text-[#9A4E10]">{config.title}</p>
+                            </div>
+                            <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-[#FF7A16] text-white">
+                              <Check className="h-7 w-7" />
+                            </div>
+                          </div>
+                        </button>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  <div className="rounded-[1.55rem] border-2 border-[#FFD7B0] bg-[#FFF7ED] p-6 text-center">
+                    <p className="text-2xl font-black text-[#14295F]">좌석 배정 확인 필요</p>
+                    <p className="mt-2 text-base font-bold text-[#9A4E10]">관리자에게 좌석 배정을 요청해 주세요.</p>
+                  </div>
+                )}
               </div>
 
-              <Button
-                type="button"
-                variant="ghost"
-                onPointerDown={(event) => handleKioskPointerPress(event, resetKiosk)}
-                onClick={(event) => handleKioskClick(event, resetKiosk)}
-                className={cn(kioskTouchClass, 'mt-5 h-12 w-full rounded-[1rem] text-base font-black text-[#5C6E97] hover:bg-[#F1F6FF] hover:text-[#14295F]')}
-              >
-                처음으로
-              </Button>
+              <div className="rounded-[1.85rem] border border-[#FFD7B0] bg-white px-5 py-4 shadow-[0_20px_42px_-36px_rgba(20,41,95,0.28)]">
+                <div className="flex items-center gap-4">
+                  <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-[1.15rem] bg-[#FFF1E4] text-[#FF7A16] shadow-[0_12px_24px_-20px_rgba(255,122,22,0.55)]">
+                    <UserRound className="h-7 w-7" />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-2xl font-black text-[#14295F]">{selectedStudent.name}</p>
+                    <p className="mt-1 truncate text-sm font-bold text-[#7B5A43]">
+                      {[selectedStudent.schoolName, selectedStudent.grade, selectedStudent.className].filter(Boolean).join(' · ') || '학생 정보'}
+                    </p>
+                  </div>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onPointerDown={(event) => handleTouchPress(event, 'action-reset', resetKiosk)}
+                    onKeyDown={(event) => handleKeyboardPress(event, 'action-reset', resetKiosk)}
+                    className={cn(kioskTouchClass, 'h-12 rounded-[1rem] border-[#FFD7B0] bg-[#FFF7ED] px-4 text-sm font-black text-[#9A4E10] hover:bg-white')}
+                  >
+                    처음으로
+                  </Button>
+                </div>
+              </div>
             </div>
           ) : null}
         </section>
 
-        <footer className="pb-2 text-center text-[11px] font-black text-[#8FA0BE]">
-          TRACK LEARNING SYSTEM
+        <footer className="pb-2 text-center text-[11px] font-black uppercase text-[#C95A08]/70">
+          TRACK Learning System
         </footer>
       </main>
-
-      <div className="fixed bottom-4 right-4 hidden items-center gap-2 rounded-full border border-[#D7E4FF] bg-white px-3 py-2 text-[11px] font-black text-[#5C6E97] shadow-sm sm:flex">
-        <CheckCircle2 className="h-4 w-4 text-[#FF7A16]" />
-        Queue Ready
-      </div>
     </div>
   );
 }
