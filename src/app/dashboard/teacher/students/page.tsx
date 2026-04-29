@@ -2,6 +2,7 @@
 'use client';
 
 import Link from 'next/link';
+import dynamic from 'next/dynamic';
 import { useState, useMemo, useEffect, useRef } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -79,6 +80,19 @@ import {
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
 import { canManageSettings, canManageStaff, canReadFinance, isTeacherOrAdminRole } from '@/lib/dashboard-access';
+
+const RiskIntelligencePanel = dynamic(
+  () => import('@/components/dashboard/risk-intelligence').then((mod) => mod.RiskIntelligence),
+  {
+    ssr: false,
+    loading: () => (
+      <div className="flex min-h-[22rem] flex-col items-center justify-center gap-3">
+        <Loader2 className="h-7 w-7 animate-spin text-rose-500/40" />
+        <p className="text-xs font-bold text-[#9aa9c7]">리스크 분석을 준비하는 중입니다...</p>
+      </div>
+    ),
+  }
+);
 
 function resolveCallableErrorMessage(error: any, fallback: string): string {
   const detailMessage =
@@ -242,6 +256,7 @@ export default function StudentListPage() {
   const [isCounselingDemoDialogOpen, setIsCounselingDemoDialogOpen] = useState(false);
   const [isCounselingDemoCreating, setIsCounselingDemoCreating] = useState(false);
   const [counselingDemoResult, setCounselingDemoResult] = useState<CounselingDemoSeedResult | null>(null);
+  const [isRiskAnalysisDialogOpen, setIsRiskAnalysisDialogOpen] = useState(false);
 
   const centerId = activeMembership?.id;
   const isTeacherOrAdmin = isTeacherOrAdminRole(activeMembership?.role);
@@ -252,7 +267,8 @@ export default function StudentListPage() {
   useEffect(() => {
     const showRisk = searchParams.get('showRisk');
     if ((showRisk === '1' || showRisk === 'true') && canOpenFinance) {
-      router.replace('/dashboard/revenue?showRisk=1#risk-analysis');
+      setIsRiskAnalysisDialogOpen(true);
+      router.replace('/dashboard/teacher/students');
     }
   }, [canOpenFinance, searchParams, router]);
 
@@ -1030,6 +1046,33 @@ export default function StudentListPage() {
         </DialogContent>
       </Dialog>
 
+      <Dialog open={isRiskAnalysisDialogOpen} onOpenChange={setIsRiskAnalysisDialogOpen}>
+        <DialogContent
+          motionPreset="dashboard-premium"
+          className={cn(
+            'flex min-h-0 flex-col overflow-hidden border-none bg-white p-0 shadow-[0_32px_80px_-44px_rgba(20,41,95,0.55)]',
+            isMobile
+              ? 'h-[88svh] w-[94vw] max-w-[94vw] rounded-[2rem]'
+              : 'h-[min(92dvh,960px)] w-[min(1180px,calc(100vw-2rem))] max-w-[1180px] rounded-[2.5rem]'
+          )}
+        >
+          <div className="shrink-0 bg-[linear-gradient(135deg,#14295F_0%,#173D8B_58%,#2554D4_100%)] px-6 py-6 text-white sm:px-8">
+            <DialogHeader className="space-y-2 text-left">
+              <Badge className="w-fit border border-white/14 bg-white/10 px-3 py-1 text-[10px] font-black uppercase tracking-[0.18em] text-white">
+                관리자 전용
+              </Badge>
+              <DialogTitle className="text-2xl font-black tracking-tight text-white">리스크 분석</DialogTitle>
+              <DialogDescription className="text-sm font-bold text-white/80">
+                학생 운영 화면에서 바로 리스크 인텔리전스를 확인합니다.
+              </DialogDescription>
+            </DialogHeader>
+          </div>
+          <div className="min-h-0 flex-1 overflow-y-auto bg-[#f8fbff] p-4 sm:p-6">
+            <RiskIntelligencePanel />
+          </div>
+        </DialogContent>
+      </Dialog>
+
       <section className={cn('grid gap-4', isMobile ? 'grid-cols-2' : 'md:grid-cols-3 xl:grid-cols-6')}>
         {[
           { label: '관리 규모', value: `${operationalSummary.activeStudents}명`, sub: '현재 관리 대상', tone: 'text-[#14295F] bg-[#eef4ff]' },
@@ -1038,10 +1081,28 @@ export default function StudentListPage() {
           { label: '미입실', value: `${operationalSummary.absentCount}명`, sub: '도착 전 / 퇴실 포함', tone: 'text-rose-700 bg-rose-50' },
           { label: '좌석 연동', value: `${operationalSummary.assignedSeatCount}명`, sub: '도면 연동 가능', tone: 'text-sky-700 bg-sky-50' },
           ...(canOpenFinance
-            ? [{ label: '리스크 분석', value: '이동', sub: '비즈니스 분석에서 확인', tone: 'text-violet-700 bg-violet-50' }]
+            ? [{ label: '리스크 분석', value: '보기', sub: '팝업으로 바로 확인', tone: 'text-violet-700 bg-violet-50', onClick: () => setIsRiskAnalysisDialogOpen(true) }]
             : []),
         ].map((item) => (
-          <Card key={item.label} className="rounded-[1.75rem] border border-[#dbe7ff] bg-white shadow-[0_22px_52px_-46px_rgba(20,41,95,0.32)]">
+          <Card
+            key={item.label}
+            role={item.onClick ? 'button' : undefined}
+            tabIndex={item.onClick ? 0 : undefined}
+            onClick={item.onClick}
+            onKeyDown={(event) => {
+              if (!item.onClick) return;
+              if (event.key === 'Enter' || event.key === ' ') {
+                event.preventDefault();
+                item.onClick();
+              }
+            }}
+            className={cn(
+              'rounded-[1.75rem] border border-[#dbe7ff] bg-white shadow-[0_22px_52px_-46px_rgba(20,41,95,0.32)]',
+              item.onClick
+                ? 'cursor-pointer transition hover:-translate-y-0.5 hover:border-violet-200 hover:shadow-[0_28px_58px_-42px_rgba(124,58,237,0.5)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-400 focus-visible:ring-offset-2'
+                : ''
+            )}
+          >
             <CardContent className="p-4">
               <p className="text-[10px] font-black uppercase tracking-[0.24em] text-[#5c6e97]">{item.label}</p>
               <p className="mt-2 text-2xl font-black tracking-tight text-[#14295F]">{item.value}</p>
