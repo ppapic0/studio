@@ -150,6 +150,18 @@ function formatPointHistoryDateLabel(dateKey: string): string {
   return format(parsed, 'M월 d일 (EEE)', { locale: ko });
 }
 
+function createEmptyPointHistoryRow(dateKey: string): StudentPointHistoryRow {
+  return {
+    dateKey,
+    dateLabel: formatPointHistoryDateLabel(dateKey),
+    totalPoints: 0,
+    studyBoxPoints: 0,
+    rankPoints: 0,
+    otherPoints: 0,
+    pointItems: [],
+  };
+}
+
 function summarizePointHistoryItems(row: Pick<StudentPointHistoryRow, 'pointItems'>): string {
   const labels = row.pointItems
     .map((item) => item.label.trim())
@@ -701,6 +713,7 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
   const [isReservationModalOpen, setIsReservationModalOpen] = useState(false);
   const [isPointHistoryModalOpen, setIsPointHistoryModalOpen] = useState(false);
   const [selectedPointHistoryDateKey, setSelectedPointHistoryDateKey] = useState<string | null>(null);
+  const [pointAdjustmentDateKey, setPointAdjustmentDateKey] = useState<string | null>(null);
   const [pointAdjustmentMode, setPointAdjustmentMode] = useState<PointAdjustmentMode>('subtract');
   const [isPointAdjustmentModalOpen, setIsPointAdjustmentModalOpen] = useState(false);
   const [pointAdjustmentAmountDraft, setPointAdjustmentAmountDraft] = useState('');
@@ -1513,14 +1526,24 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
     if (pointHistoryRows.length === 0) return null;
     return pointHistoryRows.find((row) => row.dateKey === selectedPointHistoryDateKey) || pointHistoryRows[0];
   }, [pointHistoryRows, selectedPointHistoryDateKey]);
+  const pointAdjustmentTargetRow = useMemo(() => {
+    const targetDateKey = pointAdjustmentDateKey || selectedPointHistoryRow?.dateKey || todayKey;
+    return pointHistoryRows.find((row) => row.dateKey === targetDateKey) || createEmptyPointHistoryRow(targetDateKey);
+  }, [pointAdjustmentDateKey, pointHistoryRows, selectedPointHistoryRow?.dateKey, todayKey]);
+  const getPointAdjustmentTargetRow = (dateKey?: string | null) => {
+    const targetDateKey = dateKey || pointAdjustmentDateKey || selectedPointHistoryRow?.dateKey || todayKey;
+    return pointHistoryRows.find((row) => row.dateKey === targetDateKey) || createEmptyPointHistoryRow(targetDateKey);
+  };
   const resetPointAdjustmentModal = () => {
     setIsPointAdjustmentModalOpen(false);
+    setPointAdjustmentDateKey(null);
     setPointAdjustmentMode('subtract');
     setPointAdjustmentAmountDraft('');
     setPointAdjustmentReasonDraft('');
   };
-  const openPointAdjustmentModal = (mode: PointAdjustmentMode) => {
-    if (!canEditGrowthData || !selectedPointHistoryRow) return;
+  const openPointAdjustmentModal = (mode: PointAdjustmentMode, dateKey?: string | null) => {
+    if (!canEditGrowthData) return;
+    setPointAdjustmentDateKey(dateKey || selectedPointHistoryRow?.dateKey || todayKey);
     setPointAdjustmentMode(mode);
     setPointAdjustmentAmountDraft('');
     setPointAdjustmentReasonDraft('');
@@ -2008,11 +2031,12 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
     return Math.round((presentDays / trackedDays.length) * 100);
   }, [operationsTimeline]);
 
-  const handleSubmitPointAdjustment = async () => {
-    if (!functions || !centerId || !studentId || !canEditGrowthData || !selectedPointHistoryRow) return;
+  const handleSubmitPointAdjustment = async (dateKey?: string | null) => {
+    if (!functions || !centerId || !studentId || !canEditGrowthData) return;
 
     const amount = Math.floor(Number(pointAdjustmentAmountDraft));
     const reason = pointAdjustmentReasonDraft.trim();
+    const targetRow = getPointAdjustmentTargetRow(dateKey);
     if (!Number.isFinite(amount) || amount < 1 || amount > 100000) {
       toast({
         variant: 'destructive',
@@ -2048,7 +2072,7 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
       const result = await adjustStudentPoints({
         centerId,
         studentId,
-        dateKey: selectedPointHistoryRow.dateKey,
+        dateKey: targetRow.dateKey,
         deltaPoints,
         reason,
       });
@@ -4777,18 +4801,18 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
             </DialogHeader>
           </div>
 
-          {selectedPointHistoryRow ? (
+          {pointAdjustmentTargetRow ? (
             <div className="grid gap-4 bg-[#f8fbff] px-5 py-5">
               <div className="grid gap-2 rounded-[1.25rem] border border-[#dbe7ff] bg-white p-4">
                 <div className="flex items-center justify-between gap-3">
                   <div className="min-w-0">
-                    <p className="truncate text-sm font-black text-[#14295F]">{selectedPointHistoryRow.dateLabel}</p>
+                    <p className="truncate text-sm font-black text-[#14295F]">{pointAdjustmentTargetRow.dateLabel}</p>
                     <p className="mt-1 text-[11px] font-bold text-[#5c6e97]">
                       현재 잔액 {formatPointAmount(currentPointBalance)}
                     </p>
                   </div>
                   <Badge className="shrink-0 border-none bg-[#fff8ef] px-3 py-1 text-[11px] font-black text-[#d86a11]">
-                    일자 {formatPointAmount(selectedPointHistoryRow.totalPoints)}
+                    일자 {formatPointAmount(pointAdjustmentTargetRow.totalPoints)}
                   </Badge>
                 </div>
               </div>
@@ -5432,9 +5456,75 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
               <Card className="rounded-[1.5rem] border-2 border-[#dbe7ff] bg-[#f8fbff] p-6 flex flex-col items-center text-center gap-4">
                 <div className="text-5xl font-black text-[#14295F]">{currentPointBalance.toLocaleString()}<span className="ml-1 text-xl opacity-20">P</span></div>
                 {isEditStats && canEditGrowthData ? (
-                  <p className="text-[11px] font-bold leading-relaxed text-[#5c6e97]">
-                    포인트 증감은 포인트 수급 확인 또는 포인트 조정에서 처리됩니다.
-                  </p>
+                  <div className="w-full space-y-3 rounded-[1.2rem] border border-[#dbe7ff] bg-white p-3 text-left">
+                    <div className="grid grid-cols-2 gap-2">
+                      {(['add', 'subtract'] as PointAdjustmentMode[]).map((mode) => {
+                        const isSelected = pointAdjustmentMode === mode;
+                        return (
+                          <Button
+                            key={`mastery-point-adjustment-${mode}`}
+                            type="button"
+                            variant={isSelected ? 'default' : 'outline'}
+                            className={cn(
+                              'h-10 rounded-xl text-xs font-black',
+                              isSelected
+                                ? mode === 'add'
+                                  ? 'bg-emerald-600 text-white hover:bg-emerald-700'
+                                  : 'bg-rose-600 text-white hover:bg-rose-700'
+                                : 'border-[#dbe7ff] bg-[#f8fbff] text-[#5c6e97] hover:bg-[#eef4ff]'
+                            )}
+                            onClick={() => {
+                              setPointAdjustmentDateKey(todayKey);
+                              setPointAdjustmentMode(mode);
+                            }}
+                          >
+                            {mode === 'add' ? (
+                              <PlusCircle className="mr-1.5 h-3.5 w-3.5" />
+                            ) : (
+                              <Trash2 className="mr-1.5 h-3.5 w-3.5" />
+                            )}
+                            {mode === 'add' ? '포인트 부여' : '포인트 차감'}
+                          </Button>
+                        );
+                      })}
+                    </div>
+                    <div className="grid gap-2 sm:grid-cols-[0.8fr_1.2fr]">
+                      <Input
+                        type="number"
+                        min={1}
+                        max={100000}
+                        inputMode="numeric"
+                        value={pointAdjustmentAmountDraft}
+                        onChange={(event) => setPointAdjustmentAmountDraft(event.target.value)}
+                        placeholder="포인트"
+                        className="h-11 rounded-xl border-[#dbe7ff] bg-[#f8fbff] text-center font-black text-[#14295F]"
+                      />
+                      <Input
+                        value={pointAdjustmentReasonDraft}
+                        onChange={(event) => setPointAdjustmentReasonDraft(event.target.value.slice(0, 160))}
+                        placeholder="수정 사유"
+                        className="h-11 rounded-xl border-[#dbe7ff] bg-[#f8fbff] font-bold text-[#14295F]"
+                      />
+                    </div>
+                    <Button
+                      type="button"
+                      className={cn(
+                        'h-11 w-full rounded-xl font-black text-white',
+                        pointAdjustmentMode === 'add' ? 'bg-emerald-600 hover:bg-emerald-700' : 'bg-rose-600 hover:bg-rose-700'
+                      )}
+                      disabled={isPointAdjustmentSaving}
+                      onClick={() => {
+                        setPointAdjustmentDateKey(todayKey);
+                        void handleSubmitPointAdjustment(todayKey);
+                      }}
+                    >
+                      {isPointAdjustmentSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
+                      오늘 날짜로 {pointAdjustmentMode === 'add' ? '부여' : '차감'} 적용
+                    </Button>
+                    <p className="text-center text-[11px] font-bold leading-relaxed text-[#5c6e97]">
+                      차감은 보유 포인트를 초과할 수 없고, 사유는 포인트 내역에 남습니다.
+                    </p>
+                  </div>
                 ) : null}
               </Card>
             </section>
