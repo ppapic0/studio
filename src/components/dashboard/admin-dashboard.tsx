@@ -10438,10 +10438,22 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
                   </Badge>
                 )}
               </div>
-              <div className={cn('grid gap-3', isMobile ? 'grid-cols-2' : 'grid-cols-4')}>
+              <div className={cn('grid gap-3', isMobile ? 'grid-cols-2' : 'grid-cols-6')}>
                 <div className="rounded-[1.45rem] border border-white/10 bg-white/10 px-4 py-3">
                   <p className="text-[10px] font-black uppercase tracking-[0.16em] text-white/60">오늘 집중 점수</p>
                   <p className="dashboard-number mt-2 text-[1.55rem] text-white">{selectedFocusStudent?.score ?? 0}</p>
+                </div>
+                <div className="rounded-[1.45rem] border border-[#FFB677]/28 bg-[#FF7A16]/18 px-4 py-3">
+                  <p className="text-[10px] font-black uppercase tracking-[0.16em] text-white/68">보유 포인트</p>
+                  <p className="dashboard-number mt-2 text-[1.55rem] text-white">
+                    {selectedFocusAdjustmentSnapshot.pointsBalance.toLocaleString()}pt
+                  </p>
+                </div>
+                <div className="rounded-[1.45rem] border border-rose-200/28 bg-rose-500/16 px-4 py-3">
+                  <p className="text-[10px] font-black uppercase tracking-[0.16em] text-white/68">현재 벌점</p>
+                  <p className="dashboard-number mt-2 text-[1.55rem] text-white">
+                    {selectedFocusAdjustmentSnapshot.penaltyPoints.toLocaleString()}점
+                  </p>
                 </div>
                 <div className="rounded-[1.45rem] border border-white/10 bg-white/10 px-4 py-3">
                   <p className="text-[10px] font-black uppercase tracking-[0.16em] text-white/60">오늘 성장도</p>
