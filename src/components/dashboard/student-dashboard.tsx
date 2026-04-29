@@ -1414,23 +1414,23 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
     }
   }, [getCarryoverAutoOpenStorageKey]);
 
-  const getStudyBoxLoginReminderStorageKey = useCallback((dateKey: string) => {
-    return `student-dashboard:study-box-login-reminder:${user?.uid ?? 'anonymous'}:${dateKey}`;
+  const getStudyBoxLoginReminderStorageKey = useCallback((dateKey: string, readySignature: string) => {
+    return `student-dashboard:study-box-login-reminder:${user?.uid ?? 'anonymous'}:${dateKey}:${readySignature}`;
   }, [user?.uid]);
 
-  const hasHandledStudyBoxLoginReminder = useCallback((dateKey: string) => {
+  const hasHandledStudyBoxLoginReminder = useCallback((dateKey: string, readySignature: string) => {
     if (typeof window === 'undefined') return false;
     try {
-      return window.sessionStorage.getItem(getStudyBoxLoginReminderStorageKey(dateKey)) === '1';
+      return window.sessionStorage.getItem(getStudyBoxLoginReminderStorageKey(dateKey, readySignature)) === '1';
     } catch {
       return false;
     }
   }, [getStudyBoxLoginReminderStorageKey]);
 
-  const markStudyBoxLoginReminderHandled = useCallback((dateKey: string) => {
+  const markStudyBoxLoginReminderHandled = useCallback((dateKey: string, readySignature: string) => {
     if (typeof window === 'undefined') return;
     try {
-      window.sessionStorage.setItem(getStudyBoxLoginReminderStorageKey(dateKey), '1');
+      window.sessionStorage.setItem(getStudyBoxLoginReminderStorageKey(dateKey, readySignature), '1');
     } catch {
       // Ignore storage access failures and keep the in-memory signature guard.
     }
@@ -3150,17 +3150,20 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
       return;
     }
     if (isVaultOpen) return;
+    if (readyBoxes.length === 0) {
+      studyBoxLoginReminderSignatureRef.current = null;
+      return;
+    }
 
     const nextSignature = `${activeStudyDayKey}:${readyBoxSignature}`;
     if (studyBoxLoginReminderSignatureRef.current === nextSignature) return;
-    if (hasHandledStudyBoxLoginReminder(activeStudyDayKey)) {
+    if (hasHandledStudyBoxLoginReminder(activeStudyDayKey, readyBoxSignature)) {
       studyBoxLoginReminderSignatureRef.current = nextSignature;
       return;
     }
 
     studyBoxLoginReminderSignatureRef.current = nextSignature;
-    markStudyBoxLoginReminderHandled(activeStudyDayKey);
-    if (readyBoxes.length === 0) return;
+    markStudyBoxLoginReminderHandled(activeStudyDayKey, readyBoxSignature);
 
     setVaultSourceDateKey(activeStudyDayKey);
     setSelectedBoxHour(readyBoxes[0]?.hour ?? null);
