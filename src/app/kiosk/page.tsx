@@ -6,7 +6,6 @@ import { useRouter } from 'next/navigation';
 import {
   ArrowLeft,
   Check,
-  CheckCircle2,
   Coffee,
   Delete,
   Loader2,
@@ -29,7 +28,9 @@ import { cn } from '@/lib/utils';
 import { resolveSeatIdentity } from '@/lib/seat-layout';
 import type { AttendanceCurrent, StudentProfile } from '@/lib/types';
 import {
+  enqueueKioskAttendanceActionSecure,
   submitKioskAttendanceActionFast,
+  type EnqueueKioskAttendanceActionResult,
   type KioskAttendanceAction,
   type SubmitKioskAttendanceActionFastInput,
   type SubmitKioskAttendanceActionFastResult,
@@ -94,6 +95,7 @@ const TOUCH_LOCK_MS = 350;
 const SUCCESS_FEEDBACK_VISIBLE_MS = 760;
 const RESET_AFTER_ACTION_MS = 420;
 const kioskTouchClass = 'touch-manipulation select-none [-webkit-tap-highlight-color:transparent] [-webkit-touch-callout:none] [touch-action:manipulation]';
+const ENABLE_FAST_CALLABLE = process.env.NEXT_PUBLIC_KIOSK_FAST_CALLABLE === 'true';
 
 const ACTIONS: Record<KioskAttendanceAction, KioskActionConfig> = {
   check_in: {
@@ -218,6 +220,28 @@ function getKioskErrorMessage(error: unknown) {
 
 function isStudentLookupResult(value: KioskStudentLookupResult | null): value is KioskStudentLookupResult {
   return Boolean(value?.students?.length);
+}
+
+function normalizeQueuedAttendanceResult(
+  result: EnqueueKioskAttendanceActionResult
+): SubmitKioskAttendanceActionFastResult {
+  const state: SubmitKioskAttendanceActionFastResult['state'] =
+    result.status === 'rejected_stale'
+      ? 'stale'
+      : result.status === 'completed'
+        ? result.result?.alreadyApplied === true ? 'already_applied' : 'applied'
+        : 'queued';
+  const userMessage = result.userMessage || result.staleReason || '';
+
+  return {
+    ok: true,
+    actionId: result.actionId,
+    state,
+    nextStatus: result.confirmedStatus || result.optimisticStatus,
+    ...(result.confirmedStatus ? { confirmedStatus: result.confirmedStatus } : {}),
+    ...(result.confirmedSeatId ? { confirmedSeatId: result.confirmedSeatId } : {}),
+    ...(userMessage ? { userMessage } : {}),
+  };
 }
 
 async function firstLookupWithStudents(
@@ -507,14 +531,10 @@ export default function KioskPage() {
     }
 
     try {
-      const result = await submitKioskAttendanceActionFast(functions, payload);
+      const result = ENABLE_FAST_CALLABLE
+        ? await submitKioskAttendanceActionFast(functions, payload)
+        : normalizeQueuedAttendanceResult(await enqueueKioskAttendanceActionSecure(functions, payload));
       removeActionFromRetry(payload.idempotencyKey);
-      if (!options.quiet && result.state === 'queued') {
-        toast({
-          title: '동기화 대기',
-          description: result.userMessage || '출결 기록을 서버에서 이어서 처리하고 있습니다.',
-        });
-      }
       if (!options.quiet && result.state === 'stale') {
         toast({
           title: '상태 확인 필요',
@@ -523,12 +543,24 @@ export default function KioskPage() {
       }
       return result;
     } catch (error) {
-      saveActionForRetry(payload, getKioskErrorMessage(error));
-      if (!options.quiet) {
-        toast({
-          title: '동기화 대기',
-          description: '화면 처리는 완료했고, 네트워크가 안정되면 자동으로 다시 전송합니다.',
-        });
+      if (ENABLE_FAST_CALLABLE) {
+        try {
+          const fallbackResult = normalizeQueuedAttendanceResult(
+            await enqueueKioskAttendanceActionSecure(functions, payload)
+          );
+          removeActionFromRetry(payload.idempotencyKey);
+          if (!options.quiet && fallbackResult.state === 'stale') {
+            toast({
+              title: '상태 확인 필요',
+              description: fallbackResult.userMessage || '출결 상태가 이미 바뀌었습니다. 번호를 다시 입력해 확인해 주세요.',
+            });
+          }
+          return fallbackResult;
+        } catch (fallbackError) {
+          saveActionForRetry(payload, getKioskErrorMessage(fallbackError));
+        }
+      } else {
+        saveActionForRetry(payload, getKioskErrorMessage(error));
       }
       return null;
     }
@@ -674,7 +706,7 @@ export default function KioskPage() {
   const selectedActions = selectedSeat ? getAllowedActions(selectedStatus) : [];
 
   return (
-    <div className={cn('min-h-screen overflow-hidden bg-[#FFF7ED] text-[#14295F]', kioskTouchClass)}>
+    <div className={cn('min-h-[100dvh] overflow-hidden bg-[#FFF7ED] text-[#14295F]', kioskTouchClass)}>
       <div className="pointer-events-none fixed inset-0 overflow-hidden">
         <div className="absolute inset-x-0 top-0 h-3 bg-[#FF7A16]" />
         <div className="absolute inset-x-0 top-3 h-28 bg-white/70" />
@@ -704,7 +736,7 @@ export default function KioskPage() {
         </div>
       ) : null}
 
-      <main className="relative z-10 mx-auto flex min-h-screen w-full max-w-6xl flex-col px-5 py-6 sm:px-8">
+      <main className="relative z-10 mx-auto flex min-h-[100dvh] w-full max-w-[760px] flex-col px-5 py-5 sm:px-7 sm:py-7">
         <header className="flex items-center justify-between gap-4">
           <div className="flex items-center gap-3">
             <div className="flex h-16 w-16 items-center justify-center rounded-[1.35rem] bg-white shadow-[0_18px_36px_-24px_rgba(255,122,22,0.56)] ring-2 ring-[#FF7A16]/16">
@@ -720,14 +752,9 @@ export default function KioskPage() {
             {queuedCount > 0 ? (
               <div className="hidden items-center gap-2 rounded-full border border-[#FFD7B0] bg-white px-3 py-2 text-[11px] font-black text-[#C95A08] shadow-sm sm:flex">
                 <WifiOff className="h-4 w-4" />
-                {queuedCount}건 동기화 대기
+                {queuedCount}건 재전송 중
               </div>
-            ) : (
-              <div className="hidden items-center gap-2 rounded-full border border-[#FFD7B0] bg-white px-3 py-2 text-[11px] font-black text-[#C95A08] shadow-sm sm:flex">
-                <CheckCircle2 className="h-4 w-4" />
-                Sync ready
-              </div>
-            )}
+            ) : null}
             {canGoBack ? (
               <Button
                 type="button"
@@ -743,38 +770,36 @@ export default function KioskPage() {
           </div>
         </header>
 
-        <section className="flex flex-1 items-center py-6">
+        <section className="flex flex-1 items-start justify-center py-5 sm:py-6">
           {step === 'pin' ? (
-            <div className="grid w-full gap-5 lg:grid-cols-[0.78fr_1.22fr]">
-              <div className="relative overflow-hidden rounded-[2.4rem] bg-[#FF7A16] p-7 text-white shadow-[0_34px_80px_-45px_rgba(255,122,22,0.9)]">
+            <div className="w-full space-y-5">
+              <div className="relative overflow-hidden rounded-[2rem] bg-[#FF7A16] p-6 text-white shadow-[0_34px_80px_-45px_rgba(255,122,22,0.9)] sm:rounded-[2.3rem] sm:p-7">
                 <div className="pointer-events-none absolute inset-x-0 top-0 h-3 bg-white/50" />
                 <div className="pointer-events-none absolute inset-x-0 bottom-0 h-16 bg-[#14295F]/10" />
-                <div className="relative z-10 flex min-h-[24rem] flex-col justify-between">
-                  <div>
-                    <div className="flex h-16 w-16 items-center justify-center rounded-[1.35rem] bg-white text-[#FF7A16] shadow-xl">
+                <div className="relative z-10 flex min-h-40 items-center justify-between gap-5 sm:min-h-44">
+                  <div className="flex min-w-0 items-center gap-4">
+                    <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-[1.15rem] bg-white text-[#FF7A16] shadow-xl sm:h-16 sm:w-16 sm:rounded-[1.35rem]">
                       <ShieldCheck className="h-8 w-8" />
                     </div>
-                    <h1 className="mt-7 font-aggro-display text-5xl leading-[0.95] sm:text-6xl">
-                      번호 6자리
-                    </h1>
-                    <p className="mt-5 max-w-sm text-lg font-black leading-7 text-white/90">
-                      출결 확인 대기
-                    </p>
+                    <div className="min-w-0">
+                      <h1 className="font-aggro-display text-5xl leading-[0.95] sm:text-6xl">번호 6자리</h1>
+                      <p className="mt-3 text-lg font-black leading-7 text-white/90">출결 확인 대기</p>
+                    </div>
                   </div>
-                  <div className="rounded-[1.45rem] border border-white/20 bg-white/14 p-4">
+                  <div className="hidden shrink-0 rounded-[1.45rem] border border-white/20 bg-white/14 p-4 text-left sm:block">
                     <p className="text-[11px] font-black uppercase text-white/70">speed mode</p>
                     <p className="mt-2 text-xl font-black">빠른 출결 모드</p>
                   </div>
                 </div>
               </div>
 
-              <div className="rounded-[2.4rem] border border-[#FFD7B0] bg-white p-6 shadow-[0_34px_80px_-54px_rgba(20,41,95,0.28)] sm:p-8">
+              <div className="rounded-[2rem] border border-[#FFD7B0] bg-white p-5 shadow-[0_34px_80px_-54px_rgba(20,41,95,0.28)] sm:rounded-[2.3rem] sm:p-7">
                 <div className="flex justify-center gap-3 sm:gap-4">
                   {Array.from({ length: 6 }).map((_, index) => (
                     <div
                       key={index}
                       className={cn(
-                        'flex h-16 w-12 items-center justify-center rounded-[1rem] border-2 text-2xl font-black transition-colors sm:h-[4.6rem] sm:w-14',
+                        'flex h-14 w-11 items-center justify-center rounded-[0.95rem] border-2 text-2xl font-black transition-colors sm:h-[4.35rem] sm:w-14 sm:rounded-[1rem]',
                         pin.length > index
                           ? 'border-[#FF7A16] bg-[#FF7A16] text-white'
                           : 'border-[#FFD7B0] bg-[#FFF7ED] text-[#F4B37A]'
@@ -785,7 +810,7 @@ export default function KioskPage() {
                   ))}
                 </div>
 
-                <div className="relative mt-8">
+                <div className="relative mt-7">
                   {showLookupOverlay ? (
                     <div className="absolute inset-0 z-10 flex flex-col items-center justify-center rounded-[1.6rem] bg-white/88 backdrop-blur-sm">
                       <Loader2 className="h-10 w-10 animate-spin text-[#FF7A16]" />
@@ -801,7 +826,7 @@ export default function KioskPage() {
                         disabled={isSearching}
                         onPointerDown={(event) => handleTouchPress(event, `num-${num}`, () => handleNumberClick(num))}
                         onKeyDown={(event) => handleKeyboardPress(event, `num-${num}`, () => handleNumberClick(num))}
-                        className={cn(kioskTouchClass, 'h-24 rounded-[1.45rem] border-2 border-[#FFD7B0] bg-white text-4xl font-black text-[#14295F] shadow-sm active:scale-[0.99] active:bg-[#FFF7ED] sm:h-28')}
+                        className={cn(kioskTouchClass, 'h-[5.7rem] rounded-[1.35rem] border-2 border-[#FFD7B0] bg-white text-4xl font-black text-[#14295F] shadow-sm active:scale-[0.99] active:bg-[#FFF7ED] sm:h-28 sm:rounded-[1.45rem]')}
                       >
                         {num}
                       </Button>
@@ -812,7 +837,7 @@ export default function KioskPage() {
                       disabled={isSearching}
                       onPointerDown={(event) => handleTouchPress(event, 'reset', resetKiosk)}
                       onKeyDown={(event) => handleKeyboardPress(event, 'reset', resetKiosk)}
-                      className={cn(kioskTouchClass, 'h-24 rounded-[1.45rem] border-2 border-[#FFD7B0] bg-[#FFF7ED] text-base font-black text-[#9A4E10] active:scale-[0.99] active:bg-white sm:h-28')}
+                      className={cn(kioskTouchClass, 'h-[5.7rem] rounded-[1.35rem] border-2 border-[#FFD7B0] bg-[#FFF7ED] text-base font-black text-[#9A4E10] active:scale-[0.99] active:bg-white sm:h-28 sm:rounded-[1.45rem]')}
                     >
                       <RotateCcw className="mr-2 h-5 w-5" />
                       초기화
@@ -823,7 +848,7 @@ export default function KioskPage() {
                       disabled={isSearching}
                       onPointerDown={(event) => handleTouchPress(event, 'num-0', () => handleNumberClick('0'))}
                       onKeyDown={(event) => handleKeyboardPress(event, 'num-0', () => handleNumberClick('0'))}
-                      className={cn(kioskTouchClass, 'h-24 rounded-[1.45rem] border-2 border-[#FFD7B0] bg-white text-4xl font-black text-[#14295F] shadow-sm active:scale-[0.99] active:bg-[#FFF7ED] sm:h-28')}
+                      className={cn(kioskTouchClass, 'h-[5.7rem] rounded-[1.35rem] border-2 border-[#FFD7B0] bg-white text-4xl font-black text-[#14295F] shadow-sm active:scale-[0.99] active:bg-[#FFF7ED] sm:h-28 sm:rounded-[1.45rem]')}
                     >
                       0
                     </Button>
@@ -833,7 +858,7 @@ export default function KioskPage() {
                       disabled={isSearching}
                       onPointerDown={(event) => handleTouchPress(event, 'delete', handleDelete)}
                       onKeyDown={(event) => handleKeyboardPress(event, 'delete', handleDelete)}
-                      className={cn(kioskTouchClass, 'h-24 rounded-[1.45rem] border-2 border-[#FFD7B0] bg-[#FFF7ED] text-[#14295F] active:scale-[0.99] active:bg-white sm:h-28')}
+                      className={cn(kioskTouchClass, 'h-[5.7rem] rounded-[1.35rem] border-2 border-[#FFD7B0] bg-[#FFF7ED] text-[#14295F] active:scale-[0.99] active:bg-white sm:h-28 sm:rounded-[1.45rem]')}
                       aria-label="한 글자 지우기"
                     >
                       <Delete className="h-8 w-8" />
@@ -845,7 +870,7 @@ export default function KioskPage() {
           ) : null}
 
           {step === 'select' ? (
-            <div className="mx-auto w-full max-w-4xl rounded-[2.4rem] border border-[#FFD7B0] bg-white p-6 shadow-[0_34px_80px_-54px_rgba(20,41,95,0.28)] sm:p-8">
+            <div className="mx-auto w-full rounded-[2rem] border border-[#FFD7B0] bg-white p-6 shadow-[0_34px_80px_-54px_rgba(20,41,95,0.28)] sm:rounded-[2.3rem] sm:p-8">
               <div className="flex items-end justify-between gap-4">
                 <div>
                   <p className="text-[11px] font-black uppercase text-[#FF7A16]">student match</p>
@@ -890,8 +915,8 @@ export default function KioskPage() {
           ) : null}
 
           {step === 'action' && selectedStudent ? (
-            <div className="mx-auto w-full max-w-5xl space-y-5">
-              <div className="rounded-[2.4rem] border border-[#FFD7B0] bg-white p-5 shadow-[0_34px_80px_-54px_rgba(20,41,95,0.28)] sm:p-7">
+            <div className="mx-auto w-full space-y-5">
+              <div className="rounded-[2rem] border border-[#FFD7B0] bg-white p-5 shadow-[0_34px_80px_-54px_rgba(20,41,95,0.28)] sm:rounded-[2.3rem] sm:p-7">
                 <div className="mb-5 flex items-end justify-between gap-4">
                   <div>
                     <p className="text-[11px] font-black uppercase text-[#FF7A16]">quick action</p>
@@ -903,7 +928,7 @@ export default function KioskPage() {
                 </div>
 
                 {selectedSeat ? (
-                  <div className={cn('grid gap-4', selectedActions.length === 1 ? 'grid-cols-1' : 'grid-cols-1 sm:grid-cols-2')}>
+                  <div className="grid grid-cols-1 gap-4">
                     {selectedActions.map((action) => {
                       const config = ACTIONS[action];
                       return (
