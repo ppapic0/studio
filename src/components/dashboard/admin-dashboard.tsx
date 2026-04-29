@@ -112,7 +112,7 @@ import {
 } from '@/components/dashboard/operations-inbox';
 import { motion, useReducedMotion } from 'framer-motion';
 import { buildNoShowFlag } from '@/features/schedules/lib/buildNoShowFlag';
-import { normalizeOutings } from '@/features/schedules/lib/scheduleModel';
+import { normalizeOutings, toAbsentScheduleDraft } from '@/features/schedules/lib/scheduleModel';
 import type { AttendanceScheduleDraft } from '@/components/dashboard/student-planner/planner-constants';
 import { useCenterAdminAttendanceBoard } from '@/hooks/use-center-admin-attendance-board';
 import { useCenterAdminHeatmap } from '@/hooks/use-center-admin-heatmap';
@@ -976,7 +976,8 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
   const [focusScheduleAwayStartDraft, setFocusScheduleAwayStartDraft] = useState('');
   const [focusScheduleAwayEndDraft, setFocusScheduleAwayEndDraft] = useState('');
   const [focusScheduleAwayReasonDraft, setFocusScheduleAwayReasonDraft] = useState('');
-  const [isFocusScheduleSaving, setIsFocusScheduleSaving] = useState(false);
+  const [focusScheduleSavingMode, setFocusScheduleSavingMode] = useState<'save' | 'absent' | null>(null);
+  const isFocusScheduleSaving = focusScheduleSavingMode !== null;
   const [focusPhoneEditMode, setFocusPhoneEditMode] = useState<'student' | 'parent' | null>(null);
   const [focusStudentPhoneDraft, setFocusStudentPhoneDraft] = useState('');
   const [focusParentPhoneDraft, setFocusParentPhoneDraft] = useState('');
@@ -1140,7 +1141,7 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
     setFocusScheduleAwayStartDraft('');
     setFocusScheduleAwayEndDraft('');
     setFocusScheduleAwayReasonDraft('');
-    setIsFocusScheduleSaving(false);
+    setFocusScheduleSavingMode(null);
     setFocusPhoneEditMode(null);
     setFocusStudentPhoneDraft('');
     setFocusParentPhoneDraft('');
@@ -4862,21 +4863,46 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
             </div>
           </div>
 
-          <DialogFooter className="border-t border-[#DCE7FF] bg-white px-5 py-4">
-            <DialogClose asChild>
-              <Button type="button" variant="outline" className="rounded-xl border-[#DCE7FF] font-black text-[#14295F]">
-                취소
-              </Button>
-            </DialogClose>
+          <DialogFooter className="gap-2 border-t border-[#DCE7FF] bg-white px-5 py-4 sm:justify-between sm:space-x-0">
             <Button
               type="button"
-              onClick={() => void handleSaveFocusSchedule()}
+              variant="outline"
+              onClick={() => void handleSaveFocusSchedule('absent')}
               disabled={isFocusScheduleSaving || !canEditFocusSchedule}
-              className="rounded-xl bg-[#14295F] font-black text-white hover:bg-[#10224C]"
+              className="rounded-xl border-[#FFD0C2] bg-[#FFF5F2] font-black text-[#D54E2B] hover:bg-[#FFE9E2]"
             >
-              {isFocusScheduleSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
-              일정 저장
+              {focusScheduleSavingMode === 'absent' ? (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              ) : (
+                <UserX className="mr-2 h-4 w-4" />
+              )}
+              오늘 미등원
             </Button>
+            <div className="flex flex-col-reverse gap-2 sm:flex-row">
+              <DialogClose asChild>
+                <Button
+                  type="button"
+                  variant="outline"
+                  disabled={isFocusScheduleSaving}
+                  className="rounded-xl border-[#DCE7FF] font-black text-[#14295F]"
+                >
+                  취소
+                </Button>
+              </DialogClose>
+              <Button
+                type="button"
+                onClick={() => void handleSaveFocusSchedule('save')}
+                disabled={isFocusScheduleSaving || !canEditFocusSchedule}
+                className="rounded-xl bg-[#14295F] font-black text-white hover:bg-[#10224C]"
+              >
+                {focusScheduleSavingMode === 'save' ? (
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                ) : (
+                  <Save className="mr-2 h-4 w-4" />
+                )}
+                일정 저장
+              </Button>
+            </div>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -7135,7 +7161,7 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
     setFocusScheduleAwayReasonDraft(signal?.excursionReason || '');
     setIsFocusScheduleDialogOpen(true);
   };
-  const handleSaveFocusSchedule = async () => {
+  const handleSaveFocusSchedule = async (mode: 'save' | 'absent' = 'save') => {
     if (!firestore || !centerId || !selectedFocusStudentId || !todayKey) return;
     if (!canEditFocusSchedule) {
       toast({
@@ -7153,7 +7179,8 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
       || studentsById.get(studentId)?.name
       || studentMembersById.get(studentId)?.displayName
       || '학생';
-    const draft: AttendanceScheduleDraft = {
+    const isAbsentMode = mode === 'absent';
+    const baseDraft: AttendanceScheduleDraft = {
       inTime: focusScheduleArrivalDraft.trim(),
       outTime: focusScheduleDepartureDraft.trim(),
       academyName: '',
@@ -7167,7 +7194,8 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
       classScheduleId: null,
       classScheduleName: null,
     };
-    const validationMessage = validateFocusScheduleDraft(draft);
+    const draft = isAbsentMode ? toAbsentScheduleDraft(baseDraft) : baseDraft;
+    const validationMessage = isAbsentMode ? null : validateFocusScheduleDraft(draft);
     if (validationMessage) {
       toast({
         variant: 'destructive',
@@ -7182,10 +7210,14 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
     const savedAt = serverTimestamp();
     const editorUid = user?.uid || null;
     const editorName = user?.displayName || activeMembership?.displayName || '센터관리자';
-    const scheduleStatus = getScheduleStatusFromFocusStatus(
-      selectedFocusOperationsSummary?.currentStatus,
-      selectedFocusOperationsSummary?.firstCheckInLabel
-    );
+    const scheduleStatus = isAbsentMode
+      ? 'absent'
+      : getScheduleStatusFromFocusStatus(
+          selectedFocusOperationsSummary?.currentStatus,
+          selectedFocusOperationsSummary?.firstCheckInLabel
+        );
+    const shouldClearExcusedAbsentRecord =
+      !isAbsentMode && selectedFocusOperationsSummary?.signal?.attendanceDisplayStatus === 'excused_absent';
     const schedulePayload: Record<string, unknown> = {
       uid: studentId,
       studentName,
@@ -7196,7 +7228,7 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
       departurePlannedAt: draft.outTime,
       inTime: draft.inTime,
       outTime: draft.outTime,
-      isAbsent: false,
+      isAbsent: isAbsentMode,
       status: scheduleStatus,
       hasExcursion: outings.length > 0,
       excursionStartAt: primaryOuting?.startTime || null,
@@ -7214,9 +7246,21 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
       penaltyWaived: true,
       sameDayAdminEditPenaltyWaived: true,
       updatedAt: savedAt,
+      ...(isAbsentMode
+        ? {
+            actualArrivalAt: null,
+            actualDepartureAt: null,
+            classScheduleId: null,
+            classScheduleName: null,
+            note: null,
+            recurrenceSourceId: null,
+            recommendedStudyMinutes: null,
+            recommendedWeeklyDays: null,
+          }
+        : {}),
     };
 
-    setIsFocusScheduleSaving(true);
+    setFocusScheduleSavingMode(mode);
     try {
       const routinePenaltySnapshot = await getDocs(
         query(
@@ -7246,6 +7290,19 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
           penaltyApplied: false,
           penaltyPointsDelta: 0,
           penaltyWaived: true,
+          ...(isAbsentMode
+            ? {
+                status: 'excused_absent',
+                statusSource: 'manual',
+                statusUpdatedAt: savedAt,
+              }
+            : shouldClearExcusedAbsentRecord
+              ? {
+                  status: deleteField(),
+                  statusSource: deleteField(),
+                  statusUpdatedAt: deleteField(),
+                }
+              : {}),
           routineMissingAtCheckIn: deleteField(),
           routineMissingPenaltyApplied: deleteField(),
           updatedAt: savedAt,
@@ -7302,10 +7359,12 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
       setLiveTickMs(Date.now());
       resetFocusScheduleDialog();
       toast({
-        title: '오늘 일정을 저장했습니다.',
+        title: isAbsentMode ? '오늘 미등원으로 설정했습니다.' : '오늘 일정을 저장했습니다.',
         description: waivedRoutinePenaltyPoints > 0
           ? `${studentName} 학생 일정과 루틴 미작성 벌점 ${waivedRoutinePenaltyPoints}점을 함께 정리했습니다.`
-          : `${studentName} 학생의 등하원·외출 일정을 벌점 없이 반영했습니다.`,
+          : isAbsentMode
+            ? `${studentName} 학생의 오늘 등원 계획을 비우고 미등원으로 반영했습니다.`
+            : `${studentName} 학생의 등하원·외출 일정을 벌점 없이 반영했습니다.`,
       });
     } catch (error) {
       logHandledClientIssue('[admin-dashboard] focus schedule save failed', error);
@@ -7315,7 +7374,7 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
         description: getCallableErrorMessage(error, '잠시 후 다시 시도해 주세요.'),
       });
     } finally {
-      setIsFocusScheduleSaving(false);
+      setFocusScheduleSavingMode(null);
     }
   };
   const openFocusAdjustmentDialog = (kind: FocusAdjustmentKind, mode: PointAdjustmentMode = 'add') => {
