@@ -10557,10 +10557,10 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
 
           {/* ── SCROLLABLE BODY ── */}
           <div className="flex-1 overflow-y-auto bg-[linear-gradient(180deg,#F7FAFF_0%,#EEF4FF_100%)]">
-            <div className="bg-transparent p-5 space-y-5">
+            <div className="flex flex-col gap-5 bg-transparent p-5">
 
               {selectedFocusCounselingLens ? (
-                <div className="grid gap-4 lg:grid-cols-[1.12fr_0.88fr]">
+                <div className="order-last grid gap-4 lg:grid-cols-[1.12fr_0.88fr]">
                   <div className="rounded-[1.8rem] border border-[#DCE7FF] bg-white p-4 shadow-[0_20px_38px_-30px_rgba(20,41,95,0.22)]">
                     <div className="flex flex-wrap items-start justify-between gap-3">
                       <div className="min-w-0">
