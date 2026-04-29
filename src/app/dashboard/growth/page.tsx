@@ -1871,9 +1871,9 @@ export default function GrowthPage() {
                     </p>
                   </div>
                   <div className="rounded-[1.1rem] bg-[#F6F9FF] px-3.5 py-3">
-                    <p className="text-sm font-black text-[#14295F]">전날 상자는 새벽 1시 30분까지</p>
+                    <p className="text-sm font-black text-[#14295F]">전날 상자는 다음 공부일 새벽 1시 30분까지</p>
                     <p className="mt-1 text-xs font-bold leading-5 text-[#5F729B]">
-                      못 연 상자는 다음 공부일 초반까지 남아 있지만, 리셋 이후 1시 30분까지만 유지돼요.
+                      못 연 상자는 다음 공부일 내내 남고, 그다음 새벽 1시 30분에 정리돼요.
                     </p>
                   </div>
                 </div>

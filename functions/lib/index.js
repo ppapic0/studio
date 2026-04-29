@@ -1039,14 +1039,14 @@ function getRecentDateKeys(dateKey, count) {
     return keys;
 }
 function getStudyBoxCarryoverExpiresAtMs(dateKey) {
-    return getStudyDayWindowBounds(dateKey).endMs + STUDY_BOX_CARRYOVER_GRACE_MINUTES * MINUTE_MS;
+    return getStudyDayWindowBounds(dateKey).endMs + STUDY_DAY_MS + STUDY_BOX_CARRYOVER_GRACE_MINUTES * MINUTE_MS;
 }
 function hasStudyBoxCarryoverExpired(dateKey, baseDate = new Date()) {
     return baseDate.getTime() >= getStudyBoxCarryoverExpiresAtMs(dateKey);
 }
 function getExpiredStudyBoxCarryoverDateKey(baseDate = new Date()) {
     const currentStudyDayDate = toStudyDayDate(baseDate);
-    currentStudyDayDate.setDate(currentStudyDayDate.getDate() - 1);
+    currentStudyDayDate.setDate(currentStudyDayDate.getDate() - 2);
     return toDateKey(currentStudyDayDate);
 }
 function getTimeRangeOverlapMs(rangeStartMs, rangeEndMs, windowStartMs, windowEndMs) {
@@ -10782,7 +10782,7 @@ exports.openStudyRewardBoxSecure = functions.region(region).https.onCall(async (
     const isCarryoverDate = dateKey !== currentStudyDayKey;
     if (isCarryoverDate && hasStudyBoxCarryoverExpired(dateKey, nowDate)) {
         throw new functions.https.HttpsError("failed-precondition", "Study box carryover expired.", {
-            userMessage: "전날 상자는 새벽 1시 30분까지만 열 수 있습니다. 오늘 상자를 새로 모아 주세요.",
+            userMessage: "전날 상자 보관 기간이 지났습니다. 전날 상자는 다음 공부일 새벽 1시 30분까지 열 수 있습니다.",
         });
     }
     const { startMs: studyDayStartMs, endMs: studyDayEndMs } = getStudyDayWindowBounds(dateKey);
@@ -10973,7 +10973,7 @@ exports.openStudyRewardBoxesSecure = functions.region(region).https.onCall(async
     const isCarryoverDate = dateKey !== currentStudyDayKey;
     if (isCarryoverDate && hasStudyBoxCarryoverExpired(dateKey, nowDate)) {
         throw new functions.https.HttpsError("failed-precondition", "Study box carryover expired.", {
-            userMessage: "전날 상자는 새벽 1시 30분까지만 열 수 있습니다. 오늘 상자를 새로 모아 주세요.",
+            userMessage: "전날 상자 보관 기간이 지났습니다. 전날 상자는 다음 공부일 새벽 1시 30분까지 열 수 있습니다.",
         });
     }
     const { startMs: studyDayStartMs, endMs: studyDayEndMs } = getStudyDayWindowBounds(dateKey);

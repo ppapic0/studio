@@ -247,7 +247,7 @@ function RewardModal({
   hasMoreBoxes: boolean;
 }) {
   const canRevealSelectedBox =
-    revealedReward === null && Boolean(selectedBox && selectedBox.state === "ready");
+    boxStage === "idle" && revealedReward === null && Boolean(selectedBox && selectedBox.state === "ready");
   const modalBox = displayBox ?? selectedBox;
 
   return (

@@ -1349,6 +1349,7 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
   const homeBoxTimeoutsRef = useRef<Array<ReturnType<typeof setTimeout>>>([]);
   const pendingHomeBoxOpenHoursRef = useRef<Map<string, Set<number>>>(new Map());
   const isFlushingHomeBoxOpensRef = useRef(false);
+  const activeHomeBoxRevealKeyRef = useRef<string | null>(null);
   const homeLiveClaimKeyRef = useRef<string | null>(null);
   const autoRequestDateRef = useRef('');
   const [homeClaimedBoxes, setHomeClaimedBoxes] = useState<number[]>([]);
@@ -1381,6 +1382,7 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
   const [hydratedStudyBoxClaimCacheKey, setHydratedStudyBoxClaimCacheKey] = useState<string | null>(null);
   const pendingQuestIdsRef = useRef<Set<string>>(new Set());
   const carryoverAutoOpenSignatureRef = useRef<string | null>(null);
+  const studyBoxLoginReminderSignatureRef = useRef<string | null>(null);
 
   const getCarryoverAutoOpenStorageKey = useCallback((dateKey: string) => {
     return `student-dashboard:carryover-auto-open:${user?.uid ?? 'anonymous'}:${dateKey}`;
@@ -1411,6 +1413,28 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
       // Ignore storage access failures and continue with in-memory guards.
     }
   }, [getCarryoverAutoOpenStorageKey]);
+
+  const getStudyBoxLoginReminderStorageKey = useCallback((dateKey: string) => {
+    return `student-dashboard:study-box-login-reminder:${user?.uid ?? 'anonymous'}:${dateKey}`;
+  }, [user?.uid]);
+
+  const hasHandledStudyBoxLoginReminder = useCallback((dateKey: string) => {
+    if (typeof window === 'undefined') return false;
+    try {
+      return window.sessionStorage.getItem(getStudyBoxLoginReminderStorageKey(dateKey)) === '1';
+    } catch {
+      return false;
+    }
+  }, [getStudyBoxLoginReminderStorageKey]);
+
+  const markStudyBoxLoginReminderHandled = useCallback((dateKey: string) => {
+    if (typeof window === 'undefined') return;
+    try {
+      window.sessionStorage.setItem(getStudyBoxLoginReminderStorageKey(dateKey), '1');
+    } catch {
+      // Ignore storage access failures and keep the in-memory signature guard.
+    }
+  }, [getStudyBoxLoginReminderStorageKey]);
 
   useEffect(() => {
     const syncToday = () => {
@@ -3000,7 +3024,14 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
       }),
     [activeMembership?.id, activeStudyDayKey, renderableTodayStudyBoxState, rewardByHour, studentUid]
   );
-  const readyBoxes = homeRewardBoxes.filter((box) => box.state === 'ready');
+  const readyBoxes = useMemo(
+    () => homeRewardBoxes.filter((box) => box.state === 'ready'),
+    [homeRewardBoxes]
+  );
+  const readyBoxSignature = useMemo(
+    () => readyBoxes.map((box) => box.hour).join(','),
+    [readyBoxes]
+  );
   const carryoverRewardBoxes = useMemo(
     () => {
       if (!canRenderCarryoverBoxes) return [] as StudentHomeRewardBox[];
@@ -3105,6 +3136,49 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
     markCarryoverAutoOpenHandled,
     activeStudyDayKey,
     previousStudyDayKey,
+  ]);
+
+  useEffect(() => {
+    if (
+      !isActive ||
+      !activeStudyDayKey ||
+      hasCarryoverReadyBoxes ||
+      isProgressLoading ||
+      (studyBoxClaimCacheKey || EMPTY_STUDY_BOX_CACHE_KEY) !== hydratedStudyBoxClaimCacheKey
+    ) {
+      studyBoxLoginReminderSignatureRef.current = null;
+      return;
+    }
+    if (isVaultOpen) return;
+
+    const nextSignature = `${activeStudyDayKey}:${readyBoxSignature}`;
+    if (studyBoxLoginReminderSignatureRef.current === nextSignature) return;
+    if (hasHandledStudyBoxLoginReminder(activeStudyDayKey)) {
+      studyBoxLoginReminderSignatureRef.current = nextSignature;
+      return;
+    }
+
+    studyBoxLoginReminderSignatureRef.current = nextSignature;
+    markStudyBoxLoginReminderHandled(activeStudyDayKey);
+    if (readyBoxes.length === 0) return;
+
+    setVaultSourceDateKey(activeStudyDayKey);
+    setSelectedBoxHour(readyBoxes[0]?.hour ?? null);
+    setHomeBoxStage('idle');
+    setRevealedHomeReward(null);
+    setIsVaultOpen(true);
+  }, [
+    activeStudyDayKey,
+    hasCarryoverReadyBoxes,
+    hasHandledStudyBoxLoginReminder,
+    hydratedStudyBoxClaimCacheKey,
+    isActive,
+    isProgressLoading,
+    isVaultOpen,
+    markStudyBoxLoginReminderHandled,
+    readyBoxes,
+    readyBoxSignature,
+    studyBoxClaimCacheKey,
   ]);
 
   const growthGoalMinutes = Math.max(30, resolvedTargetDailyMinutes.minutes);
@@ -3471,14 +3545,23 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
       setVaultSourceDateKey(null);
       setHomeBoxStage('idle');
       setRevealedHomeReward(null);
+      activeHomeBoxRevealKeyRef.current = null;
     }
   }, [flushPendingHomeBoxOpens]);
 
-  const handleRevealHomeBox = useCallback(() => {
-    const isRevealableBox = selectedHomeBox?.state === 'ready';
-    if (!selectedHomeBox || !isRevealableBox || !activeVaultDateKey || !activeMembership?.id || !studentUid) return;
-    const targetHour = selectedHomeBox.hour;
+  const handleRevealHomeBox = useCallback((hourOverride?: number) => {
+    if (!hourOverride && homeBoxStage !== 'idle') return;
+    const targetBox =
+      typeof hourOverride === 'number'
+        ? activeRewardBoxes.find((box) => box.hour === hourOverride) || null
+        : selectedHomeBox;
+    const isRevealableBox = targetBox?.state === 'ready';
+    if (!targetBox || !isRevealableBox || !activeVaultDateKey || !activeMembership?.id || !studentUid) return;
+    const targetHour = targetBox.hour;
     const targetDateKey = activeVaultDateKey;
+    const revealKey = `${targetDateKey}:${targetHour}`;
+    if (activeHomeBoxRevealKeyRef.current === revealKey) return;
+    activeHomeBoxRevealKeyRef.current = revealKey;
     const optimisticRewardEntry = activeRewardByHour.get(targetHour) || buildDeterministicStudyBoxReward({
       centerId: activeMembership.id,
       studentId: studentUid,
@@ -3486,15 +3569,18 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
       milestone: targetHour,
     });
 
+    setSelectedBoxHour(targetHour);
+    setRevealedHomeReward(null);
     setHomeBoxStage('shake');
 
     const burstId = setTimeout(() => setHomeBoxStage('burst'), HOME_REWARD_BOX_BURST_DELAY_MS);
     homeBoxTimeoutsRef.current.push(burstId);
 
     const revealId = setTimeout(() => {
-      const optimisticReward = optimisticRewardEntry.awardedPoints ?? selectedHomeBox.reward ?? 0;
+      const optimisticReward = optimisticRewardEntry.awardedPoints ?? targetBox.reward ?? 0;
       setRevealedHomeReward(optimisticReward);
       setHomeBoxStage('revealed');
+      activeHomeBoxRevealKeyRef.current = null;
       queuePendingHomeBoxOpen(targetDateKey, targetHour);
 
       if (targetDateKey === activeStudyDayKey) {
@@ -3526,8 +3612,10 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
     homeBoxTimeoutsRef.current.push(revealId);
   }, [
     activeMembership?.id,
+    activeRewardBoxes,
     activeRewardByHour,
     activeVaultDateKey,
+    homeBoxStage,
     queuePendingHomeBoxOpen,
     resolvedCarryoverOpenedBoxes,
     selectedHomeBox,
@@ -3539,15 +3627,19 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
   ]);
 
   const handleNextHomeBox = useCallback(() => {
-    const nextReady = activeRewardBoxes.find((box) => box.state === 'ready' && box.hour !== selectedBoxHour);
+    const readyCandidates = activeRewardBoxes
+      .filter((box) => box.state === 'ready' && box.hour !== selectedBoxHour)
+      .sort((left, right) => left.hour - right.hour);
+    const nextReady =
+      readyCandidates.find((box) => selectedBoxHour === null || box.hour > selectedBoxHour) ||
+      readyCandidates[0] ||
+      null;
     if (!nextReady) {
       handleVaultChange(false);
       return;
     }
-    setSelectedBoxHour(nextReady.hour);
-    setHomeBoxStage('idle');
-    setRevealedHomeReward(null);
-  }, [activeRewardBoxes, handleVaultChange, selectedBoxHour]);
+    handleRevealHomeBox(nextReady.hour);
+  }, [activeRewardBoxes, handleRevealHomeBox, handleVaultChange, selectedBoxHour]);
   return (
     <div
       className={cn(

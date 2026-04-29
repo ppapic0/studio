@@ -40,7 +40,7 @@ export function getStudyDayWindowForKey(dateKey: string) {
 
 export function getStudyBoxCarryoverExpiresAtForKey(dateKey: string) {
   const { endAt } = getStudyDayWindowForKey(dateKey);
-  return new Date(endAt.getTime() + STUDY_BOX_CARRYOVER_GRACE_MINUTES * MINUTE_MS);
+  return new Date(endAt.getTime() + STUDY_DAY_MS + STUDY_BOX_CARRYOVER_GRACE_MINUTES * MINUTE_MS);
 }
 
 export function hasStudyBoxCarryoverExpired(dateKey: string | null | undefined, baseDate: Date = new Date()) {
