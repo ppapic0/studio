@@ -256,6 +256,10 @@ const normalizePhoneNumber = (value?: string | null): string => {
   return String(value || '').replace(/\D/g, '').trim();
 };
 
+const normalizeParentLinkCode = (value?: string | number | null): string => {
+  return String(value ?? '').replace(/\D/g, '').slice(0, 6);
+};
+
 const normalizePhoneDraft = (value: string): string => {
   return value.replace(/\D/g, '').slice(0, 11);
 };
@@ -3285,6 +3289,7 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
       normalizePhoneNumber(student?.phoneNumber)
       || normalizePhoneNumber(studentMember?.phoneNumber)
       || '-';
+    const parentLinkCode = normalizeParentLinkCode(student?.parentLinkCode) || '-';
     const classScheduleLabel = signal?.classScheduleName?.trim()
       ? toStudyRoomTrackScheduleName(signal.classScheduleName)
       : '';
@@ -3332,6 +3337,7 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
       hasManualParentPhone: Boolean(manualParentPhone),
       parentPhone,
       studentPhone,
+      parentLinkCode,
       smsLogs: todaysSmsLogs,
       recentSmsLogs: todaysSmsLogs.slice(0, 4),
       smsStatusSummary: buildAdminSmsStatusSummaryLabel(todaysSmsLogs),
@@ -10917,7 +10923,7 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
                         <p className="mt-2 truncate text-base font-black text-[#14295F]">{selectedFocusOperationsSummary.studentPhone}</p>
                       )}
                     </div>
-                    <div className="min-w-0 rounded-2xl border border-[#DCE7FF] bg-white p-3 sm:col-span-2">
+                    <div className="min-w-0 rounded-2xl border border-[#DCE7FF] bg-white p-3">
                       <div className="flex items-center justify-between gap-2">
                         <div className="flex items-center gap-1.5 text-[#5C6E97]">
                           <Phone className="h-3.5 w-3.5" />
@@ -10976,6 +10982,16 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
                           <p className="mt-1 truncate text-[11px] font-bold text-[#6E7EA3]">{selectedFocusOperationsSummary.parentName}</p>
                         </>
                       )}
+                    </div>
+                    <div className="min-w-0 rounded-2xl border border-[#FFD7BA] bg-[#FFF8F2] p-3">
+                      <div className="flex items-center gap-1.5 text-[#C95A08]">
+                        <Link2 className="h-3.5 w-3.5" />
+                        <p className="text-[10px] font-black uppercase tracking-[0.14em]">학부모 연동코드</p>
+                      </div>
+                      <p className="mt-2 truncate text-base font-black tracking-[0.18em] text-[#14295F]">
+                        {selectedFocusOperationsSummary.parentLinkCode}
+                      </p>
+                      <p className="mt-1 truncate text-[11px] font-bold text-[#C95A08]">6자리 가입 코드</p>
                     </div>
                   </div>
 
