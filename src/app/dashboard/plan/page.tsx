@@ -4251,6 +4251,9 @@ export default function StudyPlanPage() {
                     const isVolumeTask = resolveStudyPlanMode(task) === 'volume';
                     const targetAmount = Math.max(0, task.targetAmount || 0);
                     const metaLabel = buildChecklistMeta(task);
+                    const recordedCompletionPercent = getRecordedCompletionPercent(task);
+                    const shouldShowPartialCompletionBadge =
+                      isStudyTask && recordedCompletionPercent > 0 && recordedCompletionPercent < 100;
                     return (
                       <div
                         key={task.id}
@@ -4277,21 +4280,31 @@ export default function StudyPlanPage() {
                           </p>
                           <p className="student-aggro-body mt-1 text-[11px] font-semibold text-white/68">{metaLabel}</p>
                         </div>
-                        <Button
-                          type="button"
-                          variant={task.done ? 'outline' : 'secondary'}
-                          className={cn(
-                            "student-aggro-body shrink-0 rounded-full px-4 font-black shadow-none",
-                            task.done
-                              ? "border-white/16 bg-white/8 text-white hover:bg-white/12 hover:text-white"
-                              : "border border-white/12 bg-white text-[#17326B] hover:bg-[#FFF4E8]",
-                            isMobile ? "h-9 text-[11px]" : "h-10 text-xs"
-                          )}
-                          onClick={() => void handleToggleTask(task as WithId<StudyPlanItem>)}
-                          disabled={isPast || (!canCompleteSelectedDate && !task.done)}
-                        >
-                          {task.done ? '완료됨' : canCompleteSelectedDate ? '완료' : '당일만'}
-                        </Button>
+                        <div className="flex shrink-0 items-center gap-2">
+                          {shouldShowPartialCompletionBadge ? (
+                            <span className={cn(
+                              "dashboard-number rounded-full border border-[#FFB86F]/35 bg-[#FFB86F]/18 px-3 py-1.5 text-sm font-black leading-none text-[#FFE1B8] shadow-[0_10px_22px_-18px_rgba(255,184,111,0.72)]",
+                              !isMobile && "text-base"
+                            )}>
+                              {recordedCompletionPercent}%
+                            </span>
+                          ) : null}
+                          <Button
+                            type="button"
+                            variant={task.done ? 'outline' : 'secondary'}
+                            className={cn(
+                              "student-aggro-body shrink-0 rounded-full px-4 font-black shadow-none",
+                              task.done
+                                ? "border-white/16 bg-white/8 text-white hover:bg-white/12 hover:text-white"
+                                : "border border-white/12 bg-white text-[#17326B] hover:bg-[#FFF4E8]",
+                              isMobile ? "h-9 text-[11px]" : "h-10 text-xs"
+                            )}
+                            onClick={() => void handleToggleTask(task as WithId<StudyPlanItem>)}
+                            disabled={isPast || (!canCompleteSelectedDate && !task.done)}
+                          >
+                            {task.done ? '완료됨' : canCompleteSelectedDate ? '완료' : '당일만'}
+                          </Button>
+                        </div>
                       </div>
                     );
                   })}
