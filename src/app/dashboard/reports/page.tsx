@@ -366,6 +366,7 @@ export default function DailyReportsPage() {
   const writeModalContentRef = useRef<HTMLDivElement | null>(null);
   const reportContentTextareaRef = useRef<HTMLTextAreaElement | null>(null);
   const sendReportButtonRef = useRef<HTMLButtonElement | null>(null);
+  const trustReviewCancelButtonRef = useRef<HTMLButtonElement | null>(null);
   const reportFocusTimerRef = useRef<number | null>(null);
   const isClosingWriteModalRef = useRef(false);
 
@@ -913,6 +914,7 @@ export default function DailyReportsPage() {
         aiMeta: aiReportMeta,
       });
       if (warnings.length > 0) {
+        blurActiveReportElement();
         setTrustReviewWarnings(warnings);
         setIsTrustReviewOpen(true);
         return;
@@ -1386,6 +1388,10 @@ export default function DailyReportsPage() {
 
       <AlertDialog open={isTrustReviewOpen} onOpenChange={handleTrustReviewOpenChange}>
         <AlertDialogContent
+          onOpenAutoFocus={(event) => {
+            event.preventDefault();
+            trustReviewCancelButtonRef.current?.focus({ preventScroll: true });
+          }}
           onCloseAutoFocus={(event) => {
             event.preventDefault();
             moveTrustReviewFocusToWriteModal();
@@ -1431,6 +1437,7 @@ export default function DailyReportsPage() {
           </div>
           <AlertDialogFooter className="gap-2 border-t border-slate-100 bg-slate-50 px-6 py-4 sm:space-x-0">
             <AlertDialogCancel
+              ref={trustReviewCancelButtonRef}
               className="mt-0 h-11 rounded-xl border-slate-200 bg-white px-5 font-black text-slate-700"
             >
               다시 확인할게요
