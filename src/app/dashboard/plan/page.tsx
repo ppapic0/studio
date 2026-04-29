@@ -154,6 +154,7 @@ import {
   buildScheduleDocFromDraft,
   mergeAcademyIntoAwayDraft,
   parseTimeToMinutes,
+  toAbsentScheduleDraft,
   validateScheduleDraft,
 } from '@/features/schedules/lib/scheduleModel';
 import { buildMainPlanRecommendations, type MainPlanRecommendation } from '@/features/planner/lib/buildMainPlanRecommendations';
@@ -1587,18 +1588,19 @@ export default function StudyPlanPage() {
       classScheduleName: null,
     };
 
-    setInTime(draft.inTime || '09:00');
-    setOutTime(draft.outTime || '22:00');
-    setAcademyName(draft.academyName || '');
-    setAcademyStartTime(draft.academyStartTime || '');
-    setAcademyEndTime(draft.academyEndTime || '');
-    setAwayStartTime(draft.awayStartTime || '');
-    setAwayEndTime(draft.awayEndTime || '');
-    setAwayReason(draft.awayReason || '');
-    setExtraAwayPlans(draft.awaySlots || []);
-    setIsScheduleAbsent(Boolean(draft.isAbsent));
-    setAppliedClassScheduleId(draft.classScheduleId || null);
-    setAppliedClassScheduleName(draft.classScheduleName || null);
+    const isDraftAbsent = Boolean(draft.isAbsent);
+    setInTime(isDraftAbsent ? '' : draft.inTime || '09:00');
+    setOutTime(isDraftAbsent ? '' : draft.outTime || '22:00');
+    setAcademyName(isDraftAbsent ? '' : draft.academyName || '');
+    setAcademyStartTime(isDraftAbsent ? '' : draft.academyStartTime || '');
+    setAcademyEndTime(isDraftAbsent ? '' : draft.academyEndTime || '');
+    setAwayStartTime(isDraftAbsent ? '' : draft.awayStartTime || '');
+    setAwayEndTime(isDraftAbsent ? '' : draft.awayEndTime || '');
+    setAwayReason(isDraftAbsent ? '' : draft.awayReason || '');
+    setExtraAwayPlans(isDraftAbsent ? [] : draft.awaySlots || []);
+    setIsScheduleAbsent(isDraftAbsent);
+    setAppliedClassScheduleId(isDraftAbsent ? null : draft.classScheduleId || null);
+    setAppliedClassScheduleName(isDraftAbsent ? null : draft.classScheduleName || null);
   }, [matchedClassSchedule, matchingWeekdayTemplate, scheduleItems, selectedScheduleDoc]);
 
   useEffect(() => {
@@ -2954,10 +2956,7 @@ export default function StudyPlanPage() {
       } else {
         await persistStudentSchedule({
           dateKey: selectedDateKey,
-          draft: {
-            ...buildCurrentAttendanceDraft(),
-            isAbsent: true,
-          },
+          draft: toAbsentScheduleDraft(buildCurrentAttendanceDraft()),
           note: null,
         });
       }
@@ -2998,18 +2997,19 @@ export default function StudyPlanPage() {
 
   const applyAttendanceDraftToState = useCallback((draft: AttendanceScheduleDraft) => {
     const normalizedDraft = mergeAcademyIntoAwayDraft(draft);
-    setInTime(normalizedDraft.inTime || '09:00');
-    setOutTime(normalizedDraft.outTime || '22:00');
+    const isDraftAbsent = Boolean(normalizedDraft.isAbsent);
+    setInTime(isDraftAbsent ? '' : normalizedDraft.inTime || '09:00');
+    setOutTime(isDraftAbsent ? '' : normalizedDraft.outTime || '22:00');
     setAcademyName('');
     setAcademyStartTime('');
     setAcademyEndTime('');
-    setAwayStartTime(normalizedDraft.awayStartTime || '');
-    setAwayEndTime(normalizedDraft.awayEndTime || '');
-    setAwayReason(normalizedDraft.awayReason || '');
-    setExtraAwayPlans(normalizedDraft.awaySlots || []);
-    setIsScheduleAbsent(Boolean(normalizedDraft.isAbsent));
-    setAppliedClassScheduleId(normalizedDraft.classScheduleId || null);
-    setAppliedClassScheduleName(normalizedDraft.classScheduleName || null);
+    setAwayStartTime(isDraftAbsent ? '' : normalizedDraft.awayStartTime || '');
+    setAwayEndTime(isDraftAbsent ? '' : normalizedDraft.awayEndTime || '');
+    setAwayReason(isDraftAbsent ? '' : normalizedDraft.awayReason || '');
+    setExtraAwayPlans(isDraftAbsent ? [] : normalizedDraft.awaySlots || []);
+    setIsScheduleAbsent(isDraftAbsent);
+    setAppliedClassScheduleId(isDraftAbsent ? null : normalizedDraft.classScheduleId || null);
+    setAppliedClassScheduleName(isDraftAbsent ? null : normalizedDraft.classScheduleName || null);
   }, []);
 
   const handleTodayScheduleChange = useCallback((patch: Partial<AttendanceScheduleDraft>) => {
@@ -3054,11 +3054,11 @@ export default function StudyPlanPage() {
       });
       setScheduleSaveFeedback({
         variant: persistResult.legacySyncWarning ? 'warning' : 'success',
-        title: draft.isAbsent ? '미등원 일정 저장 완료' : '날짜별 일정 저장 완료',
+        title: draft.isAbsent ? '등원 계획 없음 저장 완료' : '날짜별 일정 저장 완료',
         description: draft.isAbsent
           ? persistResult.legacySyncWarning
-            ? '선택한 날짜를 미등원 일정으로 저장했어요. 일부 일정 카드는 잠시 늦게 갱신될 수 있어요.'
-            : '선택한 날짜를 미등원 일정으로 저장했어요.'
+            ? '선택한 날짜의 등원 계획을 비우고 미등원으로 저장했어요. 일부 일정 카드는 잠시 늦게 갱신될 수 있어요.'
+            : '선택한 날짜의 등원 계획을 비우고 미등원으로 저장했어요.'
           : persistResult.legacySyncWarning
             ? '선택한 날짜의 등하원·외출 일정을 저장했어요. 일부 일정 카드는 잠시 늦게 갱신될 수 있어요.'
             : '선택한 날짜의 등하원·외출 일정을 저장했어요.',
@@ -3132,10 +3132,7 @@ export default function StudyPlanPage() {
     setIsSubmitting(true);
     setAttendanceSaveError(null);
     try {
-      await executeSaveTodaySchedule({
-        ...buildCurrentAttendanceDraft(),
-        isAbsent: true,
-      });
+      await executeSaveTodaySchedule(toAbsentScheduleDraft(buildCurrentAttendanceDraft()));
     } finally {
       setIsSubmitting(false);
     }
@@ -3174,10 +3171,7 @@ export default function StudyPlanPage() {
 
       const draft =
         pendingSameDayChangeAction === 'absent'
-          ? {
-              ...buildCurrentAttendanceDraft(),
-              isAbsent: true,
-            }
+          ? toAbsentScheduleDraft(buildCurrentAttendanceDraft())
           : buildCurrentAttendanceDraft();
 
       const scheduleSaved = pendingSameDayChangeAction === 'reset'
@@ -5106,7 +5100,7 @@ export default function StudyPlanPage() {
           pendingSameDayChangeAction === 'reset'
             ? '저장된 오늘 일정을 비우고 다시 시작합니다.'
             : pendingSameDayChangeAction === 'absent'
-              ? '오늘을 미등원 일정으로 변경합니다.'
+              ? '오늘 등원 계획을 비우고 미등원으로 처리합니다.'
               : `${buildCurrentAttendanceDraft().inTime} ~ ${buildCurrentAttendanceDraft().outTime}${buildCurrentAttendanceDraft().awayStartTime && buildCurrentAttendanceDraft().awayEndTime ? ` · 학원/외출 ${buildCurrentAttendanceDraft().awayStartTime} ~ ${buildCurrentAttendanceDraft().awayEndTime}` : ''}`
         }
         actionLabel={

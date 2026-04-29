@@ -47,6 +47,10 @@ function toOperationalScheduleMinutes(minutes: number, arrivalMinutes: number, o
 }
 
 export function mergeAcademyIntoAwayDraft(draft: AttendanceScheduleDraft): AttendanceScheduleDraft {
+  if (draft.isAbsent) {
+    return toAbsentScheduleDraft(draft);
+  }
+
   const slots: AttendanceAwaySlot[] = [];
   const academyReason = draft.academyName?.trim() || '학원';
 
@@ -84,10 +88,30 @@ export function mergeAcademyIntoAwayDraft(draft: AttendanceScheduleDraft): Atten
   };
 }
 
+export function toAbsentScheduleDraft(draft: AttendanceScheduleDraft): AttendanceScheduleDraft {
+  return {
+    ...draft,
+    inTime: '',
+    outTime: '',
+    academyName: '',
+    academyStartTime: '',
+    academyEndTime: '',
+    awayStartTime: '',
+    awayEndTime: '',
+    awayReason: '',
+    awaySlots: [],
+    isAbsent: true,
+    classScheduleId: null,
+    classScheduleName: null,
+  };
+}
+
 export function normalizeOutings(
   primaryAway: AttendanceScheduleDraft,
   extraAwaySlots?: AttendanceAwaySlot[]
 ): StudentScheduleOuting[] {
+  if (primaryAway.isAbsent) return [];
+
   const sourceExtraAwaySlots = extraAwaySlots ?? primaryAway.awaySlots ?? [];
   const mergedDraft = mergeAcademyIntoAwayDraft({
     ...primaryAway,
@@ -199,8 +223,11 @@ export function buildScheduleDocFromDraft(params: {
   recommendedWeeklyDays?: number | null;
   source?: StudentScheduleDoc['source'];
 }): Omit<StudentScheduleDoc, 'createdAt' | 'updatedAt'> {
-  const outings = normalizeOutings(params.draft, params.extraAwaySlots || []);
+  const isAbsent = Boolean(params.draft.isAbsent);
+  const outings = isAbsent ? [] : normalizeOutings(params.draft, params.extraAwaySlots || []);
   const primaryOuting = outings[0] || null;
+  const arrivalPlannedAt = isAbsent ? '' : params.draft.inTime;
+  const departurePlannedAt = isAbsent ? '' : params.draft.outTime;
 
   return {
     uid: params.uid,
@@ -208,23 +235,23 @@ export function buildScheduleDocFromDraft(params: {
     centerId: params.centerId,
     dateKey: params.dateKey,
     timezone: DEFAULT_SCHEDULE_TIMEZONE,
-    arrivalPlannedAt: params.draft.inTime,
-    departurePlannedAt: params.draft.outTime,
+    arrivalPlannedAt,
+    departurePlannedAt,
     hasExcursion: outings.length > 0,
     excursionStartAt: primaryOuting?.startTime || null,
     excursionEndAt: primaryOuting?.endTime || null,
     excursionReason: primaryOuting?.reason || null,
     note: params.note?.trim() || null,
     recurrenceSourceId: params.recurrenceSourceId || null,
-    status: params.draft.isAbsent ? 'absent' : 'scheduled',
+    status: isAbsent ? 'absent' : 'scheduled',
     actualArrivalAt: null,
     actualDepartureAt: null,
-    inTime: params.draft.inTime,
-    outTime: params.draft.outTime,
-    isAbsent: Boolean(params.draft.isAbsent),
+    inTime: arrivalPlannedAt,
+    outTime: departurePlannedAt,
+    isAbsent,
     outings,
-    classScheduleId: params.draft.classScheduleId || null,
-    classScheduleName: params.draft.classScheduleName || null,
+    classScheduleId: isAbsent ? null : params.draft.classScheduleId || null,
+    classScheduleName: isAbsent ? null : params.draft.classScheduleName || null,
     recommendedStudyMinutes: params.recommendedStudyMinutes ?? null,
     recommendedWeeklyDays: params.recommendedWeeklyDays ?? null,
     source: params.source || (params.recurrenceSourceId ? 'regular-routine' : 'manual'),
@@ -232,15 +259,18 @@ export function buildScheduleDocFromDraft(params: {
 }
 
 export function buildDraftFromScheduleDoc(schedule?: Partial<StudentScheduleDoc> | null): AttendanceScheduleDraft {
+  const isAbsent = Boolean(schedule?.isAbsent || (schedule as any)?.status === 'absent');
   const outingSlots =
-    schedule?.outings?.map((outing) => ({
-      id: outing.id,
-      startTime: outing.startTime,
-      endTime: outing.endTime,
-      reason: outing.reason || outing.title || (outing.kind === 'academy' ? '학원' : ''),
-    })) || [];
+    isAbsent
+      ? []
+      : (schedule?.outings?.map((outing) => ({
+          id: outing.id,
+          startTime: outing.startTime,
+          endTime: outing.endTime,
+          reason: outing.reason || outing.title || (outing.kind === 'academy' ? '학원' : ''),
+        })) || []);
   const fallbackOuting =
-    !outingSlots.length && ((schedule as any)?.excursionStartAt || (schedule as any)?.excursionEndAt || (schedule as any)?.excursionReason)
+    !isAbsent && !outingSlots.length && ((schedule as any)?.excursionStartAt || (schedule as any)?.excursionEndAt || (schedule as any)?.excursionReason)
       ? [{
           id: 'legacy-excursion',
           startTime: (schedule as any)?.excursionStartAt || '',
@@ -250,8 +280,8 @@ export function buildDraftFromScheduleDoc(schedule?: Partial<StudentScheduleDoc>
       : [];
   const [firstOuting, ...extraOutings] = [...outingSlots, ...fallbackOuting].filter(hasAwaySlotValue);
   return {
-    inTime: schedule?.inTime || (schedule as any)?.arrivalPlannedAt || '09:00',
-    outTime: schedule?.outTime || (schedule as any)?.departurePlannedAt || '22:00',
+    inTime: isAbsent ? '' : schedule?.inTime || (schedule as any)?.arrivalPlannedAt || '09:00',
+    outTime: isAbsent ? '' : schedule?.outTime || (schedule as any)?.departurePlannedAt || '22:00',
     academyName: '',
     academyStartTime: '',
     academyEndTime: '',
@@ -264,9 +294,9 @@ export function buildDraftFromScheduleDoc(schedule?: Partial<StudentScheduleDoc>
       endTime: outing.endTime,
       reason: outing.reason,
     })) || [],
-    isAbsent: Boolean(schedule?.isAbsent || (schedule as any)?.status === 'absent'),
-    classScheduleId: schedule?.classScheduleId || null,
-    classScheduleName: schedule?.classScheduleName || null,
+    isAbsent,
+    classScheduleId: isAbsent ? null : schedule?.classScheduleId || null,
+    classScheduleName: isAbsent ? null : schedule?.classScheduleName || null,
   };
 }
 

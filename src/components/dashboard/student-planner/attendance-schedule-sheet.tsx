@@ -26,7 +26,7 @@ import {
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { normalizeOutings, validateScheduleDraft } from '@/features/schedules/lib/scheduleModel';
+import { normalizeOutings, toAbsentScheduleDraft, validateScheduleDraft } from '@/features/schedules/lib/scheduleModel';
 import { buildStudyRoomClassScheduleSummary, formatStudyRoomWeekdays } from '@/lib/attendance-request';
 import {
   getStudyRoomClassScheduleDisplayName,
@@ -139,7 +139,13 @@ function AttendanceDraftFields({
           <Button
             type="button"
             variant={isAbsent ? 'default' : 'outline'}
-            onClick={() => onChange({ isAbsent: false })}
+            onClick={() =>
+              onChange({
+                isAbsent: false,
+                inTime: draft.inTime || '09:00',
+                outTime: draft.outTime || '22:00',
+              })
+            }
             disabled={disabled}
             className={cn(
               'h-9 rounded-full px-4 text-[11px] font-black',
@@ -153,7 +159,7 @@ function AttendanceDraftFields({
           <Button
             type="button"
             variant="outline"
-            onClick={() => onChange({ isAbsent: true })}
+            onClick={() => onChange(toAbsentScheduleDraft(draft))}
             disabled={disabled}
             className={cn(
               'h-9 rounded-full px-4 text-[11px] font-black',
@@ -173,6 +179,15 @@ function AttendanceDraftFields({
           <p className="mt-1 text-sm font-black text-[#17326B]">{toStudyRoomTrackScheduleName(draft.classScheduleName)}</p>
           <p className="mt-1 text-[11px] font-semibold leading-5 text-[#5F739F]">
             특이사항이 없으면 이 트랙제대로 가고, 학원 수업이 있는 날만 아래에 추가해요.
+          </p>
+        </div>
+      ) : null}
+
+      {isAbsent ? (
+        <div className="rounded-[1rem] border border-[#FFD7AE] bg-[#FFF9F1] px-4 py-3">
+          <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#D86A11]">등원 계획 없음</p>
+          <p className="mt-1 break-keep text-[11px] font-semibold leading-5 text-[#6C5A49]">
+            미등원으로 저장하면 해당 날짜의 등원·하원 예정 시간과 학원/외출 계획이 비워집니다.
           </p>
         </div>
       ) : null}
@@ -300,7 +315,7 @@ function AttendanceDraftFields({
 
 function formatDraftSummary(draft: AttendanceScheduleDraft) {
   if (draft.isAbsent) {
-    return '이날은 등원하지 않아요';
+    return '등원 계획 없음';
   }
   const range = `${draft.inTime || '--:--'} ~ ${draft.outTime || '--:--'}`;
   const outings = normalizeOutings(draft, draft.awaySlots || []);
@@ -462,7 +477,7 @@ export function AttendanceScheduleSheet({
     activeTab === 'today'
       ? validateScheduleDraft(todayDraft, todayDraft.awaySlots || [])
       : validateScheduleDraft(weekdayDraft, weekdayDraft.awaySlots || []);
-  const todaySaveButtonLabel = todayDraft.isAbsent ? '미등원 일정 저장하기' : '일정 저장하기';
+  const todaySaveButtonLabel = todayDraft.isAbsent ? '등원 계획 없음 저장하기' : '일정 저장하기';
 
   const handleCloseRequest = () => {
     if (isSubmitting) return;
