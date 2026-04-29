@@ -35,7 +35,8 @@ class ApiError extends Error {
 
 const seatHoldStatusSchema = z.object({
   centerId: z.string().trim().min(1, '센터 정보를 확인해 주세요.'),
-  seatHoldId: z.string().trim().min(1, '좌석예약 요청 정보를 확인해 주세요.'),
+  seatHoldId: z.string().trim().min(1, '좌석예약 요청 정보를 확인해 주세요.').optional(),
+  manualSeatHoldName: z.string().trim().min(1, '예약자 이름을 입력해 주세요.').max(30, '예약자 이름은 30자 이하로 입력해 주세요.').optional(),
   nextStatus: z.enum(['held', 'pending_transfer', 'canceled']),
   replaceStudentId: z.string().trim().min(1).optional(),
   seatAssignment: z
@@ -48,6 +49,32 @@ const seatHoldStatusSchema = z.object({
       seatGenderPolicy: z.enum(['all', 'male', 'female']).optional().nullable(),
     })
     .optional(),
+}).superRefine((value, context) => {
+  if (value.nextStatus === 'held') {
+    if (!value.seatHoldId && !value.manualSeatHoldName) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['manualSeatHoldName'],
+        message: '좌석예약 요청 또는 예약자 이름을 입력해 주세요.',
+      });
+    }
+    if (value.manualSeatHoldName && !value.seatAssignment) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['seatAssignment'],
+        message: '배정할 좌석 정보를 확인해 주세요.',
+      });
+    }
+    return;
+  }
+
+  if (!value.seatHoldId) {
+    context.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ['seatHoldId'],
+      message: '좌석예약 요청 정보를 확인해 주세요.',
+    });
+  }
 });
 
 async function getCenterMembership(uid: string, centerId: string) {
@@ -101,7 +128,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const { centerId, seatHoldId, nextStatus, seatAssignment, replaceStudentId } = parsed.data;
+    const { centerId, seatHoldId, manualSeatHoldName, nextStatus, seatAssignment, replaceStudentId } = parsed.data;
     const membership = await getCenterMembership(session.uid, centerId);
 
     if (!isAdminRole(membership.role) || !isActiveMembershipStatus(membership.status)) {
@@ -117,20 +144,54 @@ export async function POST(request: NextRequest) {
     const centerRef = adminDb.collection('centers').doc(centerId);
 
     const result = await adminDb.runTransaction(async (transaction) => {
-      const seatHoldRef = centerRef.collection('websiteSeatHoldRequests').doc(seatHoldId);
+      const seatHoldRef = seatHoldId
+        ? centerRef.collection('websiteSeatHoldRequests').doc(seatHoldId)
+        : centerRef.collection('websiteSeatHoldRequests').doc();
       const [seatHoldSnap, centerSnap, studentsSnap, attendanceSnap] = await Promise.all([
-        transaction.get(seatHoldRef),
+        seatHoldId ? transaction.get(seatHoldRef) : Promise.resolve(null),
         transaction.get(centerRef),
         transaction.get(centerRef.collection('students')),
         transaction.get(centerRef.collection('attendanceCurrent')),
       ]);
 
-      if (!seatHoldSnap.exists) {
+      if (seatHoldId && !seatHoldSnap?.exists) {
         throw new ApiError(404, '좌석예약 요청을 찾을 수 없습니다.');
       }
 
-      const seatHold = { ...(seatHoldSnap.data() as WebsiteSeatHoldRequest), id: seatHoldSnap.id };
       const nowIso = new Date().toISOString();
+      const seatHold = seatHoldSnap?.exists
+        ? { ...(seatHoldSnap.data() as WebsiteSeatHoldRequest), id: seatHoldSnap.id }
+        : {
+            id: seatHoldRef.id,
+            centerId,
+            leadId: `manual:${seatHoldRef.id}`,
+            consultPhone: '',
+            studentName: manualSeatHoldName?.trim() || '예약자',
+            school: null,
+            grade: null,
+            receiptId: null,
+            requestType: 'admin_manual',
+            requestTypeLabel: '센터 직접 등록',
+            seatId: '',
+            roomId: '',
+            roomSeatNo: 0,
+            seatNo: 0,
+            seatLabel: '',
+            seatGenderPolicy: null,
+            seatGenderLabel: null,
+            status: 'pending_transfer',
+            depositAmount: 0,
+            bankAccountDisplay: '',
+            depositorGuide: '',
+            nonRefundableNotice: '',
+            policyAcceptedAt: nowIso,
+            createdAt: nowIso,
+            updatedAt: nowIso,
+            confirmedAt: null,
+            canceledAt: null,
+            createdByUid: session.uid,
+            updatedByUid: session.uid,
+          } satisfies WebsiteSeatHoldRequest;
       const releaseReservedAttendanceSeat = () => {
         const expectedManualName = `예약 ${seatHold.studentName}`;
         let releasedSeatCount = 0;
@@ -297,7 +358,7 @@ export async function POST(request: NextRequest) {
         });
       }
 
-      transaction.update(seatHoldRef, {
+      const seatHoldPatch = {
         status: 'held',
         seatId: targetSeatId,
         roomId: targetRoomId,
@@ -309,7 +370,15 @@ export async function POST(request: NextRequest) {
         confirmedAt: nowIso,
         canceledAt: null,
         updatedByUid: session.uid,
-      });
+      };
+      if (seatHoldSnap?.exists) {
+        transaction.update(seatHoldRef, seatHoldPatch);
+      } else {
+        transaction.set(seatHoldRef, {
+          ...seatHold,
+          ...seatHoldPatch,
+        });
+      }
 
       if (seatAssignment) {
         transaction.set(
@@ -350,6 +419,7 @@ export async function POST(request: NextRequest) {
 
       return {
         nextStatus,
+        seatHoldId: seatHold.id,
         canceledCompetingCount,
       };
     });

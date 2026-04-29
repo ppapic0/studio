@@ -4396,6 +4396,10 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
     const hasSelectedLayoutSeatStudent = Boolean(selectedLayoutSeatStudentId);
     const hasSelectedLayoutSeatOccupant =
       hasSelectedLayoutSeatStudent || Boolean(releaseSeatHold) || Boolean(selectedLayoutSeatManualOccupantName);
+    const reservationNameOnlyDraft =
+      layoutSeatActionMode === 'reservation' ? layoutSeatActionSearch.trim() : '';
+    const canAssignNameOnlyReservation = reservationNameOnlyDraft.length > 0;
+    const isSavingNameOnlyReservation = layoutSeatActionSavingId === 'reservation:manual';
     const actionDialogTitle = isReleaseReservationMode
       ? '예약 좌석을 어떻게 처리할까요?'
       : hasSelectedLayoutSeatStudent
@@ -4618,7 +4622,14 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
                   <Input
                     value={layoutSeatActionSearch}
                     onChange={(event) => setLayoutSeatActionSearch(event.target.value)}
-                    placeholder={layoutSeatActionMode === 'student' ? '학생 이름, 학교, 반으로 검색' : '예약자, 연락처, 학교로 검색'}
+                    onKeyDown={(event) => {
+                      if (layoutSeatActionMode !== 'reservation' || !canAssignNameOnlyReservation) return;
+                      if (event.key !== 'Enter') return;
+                      if ((event.nativeEvent as { isComposing?: boolean }).isComposing) return;
+                      event.preventDefault();
+                      void handleAssignNameOnlyReservationToLayoutSeat();
+                    }}
+                    placeholder={layoutSeatActionMode === 'student' ? '학생 이름, 학교, 반으로 검색' : '예약자 이름만 입력하거나, 연락처/학교로 검색'}
                     className="h-12 rounded-[1.05rem] border border-[#DCE7FF] bg-white pl-11 font-black text-[#14295F] placeholder:text-[#7F91B3]"
                   />
                 </div>
@@ -4657,10 +4668,39 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
                   </div>
                 ) : (
                   <div className="space-y-3">
+                    {canAssignNameOnlyReservation ? (
+                      <button
+                        type="button"
+                        disabled={isSavingSeatAction}
+                        onClick={() => void handleAssignNameOnlyReservationToLayoutSeat()}
+                        className="flex w-full items-center justify-between gap-3 rounded-[1.45rem] border border-[#9EE7C5] bg-emerald-50 px-4 py-3 text-left transition-all hover:-translate-y-0.5 hover:border-emerald-400 disabled:cursor-not-allowed disabled:opacity-60"
+                      >
+                        <div className="min-w-0">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <p className="truncate text-sm font-black text-[#14295F]">{reservationNameOnlyDraft}</p>
+                            <Badge className="border-none bg-white text-[10px] font-black text-emerald-700">
+                              이름만 배정
+                            </Badge>
+                          </div>
+                          <p className="mt-1 truncate text-xs font-bold text-emerald-800">
+                            등록된 예약 요청이 없어도 이 이름으로 {selectedSeatLabel}에 바로 예약좌석을 만듭니다.
+                          </p>
+                        </div>
+                        <span className="inline-flex h-9 shrink-0 items-center rounded-full bg-emerald-600 px-3 text-[10px] font-black text-white">
+                          {isSavingNameOnlyReservation ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : '확정'}
+                        </span>
+                      </button>
+                    ) : null}
                     {layoutSeatReservationCandidates.length === 0 ? (
                       <div className="rounded-[1.6rem] border border-dashed border-[#DCE7FF] bg-white px-5 py-8 text-center">
-                        <p className="text-base font-black text-[#14295F]">배정할 좌석예약 대기가 없습니다.</p>
-                        <p className="mt-2 text-xs font-bold text-[#5c6e97]">입금 확인 대기 상태의 좌석예약 요청만 여기서 확정할 수 있습니다.</p>
+                        <p className="text-base font-black text-[#14295F]">
+                          {canAssignNameOnlyReservation ? '검색된 좌석예약 대기는 없습니다.' : '배정할 좌석예약 대기가 없습니다.'}
+                        </p>
+                        <p className="mt-2 text-xs font-bold text-[#5c6e97]">
+                          {canAssignNameOnlyReservation
+                            ? '위 버튼으로 입력한 이름만 사용해 예약좌석을 바로 배정할 수 있습니다.'
+                            : '입금 확인 대기 상태의 좌석예약 요청만 여기서 확정할 수 있습니다.'}
+                        </p>
                       </div>
                     ) : (
                       layoutSeatReservationCandidates.map((seatHold) => {
@@ -6524,6 +6564,82 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
     } catch (error) {
       logHandledClientIssue('[admin-dashboard] release student layout seat failed', error);
       toast({ variant: 'destructive', title: '좌석 해제 실패' });
+    } finally {
+      setIsClassroomLayoutSaving(false);
+      setLayoutSeatActionSavingId(null);
+    }
+  };
+
+  const handleAssignNameOnlyReservationToLayoutSeat = async () => {
+    if (!centerId || !selectedLayoutSeat) return;
+
+    const studentName = layoutSeatActionSearch.trim();
+    if (!studentName) {
+      toast({ variant: 'destructive', title: '예약자 이름을 입력해 주세요.' });
+      return;
+    }
+
+    const seatId = buildSeatId(selectedLayoutSeat.roomId, selectedLayoutSeat.roomSeatNo);
+    if (!seatId) return;
+
+    const reservationHoldToRelease = selectedLayoutSeatReservationHold;
+    const replaceStudentId =
+      typeof selectedLayoutSeat.studentId === 'string' ? selectedLayoutSeat.studentId.trim() : '';
+    setLayoutSeatActionSavingId('reservation:manual');
+    setIsClassroomLayoutSaving(true);
+    try {
+      if (reservationHoldToRelease) {
+        await releaseReservationSeatHold(reservationHoldToRelease);
+      }
+
+      const seatNo = getGlobalSeatNo(selectedLayoutSeat.roomId, selectedLayoutSeat.roomSeatNo);
+      const seatLabel = selectedLayoutSeat.seatLabel || persistedSeatLabelsBySeatId[seatId] || String(selectedLayoutSeat.roomSeatNo);
+      const response = await fetch('/api/dashboard/seat-hold-status', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          centerId,
+          manualSeatHoldName: studentName,
+          nextStatus: 'held',
+          replaceStudentId: replaceStudentId || undefined,
+          seatAssignment: {
+            seatId,
+            roomId: selectedLayoutSeat.roomId,
+            roomSeatNo: selectedLayoutSeat.roomSeatNo,
+            seatNo,
+            seatLabel,
+            seatGenderPolicy: selectedLayoutSeat.seatGenderPolicy || persistedSeatGenderBySeatId[seatId] || 'all',
+          },
+        }),
+      });
+      const result = await response.json();
+      if (!response.ok || !result?.ok) {
+        throw new Error(result?.message || '예약좌석 배정 중 오류가 발생했습니다.');
+      }
+
+      const seatHoldId = typeof result?.seatHoldId === 'string' ? result.seatHoldId : null;
+      setSelectedLayoutSeat((current) =>
+        current
+          ? {
+              ...current,
+              id: seatId,
+              manualOccupantName: `예약 ${studentName}`,
+              seatHoldRequestId: seatHoldId,
+              studentId: undefined,
+              type: 'seat',
+              status: 'absent',
+            }
+          : current
+      );
+      closeLayoutSeatActionDialog();
+      toast({
+        title: `${studentName} 예약좌석을 배정했습니다.`,
+        description: `${formatSeatLabel(selectedLayoutSeat, roomConfigs, '선택 셀', persistedSeatLabelsBySeatId)}에 이름만으로 예약 확정했습니다.`,
+      });
+    } catch (error: any) {
+      toast({ variant: 'destructive', title: '예약 배정 실패', description: error?.message });
     } finally {
       setIsClassroomLayoutSaving(false);
       setLayoutSeatActionSavingId(null);
