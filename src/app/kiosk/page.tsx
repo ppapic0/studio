@@ -723,7 +723,7 @@ export default function KioskPage() {
 
       {successFeedback ? (
         <div className="pointer-events-none fixed inset-0 z-[120] flex items-center justify-center bg-[#14295F]/18 p-5">
-            <div className="w-full max-w-xl rounded-[2.4rem] border-4 border-white bg-[#FF7A16] p-9 text-center text-white shadow-[0_44px_90px_-34px_rgba(255,122,22,0.92)] animate-in zoom-in-95 fade-in duration-75">
+          <div className="w-full max-w-xl rounded-[2.4rem] border-4 border-white bg-[#FF7A16] p-9 text-center text-white shadow-[0_44px_90px_-34px_rgba(255,122,22,0.92)] animate-in zoom-in-95 fade-in duration-75">
             <div className="mx-auto flex h-24 w-24 items-center justify-center rounded-[1.8rem] bg-white text-[#FF7A16] shadow-xl">
               <successFeedback.Icon className="h-12 w-12" />
             </div>
@@ -743,8 +743,8 @@ export default function KioskPage() {
               <Image src="/track-logo-mark-transparent.png" alt="TRACK" width={42} height={42} priority />
             </div>
             <div>
-              <p className="font-aggro-display text-3xl leading-none text-[#14295F]">TRACK KIOSK</p>
-              <p className="mt-1 text-xs font-black uppercase text-[#FF7A16]">Fast attendance</p>
+              <p className="font-aggro-display text-3xl leading-none text-[#14295F]">트랙 키오스크</p>
+              <p className="mt-1 text-xs font-black text-[#FF7A16]">출결 키오스크</p>
             </div>
           </div>
 
@@ -773,22 +773,23 @@ export default function KioskPage() {
         <section className="flex flex-1 items-start justify-center py-5 sm:py-6">
           {step === 'pin' ? (
             <div className="w-full space-y-5">
-              <div className="relative overflow-hidden rounded-[2rem] bg-[#FF7A16] p-6 text-white shadow-[0_34px_80px_-45px_rgba(255,122,22,0.9)] sm:rounded-[2.3rem] sm:p-7">
-                <div className="pointer-events-none absolute inset-x-0 top-0 h-3 bg-white/50" />
-                <div className="pointer-events-none absolute inset-x-0 bottom-0 h-16 bg-[#14295F]/10" />
+              <div className="relative overflow-hidden rounded-[2rem] border-2 border-[#FFD7B0] bg-white p-6 text-[#14295F] shadow-[0_34px_80px_-50px_rgba(20,41,95,0.34)] sm:rounded-[2.3rem] sm:p-7">
+                <div className="pointer-events-none absolute inset-y-0 left-0 w-3 bg-[#FF7A16]" />
+                <div className="pointer-events-none absolute inset-x-0 top-0 h-3 bg-[#FF7A16]" />
+                <div className="pointer-events-none absolute inset-x-0 bottom-0 h-16 bg-[#14295F]/5" />
                 <div className="relative z-10 flex min-h-40 items-center justify-between gap-5 sm:min-h-44">
                   <div className="flex min-w-0 items-center gap-4">
-                    <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-[1.15rem] bg-white text-[#FF7A16] shadow-xl sm:h-16 sm:w-16 sm:rounded-[1.35rem]">
+                    <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-[1.15rem] bg-[#FF7A16] text-white shadow-[0_18px_34px_-24px_rgba(255,122,22,0.76)] sm:h-16 sm:w-16 sm:rounded-[1.35rem]">
                       <ShieldCheck className="h-8 w-8" />
                     </div>
                     <div className="min-w-0">
                       <h1 className="font-aggro-display text-5xl leading-[0.95] sm:text-6xl">번호 6자리</h1>
-                      <p className="mt-3 text-lg font-black leading-7 text-white/90">출결 확인 대기</p>
+                      <p className="mt-3 text-lg font-black leading-7 text-[#FF7A16]">출결 확인 대기</p>
                     </div>
                   </div>
-                  <div className="hidden shrink-0 rounded-[1.45rem] border border-white/20 bg-white/14 p-4 text-left sm:block">
-                    <p className="text-[11px] font-black uppercase text-white/70">speed mode</p>
-                    <p className="mt-2 text-xl font-black">빠른 출결 모드</p>
+                  <div className="hidden shrink-0 rounded-[1.45rem] border border-[#14295F]/10 bg-[#14295F] p-4 text-left text-white shadow-[0_18px_34px_-26px_rgba(20,41,95,0.56)] sm:block">
+                    <p className="text-[11px] font-black text-white/70">현재 상태</p>
+                    <p className="mt-2 text-xl font-black text-white">번호 입력</p>
                   </div>
                 </div>
               </div>
@@ -873,7 +874,7 @@ export default function KioskPage() {
             <div className="mx-auto w-full rounded-[2rem] border border-[#FFD7B0] bg-white p-6 shadow-[0_34px_80px_-54px_rgba(20,41,95,0.28)] sm:rounded-[2.3rem] sm:p-8">
               <div className="flex items-end justify-between gap-4">
                 <div>
-                  <p className="text-[11px] font-black uppercase text-[#FF7A16]">student match</p>
+                  <p className="text-[11px] font-black text-[#FF7A16]">학생 확인</p>
                   <h1 className="mt-2 font-aggro-display text-5xl leading-none text-[#14295F]">학생 선택</h1>
                 </div>
                 <div className="rounded-full bg-[#FFF7ED] px-4 py-2 text-sm font-black text-[#C95A08]">{matchedStudents.length}명</div>
@@ -919,7 +920,7 @@ export default function KioskPage() {
               <div className="rounded-[2rem] border border-[#FFD7B0] bg-white p-5 shadow-[0_34px_80px_-54px_rgba(20,41,95,0.28)] sm:rounded-[2.3rem] sm:p-7">
                 <div className="mb-5 flex items-end justify-between gap-4">
                   <div>
-                    <p className="text-[11px] font-black uppercase text-[#FF7A16]">quick action</p>
+                    <p className="text-[11px] font-black text-[#FF7A16]">출결 처리</p>
                     <h1 className="mt-2 font-aggro-display text-5xl leading-none text-[#14295F]">바로 처리</h1>
                   </div>
                   <div className="rounded-full border border-[#FFD7B0] bg-[#FFF7ED] px-4 py-2 text-sm font-black text-[#C95A08]">
@@ -993,8 +994,8 @@ export default function KioskPage() {
           ) : null}
         </section>
 
-        <footer className="pb-2 text-center text-[11px] font-black uppercase text-[#C95A08]/70">
-          TRACK Learning System
+        <footer className="pb-2 text-center text-[11px] font-black text-[#C95A08]/70">
+          트랙 학습 시스템
         </footer>
       </main>
     </div>
