@@ -13,9 +13,11 @@ import {
   RefreshCcw,
   Save,
   Search,
+  Send,
   ShieldCheck,
   Trash2,
   TrendingUp,
+  Users,
   XCircle,
 } from 'lucide-react';
 
@@ -30,6 +32,7 @@ import { cn } from '@/lib/utils';
 import { AdminWorkbenchCommandBar } from '@/components/dashboard/admin-workbench-command-bar';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
@@ -67,6 +70,8 @@ type ParentSmsEventType =
   | 'payment_reminder';
 
 type SmsConsoleEventType = ParentSmsEventType | 'risk_alert' | 'manual_note';
+
+type BulkSmsAudience = 'students' | 'parents';
 
 type SmsEventTemplateKey =
   | 'smsTemplateStudyStart'
@@ -268,6 +273,30 @@ type StudentRecipientRow = {
   studentName: string;
   className: string;
   parentRows: RecipientPreferenceRow[];
+};
+
+type BulkSmsRecipientRow = {
+  key: string;
+  studentId: string;
+  studentName: string;
+  className: string;
+  recipientName: string;
+  phoneNumber: string;
+  isSendable: boolean;
+  disabledReason?: string;
+};
+
+type SendBulkManualSmsResult = {
+  ok?: boolean;
+  queuedCount?: number;
+  recipientCount?: number;
+  selectedCount?: number;
+  excludedCount?: number;
+  unselectedCount?: number;
+  missingPhoneCount?: number;
+  suppressedCount?: number;
+  duplicateCount?: number;
+  provider?: string;
 };
 
 const DEFAULT_FORM: Required<Pick<NotificationSettings,
@@ -756,6 +785,11 @@ export default function NotificationSettingsPage() {
   const [recipientPhoneDrafts, setRecipientPhoneDrafts] = useState<Record<string, string>>({});
   const [manualSmsMessage, setManualSmsMessage] = useState('');
   const [manualSmsActionKey, setManualSmsActionKey] = useState<string | null>(null);
+  const [bulkSmsAudience, setBulkSmsAudience] = useState<BulkSmsAudience>('students');
+  const [bulkSmsMessage, setBulkSmsMessage] = useState('');
+  const [bulkSmsSearchTerm, setBulkSmsSearchTerm] = useState('');
+  const [bulkSmsExcludedKeys, setBulkSmsExcludedKeys] = useState<string[]>([]);
+  const [isBulkSmsSending, setIsBulkSmsSending] = useState(false);
   const [isRepairingTodaySms, setIsRepairingTodaySms] = useState(false);
 
   const settingsRef = useMemoFirebase(() => {
@@ -770,6 +804,11 @@ export default function NotificationSettingsPage() {
     const timer = window.setInterval(() => setOperationalNowMs(Date.now()), OPERATIONAL_DAY_TICK_MS);
     return () => window.clearInterval(timer);
   }, []);
+
+  useEffect(() => {
+    setBulkSmsExcludedKeys([]);
+    setBulkSmsSearchTerm('');
+  }, [bulkSmsAudience]);
 
   const operationalDayContext = useMemo(() => getStudyDayContext(new Date(operationalNowMs)), [operationalNowMs]);
   const operationalToday = operationalDayContext.studyDayDate;
@@ -1140,6 +1179,102 @@ export default function NotificationSettingsPage() {
       })
       .sort((a, b) => a.studentName.localeCompare(b.studentName, 'ko-KR'));
   }, [membersById, preferencesByKey, studentsRaw]);
+
+  const studentBulkSmsRows = useMemo<BulkSmsRecipientRow[]>(() => {
+    return (studentsRaw || [])
+      .filter((student) => {
+        if (shouldExcludeFromSmsQueries(student, student.id)) return false;
+        const membership = membersById.get(student.id);
+        if (shouldExcludeFromSmsQueries(membership, student.id)) return false;
+        if (membership?.role === 'student' && membership?.status && membership.status !== 'active') return false;
+        return true;
+      })
+      .map((student) => {
+        const membership = membersById.get(student.id);
+        const phoneNumber = resolveFirstValidPhoneNumber(student.phoneNumber, membership?.phoneNumber);
+        return {
+          key: `student:${student.id}`,
+          studentId: student.id,
+          studentName: student.name || membership?.displayName || '학생',
+          className: student.className || student.grade || '-',
+          recipientName: '학생 본인',
+          phoneNumber,
+          isSendable: Boolean(phoneNumber),
+          disabledReason: phoneNumber ? undefined : '번호 미등록',
+        };
+      })
+      .sort((a, b) => a.studentName.localeCompare(b.studentName, 'ko-KR'));
+  }, [membersById, studentsRaw]);
+
+  const parentBulkSmsRows = useMemo<BulkSmsRecipientRow[]>(() => {
+    const rows: BulkSmsRecipientRow[] = [];
+    recipientRows.forEach((student) => {
+      student.parentRows.forEach((parentRow) => {
+        const isSendable = Boolean(parentRow.phoneNumber && parentRow.enabled && !parentRow.isPhoneMissing);
+        rows.push({
+          key: `parent:${parentRow.studentId}:${parentRow.parentUid}`,
+          studentId: parentRow.studentId,
+          studentName: student.studentName,
+          className: student.className,
+          recipientName: parentRow.parentName,
+          phoneNumber: parentRow.phoneNumber,
+          isSendable,
+          disabledReason: parentRow.isPhoneMissing ? '번호 미등록' : parentRow.enabled ? undefined : '수신 꺼짐',
+        });
+      });
+    });
+    return rows.sort((a, b) => {
+      const studentCompare = a.studentName.localeCompare(b.studentName, 'ko-KR');
+      return studentCompare !== 0 ? studentCompare : a.recipientName.localeCompare(b.recipientName, 'ko-KR');
+    });
+  }, [recipientRows]);
+
+  const bulkSmsRows = useMemo(
+    () => (bulkSmsAudience === 'students' ? studentBulkSmsRows : parentBulkSmsRows),
+    [bulkSmsAudience, parentBulkSmsRows, studentBulkSmsRows]
+  );
+  const bulkSmsExcludedKeySet = useMemo(() => new Set(bulkSmsExcludedKeys), [bulkSmsExcludedKeys]);
+  const bulkSmsSelectedRows = useMemo(
+    () => bulkSmsRows.filter((row) => row.isSendable && !bulkSmsExcludedKeySet.has(row.key)),
+    [bulkSmsExcludedKeySet, bulkSmsRows]
+  );
+  const bulkSmsSelectedPhoneCount = useMemo(
+    () => new Set(bulkSmsSelectedRows.map((row) => row.phoneNumber)).size,
+    [bulkSmsSelectedRows]
+  );
+  const bulkSmsAvailableCount = useMemo(
+    () => new Set(bulkSmsRows.filter((row) => row.isSendable).map((row) => row.phoneNumber)).size,
+    [bulkSmsRows]
+  );
+  const bulkSmsHiddenIssueCount = useMemo(
+    () => bulkSmsRows.filter((row) => !row.isSendable).length,
+    [bulkSmsRows]
+  );
+  const filteredBulkSmsRows = useMemo(() => {
+    const keyword = bulkSmsSearchTerm.trim().toLowerCase();
+    if (!keyword) return bulkSmsRows;
+    return bulkSmsRows.filter((row) => {
+      const haystack = [
+        row.studentName,
+        row.className,
+        row.recipientName,
+        row.phoneNumber,
+        row.disabledReason || '',
+      ].join(' ').toLowerCase();
+      return haystack.includes(keyword);
+    });
+  }, [bulkSmsRows, bulkSmsSearchTerm]);
+  const visibleBulkSmsSelectableRows = useMemo(
+    () => filteredBulkSmsRows.filter((row) => row.isSendable),
+    [filteredBulkSmsRows]
+  );
+  const areAllVisibleBulkRecipientsSelected = useMemo(() => {
+    if (visibleBulkSmsSelectableRows.length === 0) return false;
+    return visibleBulkSmsSelectableRows.every((row) => !bulkSmsExcludedKeySet.has(row.key));
+  }, [bulkSmsExcludedKeySet, visibleBulkSmsSelectableRows]);
+  const bulkSmsAudienceLabel = bulkSmsAudience === 'students' ? '학생 번호' : '학부모 번호';
+  const bulkSmsMessageForSend = bulkSmsMessage.replace(/\s+/g, ' ').trim();
+  const bulkSmsByteCount = calculateSmsBytes(bulkSmsMessageForSend);
 
   const todayBoardRows = useMemo<StudentSmsBoardRow[]>(() => {
     const todayKey = todayDateKey;
@@ -1833,6 +1968,92 @@ export default function NotificationSettingsPage() {
     }
   };
 
+  const handleToggleBulkRecipient = (recipientKey: string, checked: boolean) => {
+    setBulkSmsExcludedKeys((prev) => {
+      const exists = prev.includes(recipientKey);
+      if (checked) {
+        return exists ? prev.filter((key) => key !== recipientKey) : prev;
+      }
+      return exists ? prev : [...prev, recipientKey];
+    });
+  };
+
+  const handleToggleVisibleBulkRecipients = (checked: boolean) => {
+    const visibleKeys = new Set(visibleBulkSmsSelectableRows.map((row) => row.key));
+    setBulkSmsExcludedKeys((prev) => {
+      if (checked) {
+        return prev.filter((key) => !visibleKeys.has(key));
+      }
+      return Array.from(new Set([...prev, ...visibleKeys]));
+    });
+  };
+
+  const handleSendBulkSms = async () => {
+    if (!functions || !centerId || !isAdmin) return;
+    if (!bulkSmsMessageForSend) {
+      toast({
+        variant: 'destructive',
+        title: '문자 내용 확인',
+        description: '전체 발송할 문자 내용을 입력해 주세요.',
+      });
+      return;
+    }
+    if (bulkSmsByteCount > SMS_BYTE_LIMIT) {
+      toast({
+        variant: 'destructive',
+        title: '문자 길이 초과',
+        description: '전체 문자 내용이 90byte를 넘었습니다.',
+      });
+      return;
+    }
+    if (bulkSmsSelectedPhoneCount <= 0) {
+      toast({
+        variant: 'destructive',
+        title: '발송 대상 확인',
+        description: '체크된 발송 가능 번호가 없습니다.',
+      });
+      return;
+    }
+    const confirmed = window.confirm(`${bulkSmsAudienceLabel} ${bulkSmsSelectedPhoneCount}개에 같은 문자를 발송할까요?`);
+    if (!confirmed) return;
+
+    setIsBulkSmsSending(true);
+    try {
+      const sendBulkManualSms = httpsCallable<
+        {
+          centerId: string;
+          audience: BulkSmsAudience;
+          message: string;
+          selectedRecipientKeys: string[];
+          excludedRecipientKeys: string[];
+        },
+        SendBulkManualSmsResult
+      >(functions, 'sendBulkManualSms');
+      const result = await sendBulkManualSms({
+        centerId,
+        audience: bulkSmsAudience,
+        message: bulkSmsMessageForSend,
+        selectedRecipientKeys: bulkSmsSelectedRows.map((row) => row.key),
+        excludedRecipientKeys: bulkSmsExcludedKeys,
+      });
+      const data = result.data || {};
+      toast({
+        title: '전체 문자 발송 요청 완료',
+        description: `${bulkSmsAudienceLabel} ${Number(data.queuedCount || 0)}건을 발송 대기열에 넣었습니다.`,
+      });
+      setBulkSmsMessage('');
+      setBulkSmsExcludedKeys([]);
+    } catch (error: any) {
+      toast({
+        variant: 'destructive',
+        title: '전체 문자 발송 실패',
+        description: error?.message || '전체 문자 발송 중 오류가 발생했습니다.',
+      });
+    } finally {
+      setIsBulkSmsSending(false);
+    }
+  };
+
   const openStudentDialog = (studentId: string) => {
     setSelectedBoardStudentId(studentId);
     setIsStudentDialogOpen(true);
@@ -2041,6 +2262,169 @@ export default function NotificationSettingsPage() {
           </div>
       </CardContent>
       </Card>
+
+      <Card className="rounded-[2rem] border-none shadow-xl ring-1 ring-black/[0.04]">
+        <CardHeader className="border-b bg-muted/10">
+          <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+            <div className="min-w-0">
+              <CardTitle className="flex items-center gap-2 text-xl font-black tracking-tight">
+                <Send className="h-5 w-5" /> 전체 문자 발송
+              </CardTitle>
+              <CardDescription className="font-bold text-sm">
+                학생 번호 전체 또는 학부모 번호 전체에 같은 문자를 보내고, 체크 해제로 일부 번호를 제외합니다.
+              </CardDescription>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <Badge className="border-none bg-primary/10 text-primary font-black">선택 {bulkSmsSelectedPhoneCount}개</Badge>
+              <Badge className="border-none bg-slate-100 text-slate-700 font-black">발송 가능 {bulkSmsAvailableCount}개</Badge>
+              {bulkSmsHiddenIssueCount > 0 ? (
+                <Badge className="border-none bg-amber-100 text-amber-700 font-black">제외 필요 {bulkSmsHiddenIssueCount}명</Badge>
+              ) : null}
+            </div>
+          </div>
+        </CardHeader>
+        <CardContent className="grid gap-5 p-6 xl:grid-cols-[0.95fr_1.25fr]">
+          <section className="space-y-4 rounded-[1.75rem] border border-slate-200 bg-slate-50/70 p-5">
+            <div>
+              <p className="text-[11px] font-black uppercase tracking-[0.22em] text-slate-500">발송 대상</p>
+              <div className="mt-3 grid gap-2 sm:grid-cols-2 xl:grid-cols-1 2xl:grid-cols-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  className={cn(
+                    'h-auto min-h-[4.75rem] justify-start rounded-2xl border-2 px-4 py-3 text-left font-black',
+                    bulkSmsAudience === 'students'
+                      ? 'border-primary bg-primary text-white hover:bg-primary hover:text-white'
+                      : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50'
+                  )}
+                  onClick={() => setBulkSmsAudience('students')}
+                  disabled={isBulkSmsSending}
+                >
+                  <Users className="mr-3 h-5 w-5 shrink-0" />
+                  <span className="min-w-0">
+                    <span className="block text-sm">학생 번호 전체</span>
+                    <span className={cn('mt-1 block text-xs', bulkSmsAudience === 'students' ? 'text-white/75' : 'text-slate-500')}>
+                      {studentBulkSmsRows.filter((row) => row.isSendable).length}명 발송 가능
+                    </span>
+                  </span>
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  className={cn(
+                    'h-auto min-h-[4.75rem] justify-start rounded-2xl border-2 px-4 py-3 text-left font-black',
+                    bulkSmsAudience === 'parents'
+                      ? 'border-primary bg-primary text-white hover:bg-primary hover:text-white'
+                      : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50'
+                  )}
+                  onClick={() => setBulkSmsAudience('parents')}
+                  disabled={isBulkSmsSending}
+                >
+                  <MessageSquare className="mr-3 h-5 w-5 shrink-0" />
+                  <span className="min-w-0">
+                    <span className="block text-sm">학부모 번호 전체</span>
+                    <span className={cn('mt-1 block text-xs', bulkSmsAudience === 'parents' ? 'text-white/75' : 'text-slate-500')}>
+                      {parentBulkSmsRows.filter((row) => row.isSendable).length}명 발송 가능
+                    </span>
+                  </span>
+                </Button>
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <div className="flex items-center justify-between gap-3">
+                <Label className="text-[11px] font-black uppercase text-muted-foreground">문자 내용</Label>
+                <Badge className={cn('border-none font-black', getByteTone(bulkSmsByteCount))}>{bulkSmsByteCount}byte</Badge>
+              </div>
+              <Textarea
+                value={bulkSmsMessage}
+                onChange={(e) => setBulkSmsMessage(e.target.value)}
+                placeholder="예: 오늘 학원 운영 일정 안내드립니다. 하원 전까지 안전하게 지도하겠습니다."
+                className="min-h-[132px] rounded-2xl border-2 bg-white font-bold leading-6"
+                disabled={isBulkSmsSending}
+              />
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <p className="text-xs font-bold text-slate-500">선택된 {bulkSmsAudienceLabel}에 90byte 이하로 발송됩니다.</p>
+                <Button
+                  type="button"
+                  className="h-11 rounded-xl font-black"
+                  onClick={() => void handleSendBulkSms()}
+                  disabled={isBulkSmsSending || bulkSmsSelectedPhoneCount <= 0 || !bulkSmsMessageForSend || bulkSmsByteCount > SMS_BYTE_LIMIT}
+                >
+                  {isBulkSmsSending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Send className="mr-2 h-4 w-4" />}
+                  전체 문자 보내기
+                </Button>
+              </div>
+            </div>
+          </section>
+
+          <section className="min-w-0 rounded-[1.75rem] border border-slate-200 bg-white p-5">
+            <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+              <div>
+                <p className="text-[11px] font-black uppercase tracking-[0.22em] text-slate-500">수신 번호 선택</p>
+                <p className="mt-1 text-sm font-black text-slate-900">{bulkSmsAudienceLabel} {bulkSmsSelectedPhoneCount}개 선택됨</p>
+              </div>
+              <div className="relative w-full lg:w-72">
+                <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                <Input
+                  value={bulkSmsSearchTerm}
+                  onChange={(e) => setBulkSmsSearchTerm(e.target.value)}
+                  placeholder="이름, 반, 번호 검색"
+                  className="h-10 rounded-xl border-2 pl-10 font-bold"
+                />
+              </div>
+            </div>
+
+            <div className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-slate-200 bg-slate-50/70 px-4 py-3">
+              <label className="flex min-w-0 items-center gap-3 text-sm font-black text-slate-800">
+                <Checkbox
+                  checked={areAllVisibleBulkRecipientsSelected}
+                  disabled={visibleBulkSmsSelectableRows.length === 0 || isBulkSmsSending}
+                  onCheckedChange={(checked) => handleToggleVisibleBulkRecipients(checked === true)}
+                />
+                <span>검색 결과 전체 선택</span>
+              </label>
+              <span className="text-xs font-bold text-slate-500">
+                표시 {filteredBulkSmsRows.length}명 · 발송 가능 {visibleBulkSmsSelectableRows.length}명
+              </span>
+            </div>
+
+            <div className="mt-4 max-h-[28rem] overflow-y-auto rounded-2xl border border-slate-200">
+              {filteredBulkSmsRows.length === 0 ? (
+                <div className="py-12 text-center text-sm font-bold text-muted-foreground">표시할 수신 번호가 없습니다.</div>
+              ) : filteredBulkSmsRows.map((row) => {
+                const checked = row.isSendable && !bulkSmsExcludedKeySet.has(row.key);
+                return (
+                  <label
+                    key={row.key}
+                    className={cn(
+                      'flex cursor-pointer items-center gap-3 border-b border-slate-100 px-4 py-3 last:border-b-0',
+                      row.isSendable ? 'hover:bg-slate-50' : 'cursor-not-allowed bg-slate-50/70 opacity-70'
+                    )}
+                  >
+                    <Checkbox
+                      checked={checked}
+                      disabled={!row.isSendable || isBulkSmsSending}
+                      onCheckedChange={(nextChecked) => handleToggleBulkRecipient(row.key, nextChecked === true)}
+                    />
+                    <div className="min-w-0 flex-1">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className="truncate text-sm font-black text-slate-900">{row.studentName}</span>
+                        <Badge className="border-none bg-slate-100 text-slate-700 font-black">{row.className}</Badge>
+                        <Badge className="border-none bg-blue-50 text-blue-700 font-black">{row.recipientName}</Badge>
+                      </div>
+                      <p className={cn('mt-1 text-xs font-bold', row.isSendable ? 'text-slate-500' : 'text-rose-600')}>
+                        {row.isSendable ? formatPhone(row.phoneNumber) : row.disabledReason || '발송 불가'}
+                      </p>
+                    </div>
+                  </label>
+                );
+              })}
+            </div>
+          </section>
+        </CardContent>
+      </Card>
+
       <Card className="rounded-[2rem] border-none shadow-xl ring-1 ring-black/[0.04]">
         <CardHeader className="border-b bg-muted/10">
           <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">

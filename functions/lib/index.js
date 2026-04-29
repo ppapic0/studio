@@ -33,8 +33,8 @@ var __importStar = (this && this.__importStar) || (function () {
     };
 })();
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.generateOpenClawSnapshot = exports.refreshClassroomSignals = exports.stopStudentStudySessionSecure = exports.scheduledStudyBoxCarryoverExpiry = exports.openStudyRewardBoxesSecure = exports.openStudyRewardBoxSecure = exports.claimPlannerCompletionRewardSecure = exports.submitAttendanceRequestSecure = exports.applyPenaltyEventSecure = exports.adjustStudentPenaltyBalanceSecure = exports.adjustStudentPointBalanceSecure = exports.cancelPointBoostEventSecure = exports.createPointBoostEventSecure = exports.scheduledClassroomSignalsRefresh = exports.scheduledDailyRiskAlert = exports.repairRecentStudySessionTotals = exports.deleteManualStudySessionSecure = exports.updateManualStudySessionSecure = exports.createManualStudySessionSecure = exports.scheduledKioskAttendanceQueueWorker = exports.onKioskAttendanceQueueCreated = exports.enqueueKioskAttendanceActionSecure = exports.lookupKioskStudentsByPin = exports.setStudentAttendanceStatusSecure = exports.onSessionWritten = exports.onSessionCreated = exports.scheduledWeeklyReport = exports.cleanupOldDocuments = exports.scheduledAttendanceCheck = exports.runLateArrivalCheck = exports.sendPaymentReminderBatch = exports.notifyDailyReportReady = exports.notifyAttendanceSms = exports.scheduledSmsQueueDispatcher = exports.sendManualStudentSms = exports.updateSmsRecipientPreference = exports.cancelSmsQueueItem = exports.retrySmsQueueItem = exports.saveNotificationSettingsSecure = exports.confirmInvoicePayment = exports.completeSignupWithInvite = exports.redeemInviteCode = exports.createCounselingDemoBundle = exports.syncStudentEmailsForCenter = exports.registerStudent = exports.updateStudentAccount = exports.deleteTeacherAccount = exports.deleteStudentAccount = exports.repairTodayAttendanceSmsQueue = exports.onAttendanceEventCreated = void 0;
-exports.generateStudyPlan = exports.syncGiftishowCatalogSecure = exports.scheduledGiftishowCatalogSync = exports.saveGiftishowSettingsSecure = exports.resendGiftishowOrderSecure = exports.rejectGiftishowOrderSecure = exports.reconcilePendingGiftishowOrders = exports.getGiftishowBizmoneySecure = exports.createGiftishowOrderRequestSecure = exports.cancelGiftishowOrderSecure = exports.cancelGiftishowSendFailSecure = exports.approveGiftishowOrderSecure = exports.reissueDailyRankingRewardV2Secure = exports.scheduledRankingRewardSettlement = exports.ensureCurrentUserMemberships = exports.scheduledOpenClawSnapshotExport = void 0;
+exports.refreshClassroomSignals = exports.stopStudentStudySessionSecure = exports.scheduledStudyBoxCarryoverExpiry = exports.openStudyRewardBoxesSecure = exports.openStudyRewardBoxSecure = exports.claimPlannerCompletionRewardSecure = exports.submitAttendanceRequestSecure = exports.applyPenaltyEventSecure = exports.adjustStudentPenaltyBalanceSecure = exports.adjustStudentPointBalanceSecure = exports.cancelPointBoostEventSecure = exports.createPointBoostEventSecure = exports.scheduledClassroomSignalsRefresh = exports.scheduledDailyRiskAlert = exports.repairRecentStudySessionTotals = exports.deleteManualStudySessionSecure = exports.updateManualStudySessionSecure = exports.createManualStudySessionSecure = exports.scheduledKioskAttendanceQueueWorker = exports.onKioskAttendanceQueueCreated = exports.enqueueKioskAttendanceActionSecure = exports.lookupKioskStudentsByPin = exports.setStudentAttendanceStatusSecure = exports.onSessionWritten = exports.onSessionCreated = exports.scheduledWeeklyReport = exports.cleanupOldDocuments = exports.scheduledAttendanceCheck = exports.runLateArrivalCheck = exports.sendPaymentReminderBatch = exports.notifyDailyReportReady = exports.notifyAttendanceSms = exports.scheduledSmsQueueDispatcher = exports.sendBulkManualSms = exports.sendManualStudentSms = exports.updateSmsRecipientPreference = exports.cancelSmsQueueItem = exports.retrySmsQueueItem = exports.saveNotificationSettingsSecure = exports.confirmInvoicePayment = exports.completeSignupWithInvite = exports.redeemInviteCode = exports.createCounselingDemoBundle = exports.syncStudentEmailsForCenter = exports.registerStudent = exports.updateStudentAccount = exports.deleteTeacherAccount = exports.deleteStudentAccount = exports.repairTodayAttendanceSmsQueue = exports.onAttendanceEventCreated = void 0;
+exports.generateStudyPlan = exports.syncGiftishowCatalogSecure = exports.scheduledGiftishowCatalogSync = exports.saveGiftishowSettingsSecure = exports.resendGiftishowOrderSecure = exports.rejectGiftishowOrderSecure = exports.reconcilePendingGiftishowOrders = exports.getGiftishowBizmoneySecure = exports.createGiftishowOrderRequestSecure = exports.cancelGiftishowOrderSecure = exports.cancelGiftishowSendFailSecure = exports.approveGiftishowOrderSecure = exports.reissueDailyRankingRewardV2Secure = exports.scheduledRankingRewardSettlement = exports.ensureCurrentUserMemberships = exports.scheduledOpenClawSnapshotExport = exports.generateOpenClawSnapshot = void 0;
 const params_1 = require("firebase-functions/params");
 const functions = __importStar(require("firebase-functions"));
 const admin = __importStar(require("firebase-admin"));
@@ -2447,6 +2447,168 @@ function buildParentNotificationTitle(eventType) {
     if (eventType === "manual_note")
         return "수동 문자";
     return "결제 예정 알림";
+}
+function normalizeBulkManualSmsAudience(value) {
+    const normalized = asTrimmedString(value);
+    return normalized === "students" || normalized === "parents" ? normalized : null;
+}
+function buildBulkManualSmsRecipientKey(audience, studentId, parentUid) {
+    if (audience === "students")
+        return `student:${studentId}`;
+    return `parent:${studentId}:${asTrimmedString(parentUid, MANUAL_PARENT_SMS_UID)}`;
+}
+async function listActiveCenterStudentDocs(db, centerId) {
+    const [studentsSnap, membersSnap] = await Promise.all([
+        db.collection(`centers/${centerId}/students`).get(),
+        db.collection(`centers/${centerId}/members`).where("role", "==", "student").get(),
+    ]);
+    const memberById = new Map();
+    membersSnap.docs.forEach((docSnap) => {
+        memberById.set(docSnap.id, docSnap.data());
+    });
+    return studentsSnap.docs
+        .map((docSnap) => {
+        const studentId = docSnap.id;
+        const studentData = docSnap.data();
+        const memberData = memberById.get(studentId) || null;
+        const memberStatus = asTrimmedString(memberData === null || memberData === void 0 ? void 0 : memberData.status);
+        const memberRole = asTrimmedString(memberData === null || memberData === void 0 ? void 0 : memberData.role);
+        if (shouldExcludeFromSmsQueries(studentData, studentId) || shouldExcludeFromSmsQueries(memberData, studentId)) {
+            return null;
+        }
+        if (memberData && memberRole === "student" && memberStatus && !isActiveMembershipStatus(memberStatus)) {
+            return null;
+        }
+        return {
+            studentId,
+            studentName: asTrimmedString(studentData.name || studentData.displayName || (memberData === null || memberData === void 0 ? void 0 : memberData.displayName), "학생"),
+            studentData,
+            memberData,
+        };
+    })
+        .filter((row) => row !== null);
+}
+async function collectBulkManualSmsRecipients(db, centerId, audience) {
+    const students = await listActiveCenterStudentDocs(db, centerId);
+    let missingPhoneCount = 0;
+    let suppressedCount = 0;
+    let duplicateCount = 0;
+    const recipients = [];
+    const seenPhoneNumbers = new Set();
+    const pushRecipient = (recipient) => {
+        const phoneNumber = normalizePhoneNumber(recipient.phoneNumber);
+        if (!phoneNumber) {
+            missingPhoneCount += 1;
+            return;
+        }
+        if (seenPhoneNumbers.has(phoneNumber)) {
+            duplicateCount += 1;
+            return;
+        }
+        seenPhoneNumbers.add(phoneNumber);
+        recipients.push(Object.assign(Object.assign({}, recipient), { phoneNumber }));
+    };
+    if (audience === "students") {
+        const userRefs = students.map((student) => db.doc(`users/${student.studentId}`));
+        const userSnaps = await getDocsInChunks(db, userRefs);
+        const userDataById = new Map();
+        userSnaps.forEach((snap) => {
+            if (snap.exists)
+                userDataById.set(snap.id, snap.data());
+        });
+        students.forEach((student) => {
+            var _a;
+            const userData = userDataById.get(student.studentId) || null;
+            if (shouldExcludeFromSmsQueries(userData, student.studentId))
+                return;
+            const phoneNumber = normalizePhoneNumber(student.studentData.phoneNumber ||
+                ((_a = student.memberData) === null || _a === void 0 ? void 0 : _a.phoneNumber) ||
+                (userData === null || userData === void 0 ? void 0 : userData.phoneNumber));
+            pushRecipient({
+                recipientKey: buildBulkManualSmsRecipientKey("students", student.studentId),
+                studentId: student.studentId,
+                studentName: student.studentName,
+                parentUid: `student:${student.studentId}`,
+                parentName: "학생 본인",
+                phoneNumber,
+            });
+        });
+        return { recipients, missingPhoneCount, suppressedCount, duplicateCount };
+    }
+    for (const student of students) {
+        const studentRecipients = await collectParentRecipients(db, centerId, student.studentId);
+        if (studentRecipients.length === 0) {
+            missingPhoneCount += 1;
+            continue;
+        }
+        const split = await splitRecipientsBySmsPreference(db, centerId, student.studentId, student.studentName, "manual_note", studentRecipients);
+        suppressedCount += split.suppressedRecipients.length;
+        split.allowedRecipients.forEach((recipient) => {
+            pushRecipient({
+                recipientKey: buildBulkManualSmsRecipientKey("parents", student.studentId, recipient.parentUid),
+                studentId: student.studentId,
+                studentName: student.studentName,
+                parentUid: recipient.parentUid,
+                parentName: recipient.parentName || "학부모",
+                phoneNumber: recipient.phoneNumber,
+            });
+        });
+    }
+    return { recipients, missingPhoneCount, suppressedCount, duplicateCount };
+}
+async function queueBulkManualSms(db, params) {
+    const ts = admin.firestore.Timestamp.now();
+    const date = toKstDate();
+    const dateKey = toStudyDayKey(date);
+    const provider = params.settings.smsProvider || "none";
+    const initialStatus = buildSmsQueueInitialStatus(params.settings);
+    const message = trimSmsToByteLimit(normalizeTrackManagedSmsMessage(params.message, { ensurePrefix: false }));
+    const messageBytes = calculateSmsBytes(message);
+    let queuedCount = 0;
+    for (const recipientChunk of chunkArray(params.recipients, 400)) {
+        const batch = db.batch();
+        recipientChunk.forEach((recipient) => {
+            const queueRef = db.collection(`centers/${params.centerId}/smsQueue`).doc();
+            batch.set(queueRef, {
+                centerId: params.centerId,
+                studentId: recipient.studentId,
+                studentName: recipient.studentName,
+                parentUid: recipient.parentUid,
+                parentName: recipient.parentName,
+                phoneNumber: recipient.phoneNumber,
+                to: recipient.phoneNumber,
+                provider,
+                sender: params.settings.smsSender || null,
+                endpointUrl: params.settings.smsEndpointUrl || null,
+                message,
+                renderedMessage: message,
+                messageBytes,
+                dedupeKey: null,
+                eventType: "manual_note",
+                dateKey,
+                status: initialStatus.status,
+                providerStatus: initialStatus.providerStatus,
+                attemptCount: 0,
+                manualRetryCount: 0,
+                nextAttemptAt: initialStatus.status === "queued" ? ts : null,
+                sentAt: null,
+                failedAt: null,
+                lastErrorCode: null,
+                lastErrorMessage: null,
+                createdAt: ts,
+                updatedAt: ts,
+                metadata: {
+                    sentBy: params.sentBy,
+                    source: "bulk_manual_console",
+                    audience: params.audience,
+                    recipientKey: recipient.recipientKey,
+                },
+            });
+            queuedCount += 1;
+        });
+        await batch.commit();
+    }
+    return { queuedCount, provider, dateKey, message };
 }
 async function queueCustomParentSmsNotification(db, params) {
     const settings = params.settings || await loadNotificationSettings(db, params.centerId);
@@ -6630,6 +6792,66 @@ exports.sendManualStudentSms = functions.region(region).https.onCall(async (data
         queuedCount: queueResult.queuedCount,
         recipientCount: queueResult.recipientCount,
         provider: settings.smsProvider || "none",
+        message: queueResult.message,
+    };
+});
+exports.sendBulkManualSms = functions.region(region).runWith({
+    timeoutSeconds: 540,
+    memory: "1GB",
+}).https.onCall(async (data, context) => {
+    var _a;
+    const db = admin.firestore();
+    if (!context.auth) {
+        throw new functions.https.HttpsError("unauthenticated", "로그인이 필요합니다.");
+    }
+    const centerId = asTrimmedString(data === null || data === void 0 ? void 0 : data.centerId);
+    const audience = normalizeBulkManualSmsAudience(data === null || data === void 0 ? void 0 : data.audience);
+    const message = sanitizeSmsTemplate(asTrimmedString(data === null || data === void 0 ? void 0 : data.message));
+    const selectedRecipientKeys = new Set(normalizeStringArray(data === null || data === void 0 ? void 0 : data.selectedRecipientKeys));
+    const excludedRecipientKeys = new Set(normalizeStringArray(data === null || data === void 0 ? void 0 : data.excludedRecipientKeys));
+    if (!centerId || !audience) {
+        throw new functions.https.HttpsError("invalid-argument", "centerId와 발송 대상이 필요합니다.");
+    }
+    if (!message) {
+        throw new functions.https.HttpsError("invalid-argument", "보낼 문자 내용이 필요합니다.");
+    }
+    if (calculateSmsBytes(message) > SMS_BYTE_LIMIT) {
+        throw new functions.https.HttpsError("invalid-argument", "전체 문자 내용이 90byte를 넘었습니다.");
+    }
+    const callerMemberSnap = await db.doc(`centers/${centerId}/members/${context.auth.uid}`).get();
+    const callerRole = callerMemberSnap.exists ? (_a = callerMemberSnap.data()) === null || _a === void 0 ? void 0 : _a.role : null;
+    if (!isAdminRole(callerRole)) {
+        throw new functions.https.HttpsError("permission-denied", "센터 관리자만 전체 문자를 발송할 수 있습니다.");
+    }
+    const settings = await loadNotificationSettings(db, centerId);
+    const recipientResult = await collectBulkManualSmsRecipients(db, centerId, audience);
+    const selectionMatchedRecipients = recipientResult.recipients.filter((recipient) => selectedRecipientKeys.size === 0 || selectedRecipientKeys.has(recipient.recipientKey));
+    const selectedRecipients = selectionMatchedRecipients.filter((recipient) => !excludedRecipientKeys.has(recipient.recipientKey));
+    const excludedCount = selectionMatchedRecipients.length - selectedRecipients.length;
+    if (selectedRecipients.length === 0) {
+        throw new functions.https.HttpsError("failed-precondition", "발송 가능한 수신자가 없습니다.");
+    }
+    const queueResult = await queueBulkManualSms(db, {
+        centerId,
+        audience,
+        message,
+        recipients: selectedRecipients,
+        settings,
+        sentBy: context.auth.uid,
+    });
+    return {
+        ok: true,
+        audience,
+        queuedCount: queueResult.queuedCount,
+        recipientCount: recipientResult.recipients.length,
+        selectedCount: selectedRecipients.length,
+        excludedCount,
+        unselectedCount: recipientResult.recipients.length - selectionMatchedRecipients.length,
+        missingPhoneCount: recipientResult.missingPhoneCount,
+        suppressedCount: recipientResult.suppressedCount,
+        duplicateCount: recipientResult.duplicateCount,
+        provider: queueResult.provider,
+        dateKey: queueResult.dateKey,
         message: queueResult.message,
     };
 });

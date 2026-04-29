@@ -137,6 +137,17 @@ type SmsRecipient = {
   phoneNumber: string;
 };
 
+type BulkManualSmsAudience = "students" | "parents";
+
+type BulkManualSmsRecipient = {
+  recipientKey: string;
+  studentId: string;
+  studentName: string;
+  parentUid: string;
+  parentName: string | null;
+  phoneNumber: string;
+};
+
 type SmsRecipientPreferenceDoc = {
   studentId: string;
   studentName?: string;
@@ -3379,6 +3390,220 @@ function buildParentNotificationTitle(eventType: RecipientPreferenceEventType) {
   if (eventType === "daily_report") return "일일 리포트 알림";
   if (eventType === "manual_note") return "수동 문자";
   return "결제 예정 알림";
+}
+
+function normalizeBulkManualSmsAudience(value: unknown): BulkManualSmsAudience | null {
+  const normalized = asTrimmedString(value);
+  return normalized === "students" || normalized === "parents" ? normalized : null;
+}
+
+function buildBulkManualSmsRecipientKey(
+  audience: BulkManualSmsAudience,
+  studentId: string,
+  parentUid?: string | null
+) {
+  if (audience === "students") return `student:${studentId}`;
+  return `parent:${studentId}:${asTrimmedString(parentUid, MANUAL_PARENT_SMS_UID)}`;
+}
+
+async function listActiveCenterStudentDocs(
+  db: admin.firestore.Firestore,
+  centerId: string
+): Promise<Array<{
+  studentId: string;
+  studentName: string;
+  studentData: Record<string, unknown>;
+  memberData: Record<string, unknown> | null;
+}>> {
+  const [studentsSnap, membersSnap] = await Promise.all([
+    db.collection(`centers/${centerId}/students`).get(),
+    db.collection(`centers/${centerId}/members`).where("role", "==", "student").get(),
+  ]);
+  const memberById = new Map<string, Record<string, unknown>>();
+  membersSnap.docs.forEach((docSnap) => {
+    memberById.set(docSnap.id, docSnap.data() as Record<string, unknown>);
+  });
+
+  return studentsSnap.docs
+    .map((docSnap) => {
+      const studentId = docSnap.id;
+      const studentData = docSnap.data() as Record<string, unknown>;
+      const memberData = memberById.get(studentId) || null;
+      const memberStatus = asTrimmedString(memberData?.status);
+      const memberRole = asTrimmedString(memberData?.role);
+      if (shouldExcludeFromSmsQueries(studentData, studentId) || shouldExcludeFromSmsQueries(memberData, studentId)) {
+        return null;
+      }
+      if (memberData && memberRole === "student" && memberStatus && !isActiveMembershipStatus(memberStatus)) {
+        return null;
+      }
+      return {
+        studentId,
+        studentName: asTrimmedString(studentData.name || studentData.displayName || memberData?.displayName, "학생"),
+        studentData,
+        memberData,
+      };
+    })
+    .filter((row): row is {
+      studentId: string;
+      studentName: string;
+      studentData: Record<string, unknown>;
+      memberData: Record<string, unknown> | null;
+    } => row !== null);
+}
+
+async function collectBulkManualSmsRecipients(
+  db: admin.firestore.Firestore,
+  centerId: string,
+  audience: BulkManualSmsAudience
+): Promise<{ recipients: BulkManualSmsRecipient[]; missingPhoneCount: number; suppressedCount: number; duplicateCount: number }> {
+  const students = await listActiveCenterStudentDocs(db, centerId);
+  let missingPhoneCount = 0;
+  let suppressedCount = 0;
+  let duplicateCount = 0;
+  const recipients: BulkManualSmsRecipient[] = [];
+  const seenPhoneNumbers = new Set<string>();
+
+  const pushRecipient = (recipient: BulkManualSmsRecipient) => {
+    const phoneNumber = normalizePhoneNumber(recipient.phoneNumber);
+    if (!phoneNumber) {
+      missingPhoneCount += 1;
+      return;
+    }
+    if (seenPhoneNumbers.has(phoneNumber)) {
+      duplicateCount += 1;
+      return;
+    }
+    seenPhoneNumbers.add(phoneNumber);
+    recipients.push({ ...recipient, phoneNumber });
+  };
+
+  if (audience === "students") {
+    const userRefs = students.map((student) => db.doc(`users/${student.studentId}`));
+    const userSnaps = await getDocsInChunks(db, userRefs);
+    const userDataById = new Map<string, Record<string, unknown>>();
+    userSnaps.forEach((snap) => {
+      if (snap.exists) userDataById.set(snap.id, snap.data() as Record<string, unknown>);
+    });
+
+    students.forEach((student) => {
+      const userData = userDataById.get(student.studentId) || null;
+      if (shouldExcludeFromSmsQueries(userData, student.studentId)) return;
+      const phoneNumber = normalizePhoneNumber(
+        student.studentData.phoneNumber ||
+        student.memberData?.phoneNumber ||
+        userData?.phoneNumber
+      );
+      pushRecipient({
+        recipientKey: buildBulkManualSmsRecipientKey("students", student.studentId),
+        studentId: student.studentId,
+        studentName: student.studentName,
+        parentUid: `student:${student.studentId}`,
+        parentName: "학생 본인",
+        phoneNumber,
+      });
+    });
+
+    return { recipients, missingPhoneCount, suppressedCount, duplicateCount };
+  }
+
+  for (const student of students) {
+    const studentRecipients = await collectParentRecipients(db, centerId, student.studentId);
+    if (studentRecipients.length === 0) {
+      missingPhoneCount += 1;
+      continue;
+    }
+    const split = await splitRecipientsBySmsPreference(
+      db,
+      centerId,
+      student.studentId,
+      student.studentName,
+      "manual_note",
+      studentRecipients
+    );
+    suppressedCount += split.suppressedRecipients.length;
+    split.allowedRecipients.forEach((recipient) => {
+      pushRecipient({
+        recipientKey: buildBulkManualSmsRecipientKey("parents", student.studentId, recipient.parentUid),
+        studentId: student.studentId,
+        studentName: student.studentName,
+        parentUid: recipient.parentUid,
+        parentName: recipient.parentName || "학부모",
+        phoneNumber: recipient.phoneNumber,
+      });
+    });
+  }
+
+  return { recipients, missingPhoneCount, suppressedCount, duplicateCount };
+}
+
+async function queueBulkManualSms(
+  db: admin.firestore.Firestore,
+  params: {
+    centerId: string;
+    audience: BulkManualSmsAudience;
+    message: string;
+    recipients: BulkManualSmsRecipient[];
+    settings: NotificationSettingsDoc;
+    sentBy: string;
+  }
+): Promise<{ queuedCount: number; provider: string; dateKey: string; message: string }> {
+  const ts = admin.firestore.Timestamp.now();
+  const date = toKstDate();
+  const dateKey = toStudyDayKey(date);
+  const provider = params.settings.smsProvider || "none";
+  const initialStatus = buildSmsQueueInitialStatus(params.settings);
+  const message = trimSmsToByteLimit(
+    normalizeTrackManagedSmsMessage(params.message, { ensurePrefix: false })
+  );
+  const messageBytes = calculateSmsBytes(message);
+  let queuedCount = 0;
+
+  for (const recipientChunk of chunkArray(params.recipients, 400)) {
+    const batch = db.batch();
+    recipientChunk.forEach((recipient) => {
+      const queueRef = db.collection(`centers/${params.centerId}/smsQueue`).doc();
+      batch.set(queueRef, {
+        centerId: params.centerId,
+        studentId: recipient.studentId,
+        studentName: recipient.studentName,
+        parentUid: recipient.parentUid,
+        parentName: recipient.parentName,
+        phoneNumber: recipient.phoneNumber,
+        to: recipient.phoneNumber,
+        provider,
+        sender: params.settings.smsSender || null,
+        endpointUrl: params.settings.smsEndpointUrl || null,
+        message,
+        renderedMessage: message,
+        messageBytes,
+        dedupeKey: null,
+        eventType: "manual_note",
+        dateKey,
+        status: initialStatus.status,
+        providerStatus: initialStatus.providerStatus,
+        attemptCount: 0,
+        manualRetryCount: 0,
+        nextAttemptAt: initialStatus.status === "queued" ? ts : null,
+        sentAt: null,
+        failedAt: null,
+        lastErrorCode: null,
+        lastErrorMessage: null,
+        createdAt: ts,
+        updatedAt: ts,
+        metadata: {
+          sentBy: params.sentBy,
+          source: "bulk_manual_console",
+          audience: params.audience,
+          recipientKey: recipient.recipientKey,
+        },
+      });
+      queuedCount += 1;
+    });
+    await batch.commit();
+  }
+
+  return { queuedCount, provider, dateKey, message };
 }
 
 async function queueCustomParentSmsNotification(
@@ -8387,6 +8612,76 @@ export const sendManualStudentSms = functions.region(region).https.onCall(async 
     queuedCount: queueResult.queuedCount,
     recipientCount: queueResult.recipientCount,
     provider: settings.smsProvider || "none",
+    message: queueResult.message,
+  };
+});
+
+export const sendBulkManualSms = functions.region(region).runWith({
+  timeoutSeconds: 540,
+  memory: "1GB",
+}).https.onCall(async (data, context) => {
+  const db = admin.firestore();
+
+  if (!context.auth) {
+    throw new functions.https.HttpsError("unauthenticated", "로그인이 필요합니다.");
+  }
+
+  const centerId = asTrimmedString(data?.centerId);
+  const audience = normalizeBulkManualSmsAudience(data?.audience);
+  const message = sanitizeSmsTemplate(asTrimmedString(data?.message));
+  const selectedRecipientKeys = new Set(normalizeStringArray(data?.selectedRecipientKeys));
+  const excludedRecipientKeys = new Set(normalizeStringArray(data?.excludedRecipientKeys));
+  if (!centerId || !audience) {
+    throw new functions.https.HttpsError("invalid-argument", "centerId와 발송 대상이 필요합니다.");
+  }
+  if (!message) {
+    throw new functions.https.HttpsError("invalid-argument", "보낼 문자 내용이 필요합니다.");
+  }
+  if (calculateSmsBytes(message) > SMS_BYTE_LIMIT) {
+    throw new functions.https.HttpsError("invalid-argument", "전체 문자 내용이 90byte를 넘었습니다.");
+  }
+
+  const callerMemberSnap = await db.doc(`centers/${centerId}/members/${context.auth.uid}`).get();
+  const callerRole = callerMemberSnap.exists ? callerMemberSnap.data()?.role : null;
+  if (!isAdminRole(callerRole)) {
+    throw new functions.https.HttpsError("permission-denied", "센터 관리자만 전체 문자를 발송할 수 있습니다.");
+  }
+
+  const settings = await loadNotificationSettings(db, centerId);
+  const recipientResult = await collectBulkManualSmsRecipients(db, centerId, audience);
+  const selectionMatchedRecipients = recipientResult.recipients.filter(
+    (recipient) => selectedRecipientKeys.size === 0 || selectedRecipientKeys.has(recipient.recipientKey)
+  );
+  const selectedRecipients = selectionMatchedRecipients.filter(
+    (recipient) => !excludedRecipientKeys.has(recipient.recipientKey)
+  );
+  const excludedCount = selectionMatchedRecipients.length - selectedRecipients.length;
+  if (selectedRecipients.length === 0) {
+    throw new functions.https.HttpsError("failed-precondition", "발송 가능한 수신자가 없습니다.");
+  }
+
+  const queueResult = await queueBulkManualSms(db, {
+    centerId,
+    audience,
+    message,
+    recipients: selectedRecipients,
+    settings,
+    sentBy: context.auth.uid,
+  });
+
+  return {
+    ok: true,
+    audience,
+    queuedCount: queueResult.queuedCount,
+    recipientCount: recipientResult.recipients.length,
+    selectedCount: selectedRecipients.length,
+    excludedCount,
+    unselectedCount: recipientResult.recipients.length - selectionMatchedRecipients.length,
+    missingPhoneCount: recipientResult.missingPhoneCount,
+    suppressedCount: recipientResult.suppressedCount,
+    duplicateCount: recipientResult.duplicateCount,
+    provider: queueResult.provider,
+    dateKey: queueResult.dateKey,
     message: queueResult.message,
   };
 });
