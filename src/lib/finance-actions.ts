@@ -46,6 +46,7 @@ export type BusinessLedgerEntryInput = {
 export type ManualAcademyInvoiceInput = {
   studentName: string;
   amount: number;
+  dueDate?: Date | null;
   phoneNumber?: string | null;
   memo?: string | null;
 };
@@ -314,6 +315,9 @@ export async function issueManualAcademyInvoice(
   const amount = Math.max(0, Math.round(Number(input.amount) || 0));
   const phoneNumber = (input.phoneNumber || '').replace(/[^\d]/g, '').slice(0, 15);
   const memo = (input.memo || '').trim().slice(0, 300);
+  const dueDate = input.dueDate instanceof Date && !Number.isNaN(input.dueDate.getTime())
+    ? input.dueDate
+    : null;
 
   if (!studentName) throw new Error('학생 이름을 입력해 주세요.');
   if (amount <= 0) throw new Error('인보이스 금액을 입력해 주세요.');
@@ -321,7 +325,7 @@ export async function issueManualAcademyInvoice(
   const invoiceRef = doc(collection(db, `centers/${centerId}/invoices`));
   const now = serverTimestamp();
   const startDate = new Date();
-  const endDate = addDays(startDate, 28);
+  const endDate = dueDate || addDays(startDate, 28);
   const studentId = `manual-academy-${invoiceRef.id}`;
 
   await setDoc(invoiceRef, {
