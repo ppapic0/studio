@@ -92,6 +92,8 @@ type AttendanceRecordDoc = {
 };
 
 const MAX_RECENT_REPORT_HISTORY = 7;
+const REPORT_FOCUS_RETRY_ATTEMPTS = 12;
+const REPORT_FOCUS_RETRY_INTERVAL_MS = 75;
 const REPORT_SECTION_HEADINGS = new Set(['오늘 관찰', '선생님 코멘트', '교사 코멘트', '선생님 메모', '교육학적 해석', '내일 코칭', '가정 연계 팁']);
 
 type ReportStudyLogSummary = {
@@ -390,7 +392,7 @@ export default function DailyReportsPage() {
     return document.activeElement === element;
   };
 
-  const scheduleReportFocus = (targets: Array<() => HTMLElement | null>, delayMs = 50) => {
+  const scheduleReportFocus = (targets: Array<() => HTMLElement | null>, delayMs = REPORT_FOCUS_RETRY_INTERVAL_MS) => {
     clearReportFocusTimer();
     blurActiveReportElement();
 
@@ -404,11 +406,11 @@ export default function DailyReportsPage() {
       }
 
       if (remainingAttempts > 0) {
-        reportFocusTimerRef.current = window.setTimeout(() => tryFocus(remainingAttempts - 1), 50);
+        reportFocusTimerRef.current = window.setTimeout(() => tryFocus(remainingAttempts - 1), REPORT_FOCUS_RETRY_INTERVAL_MS);
       }
     };
 
-    reportFocusTimerRef.current = window.setTimeout(() => tryFocus(4), delayMs);
+    reportFocusTimerRef.current = window.setTimeout(() => tryFocus(REPORT_FOCUS_RETRY_ATTEMPTS), delayMs);
   };
 
   const moveReportDialogFocusToPage = () => {
