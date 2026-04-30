@@ -9,6 +9,7 @@ import { useMemoFirebase } from '@/hooks/use-memo-firebase';
 import { logHandledClientIssue } from '@/lib/handled-client-log';
 import { getStudyDayKey } from '@/lib/study-day';
 import { getLiveStudySessionDurationMinutes, getStudySessionDurationMinutes } from '@/lib/study-session-time';
+import { isAutonomousAttendanceDate } from '@/lib/korean-public-holidays';
 import {
   buildAttendanceRoutineInfo,
   deriveAttendanceDisplayState,
@@ -373,6 +374,7 @@ export function useCenterAdminAttendanceBoard({
   const todayKey = format(today, 'yyyy-MM-dd');
   const weekKey = format(today, "yyyy-'W'II");
   const weekday = today.getDay();
+  const isAutonomousAttendanceDay = isAutonomousAttendanceDate(today);
   const historyKeys = useMemo(
     () =>
       Array.from({ length: 7 }, (_, index) => {
@@ -516,6 +518,11 @@ export function useCenterAdminAttendanceBoard({
       setRoutineLoading(false);
       return;
     }
+    if (isAutonomousAttendanceDay) {
+      setRoutineInfoByStudentId({});
+      setRoutineLoading(false);
+      return;
+    }
 
     let cancelled = false;
     const loadRoutineInfo = async () => {
@@ -596,7 +603,7 @@ export function useCenterAdminAttendanceBoard({
     return () => {
       cancelled = true;
     };
-  }, [activeMembers, centerId, firestore, isActive, refreshKey, todayKey, todaySchedules, weekday, weekKey]);
+  }, [activeMembers, centerId, firestore, isActive, isAutonomousAttendanceDay, refreshKey, todayKey, todaySchedules, weekday, weekKey]);
 
   useEffect(() => {
     if (!firestore || !centerId || !isActive || !todayKey || activeMemberIds.length === 0) {
@@ -739,8 +746,10 @@ export function useCenterAdminAttendanceBoard({
         const member = memberById.get(studentId);
         const todayStat = todayStatsByStudentId.get(studentId);
         const rawRoutineInfo = routineInfoByStudentId[studentId];
-        const todaySchedule = todayScheduleByStudentId.get(studentId);
-        const routineInfo = rawRoutineInfo || (todaySchedule ? buildRoutineInfoFromSchedule(todaySchedule) : undefined);
+        const todaySchedule = isAutonomousAttendanceDay ? undefined : todayScheduleByStudentId.get(studentId);
+        const routineInfo = isAutonomousAttendanceDay
+          ? undefined
+          : rawRoutineInfo || (todaySchedule ? buildRoutineInfoFromSchedule(todaySchedule) : undefined);
         const scheduleMovementInfo = routineInfo?.isNoAttendanceDay ? EMPTY_SCHEDULE_MOVEMENT_INFO : routineInfo || EMPTY_SCHEDULE_MOVEMENT_INFO;
         const todayRecord = todayRecordByStudentId.get(studentId);
         const todayEventsForStudent = todayEventsByStudentId.get(studentId) || [];
@@ -983,6 +992,7 @@ export function useCenterAdminAttendanceBoard({
       });
   }, [
     historySummaryByStudentId,
+    isAutonomousAttendanceDay,
     memberById,
     nowMs,
     resolvedAttendanceList,

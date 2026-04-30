@@ -169,6 +169,11 @@ import {
   getStudyRoomClassScheduleDisplayName,
 } from '@/lib/study-room-class-schedule';
 import { compressAttendanceRequestProofImage } from '@/lib/attendance-proof-upload';
+import {
+  getAutonomousAttendanceDayNotice,
+  isAutonomousAttendanceDate,
+  isAutonomousAttendanceDateKey,
+} from '@/lib/korean-public-holidays';
 
 const SAME_DAY_ROUTINE_PENALTY_POINTS = 1;
 
@@ -184,7 +189,7 @@ const WEEKDAY_OPTIONS = [
   { value: 0, label: '일', isAutonomous: true },
 ];
 
-const AUTONOMOUS_SUNDAY_NOTICE = '일요일은 자율등원이므로 자율로 등원하세요 !';
+const AUTONOMOUS_ATTENDANCE_NOTICE = '일요일/공휴일은 자율등원이므로 자율로 등원하세요 !';
 const PLAN_TRACK_ONBOARDING_VERSION = 1;
 const DAILY_STUDY_MINUTES_MAP: Record<string, number> = {
   '4h': 240,
@@ -312,14 +317,11 @@ function buildAttendanceDraftFromTemplate(template: StudentScheduleTemplate): At
 }
 
 function isAutonomousSundayDate(date?: Date | null) {
-  return Boolean(date && getDay(date) === 0);
+  return isAutonomousAttendanceDate(date);
 }
 
 function isAutonomousSundayDateKey(dateKey?: string | null) {
-  if (!dateKey) return false;
-  const [year, month, day] = dateKey.split('-').map(Number);
-  if (!year || !month || !day) return false;
-  return isAutonomousSundayDate(new Date(year, month - 1, day));
+  return isAutonomousAttendanceDateKey(dateKey);
 }
 
 function isSchedulableAttendanceWeekday(value: number) {
@@ -673,10 +675,10 @@ export default function StudyPlanPage() {
   const firestore = useFirestore();
   const { activeMembership, activeStudentId, viewMode } = useAppContext();
   const { toast } = useToast();
-  const showAutonomousSundayNotice = useCallback(() => {
+  const showAutonomousSundayNotice = useCallback((date?: Date | null) => {
     toast({
-      title: AUTONOMOUS_SUNDAY_NOTICE,
-      description: '일요일은 트랙제 등원 계획을 만들지 않고 자율 등원으로 운영합니다.',
+      title: date ? getAutonomousAttendanceDayNotice(date) : AUTONOMOUS_ATTENDANCE_NOTICE,
+      description: '일요일/공휴일은 트랙제 등원 계획을 만들지 않고 자율 등원으로 운영합니다.',
     });
   }, [toast]);
   const searchParams = useSearchParams();
@@ -1885,7 +1887,7 @@ export default function StudyPlanPage() {
 
   const openAttendanceSheetForDate = useCallback((date: Date, tab: 'today' | 'weekday' | 'saved' = 'today') => {
     if (isAutonomousSundayDate(date)) {
-      showAutonomousSundayNotice();
+      showAutonomousSundayNotice(date);
       return;
     }
     setSelectedDate(date);
@@ -1896,7 +1898,7 @@ export default function StudyPlanPage() {
 
   const handleSelectAttendanceSheetDate = useCallback((date: Date) => {
     if (isAutonomousSundayDate(date)) {
-      showAutonomousSundayNotice();
+      showAutonomousSundayNotice(date);
       return;
     }
     setSelectedDate(date);
@@ -2564,7 +2566,7 @@ export default function StudyPlanPage() {
       return false;
     }
     if (category === 'schedule' && isAutonomousSundayDate(selectedDate)) {
-      showAutonomousSundayNotice();
+      showAutonomousSundayNotice(selectedDate);
       return false;
     }
 
@@ -2851,7 +2853,7 @@ export default function StudyPlanPage() {
     if (!firestore || !user) return { legacySyncWarning: false };
 
     if (isAutonomousSundayDateKey(params.dateKey)) {
-      throw new Error(AUTONOMOUS_SUNDAY_NOTICE);
+      throw new Error(AUTONOMOUS_ATTENDANCE_NOTICE);
     }
 
     const validationMessage = validateScheduleDraft(params.draft, params.awaySlots || []);
@@ -2937,7 +2939,7 @@ export default function StudyPlanPage() {
   const handleSetAttendance = async (type: 'attend' | 'absent') => {
     if (isPast || !firestore || !user || !activeMembership || !weekKey || !selectedDateKey) return;
     if (isAutonomousSundayDate(selectedDate)) {
-      showAutonomousSundayNotice();
+      showAutonomousSundayNotice(selectedDate);
       return;
     }
     setIsSubmitting(true);
@@ -3035,10 +3037,10 @@ export default function StudyPlanPage() {
   const executeSaveTodaySchedule = useCallback(async (draft: AttendanceScheduleDraft) => {
     if (!selectedDateKey) return false;
     if (isAutonomousSundayDateKey(selectedDateKey)) {
-      showAutonomousSundayNotice();
+      showAutonomousSundayNotice(selectedDate);
       setAttendanceSaveError({
-        title: '일요일은 자율등원입니다',
-        description: AUTONOMOUS_SUNDAY_NOTICE,
+        title: '자율등원일입니다',
+        description: AUTONOMOUS_ATTENDANCE_NOTICE,
       });
       return false;
     }
@@ -3073,7 +3075,7 @@ export default function StudyPlanPage() {
       });
       return false;
     }
-  }, [clearSchedulePrefillCache, persistStudentSchedule, scheduleRecommendationPrefill, selectedDateKey, showAutonomousSundayNotice]);
+  }, [clearSchedulePrefillCache, persistStudentSchedule, scheduleRecommendationPrefill, selectedDate, selectedDateKey, showAutonomousSundayNotice]);
 
   const executeResetTodaySchedule = useCallback(async () => {
     if (!firestore || !user || !selectedDateKey) return false;
@@ -3464,7 +3466,7 @@ export default function StudyPlanPage() {
 
   const handleApplyMatchedClassScheduleToToday = useCallback(() => {
     if (isAutonomousSundayDate(selectedDate)) {
-      showAutonomousSundayNotice();
+      showAutonomousSundayNotice(selectedDate);
       return;
     }
     if (!matchedClassSchedule) return;
@@ -3484,7 +3486,7 @@ export default function StudyPlanPage() {
 
   const handleApplySelectedWeekdayTemplateToToday = useCallback(() => {
     if (isAutonomousSundayDate(selectedDate)) {
-      showAutonomousSundayNotice();
+      showAutonomousSundayNotice(selectedDate);
       return;
     }
     if (!matchingWeekdayTemplate) return;
@@ -3516,7 +3518,7 @@ export default function StudyPlanPage() {
   const handleUpdateScheduleRange = async (itemId: string, baseTitle: string, start: {h: string, m: string, p: '오전' | '오후'}, end: {h: string, m: string, p: '오전' | '오후'}) => {
     if (isPast || !firestore || !user || !activeMembership || !studentUid || !weekKey) return;
     if (isAutonomousSundayDate(selectedDate)) {
-      showAutonomousSundayNotice();
+      showAutonomousSundayNotice(selectedDate);
       return;
     }
     const formattedStart = to24h(`${start.h}:${start.m}`, start.p);
@@ -3932,14 +3934,14 @@ export default function StudyPlanPage() {
     }
 
     setIsSubmitting(true);
-    const weekday = getDay(selectedDate);
-    if (weekday === 0) {
-      showAutonomousSundayNotice();
+    if (isAutonomousSundayDate(selectedDate)) {
+      showAutonomousSundayNotice(selectedDate);
       setIsSubmitting(false);
       return;
     }
+    const weekday = getDay(selectedDate);
     const monthDates = eachDayOfInterval({ start: startOfMonth(selectedDate), end: endOfMonth(selectedDate) });
-    const targetDates = monthDates.filter(d => getDay(d) === weekday && !isSameDay(d, selectedDate) && !isBefore(startOfDay(d), startOfDay(new Date())));
+    const targetDates = monthDates.filter(d => getDay(d) === weekday && !isAutonomousSundayDate(d) && !isSameDay(d, selectedDate) && !isBefore(startOfDay(d), startOfDay(new Date())));
     
     const batch = writeBatch(firestore);
     try {
@@ -4025,6 +4027,7 @@ export default function StudyPlanPage() {
     const todayStart = startOfDay(new Date());
     const targetDates = eachDayOfInterval({ start: intervalStart, end: intervalEnd }).filter(targetDate => {
       if (isBefore(startOfDay(targetDate), todayStart)) return false;
+      if (kind === 'routine' && isAutonomousSundayDate(targetDate)) return false;
       return weekdaySet.has(getDay(targetDate));
     });
 

@@ -86,6 +86,7 @@ import {
 } from '@/lib/dashboard-access';
 import { AdminWorkbenchCommandBar } from '@/components/dashboard/admin-workbench-command-bar';
 import { getStudyDayDate, getStudyDayKey } from '@/lib/study-day';
+import { isAutonomousAttendanceDate } from '@/lib/korean-public-holidays';
 
 type AttendanceRecord = {
   id: string;
@@ -260,6 +261,7 @@ export default function AttendancePage() {
   const dateKey = selectedDate ? format(selectedDate, 'yyyy-MM-dd') : '';
   const weekKey = selectedDate ? format(selectedDate, "yyyy-'W'II") : '';
   const selectedWeekdayValue = selectedDate ? selectedDate.getDay() : null;
+  const isAutonomousAttendanceDay = isAutonomousAttendanceDate(selectedDate);
   const centerId = classroomMembership?.id;
   const isTeacherOrAdmin = Boolean(classroomMembership);
   const canOpenSettings = canManageSettings(activeMembership?.role);
@@ -317,6 +319,12 @@ export default function AttendancePage() {
   useEffect(() => {
     if (!firestore || !centerId || !isTeacherOrAdmin || !dateKey || !weekKey || selectedWeekdayValue === null || !students) {
       setAttendanceRoutineMap({});
+      setRoutineLoading(false);
+      return;
+    }
+    if (isAutonomousAttendanceDay) {
+      setAttendanceRoutineMap({});
+      setRoutineLoading(false);
       return;
     }
 
@@ -401,7 +409,7 @@ export default function AttendancePage() {
     return () => {
       cancelled = true;
     };
-  }, [firestore, centerId, isTeacherOrAdmin, dateKey, weekKey, selectedWeekdayValue, students, todaySchedules]);
+  }, [firestore, centerId, isTeacherOrAdmin, dateKey, weekKey, selectedWeekdayValue, students, todaySchedules, isAutonomousAttendanceDay]);
 
   useEffect(() => {
     if (!firestore || !centerId || !isTeacherOrAdmin || !dateKey || !students) {
@@ -729,6 +737,7 @@ export default function AttendancePage() {
     return mapped;
   }, [attendanceCurrentDocs]);
   const todayScheduleMap = useMemo(() => {
+    if (isAutonomousAttendanceDay) return new Map<string, TodayScheduleInfo>();
     const mapped = new Map<string, TodayScheduleInfo>();
     (todaySchedules || []).forEach((schedule) => {
       if (!schedule.uid) return;
@@ -755,7 +764,7 @@ export default function AttendancePage() {
       });
     });
     return mapped;
-  }, [todaySchedules]);
+  }, [isAutonomousAttendanceDay, todaySchedules]);
 
   const attendanceDisplayMap = useMemo(() => {
     const mapped = new Map<string, { status: DisplayAttendanceStatus; checkedAt: Date | null }>();

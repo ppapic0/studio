@@ -68,7 +68,7 @@ type AttendanceScheduleSheetProps = {
   calendarDays: CalendarDayOption[];
   onMoveWeek: (direction: -1 | 1) => void;
   onSelectDate: (date: Date) => void;
-  onAutonomousSundayClick?: () => void;
+  onAutonomousSundayClick?: (date?: Date | null) => void;
   todayDraft: AttendanceScheduleDraft;
   onTodayChange: (patch: Partial<AttendanceScheduleDraft>) => void;
   onSaveToday: () => void | Promise<boolean>;
@@ -499,7 +499,7 @@ export function AttendanceScheduleSheet({
 
   const handleSaveTodayAction = async () => {
     if (selectedDayIsAutonomousSunday) {
-      onAutonomousSundayClick?.();
+      onAutonomousSundayClick?.(selectedDayMeta?.date);
       return false;
     }
     if (isSubmitting || activeDraftValidationMessage) return false;
@@ -666,7 +666,7 @@ export function AttendanceScheduleSheet({
                         type="button"
                         onClick={() => {
                           if (day.isAutonomousSunday) {
-                            onAutonomousSundayClick?.();
+                            onAutonomousSundayClick?.(day.date);
                             return;
                           }
                           onSelectDate(day.date);
@@ -723,7 +723,7 @@ export function AttendanceScheduleSheet({
                   <p className="text-[10px] font-black uppercase tracking-[0.18em]">현재 상태</p>
                   <p className="mt-2 text-sm font-black">
                     {selectedDayIsAutonomousSunday
-                      ? '일요일 자율등원'
+                      ? '자율등원일'
                       : selectedDayMeta?.hasSchedule
                       ? selectedDayMeta.isAbsent
                         ? '이 날짜 예외 설정됨 · 미등원'
@@ -736,7 +736,7 @@ export function AttendanceScheduleSheet({
                   </p>
                   <p className="mt-1 text-[11px] font-semibold leading-5 opacity-80">
                     {selectedDayIsAutonomousSunday
-                      ? '일요일은 자율등원이므로 트랙제 등원 일정을 작성하지 않아요.'
+                      ? '일요일/공휴일은 자율등원이므로 트랙제 등원 일정을 작성하지 않아요.'
                       : selectedDayMeta?.hasSchedule
                       ? '기본 일정 대신 이 날짜에만 별도 설정이 적용되고 있어요.'
                       : hasSelectedWeekdayTemplate
@@ -765,7 +765,7 @@ export function AttendanceScheduleSheet({
 
               {selectedDayIsAutonomousSunday ? (
                 <div className="rounded-[1.35rem] border border-sky-100 bg-sky-50 p-4">
-                  <p className="text-[11px] font-black text-sky-700">일요일은 자율등원입니다</p>
+                  <p className="text-[11px] font-black text-sky-700">자율등원일입니다</p>
                   <p className="mt-2 break-keep text-[11px] font-semibold leading-5 text-sky-700/80">
                     트랙제 등원 일정은 작성하지 않고, 필요한 학생은 자율로 등원하면 됩니다.
                   </p>
@@ -835,7 +835,7 @@ export function AttendanceScheduleSheet({
                   <p className="text-[11px] font-black uppercase tracking-[0.18em] text-[#5F739F]">주간 등원 일정</p>
                   <h3 className="mt-1 text-lg font-black tracking-tight text-[#17326B]">월~토 기본 일정을 간단히 정해두세요</h3>
                   <p className="mt-1 break-keep text-[11px] font-semibold leading-5 text-[#5F739F]">
-                    일요일은 자율등원이라 트랙제 등원 일정에 포함하지 않아요.
+                    일요일/공휴일은 자율등원이라 트랙제 등원 일정에 포함하지 않아요.
                   </p>
                 </div>
 

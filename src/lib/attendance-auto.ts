@@ -16,6 +16,7 @@ import {
 } from 'firebase/firestore';
 import { applyPenaltyEventSecure } from '@/lib/penalty-actions';
 import { getStudyDayDate, getStudyDayKey } from '@/lib/study-day';
+import { isAutonomousAttendanceDate } from '@/lib/korean-public-holidays';
 import type { StudentScheduleDoc, StudentScheduleTemplate } from '@/lib/types';
 
 export type AttendanceRecordStatus =
@@ -382,7 +383,9 @@ export async function syncAutoAttendanceRecord(params: {
     return { status: existing.status || 'requested', wrote: false, reason: 'manual_override' };
   }
 
-  const routine = await fetchAttendanceRoutineInfo(firestore, centerId, studentId, dateKey, weekKey, studyDayDate);
+  const routine = isAutonomousAttendanceDate(studyDayDate)
+    ? undefined
+    : await fetchAttendanceRoutineInfo(firestore, centerId, studentId, dateKey, weekKey, studyDayDate);
   const studyLogInfo = await fetchStudyLogInfo(firestore, centerId, studentId, dateKey);
   const existingCheckedAt = toDateSafe(existing?.checkInAt || existing?.updatedAt);
   const firstCheckedAt = pickEarliestDate(existingCheckedAt, checkInAt) || checkInAt || existingCheckedAt;
