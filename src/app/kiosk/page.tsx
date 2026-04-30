@@ -270,6 +270,18 @@ function getKioskErrorMessage(error: unknown) {
   return message || '네트워크가 안정되면 자동으로 다시 동기화합니다.';
 }
 
+function getKioskErrorCode(error: unknown) {
+  const code = (error as { code?: unknown })?.code;
+  if (typeof code !== 'string') return '';
+  return code.trim().replace(/^functions\//, '');
+}
+
+function isRetryableKioskSubmissionError(error: unknown) {
+  const code = getKioskErrorCode(error);
+  if (!code) return true;
+  return code === 'aborted' || code === 'deadline-exceeded' || code === 'internal' || code === 'unavailable';
+}
+
 function formatOutboxTime(millis: number) {
   if (!Number.isFinite(millis)) return '시간 미확인';
   return new Intl.DateTimeFormat('ko-KR', {
@@ -662,10 +674,30 @@ export default function KioskPage() {
           }
           return fallbackResult;
         } catch (fallbackError) {
-          saveActionForRetry(payload, getKioskErrorMessage(fallbackError));
+          if (isRetryableKioskSubmissionError(fallbackError)) {
+            saveActionForRetry(payload, getKioskErrorMessage(fallbackError));
+          } else {
+            removeActionFromRetry(payload.idempotencyKey);
+            if (!options.quiet) {
+              toast({
+                variant: 'destructive',
+                title: '출결 처리 실패',
+                description: getKioskErrorMessage(fallbackError),
+              });
+            }
+          }
         }
-      } else {
+      } else if (isRetryableKioskSubmissionError(error)) {
         saveActionForRetry(payload, getKioskErrorMessage(error));
+      } else {
+        removeActionFromRetry(payload.idempotencyKey);
+        if (!options.quiet) {
+          toast({
+            variant: 'destructive',
+            title: '출결 처리 실패',
+            description: getKioskErrorMessage(error),
+          });
+        }
       }
       return null;
     }

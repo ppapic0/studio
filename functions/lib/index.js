@@ -9490,6 +9490,13 @@ exports.submitKioskAttendanceActionFast = functions.region(region).runWith({
     const expectedStatusInput = parseAttendanceSeatStatus(data === null || data === void 0 ? void 0 : data.expectedStatus);
     const idempotencyKey = sanitizeKioskIdempotencyKey(data === null || data === void 0 ? void 0 : data.idempotencyKey);
     if (!centerId || !studentId || !/^\d{6}$/.test(pin) || !action || !idempotencyKey) {
+        functions.logger.warn("submitKioskAttendanceActionFast invalid input", {
+            centerId,
+            studentId,
+            pinLength: pin.length,
+            action: asTrimmedString(data === null || data === void 0 ? void 0 : data.action) || null,
+            idempotencyKeyLength: asTrimmedString(data === null || data === void 0 ? void 0 : data.idempotencyKey).length,
+        });
         throw new functions.https.HttpsError("invalid-argument", "Invalid fast kiosk attendance input.", {
             userMessage: "키오스크 출결 정보를 다시 확인해 주세요.",
         });
@@ -9762,6 +9769,13 @@ exports.enqueueKioskAttendanceActionSecure = functions.region(region).runWith({
         const expectedStatusInput = parseAttendanceSeatStatus(data === null || data === void 0 ? void 0 : data.expectedStatus);
         idempotencyKey = sanitizeKioskIdempotencyKey(data === null || data === void 0 ? void 0 : data.idempotencyKey);
         if (!centerId || !studentId || !/^\d{6}$/.test(pin) || !action || !idempotencyKey) {
+            functions.logger.warn("enqueueKioskAttendanceActionSecure invalid input", {
+                centerId,
+                studentId,
+                pinLength: pin.length,
+                action: asTrimmedString(data === null || data === void 0 ? void 0 : data.action) || null,
+                idempotencyKeyLength: asTrimmedString(data === null || data === void 0 ? void 0 : data.idempotencyKey).length,
+            });
             throw new functions.https.HttpsError("invalid-argument", "Invalid kiosk attendance queue input.", {
                 userMessage: "키오스크 출결 정보를 다시 확인해 주세요.",
             });
