@@ -110,7 +110,7 @@ const ACTIONS: Record<KioskAttendanceAction, KioskActionConfig> = {
   away_start: {
     action: 'away_start',
     label: '단기외출',
-    title: '문자 없이 잠깐 다녀와요',
+    title: '화장실 등 10분 이내 외출',
     Icon: Coffee,
     accentClassName: 'from-[#FF8A1D] to-[#FFB35C]',
     completeMessage: (studentName) => `${studentName} 학생 단기외출이 접수되었습니다.`,
@@ -118,7 +118,7 @@ const ACTIONS: Record<KioskAttendanceAction, KioskActionConfig> = {
   away_start_long: {
     action: 'away_start_long',
     label: '장기외출',
-    title: '보호자 문자와 함께 외출해요',
+    title: '10분 이상 · 학원, 편의점 등',
     Icon: Clock3,
     accentClassName: 'from-[#14295F] to-[#FF7A16]',
     completeMessage: (studentName) => `${studentName} 학생 장기외출이 접수되었습니다.`,
@@ -953,16 +953,18 @@ export default function KioskPage() {
                           )}
                         >
                           <div className={cn('absolute inset-x-0 top-0 h-3 bg-gradient-to-r', config.accentClassName)} />
-                          <div className="flex h-full items-center justify-between gap-5">
-                            <div>
+                          <div className="flex h-full min-w-0 flex-col justify-between gap-4">
+                            <div className="flex items-start justify-between gap-3">
                               <div className="flex h-16 w-16 items-center justify-center rounded-[1.25rem] bg-[#FFF1E4] text-[#FF7A16] shadow-[0_14px_26px_-20px_rgba(255,122,22,0.7)]">
                                 <config.Icon className="h-8 w-8" />
                               </div>
-                              <p className="mt-5 text-4xl font-black text-[#14295F] sm:text-3xl lg:text-4xl">{config.label}</p>
-                              <p className="mt-2 text-base font-black text-[#9A4E10]">{config.title}</p>
+                              <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-[#FF7A16] text-white shadow-[0_14px_24px_-18px_rgba(255,122,22,0.78)]">
+                                <Check className="h-6 w-6" />
+                              </div>
                             </div>
-                            <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-[#FF7A16] text-white">
-                              <Check className="h-7 w-7" />
+                            <div className="min-w-0">
+                              <p className="text-4xl font-black leading-none text-[#14295F] sm:text-[2rem] lg:text-4xl">{config.label}</p>
+                              <p className="mt-3 whitespace-normal text-base font-black leading-6 text-[#9A4E10]">{config.title}</p>
                             </div>
                           </div>
                         </button>
