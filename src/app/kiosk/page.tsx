@@ -18,7 +18,7 @@ import {
   UserRound,
   WifiOff,
 } from 'lucide-react';
-import { collection, getDocs, limit, query, Timestamp, where, type Firestore } from 'firebase/firestore';
+import { collection, doc, getDoc, getDocs, limit, query, Timestamp, where, type Firestore } from 'firebase/firestore';
 import { httpsCallable } from 'firebase/functions';
 
 import { Button } from '@/components/ui/button';
@@ -88,12 +88,17 @@ type KioskFastOutboxItem = {
   attempts: number;
   createdAt: number;
   studentName?: string;
+  studentSchool?: string;
+  studentGrade?: string;
   actionLabel?: string;
   seatLabel?: string;
   lastError?: string;
 };
 
-type KioskFastOutboxMeta = Pick<KioskFastOutboxItem, 'studentName' | 'actionLabel' | 'seatLabel'>;
+type KioskFastOutboxMeta = Pick<
+  KioskFastOutboxItem,
+  'studentName' | 'studentSchool' | 'studentGrade' | 'actionLabel' | 'seatLabel'
+>;
 
 const FAST_OUTBOX_STORAGE_KEY = 'track:kiosk-fast-attendance-outbox:v1';
 const MAX_OUTBOX_ITEMS = 48;
@@ -224,6 +229,34 @@ function writeFastOutbox(items: KioskFastOutboxItem[]) {
   window.localStorage.setItem(FAST_OUTBOX_STORAGE_KEY, JSON.stringify(items.slice(-MAX_OUTBOX_ITEMS)));
 }
 
+function getTrimmedString(value: unknown) {
+  if (typeof value === 'string') {
+    const trimmed = value.trim();
+    return trimmed || undefined;
+  }
+  if (typeof value === 'number' && Number.isFinite(value)) return String(value);
+  return undefined;
+}
+
+function getKioskStudentName(student: Partial<KioskStudent> | Record<string, unknown>) {
+  const raw = student as Record<string, unknown>;
+  return getTrimmedString(raw.name) || getTrimmedString(raw.displayName) || '학생';
+}
+
+function getKioskStudentSchool(student: Partial<KioskStudent> | Record<string, unknown>) {
+  const raw = student as Record<string, unknown>;
+  return (
+    getTrimmedString(raw.schoolName) ||
+    getTrimmedString(raw.schoolNameSnapshot) ||
+    getTrimmedString(raw.school)
+  );
+}
+
+function getKioskStudentGrade(student: Partial<KioskStudent> | Record<string, unknown>) {
+  const raw = student as Record<string, unknown>;
+  return getTrimmedString(raw.grade) || getTrimmedString(raw.gradeLabel) || getTrimmedString(raw.schoolGrade);
+}
+
 function getKioskErrorMessage(error: unknown) {
   const raw = error as { code?: unknown; message?: unknown; details?: unknown; customData?: unknown };
   const detailSources = [raw.details, raw.customData];
@@ -259,7 +292,13 @@ function formatOutboxSeatLabel(item: KioskFastOutboxItem) {
 }
 
 function formatOutboxStudentLabel(item: KioskFastOutboxItem) {
-  return item.studentName?.trim() || `학생 ${item.payload.studentId.slice(0, 6)}`;
+  return getTrimmedString(item.studentName) || `학생 ${item.payload.studentId.slice(0, 6)}`;
+}
+
+function formatOutboxStudentProfileLabel(item: KioskFastOutboxItem) {
+  const school = getTrimmedString(item.studentSchool) || '학교 미확인';
+  const grade = getTrimmedString(item.studentGrade) || '학년 미확인';
+  return `${school} · ${grade}`;
 }
 
 function formatOutboxActionLabel(item: KioskFastOutboxItem) {
@@ -453,7 +492,7 @@ export default function KioskPage() {
         studentDocs.set(docSnap.id, {
           ...data,
           id: docSnap.id,
-          name: String(data.name || raw.displayName || '학생'),
+          name: getKioskStudentName(raw),
           parentLinkCode: code,
         });
       });
@@ -566,6 +605,8 @@ export default function KioskPage() {
         attempts: lastError ? Math.max(0, existing?.attempts || 0) + 1 : Math.max(0, existing?.attempts || 0),
         createdAt: existing?.createdAt || Date.now(),
         ...(meta?.studentName ? { studentName: meta.studentName } : {}),
+        ...(meta?.studentSchool ? { studentSchool: meta.studentSchool } : {}),
+        ...(meta?.studentGrade ? { studentGrade: meta.studentGrade } : {}),
         ...(meta?.actionLabel ? { actionLabel: meta.actionLabel } : {}),
         ...(meta?.seatLabel ? { seatLabel: meta.seatLabel } : {}),
         ...(lastError ? { lastError } : existing?.lastError ? { lastError: existing.lastError } : {}),
@@ -661,6 +702,83 @@ export default function KioskPage() {
       window.removeEventListener('online', handleOnline);
     };
   }, [flushOutbox, syncQueuedCount]);
+
+  useEffect(() => {
+    if (!firestore || !centerId || queuedItems.length === 0) return;
+
+    const studentIds = Array.from(
+      new Set(
+        queuedItems
+          .filter((item) => (
+            !getTrimmedString(item.studentName) ||
+            !getTrimmedString(item.studentSchool) ||
+            !getTrimmedString(item.studentGrade)
+          ))
+          .map((item) => item.payload.studentId)
+          .filter(Boolean)
+      )
+    );
+    if (studentIds.length === 0) return;
+
+    let cancelled = false;
+    void (async () => {
+      const profiles = await Promise.all(
+        studentIds.map(async (studentId) => {
+          try {
+            const snap = await getDoc(doc(firestore, 'centers', centerId, 'students', studentId));
+            if (!snap.exists()) return null;
+            const data = snap.data() as Record<string, unknown>;
+            return {
+              studentId,
+              studentName: getTrimmedString(data.name) || getTrimmedString(data.displayName),
+              studentSchool: getKioskStudentSchool(data),
+              studentGrade: getKioskStudentGrade(data),
+            };
+          } catch {
+            return null;
+          }
+        })
+      );
+
+      if (cancelled) return;
+
+      const profilesByStudentId = new Map(
+        profiles
+          .filter((profile): profile is NonNullable<typeof profile> => Boolean(profile))
+          .map((profile) => [profile.studentId, profile])
+      );
+      if (profilesByStudentId.size === 0) return;
+
+      let changed = false;
+      const mergedItems = readFastOutbox().map((item) => {
+        const profile = profilesByStudentId.get(item.payload.studentId);
+        if (!profile) return item;
+
+        const nextItem = {
+          ...item,
+          ...(profile.studentName ? { studentName: profile.studentName } : {}),
+          ...(profile.studentSchool ? { studentSchool: profile.studentSchool } : {}),
+          ...(profile.studentGrade ? { studentGrade: profile.studentGrade } : {}),
+        };
+        if (
+          nextItem.studentName !== item.studentName ||
+          nextItem.studentSchool !== item.studentSchool ||
+          nextItem.studentGrade !== item.studentGrade
+        ) {
+          changed = true;
+        }
+        return nextItem;
+      });
+
+      if (!changed) return;
+      writeFastOutbox(mergedItems);
+      syncQueuedCount();
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [centerId, firestore, queuedItems, syncQueuedCount]);
 
   useEffect(() => {
     if (!successFeedback) return;
@@ -768,7 +886,9 @@ export default function KioskPage() {
 
     void submitFastPayload(payload, {
       outboxMeta: {
-        studentName: selectedStudent.name,
+        studentName: getKioskStudentName(selectedStudent),
+        studentSchool: getKioskStudentSchool(selectedStudent),
+        studentGrade: getKioskStudentGrade(selectedStudent),
         actionLabel: config.label,
         seatLabel: queuedSeatLabel,
       },
@@ -855,6 +975,9 @@ export default function KioskPage() {
                           <div className="min-w-0">
                             <p className="truncate text-sm font-black text-[#14295F]">
                               {formatOutboxStudentLabel(item)}
+                            </p>
+                            <p className="mt-1 truncate text-[11px] font-bold text-[#5F739F]">
+                              {formatOutboxStudentProfileLabel(item)}
                             </p>
                             <p className="mt-1 text-[11px] font-bold text-[#5F739F]">
                               {formatOutboxSeatLabel(item)} · {formatOutboxStatusFlow(item)}
