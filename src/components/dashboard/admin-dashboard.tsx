@@ -995,6 +995,9 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
   const [focusStudentPhoneDraft, setFocusStudentPhoneDraft] = useState('');
   const [focusParentPhoneDraft, setFocusParentPhoneDraft] = useState('');
   const [focusPhoneSaving, setFocusPhoneSaving] = useState<'student' | 'parent' | null>(null);
+  const [isFocusParentLinkCodeEditing, setIsFocusParentLinkCodeEditing] = useState(false);
+  const [focusParentLinkCodeDraft, setFocusParentLinkCodeDraft] = useState('');
+  const [isFocusParentLinkCodeSaving, setIsFocusParentLinkCodeSaving] = useState(false);
   const [focusStudyTotalsRepairing, setFocusStudyTotalsRepairing] = useState(false);
   const [isManualStudySessionDialogOpen, setIsManualStudySessionDialogOpen] = useState(false);
   const [manualStudySessionStartDraft, setManualStudySessionStartDraft] = useState('');
@@ -1159,6 +1162,9 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
     setFocusStudentPhoneDraft('');
     setFocusParentPhoneDraft('');
     setFocusPhoneSaving(null);
+    setIsFocusParentLinkCodeEditing(false);
+    setFocusParentLinkCodeDraft('');
+    setIsFocusParentLinkCodeSaving(false);
   }, [selectedFocusStudentId, todayKey]);
 
   useEffect(() => {
@@ -3367,6 +3373,14 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
     focusPhoneEditMode,
     selectedFocusOperationsSummary?.parentPhone,
     selectedFocusOperationsSummary?.studentPhone,
+  ]);
+
+  useEffect(() => {
+    if (isFocusParentLinkCodeEditing) return;
+    setFocusParentLinkCodeDraft(normalizeParentLinkCode(selectedFocusOperationsSummary?.parentLinkCode));
+  }, [
+    isFocusParentLinkCodeEditing,
+    selectedFocusOperationsSummary?.parentLinkCode,
   ]);
 
   const selectedFocusProgress = useMemo(
@@ -7192,6 +7206,67 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
       setFocusPhoneSaving(null);
     }
   };
+  const openFocusParentLinkCodeEditor = () => {
+    if (!canAccessAdminOnlyOperations) {
+      toast({
+        variant: 'destructive',
+        title: '연동코드 수정 권한이 없습니다.',
+        description: '센터관리자 계정에서만 학부모 연동코드를 수정할 수 있습니다.',
+      });
+      return;
+    }
+
+    setFocusParentLinkCodeDraft(normalizeParentLinkCode(selectedFocusOperationsSummary?.parentLinkCode));
+    setIsFocusParentLinkCodeEditing(true);
+  };
+  const closeFocusParentLinkCodeEditor = () => {
+    setIsFocusParentLinkCodeEditing(false);
+    setFocusParentLinkCodeDraft(normalizeParentLinkCode(selectedFocusOperationsSummary?.parentLinkCode));
+  };
+  const handleSaveFocusParentLinkCode = async () => {
+    if (!functions || !centerId || !selectedFocusStudentId) return;
+    if (!canAccessAdminOnlyOperations) {
+      toast({
+        variant: 'destructive',
+        title: '연동코드 수정 권한이 없습니다.',
+        description: '센터관리자 계정에서만 학부모 연동코드를 수정할 수 있습니다.',
+      });
+      return;
+    }
+
+    const parentLinkCode = normalizeParentLinkCode(focusParentLinkCodeDraft);
+    if (!/^\d{6}$/.test(parentLinkCode)) {
+      toast({
+        variant: 'destructive',
+        title: '학부모 연동코드 확인',
+        description: '학부모 연동코드는 6자리 숫자로 입력해 주세요.',
+      });
+      return;
+    }
+
+    setIsFocusParentLinkCodeSaving(true);
+    try {
+      const updateStudentAccount = httpsCallable(functions, 'updateStudentAccount', { timeout: 600000 });
+      await updateStudentAccount({
+        centerId,
+        studentId: selectedFocusStudentId,
+        parentLinkCode,
+      });
+      toast({
+        title: '학부모 연동코드 저장 완료',
+        description: `${selectedFocusStudent?.name || '학생'} 학부모 연동코드를 수정했습니다.`,
+      });
+      setIsFocusParentLinkCodeEditing(false);
+    } catch (error) {
+      toast({
+        variant: 'destructive',
+        title: '학부모 연동코드 저장 실패',
+        description: getCallableErrorMessage(error, '학부모 연동코드 저장 중 오류가 발생했습니다.'),
+      });
+    } finally {
+      setIsFocusParentLinkCodeSaving(false);
+    }
+  };
   const openFocusScheduleDialog = () => {
     if (!selectedFocusStudentId || !selectedFocusOperationsSummary) return;
     if (!canEditFocusSchedule) {
@@ -10862,11 +10937,22 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
                       <p className="text-[10px] font-black uppercase tracking-[0.14em] text-[#5C6E97]">문자 발송 현황</p>
                       <p className="mt-2 truncate text-sm font-black text-[#14295F]">{selectedFocusOperationsSummary.smsStatusSummary}</p>
                     </div>
-                    <div className="min-w-0 rounded-2xl border border-[#FFD7BA] bg-[#FFF8F2] p-3 sm:col-span-3">
-                      <p className="text-[10px] font-black uppercase tracking-[0.14em] text-[#C95A08]">오늘 외출 일정</p>
+                    <button
+                      type="button"
+                      disabled={!canEditFocusSchedule || isFocusScheduleSaving}
+                      onClick={openFocusScheduleDialog}
+                      className="group min-w-0 rounded-2xl border border-[#FFD7BA] bg-[#FFF8F2] p-3 text-left transition hover:border-[#FF7A16]/60 hover:bg-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#FF7A16]/30 disabled:cursor-not-allowed disabled:opacity-70 sm:col-span-3"
+                    >
+                      <div className="flex items-center justify-between gap-2">
+                        <p className="text-[10px] font-black uppercase tracking-[0.14em] text-[#C95A08]">오늘 외출 일정</p>
+                        {canEditFocusSchedule ? <Settings2 className="h-3.5 w-3.5 shrink-0 text-[#FF7A16]" /> : null}
+                      </div>
                       <p className="mt-2 line-clamp-2 text-sm font-black leading-5 text-[#14295F]">{selectedFocusOperationsSummary.outingLabel}</p>
                       <p className="mt-1 truncate text-[11px] font-bold text-[#6E7EA3]">{selectedFocusOperationsSummary.scheduleLabel}</p>
-                    </div>
+                      {canEditFocusSchedule ? (
+                        <p className="mt-1 truncate text-[10px] font-black text-[#C95A08]">눌러서 외출/학원 시간 수정</p>
+                      ) : null}
+                    </button>
                     <div className="min-w-0 rounded-2xl border border-[#DCE7FF] bg-white p-3">
                       <div className="flex items-center justify-between gap-2">
                         <div className="flex items-center gap-1.5 text-[#5C6E97]">
@@ -10984,14 +11070,65 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
                       )}
                     </div>
                     <div className="min-w-0 rounded-2xl border border-[#FFD7BA] bg-[#FFF8F2] p-3">
-                      <div className="flex items-center gap-1.5 text-[#C95A08]">
-                        <Link2 className="h-3.5 w-3.5" />
-                        <p className="text-[10px] font-black uppercase tracking-[0.14em]">학부모 연동코드</p>
+                      <div className="flex items-center justify-between gap-2">
+                        <div className="flex items-center gap-1.5 text-[#C95A08]">
+                          <Link2 className="h-3.5 w-3.5" />
+                          <p className="text-[10px] font-black uppercase tracking-[0.14em]">학부모 연동코드</p>
+                        </div>
+                        {canAccessAdminOnlyOperations && !isFocusParentLinkCodeEditing ? (
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="ghost"
+                            className="h-7 rounded-full px-2 text-[10px] font-black text-[#C95A08] hover:bg-[#FFEAD8]"
+                            onClick={openFocusParentLinkCodeEditor}
+                          >
+                            수정
+                          </Button>
+                        ) : null}
                       </div>
-                      <p className="mt-2 truncate text-base font-black tracking-[0.18em] text-[#14295F]">
-                        {selectedFocusOperationsSummary.parentLinkCode}
-                      </p>
-                      <p className="mt-1 truncate text-[11px] font-bold text-[#C95A08]">6자리 가입 코드</p>
+                      {isFocusParentLinkCodeEditing ? (
+                        <div className="mt-2 space-y-2">
+                          <Input
+                            value={focusParentLinkCodeDraft}
+                            onChange={(event) => setFocusParentLinkCodeDraft(normalizeParentLinkCode(event.target.value))}
+                            inputMode="numeric"
+                            maxLength={6}
+                            placeholder="123456"
+                            className="h-10 rounded-xl border-[#FFD7BA] bg-white font-black tracking-[0.18em] text-[#14295F]"
+                            disabled={isFocusParentLinkCodeSaving}
+                          />
+                          <div className="grid grid-cols-2 gap-2">
+                            <Button
+                              type="button"
+                              size="sm"
+                              className="h-8 rounded-xl bg-[#14295F] text-[11px] font-black text-white hover:bg-[#173D8B]"
+                              disabled={isFocusParentLinkCodeSaving}
+                              onClick={() => void handleSaveFocusParentLinkCode()}
+                            >
+                              {isFocusParentLinkCodeSaving ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> : <Save className="mr-1.5 h-3.5 w-3.5" />}
+                              저장
+                            </Button>
+                            <Button
+                              type="button"
+                              size="sm"
+                              variant="outline"
+                              className="h-8 rounded-xl border-[#FFD7BA] text-[11px] font-black text-[#14295F]"
+                              disabled={isFocusParentLinkCodeSaving}
+                              onClick={closeFocusParentLinkCodeEditor}
+                            >
+                              취소
+                            </Button>
+                          </div>
+                        </div>
+                      ) : (
+                        <>
+                          <p className="mt-2 truncate text-base font-black tracking-[0.18em] text-[#14295F]">
+                            {selectedFocusOperationsSummary.parentLinkCode}
+                          </p>
+                          <p className="mt-1 truncate text-[11px] font-bold text-[#C95A08]">6자리 가입 코드</p>
+                        </>
+                      )}
                     </div>
                   </div>
 
