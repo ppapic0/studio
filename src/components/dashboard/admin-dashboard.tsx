@@ -4125,12 +4125,16 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
         },
         {
           key: 'away',
-          title: `장기 외출 ${attendanceBoardSummary.longAwayCount}명`,
-          detail: '실시간 교실 도면에서 장기 외출 학생의 복귀 여부를 바로 점검하세요.',
+          title: attendanceBoardSummary.notReturnedCount > 0
+            ? `미복귀 ${attendanceBoardSummary.notReturnedCount}명`
+            : `장기 외출 ${attendanceBoardSummary.longAwayCount}명`,
+          detail: attendanceBoardSummary.notReturnedCount > 0
+            ? '단기외출 후 20분 이상 복귀가 눌리지 않은 학생을 바로 확인하세요.'
+            : '실시간 교실 도면에서 장기 외출 학생의 복귀 여부를 바로 점검하세요.',
           actionLabel: '실시간 교실',
           href: '/dashboard#live-classroom',
           icon: LayoutGrid,
-          toneClass: 'bg-amber-100 text-amber-700',
+          toneClass: attendanceBoardSummary.notReturnedCount > 0 ? 'bg-rose-100 text-rose-700' : 'bg-amber-100 text-amber-700',
         },
         {
           key: 'guardian',
@@ -4168,7 +4172,7 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
         if (item.key === 'schedule-change') return pendingScheduleChangeRequests.length > 0;
         if (item.key === 'intervention') return urgentInterventionStudents.length > 0;
         if (item.key === 'attendance') return attendanceBoardSummary.lateOrAbsentCount > 0;
-        if (item.key === 'away') return attendanceBoardSummary.longAwayCount > 0;
+        if (item.key === 'away') return attendanceBoardSummary.notReturnedCount + attendanceBoardSummary.longAwayCount > 0;
         if (item.key === 'guardian') return parentContactRecommendations.length > 0;
         if (item.key === 'lead') return (metrics?.leadPipelineCount30d ?? 0) > 0;
         return true;
@@ -4309,7 +4313,7 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
 
   const longAwayAlertRows = useMemo(() => {
     return attendanceSeatSignals
-      .filter((signal) => signal.isLongAway)
+      .filter((signal) => signal.isShortAwayOverdue || signal.isLongAway)
       .sort((left, right) => {
         if (right.currentAwayMinutes !== left.currentAwayMinutes) {
           return right.currentAwayMinutes - left.currentAwayMinutes;
@@ -4334,6 +4338,7 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
           studentName: signal.studentName,
           className: signal.className,
           awayMinutes: signal.currentAwayMinutes,
+          issueLabel: signal.isShortAwayOverdue ? '미복귀' : '장기외출',
           roomLabel,
           detailLabel: signal.note,
         };
@@ -4372,8 +4377,8 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
                   <p className="dashboard-number mt-2 text-[1.6rem] text-white">{attendanceBoardSummary.lateOrAbsentCount}</p>
                 </div>
                 <div className="rounded-[1.35rem] border border-white/10 bg-white/10 px-4 py-3">
-                  <p className="text-[10px] font-black uppercase tracking-[0.16em] text-white/60">장기 외출</p>
-                  <p className="dashboard-number mt-2 text-[1.6rem] text-white">{attendanceBoardSummary.longAwayCount}</p>
+                  <p className="text-[10px] font-black uppercase tracking-[0.16em] text-white/60">미복귀/장기외출</p>
+                  <p className="dashboard-number mt-2 text-[1.6rem] text-white">{attendanceBoardSummary.notReturnedCount + attendanceBoardSummary.longAwayCount}</p>
                 </div>
                 <div className="rounded-[1.35rem] border border-[#FFB677]/28 bg-[#FF7A16]/18 px-4 py-3">
                   <p className="text-[10px] font-black uppercase tracking-[0.16em] text-white/68">즉시 개입</p>
@@ -5556,6 +5561,7 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
   const secondaryAttendanceContactTargets = todayAttendanceContactTargets.slice(1, 4);
   const totalControlAlerts =
     attendanceBoardSummary.lateOrAbsentCount
+    + attendanceBoardSummary.notReturnedCount
     + attendanceBoardSummary.longAwayCount
     + urgentInterventionStudents.length
     + pendingAttendanceRequests.length;
@@ -8435,9 +8441,9 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
                     <p className="text-[10px] font-black uppercase tracking-[0.16em] text-[#5c6e97]">미입실·지각</p>
                     <p className="admin-kpi-number mt-1.5 text-[1.4rem] text-[#14295F]">{attendanceBoardSummary.lateOrAbsentCount}</p>
                   </div>
-                  <div className={cn('rounded-[1.25rem] border px-3.5 py-3', attendanceBoardSummary.longAwayCount > 0 ? 'border-[#FFD7BA] bg-[#FFF8F2]' : 'border-[#DCE7FF] bg-white')}>
-                    <p className={cn('text-[10px] font-black uppercase tracking-[0.16em]', attendanceBoardSummary.longAwayCount > 0 ? 'text-[#C95A08]' : 'text-[#5c6e97]')}>장기 외출</p>
-                    <p className={cn('admin-kpi-number mt-1.5 text-[1.4rem]', attendanceBoardSummary.longAwayCount > 0 ? 'text-[#C95A08]' : 'text-[#14295F]')}>{attendanceBoardSummary.longAwayCount}</p>
+                  <div className={cn('rounded-[1.25rem] border px-3.5 py-3', attendanceBoardSummary.notReturnedCount + attendanceBoardSummary.longAwayCount > 0 ? 'border-[#FFC2D0] bg-[#FFF1F4]' : 'border-[#DCE7FF] bg-white')}>
+                    <p className={cn('text-[10px] font-black uppercase tracking-[0.16em]', attendanceBoardSummary.notReturnedCount + attendanceBoardSummary.longAwayCount > 0 ? 'text-[#BE123C]' : 'text-[#5c6e97]')}>미복귀/장기외출</p>
+                    <p className={cn('admin-kpi-number mt-1.5 text-[1.4rem]', attendanceBoardSummary.notReturnedCount + attendanceBoardSummary.longAwayCount > 0 ? 'text-[#BE123C]' : 'text-[#14295F]')}>{attendanceBoardSummary.notReturnedCount + attendanceBoardSummary.longAwayCount}</p>
                   </div>
                   <div className={cn('rounded-[1.25rem] border px-3.5 py-3', urgentInterventionStudents.length > 0 ? 'border-[#FFD7BA] bg-[#FFF2E8]' : 'border-[#DCE7FF] bg-white')}>
                     <p className={cn('text-[10px] font-black uppercase tracking-[0.16em]', urgentInterventionStudents.length > 0 ? 'text-[#C95A08]' : 'text-[#5c6e97]')}>즉시 개입</p>
@@ -9818,7 +9824,7 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
                   </div>
                   <DialogTitle className="text-2xl font-black tracking-tight">긴급 흐름 상세</DialogTitle>
                   <DialogDescription className="text-sm font-medium text-white/75">
-                    현재 집계된 미입실·지각, 장기 외출, 즉시 개입 학생을 한 번에 확인할 수 있습니다.
+                    현재 집계된 미입실·지각, 미복귀/장기외출, 즉시 개입 학생을 한 번에 확인할 수 있습니다.
                   </DialogDescription>
                   <div className={cn('grid gap-3', isMobile ? 'grid-cols-1' : 'grid-cols-3')}>
                     <div className="rounded-[1.35rem] border border-white/10 bg-white/10 px-4 py-3">
@@ -9826,7 +9832,7 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
                       <p className="dashboard-number mt-2 text-[1.6rem] text-white">{lateOrAbsentAlertRows.length}</p>
                     </div>
                     <div className="rounded-[1.35rem] border border-white/10 bg-white/10 px-4 py-3">
-                      <p className="text-[10px] font-black uppercase tracking-[0.16em] text-white/60">장기 외출</p>
+                      <p className="text-[10px] font-black uppercase tracking-[0.16em] text-white/60">미복귀/장기외출</p>
                       <p className="dashboard-number mt-2 text-[1.6rem] text-white">{longAwayAlertRows.length}</p>
                     </div>
                     <div className="rounded-[1.35rem] border border-[#FFB677]/28 bg-[#FF7A16]/18 px-4 py-3">
@@ -9887,10 +9893,10 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
                   <section className="rounded-[1.8rem] border border-[#DCE7FF] bg-white p-4 shadow-[0_18px_36px_-30px_rgba(20,41,95,0.18)]">
                     <div className="flex items-start justify-between gap-3">
                       <div>
-                        <p className={studioSectionEyebrowClassName}>장기 외출</p>
+                        <p className={studioSectionEyebrowClassName}>미복귀/장기외출</p>
                         <h3 className="mt-2 text-lg font-black tracking-tight text-[#14295F]">복귀 확인이 필요한 학생</h3>
                         <p className="mt-1 text-xs font-bold leading-5 text-[#5c6e97]">
-                          외출 또는 휴식이 20분 이상 이어진 학생입니다.
+                          단기외출 20분 이상 또는 장기외출 진행 중인 학생입니다.
                         </p>
                       </div>
                       <Badge className="h-7 rounded-full border-none bg-[#FFF1E6] px-2.5 text-[10px] font-black text-[#C95A08]">
@@ -9900,7 +9906,7 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
 
                     {longAwayAlertRows.length === 0 ? (
                       <div className="mt-4 rounded-[1.45rem] border border-dashed border-[#DCE7FF] bg-[#F7FAFF] px-5 py-8 text-center text-sm font-bold text-[#5c6e97]">
-                        현재 장기 외출 대상이 없습니다.
+                        현재 미복귀/장기외출 대상이 없습니다.
                       </div>
                     ) : (
                       <div className="mt-4 grid gap-3">
@@ -9909,6 +9915,9 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
                             <div className="flex items-start justify-between gap-3">
                               <div className="min-w-0">
                                 <div className="flex flex-wrap items-center gap-2">
+                                  <Badge className="h-6 rounded-full border-none bg-white px-2.5 text-[10px] font-black text-[#C95A08]">
+                                    {item.issueLabel}
+                                  </Badge>
                                   <Badge className="h-6 rounded-full border-none bg-white px-2.5 text-[10px] font-black text-[#C95A08]">
                                     외출 {item.awayMinutes}분
                                   </Badge>

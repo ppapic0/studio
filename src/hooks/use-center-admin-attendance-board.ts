@@ -26,6 +26,7 @@ import {
   resolveAttendanceOperationalException,
   resolveAttendanceBoardStatus,
   resolveAttendanceRiskLevel,
+  SHORT_AWAY_NOT_RETURNED_THRESHOLD_MINUTES,
   type CenterAdminAttendanceBoardSummary,
   type CenterAdminAttendanceSeatSignal,
 } from '@/lib/center-admin-attendance-board';
@@ -180,6 +181,10 @@ function isAttendanceEventInStudyDay(event: AttendanceBoardEvent, dateKey: strin
   const occurredAt = getAttendanceEventDate(event);
   if (occurredAt) return isDateInStudyDay(occurredAt, dateKey);
   return event.dateKey === dateKey;
+}
+
+function normalizeSeatActiveAwayKind(value: unknown): AttendanceCurrent['activeAwayKind'] | null {
+  return value === 'short' || value === 'long' ? value : null;
 }
 
 function getStudySessionStartDate(session: Record<string, unknown>) {
@@ -827,15 +832,26 @@ export function useCenterAdminAttendanceBoard({
             : Math.max(storedStudyMinutes, fallbackStudyLogMinutes);
         const totalStudyMinutes = Math.max(0, recordedStudyMinutes + liveSessionMinutes);
         const currentAwayStartedAt =
-          latestAwayStartAt &&
-          (!latestAwayEndAt || latestAwayStartAt.getTime() > latestAwayEndAt.getTime())
-            ? latestAwayStartAt
+          seat.status === 'away' || seat.status === 'break'
+            ? toStudyDayDateSafe(seat.activeAwayStartedAt, todayKey) ||
+              (
+                latestAwayStartAt &&
+                (!latestAwayEndAt || latestAwayStartAt.getTime() > latestAwayEndAt.getTime())
+                  ? latestAwayStartAt
+                  : null
+              )
             : null;
         const currentAwayMinutes =
           (seat.status === 'away' || seat.status === 'break') && currentAwayStartedAt
             ? Math.max(0, Math.floor((nowMs - currentAwayStartedAt.getTime()) / 60000))
             : 0;
-        const isLongAway = currentAwayMinutes >= 20;
+        const activeAwayKind = normalizeSeatActiveAwayKind(seat.activeAwayKind);
+        const isShortAway = activeAwayKind === 'short';
+        const isShortAwayOverdue =
+          isShortAway && currentAwayMinutes >= SHORT_AWAY_NOT_RETURNED_THRESHOLD_MINUTES;
+        const isLongAway =
+          activeAwayKind === 'long' ||
+          (!activeAwayKind && currentAwayMinutes >= SHORT_AWAY_NOT_RETURNED_THRESHOLD_MINUTES);
         const isReturned =
           seat.status === 'studying' &&
           recordedStudyMinutes >= 1 &&
@@ -883,12 +899,14 @@ export function useCenterAdminAttendanceBoard({
           displayStatus: derived.status,
           hasAttendanceEvidence,
           isReturned,
+          isShortAwayOverdue,
         });
 
         const flags = buildAttendanceBoardFlags({
           displayStatus: derived.status,
           attendanceRiskLevel,
           isLongAway,
+          isShortAwayOverdue,
         });
         const operationalException = resolveAttendanceOperationalException({
           boardStatus,
@@ -941,7 +959,9 @@ export function useCenterAdminAttendanceBoard({
           recentAbsentCount: historySummary.absentCount,
           recentRoutineMissingCount: historySummary.routineMissingCount,
           currentAwayMinutes,
+          isShortAway,
           isLongAway,
+          isShortAwayOverdue,
           isReturned,
           isCheckedOut: boardStatus === 'checked_out',
           hasAttendanceEvidence,

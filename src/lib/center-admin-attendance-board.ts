@@ -2,13 +2,15 @@ import type { DisplayAttendanceStatus } from '@/lib/attendance-auto';
 import type { AttendanceCurrent } from '@/lib/types';
 
 export type CenterAdminAttendanceRiskLevel = 'stable' | 'warning' | 'risk';
-export type CenterAdminAttendanceOperationalExceptionKind = 'midday_leave' | 'returned' | 'early_checkout';
+export type CenterAdminAttendanceOperationalExceptionKind = 'not_returned' | 'midday_leave' | 'returned' | 'early_checkout';
+export const SHORT_AWAY_NOT_RETURNED_THRESHOLD_MINUTES = 20;
 
 export type CenterAdminAttendanceBoardStatus =
   | 'present'
   | 'late'
   | 'routine_missing'
   | 'present_missing_routine'
+  | 'not_returned'
   | 'away'
   | 'returned'
   | 'checked_out'
@@ -56,6 +58,8 @@ export interface CenterAdminAttendanceSeatSignal {
   recentRoutineMissingCount: number;
   currentAwayMinutes: number;
   isLongAway: boolean;
+  isShortAway: boolean;
+  isShortAwayOverdue: boolean;
   isReturned: boolean;
   isCheckedOut: boolean;
   hasAttendanceEvidence: boolean;
@@ -71,6 +75,7 @@ export interface CenterAdminAttendanceBoardSummary {
   lateOrAbsentCount: number;
   routineMissingCount: number;
   awayCount: number;
+  notReturnedCount: number;
   returnedCount: number;
   checkedOutCount: number;
   longAwayCount: number;
@@ -126,6 +131,13 @@ const PRESENTATION_BY_STATUS: Record<CenterAdminAttendanceBoardStatus, Attendanc
     flagClass: 'bg-white/95 text-[#1F9E7A]',
     isDark: false,
   },
+  not_returned: {
+    surfaceClass: 'border-[#E11D48] bg-[#FFE1E8] text-[#14295F]',
+    chipClass: 'bg-[#E11D48] text-white',
+    chipLabel: '미복귀',
+    flagClass: 'bg-white/95 text-[#BE123C]',
+    isDark: false,
+  },
   returned: {
     surfaceClass: 'border-[#4D7DFF] bg-[#E1EBFF] text-[#14295F]',
     chipClass: 'bg-[#2554D7] text-white',
@@ -176,6 +188,7 @@ const BOARD_STATUS_LABELS: Record<CenterAdminAttendanceBoardStatus, string> = {
   late: '지각 입실',
   routine_missing: '루틴 누락',
   present_missing_routine: '입실·루틴누락',
+  not_returned: '미복귀',
   away: '외출/휴식',
   returned: '복귀 후 공부',
   checked_out: '퇴실',
@@ -239,9 +252,11 @@ export function resolveAttendanceBoardStatus(params: {
   displayStatus: DisplayAttendanceStatus;
   hasAttendanceEvidence: boolean;
   isReturned: boolean;
+  isShortAwayOverdue?: boolean;
 }) {
-  const { seatStatus, displayStatus, hasAttendanceEvidence, isReturned } = params;
+  const { seatStatus, displayStatus, hasAttendanceEvidence, isReturned, isShortAwayOverdue = false } = params;
 
+  if ((seatStatus === 'away' || seatStatus === 'break') && isShortAwayOverdue) return 'not_returned';
   if (seatStatus === 'away' || seatStatus === 'break') return 'away';
   if (seatStatus === 'studying' && isReturned) return 'returned';
   if (seatStatus === 'studying') return 'present';
@@ -263,12 +278,14 @@ export function buildAttendanceBoardFlags(params: {
   displayStatus: DisplayAttendanceStatus;
   attendanceRiskLevel: CenterAdminAttendanceRiskLevel;
   isLongAway: boolean;
+  isShortAwayOverdue?: boolean;
 }) {
-  const { displayStatus, attendanceRiskLevel, isLongAway } = params;
+  const { displayStatus, attendanceRiskLevel, isLongAway, isShortAwayOverdue = false } = params;
   return [
     attendanceRiskLevel === 'risk' ? '출석위험' : attendanceRiskLevel === 'warning' ? '출석주의' : null,
     displayStatus === 'confirmed_late' ? '오늘 지각O' : null,
     displayStatus === 'missing_routine' || displayStatus === 'confirmed_present_missing_routine' ? '루틴누락' : null,
+    isShortAwayOverdue ? '미복귀' : null,
     isLongAway ? '장기외출' : null,
     displayStatus === 'excused_absent' ? '미등원' : null,
   ].filter(Boolean) as string[];
@@ -316,10 +333,10 @@ export function buildAttendanceBoardNote(params: {
       return '오늘 루틴 기록이 없어 출석 확인 전에 먼저 점검이 필요합니다.';
     case 'present_missing_routine':
       return '입실은 확인됐지만 오늘 루틴이 비어 있어 생활기록 점검이 필요합니다.';
+    case 'not_returned':
+      return `단기외출 후 ${currentAwayMinutes}분째 복귀가 눌리지 않아 미복귀 확인이 필요합니다. 복귀 처리 전까지 공부시간은 다시 카운팅되지 않습니다.`;
     case 'away':
-      return currentAwayMinutes >= 20
-        ? `외출/휴식이 ${currentAwayMinutes}분 이어져 복귀 확인이 필요합니다.`
-        : '현재 외출 또는 휴식 중입니다.';
+      return '현재 외출 또는 휴식 중입니다.';
     case 'returned':
       return '현재 공부에 복귀한 상태이며, 오늘 누적 공부 기록이 함께 확인됩니다.';
     case 'checked_out':
@@ -383,6 +400,14 @@ export function resolveAttendanceOperationalException(params: {
         : currentAwayMinutes >= 20
           ? `현재 ${currentAwayMinutes}분째 자리를 비우고 있어 복귀 확인이 필요합니다.`
           : '현재 자리를 비우고 있어 복귀 여부를 확인하면 됩니다.',
+    };
+  }
+
+  if (boardStatus === 'not_returned') {
+    return {
+      kind: 'not_returned' as const,
+      label: '미복귀',
+      note: `단기외출 후 ${currentAwayMinutes}분째 복귀가 눌리지 않았습니다. 복귀 처리 전까지 공부시간은 멈춘 상태입니다.`,
     };
   }
 
@@ -450,6 +475,7 @@ export function buildAttendanceBoardSummary(signals: CenterAdminAttendanceSeatSi
         acc.routineMissingCount += 1;
       }
       if (signal.boardStatus === 'away') acc.awayCount += 1;
+      if (signal.boardStatus === 'not_returned') acc.notReturnedCount += 1;
       if (signal.boardStatus === 'returned') acc.returnedCount += 1;
       if (signal.boardStatus === 'checked_out') acc.checkedOutCount += 1;
       if (signal.boardStatus === 'excused_absent') acc.excusedAbsentCount += 1;
@@ -462,6 +488,7 @@ export function buildAttendanceBoardSummary(signals: CenterAdminAttendanceSeatSi
       lateOrAbsentCount: 0,
       routineMissingCount: 0,
       awayCount: 0,
+      notReturnedCount: 0,
       returnedCount: 0,
       checkedOutCount: 0,
       longAwayCount: 0,
@@ -476,7 +503,7 @@ export function buildAttendanceBoardSummary(signals: CenterAdminAttendanceSeatSi
 
   summary.studyingFamilyCount = summary.normalPresentCount + summary.returnedCount;
   summary.attentionFamilyCount = summary.lateOrAbsentCount + summary.routineMissingCount;
-  summary.restFamilyCount = summary.awayCount;
+  summary.restFamilyCount = summary.awayCount + summary.notReturnedCount;
   summary.exitFamilyCount = summary.checkedOutCount + summary.excusedAbsentCount + summary.plannedCount;
 
   return summary;

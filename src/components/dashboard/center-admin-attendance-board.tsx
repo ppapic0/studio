@@ -84,6 +84,7 @@ function isAttentionSignal(signal: CenterAdminAttendanceSeatSignal) {
   return (
     signal.attendanceDisplayStatus === 'confirmed_late' ||
     signal.boardStatus === 'absent' ||
+    signal.boardStatus === 'not_returned' ||
     signal.attendanceDisplayStatus === 'missing_routine' ||
     signal.attendanceDisplayStatus === 'confirmed_present_missing_routine'
   );
@@ -96,12 +97,14 @@ function getSeatDisplayLabel(seat: AttendanceCurrent, fallbackRoomSeatNo: number
 
 function getOperationalSignalPriority(signal: CenterAdminAttendanceSeatSignal) {
   switch (signal.operationalExceptionKind) {
-    case 'midday_leave':
+    case 'not_returned':
       return 0;
-    case 'early_checkout':
+    case 'midday_leave':
       return 1;
-    case 'returned':
+    case 'early_checkout':
       return 2;
+    case 'returned':
+      return 3;
     default:
       return 99;
   }
@@ -157,6 +160,7 @@ export function CenterAdminAttendanceBoard({
     () => ({
       total: operationalSignals.length,
       away: operationalSignals.filter((signal) => signal.operationalExceptionKind === 'midday_leave').length,
+      notReturned: operationalSignals.filter((signal) => signal.operationalExceptionKind === 'not_returned').length,
       returned: operationalSignals.filter((signal) => signal.operationalExceptionKind === 'returned').length,
       earlyCheckout: operationalSignals.filter((signal) => signal.operationalExceptionKind === 'early_checkout').length,
     }),
@@ -183,10 +187,15 @@ export function CenterAdminAttendanceBoard({
     {
       label: '휴식/외출',
       value: summary.restFamilyCount,
-      note: summary.longAwayCount > 0 ? `장기 외출 ${summary.longAwayCount}` : '현재 좌석 기준',
-      toneClass: 'border-[#CFEFDF] bg-[#F2FCF8]',
-      valueClass: 'text-[#1F9E7A]',
-      dotClass: 'bg-[#1F9E7A]',
+      note:
+        summary.notReturnedCount > 0
+          ? `미복귀 ${summary.notReturnedCount}`
+          : summary.longAwayCount > 0
+            ? `장기 외출 ${summary.longAwayCount}`
+            : '현재 좌석 기준',
+      toneClass: summary.notReturnedCount > 0 ? 'border-[#FFC2D0] bg-[#FFF1F4]' : 'border-[#CFEFDF] bg-[#F2FCF8]',
+      valueClass: summary.notReturnedCount > 0 ? 'text-[#BE123C]' : 'text-[#1F9E7A]',
+      dotClass: summary.notReturnedCount > 0 ? 'bg-[#E11D48]' : 'bg-[#1F9E7A]',
     },
     {
       label: '퇴실',
@@ -225,7 +234,7 @@ export function CenterAdminAttendanceBoard({
 
       if (signal.boardStatus === 'present' || signal.boardStatus === 'returned') {
         studyingCount += 1;
-      } else if (signal.boardStatus === 'away') {
+      } else if (signal.boardStatus === 'away' || signal.boardStatus === 'not_returned') {
         awayCount += 1;
       } else if (
         signal.boardStatus === 'checked_out' ||
@@ -720,16 +729,20 @@ export function CenterAdminAttendanceBoard({
               트랙제 예외 관리
             </Badge>
             <h3 className="text-[1.35rem] font-black tracking-tight text-[#14295F] sm:text-[1.55rem]">
-              중간 하원과 재등원 학생만 따로 봅니다
+              미복귀와 중간 이동 학생만 따로 봅니다
             </h3>
             <p className="max-w-[46rem] text-xs font-bold leading-5 text-slate-500 sm:text-sm">
-              미입실·지각은 위 출석 카드에서 보고, 여기서는 트랙제 중간 이동이 생긴 학생만 빠르게 확인하면 됩니다.
+              단기외출 후 20분 이상 복귀가 눌리지 않은 학생과 트랙제 중간 이동 학생을 빠르게 확인합니다.
             </p>
           </div>
-          <div className={cn('grid gap-2', isMobile ? 'grid-cols-2' : 'grid-cols-4')}>
+          <div className={cn('grid gap-2', isMobile ? 'grid-cols-2' : 'grid-cols-5')}>
             <div className="rounded-[1.2rem] border border-[#DCE7FF] bg-white px-3.5 py-3">
               <p className="text-[10px] font-black uppercase tracking-[0.16em] text-slate-500">이동 관리</p>
               <p className="dashboard-number mt-1.5 text-[1.45rem] leading-none text-[#14295F]">{operationalSummary.total}</p>
+            </div>
+            <div className="rounded-[1.2rem] border border-[#FFC2D0] bg-[#FFF1F4] px-3.5 py-3">
+              <p className="text-[10px] font-black uppercase tracking-[0.16em] text-[#BE123C]">미복귀</p>
+              <p className="dashboard-number mt-1.5 text-[1.45rem] leading-none text-[#BE123C]">{operationalSummary.notReturned}</p>
             </div>
             <div className="rounded-[1.2rem] border border-[#D9F2E7] bg-[#F3FCF8] px-3.5 py-3">
               <p className="text-[10px] font-black uppercase tracking-[0.16em] text-[#2D8C6B]">외출 중</p>
@@ -821,8 +834,15 @@ export function CenterAdminAttendanceBoard({
                             {excursionRange}
                           </Badge>
                         ) : null}
-                        {signal.currentAwayMinutes > 0 && signal.operationalExceptionKind === 'midday_leave' ? (
-                          <Badge className="h-6 rounded-full border border-[#D9F2E7] bg-[#F3FCF8] px-2.5 text-[10px] font-black text-[#1F9E7A]">
+                        {signal.currentAwayMinutes > 0 && (signal.operationalExceptionKind === 'midday_leave' || signal.operationalExceptionKind === 'not_returned') ? (
+                          <Badge
+                            className={cn(
+                              'h-6 rounded-full border px-2.5 text-[10px] font-black',
+                              signal.operationalExceptionKind === 'not_returned'
+                                ? 'border-[#FFC2D0] bg-[#FFF1F4] text-[#BE123C]'
+                                : 'border-[#D9F2E7] bg-[#F3FCF8] text-[#1F9E7A]'
+                            )}
+                          >
                             이탈 {signal.currentAwayMinutes}분
                           </Badge>
                         ) : null}

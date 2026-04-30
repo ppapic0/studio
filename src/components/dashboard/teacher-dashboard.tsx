@@ -408,7 +408,8 @@ function getTeacherOperationalHealth(signal: CenterAdminAttendanceSeatSignal) {
   if (signal.seatStatus === 'absent') {
     return signal.todayStudyMinutes > 0 ? 54 : 32;
   }
-  if (signal.currentAwayMinutes >= 20) return 44;
+  if (signal.isShortAwayOverdue) return 38;
+  if (signal.isLongAway || signal.currentAwayMinutes >= 20) return 44;
   if (signal.todayStudyMinutes >= 240) return 92;
   if (signal.todayStudyMinutes >= 120) return 76;
   return 58;
@@ -422,9 +423,11 @@ function getTeacherParentHealth(hasUnreadReport: boolean, hasCounselingToday: bo
 }
 
 function getTeacherEfficiencyHealth(signal: CenterAdminAttendanceSeatSignal, hasUnreadReport: boolean) {
-  if (hasUnreadReport && signal.currentAwayMinutes >= 20) return 34;
+  if (hasUnreadReport && signal.isShortAwayOverdue) return 30;
+  if (hasUnreadReport && (signal.isLongAway || signal.currentAwayMinutes >= 20)) return 34;
   if (hasUnreadReport) return 48;
-  if (signal.currentAwayMinutes >= 20) return 46;
+  if (signal.isShortAwayOverdue) return 40;
+  if (signal.isLongAway || signal.currentAwayMinutes >= 20) return 46;
   if (signal.recentRoutineMissingCount >= 2) return 58;
   return 84;
 }
@@ -437,7 +440,10 @@ function getTeacherSeatTopReason(params: {
   riskLevel?: 'stable' | 'watch' | 'risk' | 'critical';
 }) {
   const { attendanceSignal, hasUnreadReport, hasCounselingToday, penaltyPoints, riskLevel = 'stable' } = params;
-  if (penaltyPoints >= 7 && attendanceSignal.currentAwayMinutes >= 20) {
+  if (penaltyPoints >= 7 && attendanceSignal.isShortAwayOverdue) {
+    return `벌점 ${penaltyPoints}점과 단기외출 미복귀가 겹쳐 오늘 바로 개입이 필요합니다.`;
+  }
+  if (penaltyPoints >= 7 && (attendanceSignal.isLongAway || attendanceSignal.currentAwayMinutes >= 20)) {
     return `벌점 ${penaltyPoints}점과 장기 외출이 겹쳐 오늘 바로 개입이 필요합니다.`;
   }
   if (riskLevel === 'critical' || riskLevel === 'risk') {
@@ -449,7 +455,10 @@ function getTeacherSeatTopReason(params: {
   if (hasUnreadReport) {
     return '최근 리포트가 아직 미열람 상태라 학부모 반응을 먼저 확인하는 편이 좋습니다.';
   }
-  if (attendanceSignal.currentAwayMinutes >= 20) {
+  if (attendanceSignal.isShortAwayOverdue) {
+    return `단기외출 후 ${attendanceSignal.currentAwayMinutes}분째 복귀가 눌리지 않아 미복귀 확인이 먼저 필요합니다.`;
+  }
+  if (attendanceSignal.isLongAway || attendanceSignal.currentAwayMinutes >= 20) {
     return `현재 외출/휴식이 ${attendanceSignal.currentAwayMinutes}분 이어져 복귀 관리가 먼저 필요합니다.`;
   }
   return attendanceSignal.note || '오늘 가장 먼저 확인할 상태와 대응 포인트를 한 화면에서 정리했습니다.';
@@ -2195,14 +2204,18 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
             onClick: () => scrollToSection(liveBoardSectionRef),
           }
         : null,
-      attendanceBoardSummary.longAwayCount > 0
+      attendanceBoardSummary.notReturnedCount + attendanceBoardSummary.longAwayCount > 0
         ? {
             key: 'long-away',
-            title: `장기 외출 ${attendanceBoardSummary.longAwayCount}명`,
-            detail: '오래 자리를 비운 학생의 복귀 여부를 실시간 교실에서 먼저 점검하세요.',
+            title: attendanceBoardSummary.notReturnedCount > 0
+              ? `미복귀 ${attendanceBoardSummary.notReturnedCount}명`
+              : `장기 외출 ${attendanceBoardSummary.longAwayCount}명`,
+            detail: attendanceBoardSummary.notReturnedCount > 0
+              ? '단기외출 후 20분 이상 복귀가 눌리지 않은 학생을 실시간 교실에서 먼저 확인하세요.'
+              : '오래 자리를 비운 학생의 복귀 여부를 실시간 교실에서 먼저 점검하세요.',
             actionLabel: '좌석 확인',
             icon: LogOut,
-            toneClass: 'bg-amber-100 text-amber-700',
+            toneClass: attendanceBoardSummary.notReturnedCount > 0 ? 'bg-rose-100 text-rose-700' : 'bg-amber-100 text-amber-700',
             onClick: () => scrollToSection(liveBoardSectionRef),
           }
         : null,
@@ -2259,7 +2272,7 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
     if (
       items.length < 3
       && attendanceBoardSummary.lateOrAbsentCount === 0
-      && attendanceBoardSummary.longAwayCount === 0
+      && attendanceBoardSummary.notReturnedCount + attendanceBoardSummary.longAwayCount === 0
     ) {
       items.push({
         key: 'attendance-overview',
@@ -2300,6 +2313,7 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
   }, [
     appointments,
     attendanceBoardSummary.lateOrAbsentCount,
+    attendanceBoardSummary.notReturnedCount,
     attendanceBoardSummary.longAwayCount,
     latestUnreadRecentReport,
     now,
@@ -2369,11 +2383,13 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
   const teacherHomeAlertCount = useMemo(
     () =>
       attendanceBoardSummary.lateOrAbsentCount +
+      attendanceBoardSummary.notReturnedCount +
       attendanceBoardSummary.longAwayCount +
       seatOverlaySummary.riskCount +
       teacherCounselingSummary.pendingCount,
     [
       attendanceBoardSummary.lateOrAbsentCount,
+      attendanceBoardSummary.notReturnedCount,
       attendanceBoardSummary.longAwayCount,
       seatOverlaySummary.riskCount,
       teacherCounselingSummary.pendingCount,
@@ -2387,26 +2403,23 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
     if (
       seatOverlaySummary.riskCount > 0 ||
       attendanceBoardSummary.lateOrAbsentCount > 0 ||
+      attendanceBoardSummary.notReturnedCount > 0 ||
       teacherCounselingSummary.pendingCount > 0
     ) {
       return {
         label: '긴급',
         headline: '지금은 조치와 좌석 흐름을 먼저 잡아야 합니다.',
-        detail: `위험 ${seatOverlaySummary.riskCount}명, 미입실·지각 ${attendanceBoardSummary.lateOrAbsentCount}명, 상담 승인 ${teacherCounselingSummary.pendingCount}건을 우선 확인하세요.`,
+        detail: `위험 ${seatOverlaySummary.riskCount}명, 미입실·지각 ${attendanceBoardSummary.lateOrAbsentCount}명, 미복귀 ${attendanceBoardSummary.notReturnedCount}명, 상담 승인 ${teacherCounselingSummary.pendingCount}건을 우선 확인하세요.`,
         badgeClass: 'border-[#FFB38A]/30 bg-[#FF7A16] text-white',
         dotClass: 'bg-[#FFB38A]',
       };
     }
 
-    if (
-      attendanceBoardSummary.longAwayCount > 0 ||
-      unreadReportCount > 0 ||
-      teacherHomeActionSignalCount > 0
-    ) {
+    if (attendanceBoardSummary.longAwayCount > 0 || unreadReportCount > 0 || teacherHomeActionSignalCount > 0) {
       return {
         label: '주의',
         headline: '큰 이상은 없지만 오늘 후속 확인이 남아 있습니다.',
-        detail: `장기 외출 ${attendanceBoardSummary.longAwayCount}명, 미열람 리포트 ${unreadReportCount}건을 홈에서 바로 이어서 확인할 수 있습니다.`,
+        detail: `미복귀/장기외출 ${attendanceBoardSummary.notReturnedCount + attendanceBoardSummary.longAwayCount}명, 미열람 리포트 ${unreadReportCount}건을 홈에서 바로 이어서 확인할 수 있습니다.`,
         badgeClass: 'border-amber-200/30 bg-amber-400/20 text-amber-100',
         dotClass: 'bg-amber-300',
       };
@@ -2421,6 +2434,7 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
     };
   }, [
     attendanceBoardSummary.lateOrAbsentCount,
+    attendanceBoardSummary.notReturnedCount,
     attendanceBoardSummary.longAwayCount,
     seatOverlaySummary.riskCount,
     teacherHomeActionSignalCount,
@@ -2456,9 +2470,13 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
         label: '외출/휴식',
         value: roomScopedKpi?.away ?? stats.away,
         unit: '명',
-        caption: `장기 외출 ${attendanceBoardSummary.longAwayCount}명`,
+        caption: `미복귀 ${attendanceBoardSummary.notReturnedCount}명 · 장기 ${attendanceBoardSummary.longAwayCount}명`,
         icon: Clock,
-        tone: attendanceBoardSummary.longAwayCount > 0 ? 'orange' as const : 'default' as const,
+        tone: attendanceBoardSummary.notReturnedCount > 0
+          ? 'rose' as const
+          : attendanceBoardSummary.longAwayCount > 0
+            ? 'orange' as const
+            : 'default' as const,
         deltaLabel: '자리 이탈 상태',
         onClick: () => scrollToSection(liveBoardSectionRef),
       },
@@ -2513,6 +2531,7 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
     ],
     [
       attendanceBoardSummary.lateOrAbsentCount,
+      attendanceBoardSummary.notReturnedCount,
       attendanceBoardSummary.longAwayCount,
       currentTeacherScopeLabel,
       latestUnreadRecentReport,
