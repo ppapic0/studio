@@ -70,7 +70,7 @@ import {
   upsertStudyBoxRewardEntry,
   type StudyBoxReward,
 } from '@/lib/student-rewards';
-import { getCurrentStudyDayLiveSeconds, getStudyDayContext, hasStudyBoxCarryoverExpired } from '@/lib/study-day';
+import { getCurrentStudyDayLiveSeconds, getStudyDayContext, isStudyBoxCarryoverOpenable } from '@/lib/study-day';
 import { readStudyBoxOpenedCache, writeStudyBoxOpenedCache } from '@/lib/study-box-opened-cache';
 import { openStudyRewardBoxesSecure } from '@/lib/study-box-actions';
 import { GiftishowOrder, GiftishowProduct, GiftishowSettings, GrowthProgress, PointBoostEvent, StudyLogDay } from '@/lib/types';
@@ -592,8 +592,8 @@ export default function GrowthPage() {
     () => getOpenedStudyBoxes(previousStudyDayStatus),
     [previousStudyDayStatus]
   );
-  const isCarryoverExpired = useMemo(
-    () => hasStudyBoxCarryoverExpired(previousStudyDayKey, new Date(nowMs)),
+  const canOpenPreviousStudyDayBoxes = useMemo(
+    () => isStudyBoxCarryoverOpenable(previousStudyDayKey, new Date(nowMs)),
     [nowMs, previousStudyDayKey]
   );
 
@@ -901,18 +901,18 @@ export default function GrowthPage() {
   );
   const carryoverReadyHours = useMemo(
     () => {
-      if (isCarryoverExpired) return [];
+      if (!canOpenPreviousStudyDayBoxes) return [];
       return getRemainingCarryoverStudyBoxHours({
         claimedHours: persistedCarryoverClaimedBoxes,
         openedHours: carryoverOpenedBoxes,
       });
     },
-    [carryoverOpenedBoxes, isCarryoverExpired, persistedCarryoverClaimedBoxes]
+    [canOpenPreviousStudyDayBoxes, carryoverOpenedBoxes, persistedCarryoverClaimedBoxes]
   );
-  const hasCarryoverReadyBoxes = !isCarryoverExpired && carryoverReadyHours.length > 0;
+  const hasCarryoverReadyBoxes = canOpenPreviousStudyDayBoxes && carryoverReadyHours.length > 0;
   const carryoverBoxes = useMemo(
     () => {
-      if (isCarryoverExpired) return [] as RewardBox[];
+      if (!canOpenPreviousStudyDayBoxes) return [] as RewardBox[];
       return buildRewardBoxes({
         earnedHours: persistedCarryoverClaimedBoxes.at(-1) || 0,
         claimedHours: persistedCarryoverClaimedBoxes,
@@ -923,7 +923,7 @@ export default function GrowthPage() {
         dateKey: previousStudyDayKey,
       });
     },
-    [activeMembership?.id, carryoverOpenedBoxes, carryoverRewardByHour, isCarryoverExpired, persistedCarryoverClaimedBoxes, previousStudyDayKey, studentUid]
+    [activeMembership?.id, canOpenPreviousStudyDayBoxes, carryoverOpenedBoxes, carryoverRewardByHour, persistedCarryoverClaimedBoxes, previousStudyDayKey, studentUid]
   );
   const todayReadyBoxes = boxes.filter((box) => box.state === 'ready');
   const carryoverReadyBoxes = hasCarryoverReadyBoxes ? carryoverBoxes.filter((box) => box.state === 'ready') : [];
@@ -1901,9 +1901,9 @@ export default function GrowthPage() {
                     </p>
                   </div>
                   <div className="rounded-[1.1rem] bg-[#F6F9FF] px-3.5 py-3">
-                    <p className="text-sm font-black text-[#14295F]">전날 상자는 다음 공부일 새벽 1시 30분까지</p>
+                    <p className="text-sm font-black text-[#14295F]">어제 미개봉 상자만 열 수 있어요</p>
                     <p className="mt-1 text-xs font-bold leading-5 text-[#5F729B]">
-                      못 연 상자는 다음 공부일 내내 남고, 그다음 새벽 1시 30분에 정리돼요.
+                      이틀 전 이전 상자는 보관함에서 사라지고 다시 열 수 없어요.
                     </p>
                   </div>
                 </div>

@@ -48,6 +48,18 @@ export function hasStudyBoxCarryoverExpired(dateKey: string | null | undefined, 
   return baseDate.getTime() >= getStudyBoxCarryoverExpiresAtForKey(dateKey).getTime();
 }
 
+export function isPreviousStudyDayKey(dateKey: string | null | undefined, baseDate: Date = new Date()) {
+  if (!dateKey) return false;
+  const currentStudyDayDate = getStudyDayDate(baseDate);
+  const previousStudyDayDate = new Date(currentStudyDayDate);
+  previousStudyDayDate.setDate(previousStudyDayDate.getDate() - 1);
+  return dateKey === toDateKey(previousStudyDayDate);
+}
+
+export function isStudyBoxCarryoverOpenable(dateKey: string | null | undefined, baseDate: Date = new Date()) {
+  return isPreviousStudyDayKey(dateKey, baseDate) && !hasStudyBoxCarryoverExpired(dateKey, baseDate);
+}
+
 export function getStudyDayContext(baseDate: Date = new Date()) {
   const nowKst = toKstDate(baseDate);
   const studyDayDate = getStudyDayDate(baseDate);
