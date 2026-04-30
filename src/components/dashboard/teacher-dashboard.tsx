@@ -258,15 +258,17 @@ function getCenterPointDayDetail(dayStatus: unknown): string {
       const label = typeof event.label === 'string' ? event.label.trim() : '';
       const reason = typeof event.reason === 'string' ? event.reason.trim() : '';
       const source = typeof event.source === 'string' ? event.source.trim() : '';
+      const hour = Number(event.hour ?? event.milestone);
       if (label) return label;
       if (reason) return reason;
       if (source === 'plan_completion') return '계획 완수';
+      if (source === 'study_box' && Number.isFinite(hour) && hour > 0) return `${Math.floor(hour)}시간 상자`;
       if (source === 'study_box') return '공부상자';
       if (source.includes('rank')) return '랭킹 보상';
       return '';
     })
     .filter(Boolean);
-  return Array.from(new Set(labels)).slice(0, 3).join(' · ') || '포인트 적립';
+  return Array.from(new Set(labels)).join(' · ') || '포인트 적립';
 }
 
 function getManualSeatOccupantName(seat?: Pick<AttendanceCurrent, 'manualOccupantName'> | null) {
@@ -5611,9 +5613,9 @@ export function TeacherDashboard({ isActive }: { isActive: boolean }) {
                           <p className="text-[10px] font-black uppercase tracking-[0.16em] text-[#6E7EA3]">학생별 전체 상세</p>
                           {day.grants.map((grant) => (
                             <div key={grant.key} className="flex items-start justify-between gap-3 rounded-2xl border border-[#EEF4FF] bg-white px-3 py-2.5">
-                              <div className="min-w-0">
+                              <div className="min-w-0 flex-1">
                                 <p className="text-sm font-black text-[#14295F]">{grant.studentName}</p>
-                                <p className="mt-1 truncate text-[11px] font-bold text-[#6E7EA3]">{grant.detail}</p>
+                                <p className="mt-1 break-keep text-[11px] font-bold leading-5 text-[#6E7EA3]">{grant.detail}</p>
                               </div>
                               <span className="shrink-0 text-sm font-black text-emerald-700">{grant.points.toLocaleString()}P</span>
                             </div>

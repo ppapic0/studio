@@ -780,7 +780,7 @@ function formatPointBreakdownDetail(breakdown: ReturnType<typeof getDailyPointBr
     : [];
 
   if (eventLabels.length > 0) {
-    return Array.from(new Set(eventLabels)).slice(0, 3).join(' · ');
+    return Array.from(new Set(eventLabels)).join(' · ');
   }
 
   return [
@@ -9230,14 +9230,14 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
                                     key={grant.key}
                                     className="flex items-start justify-between gap-3 rounded-[1rem] border border-[#E4ECFF] bg-white px-3 py-2.5"
                                   >
-                                    <div className="min-w-0">
+                                    <div className="min-w-0 flex-1">
                                       <div className="flex flex-wrap items-center gap-2">
                                         <p className="truncate text-sm font-black text-[#14295F]">{grant.studentName}</p>
                                         <Badge className="h-5 rounded-full border-none bg-[#EEF4FF] px-2 text-[10px] font-black text-[#2554D7]">
                                           {grant.className}
                                         </Badge>
                                       </div>
-                                      <p className="mt-1 truncate text-[11px] font-bold text-[#6E7EA3]">{grant.detail}</p>
+                                      <p className="mt-1 break-keep text-[11px] font-bold leading-5 text-[#6E7EA3]">{grant.detail}</p>
                                     </div>
                                     <div className="flex shrink-0 items-center gap-2">
                                       <p className="text-sm font-black text-emerald-700">{formatPointsInPt(grant.totalPoints)}</p>
