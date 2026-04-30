@@ -22,6 +22,7 @@ import { collection, getDocs, limit, query, Timestamp, where, type Firestore } f
 import { httpsCallable } from 'firebase/functions';
 
 import { Button } from '@/components/ui/button';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { useToast } from '@/hooks/use-toast';
 import { useAppContext } from '@/contexts/app-context';
 import { useFirestore, useFunctions } from '@/firebase';
@@ -86,8 +87,13 @@ type KioskFastOutboxItem = {
   payload: SubmitKioskAttendanceActionFastInput;
   attempts: number;
   createdAt: number;
+  studentName?: string;
+  actionLabel?: string;
+  seatLabel?: string;
   lastError?: string;
 };
+
+type KioskFastOutboxMeta = Pick<KioskFastOutboxItem, 'studentName' | 'actionLabel' | 'seatLabel'>;
 
 const FAST_OUTBOX_STORAGE_KEY = 'track:kiosk-fast-attendance-outbox:v1';
 const MAX_OUTBOX_ITEMS = 48;
@@ -203,7 +209,11 @@ function readFastOutbox(): KioskFastOutboxItem[] {
   if (typeof window === 'undefined') return [];
   try {
     const parsed = JSON.parse(window.localStorage.getItem(FAST_OUTBOX_STORAGE_KEY) || '[]');
-    return Array.isArray(parsed) ? parsed.slice(0, MAX_OUTBOX_ITEMS) : [];
+    return Array.isArray(parsed)
+      ? parsed
+          .filter((item) => item?.id && item?.payload?.idempotencyKey)
+          .slice(0, MAX_OUTBOX_ITEMS)
+      : [];
   } catch {
     return [];
   }
@@ -225,6 +235,41 @@ function getKioskErrorMessage(error: unknown) {
   }
   const message = typeof raw.message === 'string' ? raw.message.trim() : '';
   return message || '네트워크가 안정되면 자동으로 다시 동기화합니다.';
+}
+
+function formatOutboxTime(millis: number) {
+  if (!Number.isFinite(millis)) return '시간 미확인';
+  return new Intl.DateTimeFormat('ko-KR', {
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    hour12: false,
+  }).format(new Date(millis));
+}
+
+function formatOutboxSeatLabel(item: KioskFastOutboxItem) {
+  if (item.seatLabel?.trim()) return item.seatLabel.trim();
+  const hint = item.payload.seatHint;
+  if (hint?.roomSeatNo) {
+    return `${hint.roomId ? `${hint.roomId} · ` : ''}${hint.roomSeatNo}번`;
+  }
+  if (hint?.seatNo) return `${hint.seatNo}번`;
+  if (item.payload.seatId) return `좌석 ${item.payload.seatId}`;
+  return '좌석 미확인';
+}
+
+function formatOutboxStudentLabel(item: KioskFastOutboxItem) {
+  return item.studentName?.trim() || `학생 ${item.payload.studentId.slice(0, 6)}`;
+}
+
+function formatOutboxActionLabel(item: KioskFastOutboxItem) {
+  return item.actionLabel?.trim() || ACTIONS[item.payload.action]?.label || item.payload.action;
+}
+
+function formatOutboxStatusFlow(item: KioskFastOutboxItem) {
+  const from = statusLabel[normalizeStatus(item.payload.expectedStatus)] || item.payload.expectedStatus;
+  const to = statusLabel[getNextStatusForAction(item.payload.action)];
+  return `${from} -> ${to}`;
 }
 
 function isStudentLookupResult(value: KioskStudentLookupResult | null): value is KioskStudentLookupResult {
@@ -293,7 +338,7 @@ export default function KioskPage() {
   const [showLookupOverlay, setShowLookupOverlay] = useState(false);
   const [lookupMessage, setLookupMessage] = useState('번호 확인 중');
   const [successFeedback, setSuccessFeedback] = useState<KioskSuccessFeedback | null>(null);
-  const [queuedCount, setQueuedCount] = useState(0);
+  const [queuedItems, setQueuedItems] = useState<KioskFastOutboxItem[]>([]);
   const lookupVersionRef = useRef(0);
   const touchLocksRef = useRef<Record<string, number>>({});
   const lookupLoadingTimerRef = useRef<number | null>(null);
@@ -321,7 +366,7 @@ export default function KioskPage() {
   }, [lookupSeats]);
 
   const syncQueuedCount = useCallback(() => {
-    setQueuedCount(readFastOutbox().length);
+    setQueuedItems(readFastOutbox());
   }, []);
 
   const runLockedAction = useCallback((key: string, action: () => void) => {
@@ -504,16 +549,26 @@ export default function KioskPage() {
     toast,
   ]);
 
-  const saveActionForRetry = useCallback((payload: SubmitKioskAttendanceActionFastInput, lastError?: string) => {
-    const items = readFastOutbox().filter((item) => item.id !== payload.idempotencyKey);
+  const saveActionForRetry = useCallback((
+    payload: SubmitKioskAttendanceActionFastInput,
+    lastError?: string,
+    meta?: KioskFastOutboxMeta
+  ) => {
+    const currentItems = readFastOutbox();
+    const existing = currentItems.find((item) => item.id === payload.idempotencyKey);
+    const items = currentItems.filter((item) => item.id !== payload.idempotencyKey);
     writeFastOutbox([
       ...items,
       {
+        ...existing,
         id: payload.idempotencyKey,
         payload,
-        attempts: 0,
-        createdAt: Date.now(),
-        ...(lastError ? { lastError } : {}),
+        attempts: lastError ? Math.max(0, existing?.attempts || 0) + 1 : Math.max(0, existing?.attempts || 0),
+        createdAt: existing?.createdAt || Date.now(),
+        ...(meta?.studentName ? { studentName: meta.studentName } : {}),
+        ...(meta?.actionLabel ? { actionLabel: meta.actionLabel } : {}),
+        ...(meta?.seatLabel ? { seatLabel: meta.seatLabel } : {}),
+        ...(lastError ? { lastError } : existing?.lastError ? { lastError: existing.lastError } : {}),
       },
     ]);
     syncQueuedCount();
@@ -526,9 +581,9 @@ export default function KioskPage() {
 
   const submitFastPayload = useCallback(async (
     payload: SubmitKioskAttendanceActionFastInput,
-    options: { quiet?: boolean } = {}
+    options: { quiet?: boolean; outboxMeta?: KioskFastOutboxMeta } = {}
   ): Promise<SubmitKioskAttendanceActionFastResult | null> => {
-    saveActionForRetry(payload);
+    saveActionForRetry(payload, undefined, options.outboxMeta);
     if (!functions) {
       if (!options.quiet) {
         toast({
@@ -667,6 +722,11 @@ export default function KioskPage() {
     const config = ACTIONS[action];
     const nextStatus = getNextStatusForAction(action);
     const idempotencyKey = createIdempotencyKey();
+    const queuedSeatLabel =
+      seat.seatLabel ||
+      selectedStudent.seatLabel ||
+      (seat.roomSeatNo ? `${seat.roomId ? `${seat.roomId} · ` : ''}${seat.roomSeatNo}번` : '') ||
+      (seat.seatNo ? `${seat.seatNo}번` : '');
     const payload: SubmitKioskAttendanceActionFastInput = {
       centerId,
       studentId: selectedStudent.id,
@@ -706,10 +766,17 @@ export default function KioskPage() {
     });
     window.setTimeout(resetKiosk, RESET_AFTER_ACTION_MS);
 
-    void submitFastPayload(payload);
+    void submitFastPayload(payload, {
+      outboxMeta: {
+        studentName: selectedStudent.name,
+        actionLabel: config.label,
+        seatLabel: queuedSeatLabel,
+      },
+    });
   }, [centerId, pin, resetKiosk, resolveSeatForStudent, selectedStudent, submitFastPayload, toast]);
 
   const canGoBack = activeMembership?.role === 'teacher' || activeMembership?.role === 'centerAdmin';
+  const queuedCount = queuedItems.length;
   const selectedSeat = selectedStudent ? resolveSeatForStudent(selectedStudent) : null;
   const selectedStatus = normalizeStatus(selectedSeat?.status);
   const selectedActions = selectedSeat ? getAllowedActions(selectedStatus) : [];
@@ -759,10 +826,61 @@ export default function KioskPage() {
 
           <div className="flex items-center gap-2">
             {queuedCount > 0 ? (
-              <div className="hidden items-center gap-2 rounded-full border border-[#FFD7B0] bg-white px-3 py-2 text-[11px] font-black text-[#C95A08] shadow-sm sm:flex">
-                <WifiOff className="h-4 w-4" />
-                {queuedCount}건 재전송 중
-              </div>
+              <Popover>
+                <PopoverTrigger asChild>
+                  <button
+                    type="button"
+                    className={cn(
+                      kioskTouchClass,
+                      'inline-flex h-10 items-center gap-2 rounded-full border border-[#FFD7B0] bg-white px-3 text-[11px] font-black text-[#C95A08] shadow-sm transition-colors hover:bg-[#FFF8F0] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#FF7A16]/30'
+                    )}
+                    aria-label={`재전송 중인 출결 ${queuedCount}건 보기`}
+                  >
+                    <WifiOff className="h-4 w-4" />
+                    {queuedCount}건 재전송 중
+                  </button>
+                </PopoverTrigger>
+                <PopoverContent
+                  align="end"
+                  className="w-[min(92vw,24rem)] rounded-[1.4rem] border-[#FFD7B0] bg-white p-0 text-[#14295F] shadow-[0_24px_60px_-30px_rgba(20,41,95,0.34)]"
+                >
+                  <div className="border-b border-[#FFE2C5] bg-[#FFF8F0] px-4 py-3">
+                    <p className="text-[11px] font-black uppercase tracking-[0.14em] text-[#C95A08]">재전송 대기</p>
+                    <p className="mt-1 text-sm font-black text-[#14295F]">{queuedCount}건을 다시 보내는 중입니다</p>
+                  </div>
+                  <div className="max-h-80 space-y-2 overflow-y-auto p-3">
+                    {queuedItems.map((item) => (
+                      <div key={item.id} className="rounded-[1rem] border border-[#FFE2C5] bg-white px-3 py-3">
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="min-w-0">
+                            <p className="truncate text-sm font-black text-[#14295F]">
+                              {formatOutboxStudentLabel(item)}
+                            </p>
+                            <p className="mt-1 text-[11px] font-bold text-[#5F739F]">
+                              {formatOutboxSeatLabel(item)} · {formatOutboxStatusFlow(item)}
+                            </p>
+                          </div>
+                          <span className="shrink-0 rounded-full bg-[#FFF0DD] px-2 py-1 text-[10px] font-black text-[#C95A08]">
+                            {formatOutboxActionLabel(item)}
+                          </span>
+                        </div>
+                        <div className="mt-2 flex flex-wrap items-center gap-2 text-[10px] font-bold text-[#8C6B4E]">
+                          <span>{formatOutboxTime(item.payload.clientActionAtMillis || item.createdAt)}</span>
+                          <span>시도 {Math.max(0, item.attempts || 0)}회</span>
+                        </div>
+                        {item.lastError ? (
+                          <p className="mt-2 break-keep rounded-[0.75rem] bg-rose-50 px-2 py-1.5 text-[10px] font-bold leading-4 text-rose-600">
+                            {item.lastError}
+                          </p>
+                        ) : null}
+                      </div>
+                    ))}
+                  </div>
+                  <div className="border-t border-[#FFE2C5] px-4 py-3 text-[10px] font-bold leading-4 text-[#8C6B4E]">
+                    네트워크가 연결되면 자동으로 재전송되고, 성공하면 이 목록에서 사라집니다.
+                  </div>
+                </PopoverContent>
+              </Popover>
             ) : null}
             {canGoBack ? (
               <Button
