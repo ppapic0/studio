@@ -4665,7 +4665,7 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
                       event.preventDefault();
                       void handleAssignNameOnlyReservationToLayoutSeat();
                     }}
-                    placeholder={layoutSeatActionMode === 'student' ? '학생 이름, 학교, 반으로 검색' : '예약자 이름만 입력하거나, 연락처/학교로 검색'}
+                    placeholder={layoutSeatActionMode === 'student' ? '학생 이름, 학교, 반으로 검색' : '예약자 이름 입력 또는 연락처/학교로 검색'}
                     className="h-12 rounded-[1.05rem] border border-[#DCE7FF] bg-white pl-11 font-black text-[#14295F] placeholder:text-[#7F91B3]"
                   />
                 </div>
@@ -4704,29 +4704,51 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
                   </div>
                 ) : (
                   <div className="space-y-3">
-                    {canAssignNameOnlyReservation ? (
-                      <button
-                        type="button"
-                        disabled={isSavingSeatAction}
-                        onClick={() => void handleAssignNameOnlyReservationToLayoutSeat()}
-                        className="flex w-full items-center justify-between gap-3 rounded-[1.45rem] border border-[#9EE7C5] bg-emerald-50 px-4 py-3 text-left transition-all hover:-translate-y-0.5 hover:border-emerald-400 disabled:cursor-not-allowed disabled:opacity-60"
-                      >
-                        <div className="min-w-0">
-                          <div className="flex flex-wrap items-center gap-2">
-                            <p className="truncate text-sm font-black text-[#14295F]">{reservationNameOnlyDraft}</p>
-                            <Badge className="border-none bg-white text-[10px] font-black text-emerald-700">
-                              이름만 배정
-                            </Badge>
-                          </div>
-                          <p className="mt-1 truncate text-xs font-bold text-emerald-800">
-                            등록된 예약 요청이 없어도 이 이름으로 {selectedSeatLabel}에 바로 예약좌석을 만듭니다.
+                    <button
+                      type="button"
+                      disabled={isSavingSeatAction || !canAssignNameOnlyReservation}
+                      onClick={() => void handleAssignNameOnlyReservationToLayoutSeat()}
+                      className={cn(
+                        'flex w-full items-center justify-between gap-3 rounded-[1.45rem] border px-4 py-3 text-left transition-all disabled:cursor-not-allowed disabled:opacity-60',
+                        canAssignNameOnlyReservation
+                          ? 'border-[#9EE7C5] bg-emerald-50 hover:-translate-y-0.5 hover:border-emerald-400'
+                          : 'border-dashed border-[#DCE7FF] bg-white'
+                      )}
+                    >
+                      <div className="min-w-0">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span className={cn(
+                            'inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-[0.9rem]',
+                            canAssignNameOnlyReservation ? 'bg-white text-emerald-700' : 'bg-[#EEF4FF] text-[#5c6e97]'
+                          )}>
+                            <PlusCircle className="h-4 w-4" />
+                          </span>
+                          <p className="truncate text-sm font-black text-[#14295F]">
+                            {canAssignNameOnlyReservation ? reservationNameOnlyDraft : '예약자 이름 직접 입력'}
                           </p>
+                          <Badge className={cn(
+                            'border-none text-[10px] font-black',
+                            canAssignNameOnlyReservation ? 'bg-white text-emerald-700' : 'bg-[#EEF4FF] text-[#5c6e97]'
+                          )}>
+                            직접 예약
+                          </Badge>
                         </div>
-                        <span className="inline-flex h-9 shrink-0 items-center rounded-full bg-emerald-600 px-3 text-[10px] font-black text-white">
-                          {isSavingNameOnlyReservation ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : '확정'}
-                        </span>
-                      </button>
-                    ) : null}
+                        <p className={cn(
+                          'mt-2 truncate text-xs font-bold',
+                          canAssignNameOnlyReservation ? 'text-emerald-800' : 'text-[#5c6e97]'
+                        )}>
+                          {canAssignNameOnlyReservation
+                            ? `입력한 이름으로 ${selectedSeatLabel}에 바로 예약좌석을 만듭니다.`
+                            : `${selectedSeatLabel}에 바로 예약할 이름을 위 칸에 입력하세요.`}
+                        </p>
+                      </div>
+                      <span className={cn(
+                        'inline-flex h-9 shrink-0 items-center rounded-full px-3 text-[10px] font-black',
+                        canAssignNameOnlyReservation ? 'bg-emerald-600 text-white' : 'bg-[#EEF4FF] text-[#5c6e97]'
+                      )}>
+                        {isSavingNameOnlyReservation ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : '예약 확정'}
+                      </span>
+                    </button>
                     {layoutSeatReservationCandidates.length === 0 ? (
                       <div className="rounded-[1.6rem] border border-dashed border-[#DCE7FF] bg-white px-5 py-8 text-center">
                         <p className="text-base font-black text-[#14295F]">
