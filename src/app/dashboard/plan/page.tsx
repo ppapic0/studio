@@ -130,8 +130,6 @@ import { StudyComposerCard } from '@/components/dashboard/student-planner/study-
 import { RecentStudySheet } from '@/components/dashboard/student-planner/recent-study-sheet';
 import { StudyPlanSheet } from '@/components/dashboard/student-planner/study-plan-sheet';
 import { RoutineOnboardingFlow } from '@/components/dashboard/student-planner/routine-onboarding-flow';
-import { AttendanceScheduleSheet } from '@/components/dashboard/student-planner/attendance-schedule-sheet';
-import { SameDayScheduleChangeDialog } from '@/components/dashboard/student-planner/same-day-schedule-change-dialog';
 import {
   BUILTIN_PLANNER_TEMPLATES,
   PLAN_DEFAULT_START_TIME,
@@ -869,23 +867,9 @@ export default function StudyPlanPage() {
   useEffect(() => {
     if (!user || !searchParams.get('schedulePrefill')) return;
     try {
-      const raw = window.localStorage.getItem(`planner-schedule-prefill:${user.uid}`);
-      if (!raw) return;
-      const parsed = JSON.parse(raw) as typeof scheduleRecommendationPrefill;
-      if (!parsed) return;
-      setScheduleRecommendationPrefill(parsed);
-      const prefillWeekdays = normalizeWeekdayValues(parsed.repeatWeekdays || [1, 2, 3, 4, 5]);
-      setSelectedRecurringWeekdays(prefillWeekdays.length > 0 ? prefillWeekdays : [1, 2, 3, 4, 5]);
-      setWeekdayDraft((previous) => ({
-        ...previous,
-        inTime: parsed.recommendedArrivalTime || previous.inTime,
-        outTime: parsed.recommendedDepartureTime || previous.outTime,
-      }));
-      setInTime(parsed.recommendedArrivalTime || '09:00');
-      setOutTime(parsed.recommendedDepartureTime || '22:00');
-      setAttendanceSheetInitialTab('weekday');
+      window.localStorage.removeItem(`planner-schedule-prefill:${user.uid}`);
+      setScheduleRecommendationPrefill(null);
       setAttendanceSaveError(null);
-      setIsAttendanceScheduleSheetOpen(true);
     } catch {
       window.localStorage.removeItem(`planner-schedule-prefill:${user.uid}`);
     }
@@ -1357,15 +1341,15 @@ export default function StudyPlanPage() {
   const hasCopyableRoutines = copyableRoutineItems.length > 0;
 
   const hasInPlan = useMemo(
-    () => Boolean(selectedScheduleDoc ? !selectedScheduleDoc.isAbsent && selectedScheduleDoc.arrivalPlannedAt : scheduleItems.some(i => i.title.includes('등원 예정'))),
-    [scheduleItems, selectedScheduleDoc]
+    () => Boolean(selectedScheduleDoc && !selectedScheduleDoc.isAbsent && selectedScheduleDoc.arrivalPlannedAt),
+    [selectedScheduleDoc]
   );
   const hasOutPlan = useMemo(
-    () => Boolean(selectedScheduleDoc ? !selectedScheduleDoc.isAbsent && selectedScheduleDoc.departurePlannedAt : scheduleItems.some(i => i.title.includes('하원 예정'))),
-    [scheduleItems, selectedScheduleDoc]
+    () => Boolean(selectedScheduleDoc && !selectedScheduleDoc.isAbsent && selectedScheduleDoc.departurePlannedAt),
+    [selectedScheduleDoc]
   );
   const hasAwayPlan = Boolean(awayStartTime && awayEndTime) || extraAwayPlans.some((slot) => Boolean(slot.startTime && slot.endTime));
-  const isAbsentMode = useMemo(() => isScheduleAbsent || scheduleItems.some(i => i.title.includes('등원하지 않습니다')), [isScheduleAbsent, scheduleItems]);
+  const isAbsentMode = useMemo(() => isScheduleAbsent, [isScheduleAbsent]);
   const resolvedTargetDailyMinutes = useMemo(
     () => resolveStudentTargetDailyMinutesOrFallback(studentProfile, userProfile, 240),
     [
@@ -1559,33 +1543,21 @@ export default function StudyPlanPage() {
   ]);
 
   useEffect(() => {
-    const fallbackArrival = scheduleItems.find((item) => item.title.startsWith('등원 예정: '));
-    const fallbackDismissal = scheduleItems.find((item) => item.title.startsWith('하원 예정: '));
-    const fallbackAwayItems = scheduleItems
-      .filter((item) => item.title.startsWith('외출 예정') || item.title.startsWith('학원/외출 예정'))
-      .map((item) => parseAwayScheduleTitle(item.title))
-      .filter((item): item is AttendanceAwaySlot => Boolean(item))
-      .sort((left, right) => left.startTime.localeCompare(right.startTime));
-
     const scheduleSource = selectedScheduleDoc
       ? buildDraftFromScheduleDoc(selectedScheduleDoc)
-      : matchingWeekdayTemplate
-        ? buildAttendanceDraftFromTemplate(matchingWeekdayTemplate)
-        : matchedClassSchedule
-          ? buildAttendanceDraftFromClassSchedule(matchedClassSchedule)
-        : null;
+      : null;
 
     const draft = scheduleSource || {
-      inTime: fallbackArrival?.title.split(': ')[1] || '09:00',
-      outTime: fallbackDismissal?.title.split(': ')[1] || '22:00',
+      inTime: '09:00',
+      outTime: '22:00',
       academyName: '',
       academyStartTime: '',
       academyEndTime: '',
-      awayStartTime: fallbackAwayItems[0]?.startTime || '',
-      awayEndTime: fallbackAwayItems[0]?.endTime || '',
-      awayReason: fallbackAwayItems[0]?.reason || '',
-      awaySlots: fallbackAwayItems.slice(1),
-      isAbsent: scheduleItems.some((item) => item.title.includes('등원하지 않습니다')),
+      awayStartTime: '',
+      awayEndTime: '',
+      awayReason: '',
+      awaySlots: [],
+      isAbsent: false,
       classScheduleId: null,
       classScheduleName: null,
     };
@@ -1603,7 +1575,7 @@ export default function StudyPlanPage() {
     setIsScheduleAbsent(isDraftAbsent);
     setAppliedClassScheduleId(isDraftAbsent ? null : draft.classScheduleId || null);
     setAppliedClassScheduleName(isDraftAbsent ? null : draft.classScheduleName || null);
-  }, [matchedClassSchedule, matchingWeekdayTemplate, scheduleItems, selectedScheduleDoc]);
+  }, [selectedScheduleDoc]);
 
   useEffect(() => {
     if (matchingRecurringTemplate) {
@@ -1807,17 +1779,13 @@ export default function StudyPlanPage() {
       const dateKey = format(day, 'yyyy-MM-dd');
       const isAutonomousSunday = isAutonomousSundayDate(day);
       const directSchedule = isAutonomousSunday ? null : weekScheduleMap[dateKey];
-      const template = isAutonomousSunday
-        ? null
-        : activeScheduleTemplates.find((item) => normalizeWeekdayValues(item.weekdays || []).includes(getDay(day)));
-      const plannedArrival = directSchedule?.arrivalPlannedAt || template?.arrivalPlannedAt || null;
-      const plannedDeparture = directSchedule?.departurePlannedAt || template?.departurePlannedAt || null;
+      const plannedArrival = directSchedule?.arrivalPlannedAt || null;
+      const plannedDeparture = directSchedule?.departurePlannedAt || null;
       const hasArrivalPlan = Boolean(plannedArrival && plannedDeparture && !directSchedule?.isAbsent);
       const hasExcursion = Boolean(
         directSchedule?.hasExcursion ||
         directSchedule?.excursionStartAt ||
-        directSchedule?.excursionEndAt ||
-        template?.hasExcursionDefault
+        directSchedule?.excursionEndAt
       );
       const isRestDay = Boolean(directSchedule?.isAbsent);
       const status = isAutonomousSunday
@@ -1849,7 +1817,7 @@ export default function StudyPlanPage() {
         isAutonomousSunday,
       };
     });
-  }, [activeScheduleTemplates, selectedDate, weekDays, weekScheduleMap]);
+  }, [selectedDate, weekDays, weekScheduleMap]);
   const tomorrowDate = useMemo(() => addDays(new Date(), 1), []);
   const tomorrowScheduleOverview = useMemo(
     () => weeklyScheduleOverview.find((item) => item.dateKey === format(tomorrowDate, 'yyyy-MM-dd')) || null,
@@ -1885,15 +1853,12 @@ export default function StudyPlanPage() {
     setIsStudyPlanSheetOpen(true);
   }, []);
 
-  const openAttendanceSheetForDate = useCallback((date: Date, tab: 'today' | 'weekday' | 'saved' = 'today') => {
+  const selectAttendanceDateForView = useCallback((date: Date) => {
     if (isAutonomousSundayDate(date)) {
       showAutonomousSundayNotice(date);
       return;
     }
     setSelectedDate(date);
-    setAttendanceSheetInitialTab(tab);
-    setAttendanceSaveError(null);
-    setIsAttendanceScheduleSheetOpen(true);
   }, [showAutonomousSundayNotice]);
 
   const handleSelectAttendanceSheetDate = useCallback((date: Date) => {
@@ -4372,25 +4337,9 @@ export default function StudyPlanPage() {
               </Badge>
             </div>
             <div className={cn("flex gap-2", isMobile ? "flex-col" : "flex-wrap justify-end")}>
-              <Button
-                type="button"
-                className={cn("student-aggro-body rounded-xl border border-[#14295F]/10 font-black text-white bg-gradient-to-r shadow-[0_14px_26px_-20px_rgba(255,138,42,0.48)]", isMobile ? "h-10 w-full text-[11px]" : "h-11 px-4 text-xs", rewardGradient)}
-                onClick={() => openAttendanceSheetForDate(tomorrowDate, 'today')}
-              >
-                내일 일정 수정하기
-              </Button>
-              <Button
-                type="button"
-                variant="outline"
-                className={cn("student-aggro-body rounded-xl border border-[#D8E3F2] bg-white font-black text-[#17326B] hover:bg-[#FFF7EF]", isMobile ? "h-10 w-full text-[11px]" : "h-11 px-4 text-xs")}
-                onClick={() => {
-                  setAttendanceSheetInitialTab('weekday');
-                  setAttendanceSaveError(null);
-                  setIsAttendanceScheduleSheetOpen(true);
-                }}
-              >
-                이번 주 한 번에 설정
-              </Button>
+              <Badge className="student-aggro-body rounded-xl border border-[#D8E3F2] bg-white px-3 py-2 text-[11px] font-black text-[#17326B] shadow-none">
+                센터 입력 정보만 표시
+              </Badge>
             </div>
           </div>
 
@@ -4408,7 +4357,7 @@ export default function StudyPlanPage() {
 
           {needsTomorrowSchedule ? (
             <div className="rounded-[1.15rem] border border-[#FFD7B5] bg-[#FFF4E8] px-4 py-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.7)]">
-              <p className="font-aggro-display text-[1rem] font-black text-[#17326B]">내일 독서실 일정이 아직 없어요. 오늘 미리 정해두면 좋아요.</p>
+              <p className="font-aggro-display text-[1rem] font-black text-[#17326B]">내일 독서실 일정은 센터에서 입력하면 이곳에 표시됩니다.</p>
             </div>
           ) : null}
 
@@ -4472,7 +4421,7 @@ export default function StudyPlanPage() {
               <button
                 key={day.dateKey}
                 type="button"
-                onClick={() => openAttendanceSheetForDate(day.date, 'today')}
+                onClick={() => selectAttendanceDateForView(day.date)}
                 className={cn(
                   "rounded-[1rem] border px-2 py-3 transition-all",
                   isMobile
@@ -5036,98 +4985,6 @@ export default function StudyPlanPage() {
         onDeletePersonalTask={(task) => void handleDeleteTask(task)}
         onUpdatePersonalTask={(task, title) => void handleUpdatePersonalTaskDetails(task, title)}
         modeOptions={STUDY_PLAN_MODE_OPTIONS.filter((option) => option.value === 'volume')}
-      />
-
-      <AttendanceScheduleSheet
-        open={isAttendanceScheduleSheetOpen}
-        onOpenChange={setIsAttendanceScheduleSheetOpen}
-        initialTab={attendanceSheetInitialTab}
-        isMobile={isMobile}
-        isSubmitting={isSubmitting}
-        selectedDateLabel={format(selectedDate, 'yyyy. MM. dd', { locale: ko })}
-        isToday={isToday}
-        sameDayPenaltyPoints={SAME_DAY_ROUTINE_PENALTY_POINTS}
-        weekRangeLabel={weekRangeLabel}
-        calendarDays={attendanceCalendarDays}
-        onMoveWeek={moveWeek}
-        onSelectDate={handleSelectAttendanceSheetDate}
-        onAutonomousSundayClick={showAutonomousSundayNotice}
-        todayDraft={buildCurrentAttendanceDraft()}
-        onTodayChange={handleTodayScheduleChange}
-        onSaveToday={handleSaveTodaySchedule}
-        onSetTodayAbsent={handleSetTodayAbsent}
-        onResetToday={() => void handleResetTodaySchedule()}
-        hasSelectedWeekdayTemplate={hasSelectedWeekdayTemplate}
-        selectedDateWeekdayLabel={matchingWeekdayLabel}
-        onApplySelectedWeekdayTemplateToToday={handleApplySelectedWeekdayTemplateToToday}
-        matchedClassSchedule={matchedClassSchedule}
-        classSchedules={availableClassSchedules}
-        onApplyMatchedClassScheduleToToday={handleApplyMatchedClassScheduleToToday}
-        onApplyClassScheduleToWeekday={handleApplyClassScheduleToWeekday}
-        selectedWeekdays={selectedRecurringWeekdays}
-        onToggleWeekday={handleToggleRecurringWeekday}
-        weekdayOptions={WEEKDAY_OPTIONS}
-        weekdayDraft={weekdayDraft}
-        onWeekdayChange={handleWeekdayDraftChange}
-        onCopyTodayToWeekday={handleCopyTodayToWeekday}
-        onSaveWeekday={handleSaveWeekdayTemplate}
-        presetName={presetName}
-        onPresetNameChange={setPresetName}
-        onSavePreset={handleSaveSchedulePreset}
-        savedRoutines={savedAttendanceRoutines}
-        onApplyPresetToToday={handleApplyPresetToToday}
-        onApplyPresetToWeekday={handleApplyPresetToWeekday}
-        onDeletePreset={(presetId) => void handleDeleteScheduleTemplate(presetId)}
-        onTogglePresetActive={(presetId, active) => void handleToggleScheduleTemplateActive(presetId, active)}
-        recommendationPrefillSummary={scheduleRecommendationPrefill}
-        saveError={attendanceSaveError}
-        personalTasks={personalTasks as Array<WithId<StudyPlanItem>>}
-        personalTaskDraft={newPersonalTask}
-        onPersonalTaskDraftChange={setNewPersonalTask}
-        onAddPersonalTask={() => void handleAddTask(newPersonalTask, 'personal')}
-        onTogglePersonalTask={(task) => void handleToggleTask(task)}
-        onDeletePersonalTask={(task) => void handleDeleteTask(task)}
-      />
-
-      <SameDayScheduleChangeDialog
-        open={isSameDayChangeDialogOpen}
-        onOpenChange={(open) => {
-          setIsSameDayChangeDialogOpen(open);
-          if (!open) {
-            resetSameDayChangeRequestState();
-          }
-        }}
-        isSubmitting={isSubmitting}
-        selectedDateLabel={format(selectedDate, 'yyyy. MM. dd', { locale: ko })}
-        scheduleSummary={
-          pendingSameDayChangeAction === 'reset'
-            ? '저장된 오늘 일정을 비우고 다시 시작합니다.'
-            : pendingSameDayChangeAction === 'absent'
-              ? '오늘 등원 계획을 비우고 미등원으로 처리합니다.'
-              : `${buildCurrentAttendanceDraft().inTime} ~ ${buildCurrentAttendanceDraft().outTime}${buildCurrentAttendanceDraft().awayStartTime && buildCurrentAttendanceDraft().awayEndTime ? ` · 학원/외출 ${buildCurrentAttendanceDraft().awayStartTime} ~ ${buildCurrentAttendanceDraft().awayEndTime}` : ''}`
-        }
-        actionLabel={
-          pendingSameDayChangeAction === 'reset'
-            ? '오늘 일정 초기화'
-            : pendingSameDayChangeAction === 'absent'
-              ? '오늘 미등원 처리'
-              : '오늘 등하원 일정 저장'
-        }
-        penaltyPoints={SAME_DAY_ROUTINE_PENALTY_POINTS}
-        reasonCategory={sameDayReasonCategory}
-        onReasonCategoryChange={setSameDayReasonCategory}
-        reason={sameDayReason}
-        onReasonChange={setSameDayReason}
-        parentContactConfirmed={sameDayParentContactConfirmed}
-        onParentContactConfirmedChange={setSameDayParentContactConfirmed}
-        proofDrafts={sameDayProofDrafts.map((proof) => ({
-          id: proof.id,
-          name: proof.file.name,
-          previewUrl: proof.previewUrl,
-        }))}
-        onProofInputChange={handleSameDayProofInputChange}
-        onRemoveProof={handleRemoveSameDayProof}
-        onConfirm={handleConfirmSameDayScheduleChange}
       />
     </div>
   );

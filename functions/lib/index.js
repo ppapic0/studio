@@ -123,6 +123,9 @@ const ATTENDANCE_REQUEST_REASON_LABELS = {
     hospital: "병원",
     other: "기타",
 };
+function areStudentAttendanceRequestsEnabled() {
+    return false;
+}
 const SECURE_PENALTY_SOURCE_POINTS = {
     manual: 1,
     routine_missing: 1,
@@ -11100,6 +11103,11 @@ exports.submitAttendanceRequestSecure = functions.region(region).https.onCall(as
     if (!isValidDateKey(requestDate)) {
         throw new functions.https.HttpsError("invalid-argument", "requestDate is required.", {
             userMessage: "요청 날짜를 선택해 주세요.",
+        });
+    }
+    if (!areStudentAttendanceRequestsEnabled()) {
+        throw new functions.https.HttpsError("permission-denied", "Student attendance requests are disabled.", {
+            userMessage: "출결 변경은 센터에 직접 전달해 주세요. 센터에서 확인 후 수기로 입력합니다.",
         });
     }
     if (requestType === "schedule_change") {

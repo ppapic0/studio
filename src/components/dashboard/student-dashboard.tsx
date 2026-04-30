@@ -4023,8 +4023,8 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
                   <ClipboardPen className={cn("text-[#FF9626]", isMobile ? "h-6 w-6" : "h-8 w-8")} />
                 </div>
                 <div className="student-copy-stack grid min-w-0">
-                  <span className={cn("font-black tracking-tighter text-[#17326B] break-keep", isMobile ? "text-sm" : "text-xl")}>지각/결석 신청</span>
-                  <span className={cn("font-bold text-[#6781AE] uppercase tracking-widest", isMobile ? "text-[8px]" : "text-[10px]")}>빠른 요청</span>
+                  <span className={cn("font-black tracking-tighter text-[#17326B] break-keep", isMobile ? "text-sm" : "text-xl")}>출결 내역</span>
+                  <span className={cn("font-bold text-[#6781AE] uppercase tracking-widest", isMobile ? "text-[8px]" : "text-[10px]")}>센터 입력 정보</span>
                 </div>
                 <ChevronRight className="ml-auto h-5 w-5 text-[#8AA0C7]" />
               </Card>
@@ -4034,45 +4034,20 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
             <div className={cn("relative shrink-0 bg-amber-500 p-8 text-white", isMobile ? "p-6" : "p-6 sm:p-8")}>
           <BellRing className="pointer-events-none absolute top-0 right-0 p-8 h-24 w-24 opacity-20" />
               <DialogHeader>
-                <DialogTitle className="text-2xl font-black">신청서 작성</DialogTitle>
-                <DialogDescription className="text-white/70 font-bold">지각 또는 결석 사유를 입력하여 제출하세요.</DialogDescription>
+                <DialogTitle className="text-2xl font-black">출결 내역</DialogTitle>
+                <DialogDescription className="text-white/70 font-bold">출석 정보는 센터에서 입력한 내용만 확인할 수 있어요.</DialogDescription>
               </DialogHeader>
             </div>
             <div className="flex-1 overflow-y-auto bg-[#fafafa] custom-scrollbar">
               <div className={cn("space-y-8 p-8", isMobile ? "max-h-[calc(88svh-10.5rem)] p-4 space-y-5" : "p-4 sm:p-8")}>
-                <div className="grid min-w-0 gap-6 overflow-hidden rounded-[2rem] border bg-white p-4 sm:p-6">
-                  <div className={cn("grid gap-4", isMobile ? "grid-cols-1" : "grid-cols-1 sm:grid-cols-2")}>
-                    <div className="min-w-0 space-y-1.5">
-                      <Label className="text-[10px] font-black uppercase text-muted-foreground ml-1">신청 종류</Label>
-                      <Select value={requestType} onValueChange={(v:any) => setRequestType(v)}>
-                        <SelectTrigger className="h-12 min-w-0 rounded-xl border-2 text-base font-bold sm:text-sm"><SelectValue /></SelectTrigger>
-                        <SelectContent className="rounded-xl">
-                          <SelectItem value="late">지각</SelectItem>
-                          <SelectItem value="absence">결석</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div className="min-w-0 space-y-1.5">
-                      <Label className="text-[10px] font-black uppercase text-muted-foreground ml-1">날짜</Label>
-                      <Input type="date" value={requestDate} onChange={e => setRequestDate(e.target.value)} className="h-12 min-w-0 rounded-xl border-2 text-base font-bold sm:text-sm" />
-                    </div>
-                  </div>
-                  <div className="space-y-1.5">
-                    <div className="flex justify-between items-center ml-1">
-                      <Label className="text-[10px] font-black uppercase text-muted-foreground">사유 (최소 10자)</Label>
-                      <span className={cn("text-[9px] font-bold", requestReason.length < 10 ? "text-rose-500" : "text-emerald-500")}>{requestReason.length}/10자</span>
-                    </div>
-                    <Textarea placeholder="사유를 상세히 입력해 주세요." value={requestReason} onChange={e => setRequestReason(e.target.value)} className="min-h-[100px] min-w-0 resize-none rounded-2xl border-2 text-base font-bold sm:text-sm" />
-                  </div>
-                  {todayKey && requestDate === todayKey && (
-                    <div className="p-4 rounded-xl bg-rose-50 border border-rose-100 flex items-start gap-3"><AlertCircle className="h-4 w-4 text-rose-600 shrink-0 mt-0.5" /><p className="text-[11px] font-bold text-rose-900">당일 신청은 벌점 부과 대상이며, 아플 경우에는 진료확인, 처방전, 학부모님 연락이 필요합니다.</p></div>
-                  )}
-                  <Button onClick={handleRequestSubmitInternal} disabled={isRequestSubmitting || requestReason.length < 10} className="w-full h-14 rounded-2xl font-black bg-amber-500 hover:bg-amber-600 text-white">
-                    {isRequestSubmitting ? <Loader2 className="animate-spin h-5 w-5" /> : '신청서 제출하기'}
-                  </Button>
+                <div className="grid min-w-0 gap-3 overflow-hidden rounded-[2rem] border bg-white p-4 sm:p-6">
+                  <p className="text-sm font-black text-[#17326B]">출결 변경은 센터에 직접 전달해 주세요.</p>
+                  <p className="text-[12px] font-semibold leading-5 text-muted-foreground">
+                    센터에서 확인 후 수기로 입력한 출석, 지각, 결석 정보만 학생 화면에 표시됩니다.
+                  </p>
                 </div>
                 <div className="space-y-4">
-                  <h4 className="text-[10px] font-black uppercase text-primary/60 tracking-widest ml-1 flex items-center gap-2"><History className="h-3.5 w-3.5" /> 최근 신청 내역</h4>
+                  <h4 className="text-[10px] font-black uppercase text-primary/60 tracking-widest ml-1 flex items-center gap-2"><History className="h-3.5 w-3.5" /> 최근 처리 내역</h4>
                   <div className="grid gap-2">
                     {myRequests.length === 0 ? <div className="py-10 text-center rounded-2xl border-2 border-dashed border-muted-foreground/10 italic text-[10px]">내역이 없습니다.</div> : myRequests.map(req => (
                       <div key={req.id} className="p-4 rounded-2xl bg-white border border-border/50 flex items-center justify-between"><div className="flex items-center gap-3"><div className={cn("h-9 w-9 rounded-xl flex items-center justify-center", req.type === 'late' ? "bg-amber-50" : req.type === 'schedule_change' ? "bg-sky-50" : "bg-rose-50")}>{req.type === 'late' ? <Clock className="h-4 w-4 text-amber-600" /> : req.type === 'schedule_change' ? <CalendarClock className="h-4 w-4 text-sky-600" /> : <CalendarX className="h-4 w-4 text-rose-600" />}</div><div className="grid leading-tight"><span className="font-black text-xs">{req.date} {getAttendanceRequestTypeLabel(req.type)}</span><span className="text-[9px] font-bold text-muted-foreground line-clamp-1 max-w-[150px]">{req.reason}</span></div></div><Badge variant="outline" className={cn("font-black text-[9px] border-none px-2", req.status === 'requested' ? "bg-muted text-muted-foreground" : req.status === 'approved' ? "bg-emerald-500 text-white" : "bg-rose-500 text-white")}>{req.status === 'requested' ? '승인대기' : req.status === 'approved' ? '승인완료' : '반려'}</Badge></div>
