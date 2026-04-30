@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation';
 import {
   ArrowLeft,
   Check,
+  CircleAlert,
   Clock3,
   Coffee,
   Delete,
@@ -95,12 +96,18 @@ type KioskFastOutboxItem = {
   lastError?: string;
 };
 
+type KioskFailedOutboxItem = KioskFastOutboxItem & {
+  failedAt: number;
+  errorCode?: string;
+};
+
 type KioskFastOutboxMeta = Pick<
   KioskFastOutboxItem,
   'studentName' | 'studentSchool' | 'studentGrade' | 'actionLabel' | 'seatLabel'
 >;
 
 const FAST_OUTBOX_STORAGE_KEY = 'track:kiosk-fast-attendance-outbox:v1';
+const FAILED_OUTBOX_STORAGE_KEY = 'track:kiosk-fast-attendance-failures:v1';
 const MAX_OUTBOX_ITEMS = 48;
 const LOOKUP_LOADING_DELAY_MS = 150;
 const TOUCH_LOCK_MS = 350;
@@ -227,6 +234,25 @@ function readFastOutbox(): KioskFastOutboxItem[] {
 function writeFastOutbox(items: KioskFastOutboxItem[]) {
   if (typeof window === 'undefined') return;
   window.localStorage.setItem(FAST_OUTBOX_STORAGE_KEY, JSON.stringify(items.slice(-MAX_OUTBOX_ITEMS)));
+}
+
+function readFailedOutbox(): KioskFailedOutboxItem[] {
+  if (typeof window === 'undefined') return [];
+  try {
+    const parsed = JSON.parse(window.localStorage.getItem(FAILED_OUTBOX_STORAGE_KEY) || '[]');
+    return Array.isArray(parsed)
+      ? parsed
+          .filter((item) => item?.id && item?.payload?.idempotencyKey)
+          .slice(0, MAX_OUTBOX_ITEMS)
+      : [];
+  } catch {
+    return [];
+  }
+}
+
+function writeFailedOutbox(items: KioskFailedOutboxItem[]) {
+  if (typeof window === 'undefined') return;
+  window.localStorage.setItem(FAILED_OUTBOX_STORAGE_KEY, JSON.stringify(items.slice(-MAX_OUTBOX_ITEMS)));
 }
 
 function getTrimmedString(value: unknown) {
@@ -390,6 +416,7 @@ export default function KioskPage() {
   const [lookupMessage, setLookupMessage] = useState('번호 확인 중');
   const [successFeedback, setSuccessFeedback] = useState<KioskSuccessFeedback | null>(null);
   const [queuedItems, setQueuedItems] = useState<KioskFastOutboxItem[]>([]);
+  const [failedItems, setFailedItems] = useState<KioskFailedOutboxItem[]>([]);
   const lookupVersionRef = useRef(0);
   const touchLocksRef = useRef<Record<string, number>>({});
   const lookupLoadingTimerRef = useRef<number | null>(null);
@@ -418,6 +445,10 @@ export default function KioskPage() {
 
   const syncQueuedCount = useCallback(() => {
     setQueuedItems(readFastOutbox());
+  }, []);
+
+  const syncFailedCount = useCallback(() => {
+    setFailedItems(readFailedOutbox());
   }, []);
 
   const runLockedAction = useCallback((key: string, action: () => void) => {
@@ -632,6 +663,58 @@ export default function KioskPage() {
     syncQueuedCount();
   }, [syncQueuedCount]);
 
+  const saveActionFailure = useCallback((
+    payload: SubmitKioskAttendanceActionFastInput,
+    lastError: string,
+    meta?: KioskFastOutboxMeta,
+    errorCode?: string
+  ) => {
+    const currentRetryItems = readFastOutbox();
+    const retryItem = currentRetryItems.find((item) => item.id === payload.idempotencyKey);
+    const currentFailedItems = readFailedOutbox();
+    const existingFailure = currentFailedItems.find((item) => item.id === payload.idempotencyKey);
+    const failedAt = Date.now();
+    const nextFailure: KioskFailedOutboxItem = {
+      ...existingFailure,
+      ...retryItem,
+      id: payload.idempotencyKey,
+      payload,
+      attempts: Math.max(0, retryItem?.attempts || existingFailure?.attempts || 0),
+      createdAt: retryItem?.createdAt || existingFailure?.createdAt || failedAt,
+      failedAt,
+      ...(meta?.studentName || retryItem?.studentName || existingFailure?.studentName
+        ? { studentName: meta?.studentName || retryItem?.studentName || existingFailure?.studentName }
+        : {}),
+      ...(meta?.studentSchool || retryItem?.studentSchool || existingFailure?.studentSchool
+        ? { studentSchool: meta?.studentSchool || retryItem?.studentSchool || existingFailure?.studentSchool }
+        : {}),
+      ...(meta?.studentGrade || retryItem?.studentGrade || existingFailure?.studentGrade
+        ? { studentGrade: meta?.studentGrade || retryItem?.studentGrade || existingFailure?.studentGrade }
+        : {}),
+      ...(meta?.actionLabel || retryItem?.actionLabel || existingFailure?.actionLabel
+        ? { actionLabel: meta?.actionLabel || retryItem?.actionLabel || existingFailure?.actionLabel }
+        : {}),
+      ...(meta?.seatLabel || retryItem?.seatLabel || existingFailure?.seatLabel
+        ? { seatLabel: meta?.seatLabel || retryItem?.seatLabel || existingFailure?.seatLabel }
+        : {}),
+      lastError,
+      ...(errorCode ? { errorCode } : existingFailure?.errorCode ? { errorCode: existingFailure.errorCode } : {}),
+    };
+
+    writeFastOutbox(currentRetryItems.filter((item) => item.id !== payload.idempotencyKey));
+    writeFailedOutbox([
+      ...currentFailedItems.filter((item) => item.id !== payload.idempotencyKey),
+      nextFailure,
+    ]);
+    syncQueuedCount();
+    syncFailedCount();
+  }, [syncFailedCount, syncQueuedCount]);
+
+  const clearFailedActions = useCallback(() => {
+    writeFailedOutbox([]);
+    syncFailedCount();
+  }, [syncFailedCount]);
+
   const submitFastPayload = useCallback(async (
     payload: SubmitKioskAttendanceActionFastInput,
     options: { quiet?: boolean; outboxMeta?: KioskFastOutboxMeta } = {}
@@ -651,13 +734,16 @@ export default function KioskPage() {
       const result = ENABLE_FAST_CALLABLE
         ? await submitKioskAttendanceActionFast(functions, payload)
         : normalizeQueuedAttendanceResult(await enqueueKioskAttendanceActionSecure(functions, payload));
-      removeActionFromRetry(payload.idempotencyKey);
-      if (!options.quiet && result.state === 'stale') {
-        toast({
-          title: '상태 확인 필요',
-          description: result.userMessage || '출결 상태가 이미 바뀌었습니다. 번호를 다시 입력해 확인해 주세요.',
-        });
+      if (result.state === 'stale') {
+        saveActionFailure(
+          payload,
+          result.userMessage || '출결 상태가 이미 바뀌었습니다. 번호를 다시 입력해 확인해 주세요.',
+          options.outboxMeta,
+          'stale'
+        );
+        return result;
       }
+      removeActionFromRetry(payload.idempotencyKey);
       return result;
     } catch (error) {
       if (ENABLE_FAST_CALLABLE) {
@@ -665,43 +751,37 @@ export default function KioskPage() {
           const fallbackResult = normalizeQueuedAttendanceResult(
             await enqueueKioskAttendanceActionSecure(functions, payload)
           );
-          removeActionFromRetry(payload.idempotencyKey);
-          if (!options.quiet && fallbackResult.state === 'stale') {
-            toast({
-              title: '상태 확인 필요',
-              description: fallbackResult.userMessage || '출결 상태가 이미 바뀌었습니다. 번호를 다시 입력해 확인해 주세요.',
-            });
+          if (fallbackResult.state === 'stale') {
+            saveActionFailure(
+              payload,
+              fallbackResult.userMessage || '출결 상태가 이미 바뀌었습니다. 번호를 다시 입력해 확인해 주세요.',
+              options.outboxMeta,
+              'stale'
+            );
+            return fallbackResult;
           }
+          removeActionFromRetry(payload.idempotencyKey);
           return fallbackResult;
         } catch (fallbackError) {
           if (isRetryableKioskSubmissionError(fallbackError)) {
             saveActionForRetry(payload, getKioskErrorMessage(fallbackError));
           } else {
-            removeActionFromRetry(payload.idempotencyKey);
-            if (!options.quiet) {
-              toast({
-                variant: 'destructive',
-                title: '출결 처리 실패',
-                description: getKioskErrorMessage(fallbackError),
-              });
-            }
+            saveActionFailure(
+              payload,
+              getKioskErrorMessage(fallbackError),
+              options.outboxMeta,
+              getKioskErrorCode(fallbackError)
+            );
           }
         }
       } else if (isRetryableKioskSubmissionError(error)) {
         saveActionForRetry(payload, getKioskErrorMessage(error));
       } else {
-        removeActionFromRetry(payload.idempotencyKey);
-        if (!options.quiet) {
-          toast({
-            variant: 'destructive',
-            title: '출결 처리 실패',
-            description: getKioskErrorMessage(error),
-          });
-        }
+        saveActionFailure(payload, getKioskErrorMessage(error), options.outboxMeta, getKioskErrorCode(error));
       }
       return null;
     }
-  }, [functions, removeActionFromRetry, saveActionForRetry, toast]);
+  }, [functions, removeActionFromRetry, saveActionFailure, saveActionForRetry]);
 
   const flushOutbox = useCallback(async () => {
     if (flushingOutboxRef.current) return;
@@ -720,11 +800,13 @@ export default function KioskPage() {
     } finally {
       flushingOutboxRef.current = false;
       syncQueuedCount();
+      syncFailedCount();
     }
-  }, [submitFastPayload, syncQueuedCount]);
+  }, [submitFastPayload, syncFailedCount, syncQueuedCount]);
 
   useEffect(() => {
     syncQueuedCount();
+    syncFailedCount();
     void flushOutbox();
     const interval = window.setInterval(() => void flushOutbox(), 8000);
     const handleOnline = () => void flushOutbox();
@@ -733,14 +815,14 @@ export default function KioskPage() {
       window.clearInterval(interval);
       window.removeEventListener('online', handleOnline);
     };
-  }, [flushOutbox, syncQueuedCount]);
+  }, [flushOutbox, syncFailedCount, syncQueuedCount]);
 
   useEffect(() => {
-    if (!firestore || !centerId || queuedItems.length === 0) return;
+    if (!firestore || !centerId || (queuedItems.length === 0 && failedItems.length === 0)) return;
 
     const studentIds = Array.from(
       new Set(
-        queuedItems
+        [...queuedItems, ...failedItems]
           .filter((item) => (
             !getTrimmedString(item.studentName) ||
             !getTrimmedString(item.studentSchool) ||
@@ -781,36 +863,47 @@ export default function KioskPage() {
       );
       if (profilesByStudentId.size === 0) return;
 
-      let changed = false;
-      const mergedItems = readFastOutbox().map((item) => {
-        const profile = profilesByStudentId.get(item.payload.studentId);
-        if (!profile) return item;
+      const mergeProfiles = <T extends KioskFastOutboxItem>(items: T[]) => {
+        let changed = false;
+        const mergedItems = items.map((item) => {
+          const profile = profilesByStudentId.get(item.payload.studentId);
+          if (!profile) return item;
 
-        const nextItem = {
-          ...item,
-          ...(profile.studentName ? { studentName: profile.studentName } : {}),
-          ...(profile.studentSchool ? { studentSchool: profile.studentSchool } : {}),
-          ...(profile.studentGrade ? { studentGrade: profile.studentGrade } : {}),
-        };
-        if (
-          nextItem.studentName !== item.studentName ||
-          nextItem.studentSchool !== item.studentSchool ||
-          nextItem.studentGrade !== item.studentGrade
-        ) {
-          changed = true;
-        }
-        return nextItem;
-      });
+          const nextItem = {
+            ...item,
+            ...(profile.studentName ? { studentName: profile.studentName } : {}),
+            ...(profile.studentSchool ? { studentSchool: profile.studentSchool } : {}),
+            ...(profile.studentGrade ? { studentGrade: profile.studentGrade } : {}),
+          };
+          if (
+            nextItem.studentName !== item.studentName ||
+            nextItem.studentSchool !== item.studentSchool ||
+            nextItem.studentGrade !== item.studentGrade
+          ) {
+            changed = true;
+          }
+          return nextItem as T;
+        });
+        return { changed, mergedItems };
+      };
 
-      if (!changed) return;
-      writeFastOutbox(mergedItems);
-      syncQueuedCount();
+      const queuedMerge = mergeProfiles(readFastOutbox());
+      if (queuedMerge.changed) {
+        writeFastOutbox(queuedMerge.mergedItems);
+        syncQueuedCount();
+      }
+
+      const failedMerge = mergeProfiles(readFailedOutbox());
+      if (failedMerge.changed) {
+        writeFailedOutbox(failedMerge.mergedItems);
+        syncFailedCount();
+      }
     })();
 
     return () => {
       cancelled = true;
     };
-  }, [centerId, firestore, queuedItems, syncQueuedCount]);
+  }, [centerId, failedItems, firestore, queuedItems, syncFailedCount, syncQueuedCount]);
 
   useEffect(() => {
     if (!successFeedback) return;
@@ -929,6 +1022,7 @@ export default function KioskPage() {
 
   const canGoBack = activeMembership?.role === 'teacher' || activeMembership?.role === 'centerAdmin';
   const queuedCount = queuedItems.length;
+  const failedCount = failedItems.length;
   const selectedSeat = selectedStudent ? resolveSeatForStudent(selectedStudent) : null;
   const selectedStatus = normalizeStatus(selectedSeat?.status);
   const selectedActions = selectedSeat ? getAllowedActions(selectedStatus) : [];
@@ -977,6 +1071,79 @@ export default function KioskPage() {
           </div>
 
           <div className="flex items-center gap-2">
+            {failedCount > 0 ? (
+              <Popover>
+                <PopoverTrigger asChild>
+                  <button
+                    type="button"
+                    className={cn(
+                      kioskTouchClass,
+                      'inline-flex h-10 items-center gap-2 rounded-full border border-rose-200 bg-white px-3 text-[11px] font-black text-rose-600 shadow-sm transition-colors hover:bg-rose-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-300'
+                    )}
+                    aria-label={`실패한 출결 ${failedCount}건 보기`}
+                  >
+                    <CircleAlert className="h-4 w-4" />
+                    오류 {failedCount}건
+                  </button>
+                </PopoverTrigger>
+                <PopoverContent
+                  align="end"
+                  className="w-[min(92vw,24rem)] rounded-[1.4rem] border-rose-200 bg-white p-0 text-[#14295F] shadow-[0_24px_60px_-30px_rgba(20,41,95,0.34)]"
+                >
+                  <div className="border-b border-rose-100 bg-rose-50 px-4 py-3">
+                    <p className="text-[11px] font-black uppercase tracking-[0.14em] text-rose-600">처리 실패</p>
+                    <p className="mt-1 text-sm font-black text-[#14295F]">{failedCount}건의 출결을 처리하지 못했습니다</p>
+                  </div>
+                  <div className="flex max-h-80 flex-col gap-2 overflow-y-auto p-3">
+                    {failedItems.map((item) => (
+                      <div key={item.id} className="rounded-[1rem] border border-rose-100 bg-white px-3 py-3">
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="min-w-0">
+                            <p className="truncate text-sm font-black text-[#14295F]">
+                              {formatOutboxStudentLabel(item)}
+                            </p>
+                            <p className="mt-1 truncate text-[11px] font-bold text-[#5F739F]">
+                              {formatOutboxStudentProfileLabel(item)}
+                            </p>
+                            <p className="mt-1 text-[11px] font-bold text-[#5F739F]">
+                              {formatOutboxSeatLabel(item)} · {formatOutboxStatusFlow(item)}
+                            </p>
+                          </div>
+                          <span className="shrink-0 rounded-full bg-rose-50 px-2 py-1 text-[10px] font-black text-rose-600">
+                            {formatOutboxActionLabel(item)}
+                          </span>
+                        </div>
+                        <div className="mt-2 flex flex-wrap items-center gap-2 text-[10px] font-bold text-[#8C6B4E]">
+                          <span>{formatOutboxTime(item.payload.clientActionAtMillis || item.createdAt)}</span>
+                          <span>실패 {formatOutboxTime(item.failedAt)}</span>
+                          {item.errorCode ? <span>{item.errorCode}</span> : null}
+                        </div>
+                        {item.lastError ? (
+                          <p className="mt-2 break-keep rounded-[0.75rem] bg-rose-50 px-2 py-1.5 text-[10px] font-bold leading-4 text-rose-600">
+                            {item.lastError}
+                          </p>
+                        ) : null}
+                      </div>
+                    ))}
+                  </div>
+                  <div className="flex items-center justify-between gap-3 border-t border-rose-100 px-4 py-3">
+                    <p className="text-[10px] font-bold leading-4 text-[#8C6B4E]">
+                      확인 후 목록을 비울 수 있습니다.
+                    </p>
+                    <button
+                      type="button"
+                      onClick={clearFailedActions}
+                      className={cn(
+                        kioskTouchClass,
+                        'shrink-0 rounded-full bg-rose-600 px-3 py-2 text-[10px] font-black text-white transition-colors hover:bg-rose-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-300'
+                      )}
+                    >
+                      비우기
+                    </button>
+                  </div>
+                </PopoverContent>
+              </Popover>
+            ) : null}
             {queuedCount > 0 ? (
               <Popover>
                 <PopoverTrigger asChild>
