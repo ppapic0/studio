@@ -170,6 +170,12 @@ function parseAttendanceSeatStatus(value) {
     }
     return null;
 }
+function normalizeAttendanceAwayKind(value) {
+    const normalized = asTrimmedString(value).toLowerCase();
+    if (normalized === "short" || normalized === "long")
+        return normalized;
+    return null;
+}
 function parseAttendanceTransitionSource(value) {
     const normalized = asTrimmedString(value);
     if (normalized === "student_dashboard" ||
@@ -2760,6 +2766,21 @@ function resolveAttendanceSmsPipelineStatus(queueResult) {
         return "suppressed";
     return "no_recipient";
 }
+function shouldSuppressAttendanceEventParentSms(eventData) {
+    const meta = asRecord(eventData.meta);
+    return (eventData.suppressParentSms === true ||
+        eventData.parentSmsSuppressed === true ||
+        (meta === null || meta === void 0 ? void 0 : meta.suppressParentSms) === true ||
+        (meta === null || meta === void 0 ? void 0 : meta.parentSmsSuppressed) === true);
+}
+function resolveAttendanceEventParentSmsSuppressedReason(eventData) {
+    const meta = asRecord(eventData.meta);
+    return (asTrimmedString(eventData.parentSmsSuppressedReason) ||
+        asTrimmedString(eventData.smsSuppressedReason) ||
+        asTrimmedString(meta === null || meta === void 0 ? void 0 : meta.parentSmsSuppressedReason) ||
+        asTrimmedString(meta === null || meta === void 0 ? void 0 : meta.smsSuppressedReason) ||
+        "attendance_event_suppressed");
+}
 async function queueAttendanceEventSmsV2(db, params) {
     const centerId = asTrimmedString(params.centerId);
     const eventId = asTrimmedString(params.eventId);
@@ -2771,6 +2792,35 @@ async function queueAttendanceEventSmsV2(db, params) {
         if (!centerId || !eventId || !studentId || !smsEventType) {
             return {
                 status: "failed",
+                queuedCount: 0,
+                recipientCount: 0,
+                suppressedCount: 0,
+            };
+        }
+        if (shouldSuppressAttendanceEventParentSms(eventData)) {
+            const suppressedReason = resolveAttendanceEventParentSmsSuppressedReason(eventData);
+            await eventRef.set({
+                smsStatus: "suppressed",
+                smsPipelineVersion: "v2",
+                smsQueuedAt: admin.firestore.FieldValue.serverTimestamp(),
+                smsQueuedCount: 0,
+                smsRecipientCount: 0,
+                smsSuppressedCount: 0,
+                smsError: null,
+                smsEventType,
+                smsMessage: null,
+                smsDedupeKey: null,
+                smsSuppressedReason: suppressedReason,
+            }, { merge: true });
+            console.log("[attendance-sms-v2] suppressed", {
+                centerId,
+                studentId,
+                eventId,
+                eventType: smsEventType,
+                suppressedReason,
+            });
+            return {
+                status: "suppressed",
                 queuedCount: 0,
                 recipientCount: 0,
                 suppressedCount: 0,
@@ -7809,7 +7859,62 @@ function buildAttendanceSeatPatch(params) {
             ? admin.firestore.Timestamp.fromMillis(activeStudyStartedAtMs)
             : params.nowTs;
     }
+    if (params.nextStatus === "away" || params.nextStatus === "break") {
+        const activeAwayKind = normalizeAttendanceAwayKind(params.activeAwayKind);
+        if (activeAwayKind) {
+            patch.activeAwayKind = activeAwayKind;
+            patch.activeAwayParentSmsSuppressed = params.activeAwayParentSmsSuppressed === true;
+            patch.activeAwayStartedAt = params.nowTs;
+        }
+        else {
+            patch.activeAwayKind = admin.firestore.FieldValue.delete();
+            patch.activeAwayParentSmsSuppressed = admin.firestore.FieldValue.delete();
+            patch.activeAwayStartedAt = admin.firestore.FieldValue.delete();
+        }
+    }
+    else {
+        patch.activeAwayKind = admin.firestore.FieldValue.delete();
+        patch.activeAwayParentSmsSuppressed = admin.firestore.FieldValue.delete();
+        patch.activeAwayStartedAt = admin.firestore.FieldValue.delete();
+    }
     return patch;
+}
+function buildAttendanceEventAwayContext(params) {
+    if (params.eventType === "away_start") {
+        const awayKind = normalizeAttendanceAwayKind(params.requestedAwayKind);
+        const suppressParentSms = params.suppressParentSms === true || awayKind === "short";
+        return {
+            awayKind,
+            suppressParentSms,
+            suppressedReason: suppressParentSms ? "short_away" : null,
+        };
+    }
+    if (params.eventType === "away_end") {
+        const awayKind = normalizeAttendanceAwayKind(params.seatData.activeAwayKind);
+        const suppressParentSms = params.suppressParentSms === true ||
+            params.seatData.activeAwayParentSmsSuppressed === true ||
+            params.seatData.activeAwaySmsSuppressed === true ||
+            awayKind === "short";
+        return {
+            awayKind,
+            suppressParentSms,
+            suppressedReason: suppressParentSms ? "short_away" : null,
+        };
+    }
+    return {
+        awayKind: null,
+        suppressParentSms: params.suppressParentSms === true,
+        suppressedReason: params.suppressParentSms === true ? "attendance_event_suppressed" : null,
+    };
+}
+function buildAttendanceEventAwayPatch(context) {
+    return Object.assign(Object.assign({}, (context.awayKind ? { awayKind: context.awayKind } : {})), (context.suppressParentSms
+        ? {
+            suppressParentSms: true,
+            parentSmsSuppressed: true,
+            parentSmsSuppressedReason: context.suppressedReason || "attendance_event_suppressed",
+        }
+        : {}));
 }
 async function resolveActiveAttendanceFlowContext(params) {
     const fieldDateKey = asTrimmedString(params.seatData.activeStudyDayKey);
@@ -7961,6 +8066,8 @@ async function applyAttendanceStatusTransition(params) {
     const nowMs = Math.max(0, Math.floor((_a = params.nowMs) !== null && _a !== void 0 ? _a : Date.now()));
     const nowTs = admin.firestore.Timestamp.fromMillis(nowMs);
     const currentDateKey = toStudyDayKey(new Date(nowMs));
+    const requestedAwayKind = normalizeAttendanceAwayKind(params.awayKind);
+    const suppressParentSms = params.suppressParentSms === true;
     const seatDoc = await resolveAttendanceSeatDocForTransition({
         db,
         centerId,
@@ -8137,6 +8244,12 @@ async function applyAttendanceStatusTransition(params) {
         if (prevStatus === nextStatus) {
             if (params.source === "kiosk") {
                 const repeatEventType = resolveExplicitAttendanceEventType(prevStatus, nextStatus);
+                const repeatAwayContext = buildAttendanceEventAwayContext({
+                    eventType: repeatEventType,
+                    seatData: freshSeatData,
+                    requestedAwayKind,
+                    suppressParentSms,
+                });
                 const repeatEventRef = db.collection(`centers/${centerId}/attendanceEvents`).doc();
                 const repeatStatRef = db.doc(`centers/${centerId}/attendanceDailyStats/${attendanceDateKey}/students/${studentId}`);
                 const repeatStatSnap = await transaction.get(repeatStatRef);
@@ -8176,9 +8289,26 @@ async function applyAttendanceStatusTransition(params) {
                         ? admin.firestore.Timestamp.fromMillis(activeStudyStartedAtMs)
                         : nowTs;
                 }
+                if (nextStatus === "away" || nextStatus === "break") {
+                    if (repeatAwayContext.awayKind) {
+                        repeatSeatPatch.activeAwayKind = repeatAwayContext.awayKind;
+                        repeatSeatPatch.activeAwayParentSmsSuppressed = repeatAwayContext.suppressParentSms;
+                        repeatSeatPatch.activeAwayStartedAt = nowTs;
+                    }
+                    else {
+                        repeatSeatPatch.activeAwayKind = admin.firestore.FieldValue.delete();
+                        repeatSeatPatch.activeAwayParentSmsSuppressed = admin.firestore.FieldValue.delete();
+                        repeatSeatPatch.activeAwayStartedAt = admin.firestore.FieldValue.delete();
+                    }
+                }
+                else {
+                    repeatSeatPatch.activeAwayKind = admin.firestore.FieldValue.delete();
+                    repeatSeatPatch.activeAwayParentSmsSuppressed = admin.firestore.FieldValue.delete();
+                    repeatSeatPatch.activeAwayStartedAt = admin.firestore.FieldValue.delete();
+                }
                 transaction.set(repeatStatRef, repeatStatPatch, { merge: true });
                 transaction.set(seatDoc.ref, repeatSeatPatch, { merge: true });
-                transaction.set(repeatEventRef, Object.assign({ studentId, dateKey: attendanceDateKey, activeStudyDayKey: attendanceDateKey, flowDateKey: attendanceDateKey, eventType: repeatEventType, occurredAt: nowTs, createdAt: admin.firestore.FieldValue.serverTimestamp(), source: params.source, seatId: seatDoc.id, statusBefore: prevStatus, statusAfter: nextStatus, repeatAction: true }, (params.actorUid ? { actorUid: params.actorUid } : {})));
+                transaction.set(repeatEventRef, Object.assign(Object.assign({ studentId, dateKey: attendanceDateKey, activeStudyDayKey: attendanceDateKey, flowDateKey: attendanceDateKey, eventType: repeatEventType, occurredAt: nowTs, createdAt: admin.firestore.FieldValue.serverTimestamp(), source: params.source, seatId: seatDoc.id, statusBefore: prevStatus, statusAfter: nextStatus, repeatAction: true }, buildAttendanceEventAwayPatch(repeatAwayContext)), (params.actorUid ? { actorUid: params.actorUid } : {})));
                 return {
                     ok: true,
                     noop: false,
@@ -8216,6 +8346,12 @@ async function applyAttendanceStatusTransition(params) {
             };
         }
         const eventType = resolveAttendanceTransitionEventType(prevStatus, nextStatus);
+        const eventAwayContext = buildAttendanceEventAwayContext({
+            eventType,
+            seatData: freshSeatData,
+            requestedAwayKind,
+            suppressParentSms,
+        });
         const eventRef = eventType ? db.collection(`centers/${centerId}/attendanceEvents`).doc() : null;
         const statRef = db.doc(`centers/${centerId}/attendanceDailyStats/${attendanceDateKey}/students/${studentId}`);
         const progressRef = db.doc(`centers/${centerId}/growthProgress/${studentId}`);
@@ -8231,6 +8367,8 @@ async function applyAttendanceStatusTransition(params) {
             nowTs,
             activeStudyDayKey: attendanceDateKey,
             activeStudyStartedAtMs,
+            activeAwayKind: eventAwayContext.awayKind,
+            activeAwayParentSmsSuppressed: eventAwayContext.suppressParentSms,
         });
         transaction.set(seatDoc.ref, seatPatch, { merge: true });
         const statData = statSnap.exists ? (statSnap.data() || {}) : {};
@@ -8259,7 +8397,7 @@ async function applyAttendanceStatusTransition(params) {
         }
         transaction.set(statRef, statPatch, { merge: true });
         if (eventType && eventRef) {
-            transaction.set(eventRef, Object.assign(Object.assign({ studentId, dateKey: attendanceDateKey, activeStudyDayKey: attendanceDateKey, flowDateKey: attendanceDateKey, eventType, occurredAt: nowTs, createdAt: admin.firestore.FieldValue.serverTimestamp(), source: params.source, seatId: seatDoc.id, statusBefore: prevStatus, statusAfter: nextStatus }, (shouldAllowCheckoutWithoutSession ? { sessionFinalizeSkipped: true, sessionFinalizeSkipReason: "missing_open_session_start" } : {})), (params.actorUid ? { actorUid: params.actorUid } : {})));
+            transaction.set(eventRef, Object.assign(Object.assign(Object.assign({ studentId, dateKey: attendanceDateKey, activeStudyDayKey: attendanceDateKey, flowDateKey: attendanceDateKey, eventType, occurredAt: nowTs, createdAt: admin.firestore.FieldValue.serverTimestamp(), source: params.source, seatId: seatDoc.id, statusBefore: prevStatus, statusAfter: nextStatus }, buildAttendanceEventAwayPatch(eventAwayContext)), (shouldAllowCheckoutWithoutSession ? { sessionFinalizeSkipped: true, sessionFinalizeSkipReason: "missing_open_session_start" } : {})), (params.actorUid ? { actorUid: params.actorUid } : {})));
         }
         if (eventType === "check_in" && progressSnap) {
             const progressData = progressSnap.exists ? (progressSnap.data() || {}) : {};
@@ -8571,6 +8709,7 @@ function parseKioskAttendanceQueueAction(value) {
     const normalized = asTrimmedString(value);
     if (normalized === "check_in" ||
         normalized === "away_start" ||
+        normalized === "away_start_long" ||
         normalized === "away_end" ||
         normalized === "check_out") {
         return normalized;
@@ -8595,14 +8734,24 @@ function sanitizeKioskIdempotencyKey(value) {
 function getKioskActionNextStatus(action) {
     if (action === "check_in" || action === "away_end")
         return "studying";
-    if (action === "away_start")
+    if (action === "away_start" || action === "away_start_long")
         return "away";
     return "absent";
+}
+function getKioskActionAwayKind(action) {
+    if (action === "away_start")
+        return "short";
+    if (action === "away_start_long")
+        return "long";
+    return null;
+}
+function shouldSuppressParentSmsForKioskAction(action) {
+    return action === "away_start";
 }
 function isKioskActionAllowedFromStatus(action, status) {
     if (action === "check_in")
         return status === "absent";
-    if (action === "away_start")
+    if (action === "away_start" || action === "away_start_long")
         return status === "studying";
     if (action === "away_end")
         return status === "away" || status === "break";
@@ -8934,6 +9083,8 @@ async function processKioskAttendanceQueueItem(db, centerId, actionId) {
             actorUid: asTrimmedString(queueData.requestedByUid) || null,
             seatId: current.seatId || seatId,
             seatHint,
+            awayKind: getKioskActionAwayKind(action),
+            suppressParentSms: shouldSuppressParentSmsForKioskAction(action),
             nowMs: effectiveActionAtMs,
         });
         const verification = await verifyKioskAttendanceQueueResult({
@@ -9189,6 +9340,8 @@ async function processKioskAttendanceQueueItemInlineFast(params) {
             actorUid: asTrimmedString(queueData.requestedByUid) || null,
             seatId: current.seatId || seatId,
             seatHint,
+            awayKind: getKioskActionAwayKind(action),
+            suppressParentSms: shouldSuppressParentSmsForKioskAction(action),
             nowMs: effectiveActionAtMs,
         });
         const verification = await verifyKioskAttendanceQueueResult({
@@ -9357,8 +9510,7 @@ exports.submitKioskAttendanceActionFast = functions.region(region).runWith({
         const baseQueuePayload = Object.assign(Object.assign({ centerId,
             studentId,
             pin,
-            action,
-            expectedStatus, statusAtEnqueue: current.status, nextStatus, seatId: current.seatId || requestedSeatId, seatHint,
+            action, awayKind: getKioskActionAwayKind(action), suppressParentSms: shouldSuppressParentSmsForKioskAction(action), expectedStatus, statusAtEnqueue: current.status, nextStatus, seatId: current.seatId || requestedSeatId, seatHint,
             idempotencyKey, inlinePreferred: true, status: "processing", attemptCount: 1, processingMode: "fast_direct", requestedByUid: context.auth.uid, source: "kiosk", clientActionAt: admin.firestore.Timestamp.fromMillis(actionTime.actionAtMs), clientActionAtMillis: Math.max(0, Math.floor((_b = parseFiniteNumber(data === null || data === void 0 ? void 0 : data.clientActionAtMillis)) !== null && _b !== void 0 ? _b : 0)), acceptedAt: acceptedAtTs, effectiveActionAt: admin.firestore.Timestamp.fromMillis(actionTime.actionAtMs), effectiveActionAtMillis: actionTime.actionAtMs, actionTimeSource: actionTime.source }, (actionTime.correctionReason ? { actionTimeCorrectionReason: actionTime.correctionReason } : {})), { processingStartedAt: acceptedAtTs, leaseExpiresAt: admin.firestore.Timestamp.fromMillis(acceptedAtMs + KIOSK_ATTENDANCE_LOCK_TTL_MS), createdAt: admin.firestore.FieldValue.serverTimestamp(), updatedAt: admin.firestore.FieldValue.serverTimestamp() });
         await queueRef.set(baseQueuePayload, { merge: false });
         if (current.status !== expectedStatus) {
@@ -9437,6 +9589,8 @@ exports.submitKioskAttendanceActionFast = functions.region(region).runWith({
             actorUid: context.auth.uid,
             seatId: current.seatId || requestedSeatId,
             seatHint,
+            awayKind: getKioskActionAwayKind(action),
+            suppressParentSms: shouldSuppressParentSmsForKioskAction(action),
             nowMs: actionTime.actionAtMs,
         });
         const verification = await verifyKioskAttendanceQueueResult({
@@ -9517,6 +9671,8 @@ exports.submitKioskAttendanceActionFast = functions.region(region).runWith({
                 studentId,
                 pin,
                 action,
+                awayKind: getKioskActionAwayKind(action),
+                suppressParentSms: shouldSuppressParentSmsForKioskAction(action),
                 expectedStatus: expectedStatusInput || "absent",
                 nextStatus,
                 idempotencyKey,
@@ -9635,7 +9791,7 @@ exports.enqueueKioskAttendanceActionSecure = functions.region(region).runWith({
             }
             transaction.set(queueRef, Object.assign(Object.assign({ centerId,
                 studentId,
-                pin, action: resolvedAction, expectedStatus, statusAtEnqueue: current.status, nextStatus: getKioskActionNextStatus(resolvedAction), seatId: current.seatId || requestedSeatId, seatHint,
+                pin, action: resolvedAction, awayKind: getKioskActionAwayKind(resolvedAction), suppressParentSms: shouldSuppressParentSmsForKioskAction(resolvedAction), expectedStatus, statusAtEnqueue: current.status, nextStatus: getKioskActionNextStatus(resolvedAction), seatId: current.seatId || requestedSeatId, seatHint,
                 idempotencyKey, inlinePreferred: true, status: "queued", attemptCount: 0, requestedByUid: ((_a = context.auth) === null || _a === void 0 ? void 0 : _a.uid) || null, source: "kiosk", clientActionAt: admin.firestore.Timestamp.fromMillis(actionTime.actionAtMs), clientActionAtMillis: Math.max(0, Math.floor((_b = parseFiniteNumber(data === null || data === void 0 ? void 0 : data.clientActionAtMillis)) !== null && _b !== void 0 ? _b : 0)), acceptedAt: acceptedAtTs, effectiveActionAt: admin.firestore.Timestamp.fromMillis(actionTime.actionAtMs), effectiveActionAtMillis: actionTime.actionAtMs, actionTimeSource: actionTime.source }, (actionTime.correctionReason ? { actionTimeCorrectionReason: actionTime.correctionReason } : {})), { createdAt: admin.firestore.FieldValue.serverTimestamp(), updatedAt: admin.firestore.FieldValue.serverTimestamp() }));
             return {
                 actionId: queueRef.id,

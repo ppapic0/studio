@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation';
 import {
   ArrowLeft,
   Check,
+  Clock3,
   Coffee,
   Delete,
   Loader2,
@@ -108,11 +109,19 @@ const ACTIONS: Record<KioskAttendanceAction, KioskActionConfig> = {
   },
   away_start: {
     action: 'away_start',
-    label: '외출',
-    title: '잠깐 나갈게요',
+    label: '단기외출',
+    title: '문자 없이 잠깐 다녀와요',
     Icon: Coffee,
     accentClassName: 'from-[#FF8A1D] to-[#FFB35C]',
-    completeMessage: (studentName) => `${studentName} 학생 외출이 접수되었습니다.`,
+    completeMessage: (studentName) => `${studentName} 학생 단기외출이 접수되었습니다.`,
+  },
+  away_start_long: {
+    action: 'away_start_long',
+    label: '장기외출',
+    title: '보호자 문자와 함께 외출해요',
+    Icon: Clock3,
+    accentClassName: 'from-[#14295F] to-[#FF7A16]',
+    completeMessage: (studentName) => `${studentName} 학생 장기외출이 접수되었습니다.`,
   },
   away_end: {
     action: 'away_end',
@@ -145,14 +154,14 @@ function normalizeStatus(status?: string | null): AttendanceStatus {
 }
 
 function getAllowedActions(status: AttendanceStatus): KioskAttendanceAction[] {
-  if (status === 'studying') return ['away_start', 'check_out'];
+  if (status === 'studying') return ['away_start', 'away_start_long', 'check_out'];
   if (status === 'away' || status === 'break') return ['away_end', 'check_out'];
   return ['check_in'];
 }
 
 function getNextStatusForAction(action: KioskAttendanceAction): AttendanceStatus {
   if (action === 'check_in' || action === 'away_end') return 'studying';
-  if (action === 'away_start') return 'away';
+  if (action === 'away_start' || action === 'away_start_long') return 'away';
   return 'absent';
 }
 
@@ -706,7 +715,7 @@ export default function KioskPage() {
   const selectedActions = selectedSeat ? getAllowedActions(selectedStatus) : [];
 
   return (
-    <div className={cn('min-h-[100dvh] overflow-hidden bg-[#FFF7ED] text-[#14295F]', kioskTouchClass)}>
+    <div className={cn('min-h-[100dvh] overflow-y-auto bg-[#FFF7ED] text-[#14295F]', kioskTouchClass)}>
       <div className="pointer-events-none fixed inset-0 overflow-hidden">
         <div className="absolute inset-x-0 top-0 h-3 bg-[#FF7A16]" />
         <div className="absolute inset-x-0 top-3 h-28 bg-white/70" />
@@ -929,7 +938,7 @@ export default function KioskPage() {
                 </div>
 
                 {selectedSeat ? (
-                  <div className="grid grid-cols-1 gap-4">
+                  <div className={cn('grid grid-cols-1 gap-4', selectedActions.length >= 3 && 'sm:grid-cols-3')}>
                     {selectedActions.map((action) => {
                       const config = ACTIONS[action];
                       return (
@@ -940,7 +949,7 @@ export default function KioskPage() {
                           onKeyDown={(event) => handleKeyboardPress(event, `action-${action}`, () => handleAction(action))}
                           className={cn(
                             kioskTouchClass,
-                            'group relative min-h-36 overflow-hidden rounded-[1.75rem] border-2 border-[#FFD7B0] bg-white p-5 text-left shadow-[0_24px_50px_-36px_rgba(255,122,22,0.62)] transition active:scale-[0.99] sm:min-h-44'
+                            'group relative min-h-32 overflow-hidden rounded-[1.75rem] border-2 border-[#FFD7B0] bg-white p-5 text-left shadow-[0_24px_50px_-36px_rgba(255,122,22,0.62)] transition active:scale-[0.99] sm:min-h-40'
                           )}
                         >
                           <div className={cn('absolute inset-x-0 top-0 h-3 bg-gradient-to-r', config.accentClassName)} />
@@ -949,7 +958,7 @@ export default function KioskPage() {
                               <div className="flex h-16 w-16 items-center justify-center rounded-[1.25rem] bg-[#FFF1E4] text-[#FF7A16] shadow-[0_14px_26px_-20px_rgba(255,122,22,0.7)]">
                                 <config.Icon className="h-8 w-8" />
                               </div>
-                              <p className="mt-5 text-4xl font-black text-[#14295F]">{config.label}</p>
+                              <p className="mt-5 text-4xl font-black text-[#14295F] sm:text-3xl lg:text-4xl">{config.label}</p>
                               <p className="mt-2 text-base font-black text-[#9A4E10]">{config.title}</p>
                             </div>
                             <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-[#FF7A16] text-white">

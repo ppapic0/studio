@@ -1,7 +1,7 @@
 import { httpsCallable, type Functions } from 'firebase/functions';
 import type { AttendanceCurrent } from '@/lib/types';
 
-export type KioskAttendanceAction = 'check_in' | 'away_start' | 'away_end' | 'check_out';
+export type KioskAttendanceAction = 'check_in' | 'away_start' | 'away_start_long' | 'away_end' | 'check_out';
 
 export type EnqueueKioskAttendanceActionInput = {
   centerId: string;

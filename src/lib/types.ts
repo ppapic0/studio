@@ -911,6 +911,9 @@ export interface AttendanceCurrent {
   lastCheckInAt?: Timestamp;
   activeStudyDayKey?: string;
   activeStudyStartedAt?: Timestamp;
+  activeAwayKind?: 'short' | 'long';
+  activeAwayParentSmsSuppressed?: boolean;
+  activeAwayStartedAt?: Timestamp;
   studentId?: string; 
 }
 
