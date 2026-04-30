@@ -423,6 +423,7 @@ export default function GrowthPage() {
   const activeStudyDayDate = studyDayContext.studyDayDate;
   const periodKey = format(activeStudyDayDate, 'yyyy-MM');
   const [isVaultOpen, setIsVaultOpen] = useState(false);
+  const [selectedVaultMode, setSelectedVaultMode] = useState<'today' | 'carryover'>('today');
   const [selectedBoxHour, setSelectedBoxHour] = useState<number | null>(null);
   const [boxStage, setBoxStage] = useState<BoxStage>('idle');
   const [revealedReward, setRevealedReward] = useState<number | null>(null);
@@ -924,19 +925,20 @@ export default function GrowthPage() {
     },
     [activeMembership?.id, carryoverOpenedBoxes, carryoverRewardByHour, isCarryoverExpired, persistedCarryoverClaimedBoxes, previousStudyDayKey, studentUid]
   );
-  const activeBoxes = hasCarryoverReadyBoxes ? carryoverBoxes : boxes;
-  const readyBoxes = activeBoxes.filter((box) => box.state === 'ready');
+  const todayReadyBoxes = boxes.filter((box) => box.state === 'ready');
+  const carryoverReadyBoxes = hasCarryoverReadyBoxes ? carryoverBoxes.filter((box) => box.state === 'ready') : [];
+  const readyBoxes = [...carryoverReadyBoxes, ...todayReadyBoxes];
   const totalAvailableBoxes = readyBoxes.length;
   const heroBoxRarity =
-    readyBoxes[0]?.rarity ??
-    activeBoxes.find((box) => box.state === 'charging')?.rarity ??
-    activeBoxes[0]?.rarity ??
+    todayReadyBoxes[0]?.rarity ??
+    carryoverReadyBoxes[0]?.rarity ??
+    boxes.find((box) => box.state === 'charging')?.rarity ??
+    boxes[0]?.rarity ??
     'common';
-  const todayOpenedCount = hasCarryoverReadyBoxes
-    ? carryoverOpenedBoxes.length
-    : renderableTodayStudyBoxState.openedHours.length;
-  const activeVaultDateKey = hasCarryoverReadyBoxes ? previousStudyDayKey : activeStudyDayKey;
-  const activeRewardByHour = hasCarryoverReadyBoxes ? carryoverRewardByHour : rewardByHour;
+  const todayOpenedCount = renderableTodayStudyBoxState.openedHours.length;
+  const selectedVaultBoxes = selectedVaultMode === 'carryover' ? carryoverBoxes : boxes;
+  const activeVaultDateKey = selectedVaultMode === 'carryover' ? previousStudyDayKey : activeStudyDayKey;
+  const activeRewardByHour = selectedVaultMode === 'carryover' ? carryoverRewardByHour : rewardByHour;
 
   const heroMode = totalAvailableBoxes > 0 ? 'ready' : isTimerActive ? 'studying' : 'idle';
   const heroPrimaryLabel =
@@ -962,7 +964,7 @@ export default function GrowthPage() {
           ? `계속 공부 중 · ${formatCountdown(nextBoxSecondsLeft)}`
           : '공부 시작하고 상자 채우기';
 
-  const selectedBox = selectedBoxHour ? activeBoxes.find((box) => box.hour === selectedBoxHour) || null : null;
+  const selectedBox = selectedBoxHour ? selectedVaultBoxes.find((box) => box.hour === selectedBoxHour) || null : null;
   const isRewardRevealed = boxStage === 'revealed' && revealedReward !== null;
   const selectedBoxIsOpening = selectedBoxHour !== null && openingBoxHours.includes(selectedBoxHour);
   const isOpeningReward = selectedBoxIsOpening && !isRewardRevealed;
@@ -1140,10 +1142,13 @@ export default function GrowthPage() {
     }
   };
 
-  const openVault = (hour?: number) => {
+  const openVault = (hour?: number, mode: 'today' | 'carryover' = 'today') => {
     if (totalAvailableBoxes <= 0) return;
-    const targetHour = hour || readyBoxes[0]?.hour;
+    const modeReadyBoxes = mode === 'carryover' ? carryoverReadyBoxes : todayReadyBoxes;
+    const fallbackReadyBox = modeReadyBoxes[0] || readyBoxes[0];
+    const targetHour = hour || fallbackReadyBox?.hour;
     if (!targetHour) return;
+    setSelectedVaultMode(modeReadyBoxes.length > 0 || mode === 'carryover' ? mode : 'today');
     setSelectedBoxHour(targetHour);
     setBoxStage('idle');
     setRevealedReward(null);
@@ -1166,13 +1171,14 @@ export default function GrowthPage() {
       void flushPendingBoxOpens();
       resetRevealState();
       setSelectedBoxHour(null);
+      setSelectedVaultMode('today');
     }
   };
 
   const handleRevealBox = (hourOverride?: number) => {
     const targetBox =
       typeof hourOverride === 'number'
-        ? activeBoxes.find((box) => box.hour === hourOverride) || null
+        ? selectedVaultBoxes.find((box) => box.hour === hourOverride) || null
         : selectedBox;
     if (!targetBox || targetBox.state !== 'ready' || !activeMembership?.id || !studentUid) return;
     const targetHour = targetBox.hour;
@@ -1243,7 +1249,7 @@ export default function GrowthPage() {
   };
 
   const handleNextBox = () => {
-    const nextReady = activeBoxes.find((box) => box.state === 'ready' && box.hour !== selectedBoxHour);
+    const nextReady = selectedVaultBoxes.find((box) => box.state === 'ready' && box.hour !== selectedBoxHour);
     if (!nextReady) {
       handleVaultChange(false);
       return;
@@ -1253,7 +1259,7 @@ export default function GrowthPage() {
 
   const handleHeroCta = () => {
     if (totalAvailableBoxes > 0) {
-      openVault();
+      openVault(undefined, hasCarryoverReadyBoxes ? 'carryover' : 'today');
       return;
     }
     router.push('/dashboard');
@@ -1351,7 +1357,7 @@ export default function GrowthPage() {
               intense={totalAvailableBoxes > 0 || isNearNextBox || Boolean(arrivalEvent)}
               rarity={heroBoxRarity}
               label={totalAvailableBoxes > 0 ? '지금 열기' : `${nextBoxSecondsLeft}초 남음`}
-              onClick={totalAvailableBoxes > 0 ? () => openVault() : undefined}
+              onClick={totalAvailableBoxes > 0 ? () => openVault(undefined, hasCarryoverReadyBoxes ? 'carryover' : 'today') : undefined}
             />
 
             <div className="text-center">
@@ -1453,12 +1459,36 @@ export default function GrowthPage() {
               READY {totalAvailableBoxes}
             </div>
           </div>
+          {hasCarryoverReadyBoxes ? (
+            <div className="mb-3 rounded-[1.2rem] border border-white/10 bg-white/5 px-3 py-3">
+              <div className="mb-2 flex items-center justify-between gap-3">
+                <p className="text-[11px] font-black text-white">전날 미개봉 상자</p>
+                <button
+                  type="button"
+                  className="rounded-full bg-white/10 px-3 py-1 text-[10px] font-black text-white transition hover:bg-white/15"
+                  onClick={() => openVault(undefined, 'carryover')}
+                >
+                  {carryoverReadyBoxes.length}개 열기
+                </button>
+              </div>
+              <div className="-mx-1 flex gap-3 overflow-x-auto px-1 pb-1">
+                {carryoverBoxes.map((box) => (
+                  <RewardVaultSlot
+                    key={`carryover-${box.id}`}
+                    box={box}
+                    onSelect={(hour) => openVault(hour, 'carryover')}
+                    isFresh={false}
+                  />
+                ))}
+              </div>
+            </div>
+          ) : null}
           <div className="-mx-1 flex gap-3 overflow-x-auto px-1 pb-1">
-            {activeBoxes.map((box) => (
+            {boxes.map((box) => (
               <RewardVaultSlot
                 key={box.id}
                 box={box}
-                onSelect={openVault}
+                onSelect={(hour) => openVault(hour, 'today')}
                 chargingLabel={box.state === 'charging' ? `${Math.round(progressPercent)}% · ${formatCountdown(nextBoxSecondsLeft)}` : undefined}
                 chargingPercent={box.state === 'charging' ? progressPercent : undefined}
                 isFresh={freshReadyHours.includes(box.hour)}
