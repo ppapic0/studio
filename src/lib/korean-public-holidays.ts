@@ -117,6 +117,7 @@ function buildKoreanPublicHolidayMap(year: number) {
   [
     ['01-01', '신정', null],
     ['03-01', '삼일절', 'single-weekend'],
+    ['05-01', '근로자의 날', null],
     ['05-05', '어린이날', 'single-weekend'],
     ['06-06', '현충일', null],
     ['08-15', '광복절', 'single-weekend'],
