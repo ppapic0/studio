@@ -1248,7 +1248,7 @@ export default function DailyReportsPage() {
             event.preventDefault();
             moveReportDialogFocusToPage();
           }}
-          className={cn("rounded-[3rem] p-0 overflow-hidden border-none shadow-2xl flex flex-col transition-all duration-500", isMobile ? "fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-[95vw] h-[85vh] max-w-[450px] rounded-[2rem]" : "max-w-4xl h-[90vh]")}
+          className={cn("daily-report-instant-close rounded-[3rem] p-0 overflow-hidden border-none shadow-2xl flex flex-col transition-all duration-500", isMobile ? "fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-[95vw] h-[85vh] max-w-[450px] rounded-[2rem]" : "max-w-4xl h-[90vh]")}
         >
           <div className={cn("bg-primary text-white relative overflow-hidden shrink-0", isMobile ? "p-6" : "p-12")}>
             <div className="absolute top-0 right-0 p-12 opacity-10 rotate-12">
@@ -1437,7 +1437,7 @@ export default function DailyReportsPage() {
             event.preventDefault();
             moveTrustReviewFocusToWriteModal();
           }}
-          className="rounded-[2rem] border-none bg-white p-0 shadow-2xl sm:max-w-xl"
+          className="daily-report-instant-close rounded-[2rem] border-none bg-white p-0 shadow-2xl sm:max-w-xl"
         >
           <div className="bg-[#14295F] px-6 py-5 text-white">
             <AlertDialogHeader className="space-y-2 text-left">

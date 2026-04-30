@@ -4416,6 +4416,11 @@ select {
   animation: dashboard-premium-dialog-out 160ms ease-in forwards;
 }
 
+.daily-report-instant-close[data-state="closed"] {
+  animation: none !important;
+  transition-duration: 0ms !important;
+}
+
 .dashboard-premium-dialog [role="tabpanel"][data-state="active"] {
   animation: student-route-enter 0.2s cubic-bezier(0.2, 0.82, 0.24, 1);
 }
