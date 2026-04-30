@@ -68,8 +68,8 @@ export const CLASS_TUITION_NOTICE = {
   subject: '국어',
   registrationNumber: '등록 완료 후 업데이트 예정',
   contact: '010-5879-5888',
-  sessionSummary: '월 4회 / 주 1회 / 회당 3시간 / 총 12시간',
-  extraFees: '별도 비용 없음',
+  sessionSummary: '월 4회 / 주 1회 / 회당 3시간 수업 + 3시간 클리닉 / 총 24시간',
+  extraFees: '모의고사 비용 별도',
   tuitionRows: [
     {
       target: '고1·고2',
