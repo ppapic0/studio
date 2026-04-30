@@ -54,7 +54,8 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 
-const SMS_BYTE_LIMIT = 90;
+const SMS_SHORT_BYTE_LIMIT = 90;
+const SMS_BYTE_LIMIT = 2000;
 const MANUAL_PARENT_SMS_UID = '__manual_parent__';
 const TRACK_MANAGED_STUDY_CENTER_NAME = '트랙 관리형 스터디센터';
 const OPERATIONAL_DAY_TICK_MS = 60 * 1000;
@@ -404,12 +405,14 @@ function renderTemplatePreview(template: string, sampleValues: Record<string, st
 
 function getByteTone(bytes: number) {
   if (bytes > SMS_BYTE_LIMIT) return 'bg-rose-100 text-rose-700';
+  if (bytes > SMS_SHORT_BYTE_LIMIT) return 'bg-sky-100 text-sky-700';
   if (bytes >= 81) return 'bg-amber-100 text-amber-700';
   return 'bg-emerald-100 text-emerald-700';
 }
 
 function getByteLabel(bytes: number) {
-  if (bytes > SMS_BYTE_LIMIT) return '초과';
+  if (bytes > SMS_BYTE_LIMIT) return '너무 김';
+  if (bytes > SMS_SHORT_BYTE_LIMIT) return '장문';
   if (bytes >= 81) return '한계 근접';
   return '안전';
 }
@@ -1629,8 +1632,8 @@ export default function NotificationSettingsPage() {
     if (hasOverflow) {
       toast({
         variant: 'destructive',
-        title: '90byte 초과',
-        description: '초과된 템플릿을 먼저 줄여 주세요.',
+        title: '문자 길이 초과',
+        description: `${SMS_BYTE_LIMIT}byte를 넘은 템플릿을 먼저 줄여 주세요.`,
       });
       return;
     }
@@ -1938,7 +1941,7 @@ export default function NotificationSettingsPage() {
       toast({
         variant: 'destructive',
         title: '문자 길이 초과',
-        description: '수동 문자 내용이 90byte를 넘었습니다.',
+        description: `수동 문자 내용이 ${SMS_BYTE_LIMIT}byte를 넘었습니다.`,
       });
       return;
     }
@@ -2002,7 +2005,7 @@ export default function NotificationSettingsPage() {
       toast({
         variant: 'destructive',
         title: '문자 길이 초과',
-        description: '전체 문자 내용이 90byte를 넘었습니다.',
+        description: `전체 문자 내용이 ${SMS_BYTE_LIMIT}byte를 넘었습니다.`,
       });
       return;
     }
@@ -2076,7 +2079,7 @@ export default function NotificationSettingsPage() {
           <BellRing className="h-7 w-7" /> 문자 알림 설정
         </h1>
         <p className="text-xs font-bold uppercase tracking-[0.25em] text-muted-foreground/60">
-          90byte 최적화 · 직접 발송 · 수신 제어 · 30일 히스토리
+          단문/장문 발송 · 직접 발송 · 수신 제어 · 30일 히스토리
         </p>
       </header>
 
@@ -2344,7 +2347,7 @@ export default function NotificationSettingsPage() {
                 disabled={isBulkSmsSending}
               />
               <div className="flex flex-wrap items-center justify-between gap-3">
-                <p className="text-xs font-bold text-slate-500">선택된 {bulkSmsAudienceLabel}에 90byte 이하로 발송됩니다.</p>
+                <p className="text-xs font-bold text-slate-500">선택된 {bulkSmsAudienceLabel}에 발송됩니다. 90byte 초과 시 장문으로 처리됩니다.</p>
                 <Button
                   type="button"
                   className="h-11 rounded-xl font-black"
@@ -2700,7 +2703,7 @@ export default function NotificationSettingsPage() {
                       className="mt-3 min-h-[104px] rounded-2xl border-2 font-bold leading-6"
                     />
                     <div className="mt-3 flex flex-wrap justify-between gap-2">
-                      <p className="text-xs font-bold text-slate-500">90byte 이하로 전송됩니다.</p>
+                      <p className="text-xs font-bold text-slate-500">90byte 초과 시 장문으로 전송됩니다.</p>
                       <Button
                         type="button"
                         className="h-10 rounded-xl font-black"
@@ -2945,7 +2948,7 @@ export default function NotificationSettingsPage() {
             </div>
             <div className="flex flex-wrap items-center gap-2">
               <Button type="button" variant="outline" className="h-10 rounded-xl font-black" onClick={applyRecommendedTemplates}>
-                90byte 내 꽉 채운 추천문구
+                단문 추천문구
               </Button>
               <Button type="button" className="h-10 rounded-xl font-black gap-2" onClick={() => void handleSave()} disabled={isSaving || isLoading}>
                 {(isSaving || isLoading) ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}

@@ -95,7 +95,8 @@ function normalizeSignupRole(value) {
     const compact = normalized.toLowerCase().replace(/[\s._-]+/g, "");
     return (_a = signupRoleAliases[compact]) !== null && _a !== void 0 ? _a : null;
 }
-const SMS_BYTE_LIMIT = 90;
+const SMS_SHORT_BYTE_LIMIT = 90;
+const SMS_BYTE_LIMIT = 2000;
 const PARENT_LINK_FAILED_ATTEMPT_LIMIT = 5;
 const PARENT_LINK_FAILED_ATTEMPT_WINDOW_MS = 30 * 60 * 1000;
 const PARENT_LINK_FAILED_ATTEMPT_LOCK_MS = 30 * 60 * 1000;
@@ -2163,7 +2164,7 @@ function validateSmsTemplateLength(template, fieldLabel) {
         return "";
     const bytes = calculateSmsBytes(sanitized);
     if (bytes > SMS_BYTE_LIMIT) {
-        throw new functions.https.HttpsError("invalid-argument", `${fieldLabel} exceeds ${SMS_BYTE_LIMIT} bytes.`, { userMessage: `${fieldLabel} 문구가 90byte를 넘었습니다.` });
+        throw new functions.https.HttpsError("invalid-argument", `${fieldLabel} exceeds ${SMS_BYTE_LIMIT} bytes.`, { userMessage: `${fieldLabel} 문구가 ${SMS_BYTE_LIMIT}byte를 넘었습니다.` });
     }
     return sanitized;
 }
@@ -3614,12 +3615,18 @@ function summarizeProviderResponse(value) {
 async function sendSmsViaAligo(params) {
     var _a;
     try {
+        const messageBytes = calculateSmsBytes(params.message);
+        const msgType = messageBytes > SMS_SHORT_BYTE_LIMIT ? "LMS" : "SMS";
         const formData = new FormData();
         formData.append("key", params.apiKey);
         formData.append("userid", params.userId);
         formData.append("sender", params.sender);
         formData.append("receiver", params.receiver);
         formData.append("msg", params.message);
+        formData.append("msg_type", msgType);
+        if (msgType === "LMS") {
+            formData.append("title", "TRACK 알림");
+        }
         formData.append("testmode_yn", "N");
         const response = await fetch("https://apis.aligo.in/send/", {
             method: "POST",
@@ -6814,7 +6821,7 @@ exports.sendManualStudentSms = functions.region(region).https.onCall(async (data
         throw new functions.https.HttpsError("invalid-argument", "보낼 문자 내용이 필요합니다.");
     }
     if (calculateSmsBytes(message) > SMS_BYTE_LIMIT) {
-        throw new functions.https.HttpsError("invalid-argument", "수동 문자 내용이 90byte를 넘었습니다.");
+        throw new functions.https.HttpsError("invalid-argument", `수동 문자 내용이 ${SMS_BYTE_LIMIT}byte를 넘었습니다.`);
     }
     const callerMemberSnap = await db.doc(`centers/${centerId}/members/${context.auth.uid}`).get();
     const callerRole = callerMemberSnap.exists ? (_a = callerMemberSnap.data()) === null || _a === void 0 ? void 0 : _a.role : null;
@@ -6874,7 +6881,7 @@ exports.sendBulkManualSms = functions.region(region).runWith({
         throw new functions.https.HttpsError("invalid-argument", "보낼 문자 내용이 필요합니다.");
     }
     if (calculateSmsBytes(message) > SMS_BYTE_LIMIT) {
-        throw new functions.https.HttpsError("invalid-argument", "전체 문자 내용이 90byte를 넘었습니다.");
+        throw new functions.https.HttpsError("invalid-argument", `전체 문자 내용이 ${SMS_BYTE_LIMIT}byte를 넘었습니다.`);
     }
     const callerMemberSnap = await db.doc(`centers/${centerId}/members/${context.auth.uid}`).get();
     const callerRole = callerMemberSnap.exists ? (_a = callerMemberSnap.data()) === null || _a === void 0 ? void 0 : _a.role : null;
