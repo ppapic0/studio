@@ -8785,6 +8785,14 @@ function getKioskRequestedAwayKind(action, value) {
 function shouldSuppressParentSmsForKioskAwayKind(action, awayKind) {
     return (awayKind || getKioskActionAwayKind(action)) === "short";
 }
+function isKioskLongAwayIntent(action, awayKind) {
+    return action === "away_start_long" || awayKind === "long";
+}
+function getKioskExpectedAwayKindForVerification(action, awayKind, nextStatus) {
+    if (nextStatus !== "away" && nextStatus !== "break")
+        return null;
+    return isKioskLongAwayIntent(action, awayKind) ? "long" : null;
+}
 function isKioskActionAllowedFromStatus(action, status) {
     if (action === "check_in")
         return status === "absent";
@@ -8913,6 +8921,37 @@ async function rejectKioskQueueItemAsStale(params) {
         updatedAt: admin.firestore.FieldValue.serverTimestamp(),
     }, { merge: true });
 }
+async function ensureKioskLongAwayState(params) {
+    if (!isKioskLongAwayIntent(params.action, params.requestedAwayKind))
+        return;
+    const seatDoc = await resolveAttendanceSeatDocForTransition({
+        db: params.db,
+        centerId: params.centerId,
+        studentId: params.studentId,
+        seatId: params.seatId,
+    });
+    if (!seatDoc || !seatDoc.exists)
+        return;
+    const seatData = (seatDoc.data() || {});
+    const currentStatus = normalizeAttendanceSeatStatus(seatData.status);
+    if (currentStatus !== "away" && currentStatus !== "break")
+        return;
+    const activeStudyDayKey = asTrimmedString(seatData.activeStudyDayKey) || toStudyDayKey(new Date(params.nowMs));
+    const activeAwayStartedAtMs = toMillisSafe(seatData.activeAwayStartedAt);
+    const patch = {
+        studentId: params.studentId,
+        status: "away",
+        activeAwayKind: "long",
+        activeAwayParentSmsSuppressed: false,
+        activeAwaySmsSuppressed: admin.firestore.FieldValue.delete(),
+        activeStudyDayKey,
+        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+    };
+    if (activeAwayStartedAtMs <= 0) {
+        patch.activeAwayStartedAt = admin.firestore.Timestamp.fromMillis(params.nowMs);
+    }
+    await seatDoc.ref.set(patch, { merge: true });
+}
 async function completeKioskQueueItemAsAlreadyApplied(params) {
     const verification = await verifyKioskAttendanceQueueResult({
         db: params.db,
@@ -8920,6 +8959,7 @@ async function completeKioskQueueItemAsAlreadyApplied(params) {
         studentId: params.studentId,
         seatId: params.seatId,
         expectedStatus: params.nextStatus,
+        expectedAwayKind: params.expectedAwayKind,
     });
     if (!verification.verified) {
         return false;
@@ -8967,12 +9007,14 @@ async function verifyKioskAttendanceQueueResult(params) {
     const seatData = (seatDoc.data() || {});
     const confirmedStudentId = asTrimmedString(seatData.studentId) || null;
     const confirmedStatus = normalizeAttendanceSeatStatus(seatData.status);
+    const confirmedAwayKind = normalizeAttendanceAwayKind(seatData.activeAwayKind);
     if (confirmedStudentId !== params.studentId) {
         return {
             verified: false,
             confirmedSeatId: seatDoc.id,
             confirmedStatus,
             confirmedStudentId,
+            confirmedAwayKind,
             failedReason: "verification_student_mismatch",
         };
     }
@@ -8982,7 +9024,18 @@ async function verifyKioskAttendanceQueueResult(params) {
             confirmedSeatId: seatDoc.id,
             confirmedStatus,
             confirmedStudentId,
+            confirmedAwayKind,
             failedReason: "verification_status_mismatch",
+        };
+    }
+    if (params.expectedAwayKind && confirmedAwayKind !== params.expectedAwayKind) {
+        return {
+            verified: false,
+            confirmedSeatId: seatDoc.id,
+            confirmedStatus,
+            confirmedStudentId,
+            confirmedAwayKind,
+            failedReason: "verification_away_kind_mismatch",
         };
     }
     return {
@@ -8990,6 +9043,7 @@ async function verifyKioskAttendanceQueueResult(params) {
         confirmedSeatId: seatDoc.id,
         confirmedStatus,
         confirmedStudentId,
+        confirmedAwayKind,
     };
 }
 async function processKioskAttendanceQueueItem(db, centerId, actionId) {
@@ -9074,9 +9128,19 @@ async function processKioskAttendanceQueueItem(db, centerId, actionId) {
         const nextStatus = getKioskActionNextStatus(action);
         const requestedAwayKind = getKioskRequestedAwayKind(action, queueData.awayKind);
         const suppressParentSms = shouldSuppressParentSmsForKioskAwayKind(action, requestedAwayKind);
+        const expectedAwayKind = getKioskExpectedAwayKindForVerification(action, requestedAwayKind, nextStatus);
         const current = await resolveKioskQueueSeatStatus({ db, centerId, studentId, seatId });
         if (current.status !== expectedStatus) {
             if (current.status === nextStatus) {
+                await ensureKioskLongAwayState({
+                    db,
+                    centerId,
+                    studentId,
+                    seatId: current.seatId || seatId,
+                    action,
+                    requestedAwayKind,
+                    nowMs: effectiveActionAtMs,
+                });
                 const alreadyApplied = await completeKioskQueueItemAsAlreadyApplied({
                     db,
                     centerId,
@@ -9087,6 +9151,7 @@ async function processKioskAttendanceQueueItem(db, centerId, actionId) {
                     expectedStatus,
                     nextStatus,
                     currentStatus: current.status,
+                    expectedAwayKind,
                 });
                 if (alreadyApplied) {
                     return;
@@ -9132,6 +9197,7 @@ async function processKioskAttendanceQueueItem(db, centerId, actionId) {
             studentId,
             seatId: result.seatId || current.seatId || seatId,
             expectedStatus: nextStatus,
+            expectedAwayKind,
         });
         if (!verification.verified) {
             await queueRef.set({
@@ -9305,6 +9371,7 @@ async function processKioskAttendanceQueueItemInlineFast(params) {
     const nextStatus = getKioskActionNextStatus(action);
     const requestedAwayKind = getKioskRequestedAwayKind(action, queueData.awayKind);
     const suppressParentSms = shouldSuppressParentSmsForKioskAwayKind(action, requestedAwayKind);
+    const expectedAwayKind = getKioskExpectedAwayKindForVerification(action, requestedAwayKind, nextStatus);
     await queueRef.set({
         status: "processing",
         processingStartedAt: nowTs,
@@ -9316,6 +9383,15 @@ async function processKioskAttendanceQueueItemInlineFast(params) {
     const current = await resolveKioskQueueSeatStatus({ db, centerId, studentId, seatId });
     if (current.status !== expectedStatus) {
         if (current.status === nextStatus) {
+            await ensureKioskLongAwayState({
+                db,
+                centerId,
+                studentId,
+                seatId: current.seatId || seatId,
+                action,
+                requestedAwayKind,
+                nowMs: effectiveActionAtMs,
+            });
             const alreadyApplied = await completeKioskQueueItemAsAlreadyApplied({
                 db,
                 centerId,
@@ -9326,6 +9402,7 @@ async function processKioskAttendanceQueueItemInlineFast(params) {
                 expectedStatus,
                 nextStatus,
                 currentStatus: current.status,
+                expectedAwayKind,
             });
             if (!alreadyApplied) {
                 await rejectKioskQueueItemAsStale({
@@ -9391,6 +9468,7 @@ async function processKioskAttendanceQueueItemInlineFast(params) {
             studentId,
             seatId: result.seatId || current.seatId || seatId,
             expectedStatus: nextStatus,
+            expectedAwayKind,
         });
         const resultPayload = {
             previousStatus: result.previousStatus,
@@ -9540,6 +9618,7 @@ exports.submitKioskAttendanceActionFast = functions.region(region).runWith({
     const queueRef = db.doc(`centers/${centerId}/kioskAttendanceQueue/${actionId}`);
     const requestedAwayKind = getKioskRequestedAwayKind(action, data === null || data === void 0 ? void 0 : data.awayKind);
     const suppressParentSms = shouldSuppressParentSmsForKioskAwayKind(action, requestedAwayKind);
+    const expectedAwayKind = getKioskExpectedAwayKindForVerification(action, requestedAwayKind, nextStatus);
     try {
         await assertKioskAttendanceQueueCaller({ db, centerId, authUid: context.auth.uid });
         await assertKioskPinMatchesStudent({ db, centerId, studentId, pin });
@@ -9566,27 +9645,45 @@ exports.submitKioskAttendanceActionFast = functions.region(region).runWith({
         await queueRef.set(baseQueuePayload, { merge: false });
         if (current.status !== expectedStatus) {
             if (current.status === nextStatus) {
-                await queueRef.set({
-                    status: "completed",
-                    verified: true,
-                    confirmedSeatId: current.seatId,
-                    confirmedStatus: current.status,
-                    confirmedStudentId: studentId,
-                    completedAt: admin.firestore.FieldValue.serverTimestamp(),
-                    updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-                    result: {
-                        alreadyApplied: true,
-                        action,
-                        previousStatus: current.status,
+                await ensureKioskLongAwayState({
+                    db,
+                    centerId,
+                    studentId,
+                    seatId: current.seatId || requestedSeatId,
+                    action,
+                    requestedAwayKind,
+                    nowMs: actionTime.actionAtMs,
+                });
+                const alreadyApplied = await completeKioskQueueItemAsAlreadyApplied({
+                    db,
+                    centerId,
+                    actionId,
+                    studentId,
+                    seatId: current.seatId || requestedSeatId,
+                    action,
+                    expectedStatus,
+                    nextStatus,
+                    currentStatus: current.status,
+                    expectedAwayKind,
+                });
+                if (!alreadyApplied) {
+                    await rejectKioskQueueItemAsStale({
+                        db,
+                        centerId,
+                        actionId,
+                        reason: "already_applied_verification_failed",
+                        currentStatus: current.status,
                         expectedStatus,
+                    });
+                    return buildKioskFastResult({
+                        actionId,
+                        state: "stale",
                         nextStatus,
-                        eventType: null,
-                        eventId: null,
-                        eventAtMillis: null,
-                        sessionDateKey: null,
-                        sessionMinutes: 0,
-                    },
-                }, { merge: true });
+                        confirmedStatus: current.status,
+                        confirmedSeatId: current.seatId,
+                        userMessage: "출결 상태 확인이 필요합니다. 번호를 다시 입력해 현재 상태를 확인해 주세요.",
+                    });
+                }
                 return buildKioskFastResult({
                     actionId,
                     state: "already_applied",
@@ -9650,6 +9747,7 @@ exports.submitKioskAttendanceActionFast = functions.region(region).runWith({
             studentId,
             seatId: result.seatId || current.seatId || requestedSeatId,
             expectedStatus: nextStatus,
+            expectedAwayKind,
         });
         const resultPayload = {
             previousStatus: result.previousStatus,

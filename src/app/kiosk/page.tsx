@@ -184,8 +184,12 @@ function getNextStatusForAction(action: KioskAttendanceAction): AttendanceStatus
   return 'absent';
 }
 
-function getSubmissionActionForAction(action: KioskAttendanceAction): KioskAttendanceAction {
-  return action === 'away_start_long' ? 'away_start' : action;
+function getSubmissionActionForAction(
+  action: KioskAttendanceAction,
+  awayKind?: KioskAttendanceAwayKind | null
+): KioskAttendanceAction {
+  if (action === 'away_start' && awayKind === 'long') return 'away_start_long';
+  return action;
 }
 
 function getAwayKindForAction(action: KioskAttendanceAction): KioskAttendanceAwayKind | null {
@@ -764,13 +768,15 @@ export default function KioskPage() {
     error: unknown,
     meta?: KioskFastOutboxMeta
   ): Promise<{ handled: boolean; result: SubmitKioskAttendanceActionFastResult | null }> => {
-    if (!functions || payload.action !== 'away_start_long' || !isInvalidArgumentKioskSubmissionError(error)) {
+    const isLongAwayPayload = payload.action === 'away_start_long' || (payload.action === 'away_start' && payload.awayKind === 'long');
+    if (!functions || !isLongAwayPayload || !isInvalidArgumentKioskSubmissionError(error)) {
       return { handled: false, result: null };
     }
 
     const legacyPayload: SubmitKioskAttendanceActionFastInput = {
       ...payload,
       action: 'away_start',
+      awayKind: 'long',
     };
 
     try {
@@ -894,7 +900,7 @@ export default function KioskPage() {
   const retryFailedAction = useCallback((item: KioskFailedOutboxItem) => {
     const retryPayload: SubmitKioskAttendanceActionFastInput = {
       ...item.payload,
-      action: getSubmissionActionForAction(item.payload.action),
+      action: getSubmissionActionForAction(item.payload.action, item.payload.awayKind),
       awayKind: item.payload.awayKind || getAwayKindForAction(item.payload.action),
       pin: normalizeKioskPin(item.payload.pin),
       idempotencyKey: createIdempotencyKey(),
@@ -1118,7 +1124,8 @@ export default function KioskPage() {
 
     const config = ACTIONS[action];
     const nextStatus = getNextStatusForAction(action);
-    const submissionAction = getSubmissionActionForAction(action);
+    const awayKind = getAwayKindForAction(action);
+    const submissionAction = getSubmissionActionForAction(action, awayKind);
     const idempotencyKey = createIdempotencyKey();
     const queuedSeatLabel =
       seat.seatLabel ||
@@ -1130,7 +1137,7 @@ export default function KioskPage() {
       studentId,
       pin: actionPin,
       action: submissionAction,
-      awayKind: getAwayKindForAction(action),
+      awayKind,
       expectedStatus: status,
       seatId: seat.id,
       seatHint: {
