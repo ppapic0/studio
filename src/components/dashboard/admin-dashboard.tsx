@@ -154,7 +154,11 @@ import {
 } from '@/lib/seat-layout';
 import { toStudyRoomTrackScheduleName } from '@/lib/study-room-class-schedule';
 import { createPointBoostEventSecure, cancelPointBoostEventSecure } from '@/lib/point-boost-actions';
-import { getDailyPointBreakdown } from '@/lib/student-rewards';
+import {
+  getDailyPointBreakdown,
+  type DailyPointBreakdownItem,
+  type DailyPointBreakdownItemTone,
+} from '@/lib/student-rewards';
 import { getStudyDayDate } from '@/lib/study-day';
 
 const ADMIN_DASHBOARD_REFRESH_INTERVAL_MS = 60 * 1000;
@@ -751,7 +755,11 @@ type PointHistoryGrantRow = {
   studyBoxPoints: number;
   rankPoints: number;
   otherPoints: number;
+  planPoints: number;
+  adjustmentPoints: number;
+  legacyPoints: number;
   detail: string;
+  breakdownItems: DailyPointBreakdownItem[];
 };
 
 type PointHistoryRow = {
@@ -762,6 +770,9 @@ type PointHistoryRow = {
   studyBoxPoints: number;
   rankPoints: number;
   otherPoints: number;
+  planPoints: number;
+  adjustmentPoints: number;
+  legacyPoints: number;
 };
 
 type PointHistorySummary = {
@@ -769,6 +780,9 @@ type PointHistorySummary = {
   studyBoxPoints: number;
   rankPoints: number;
   otherPoints: number;
+  planPoints: number;
+  adjustmentPoints: number;
+  legacyPoints: number;
   earners: number;
 };
 
@@ -831,6 +845,9 @@ const EMPTY_POINT_HISTORY_SUMMARY: PointHistorySummary = {
   studyBoxPoints: 0,
   rankPoints: 0,
   otherPoints: 0,
+  planPoints: 0,
+  adjustmentPoints: 0,
+  legacyPoints: 0,
   earners: 0,
 };
 
@@ -839,24 +856,50 @@ const buildRecentDateKeys = (referenceDate: Date | null, dayCount: number): stri
   return Array.from({ length: dayCount }, (_, index) => format(subDays(referenceDate, index), 'yyyy-MM-dd'));
 };
 
-function formatPointBreakdownDetail(breakdown: ReturnType<typeof getDailyPointBreakdown>): string {
-  const eventLabels = Array.isArray(breakdown.pointItems)
-    ? breakdown.pointItems
-        .map((item: any) => {
-          const label = typeof item?.label === 'string' ? item.label.trim() : '';
-          const reason = typeof item?.reason === 'string' ? item.reason.trim() : '';
-          const type = typeof item?.type === 'string' ? item.type.trim() : '';
-          if (label) return label;
-          if (reason) return reason;
-          if (type === 'box') return '공부상자';
-          if (type === 'rank') return '랭킹 보상';
-          return '';
-        })
-        .filter(Boolean)
+const POINT_HISTORY_TONE_BADGE_CLASS: Record<DailyPointBreakdownItemTone, string> = {
+  box: 'border-[#FFD7BA] bg-[#FFF8F2] text-[#C95A00]',
+  rank: 'border-[#DCE7FF] bg-[#F7FAFF] text-[#2554D7]',
+  plan: 'border-emerald-200 bg-emerald-50 text-emerald-700',
+  adjustment: 'border-violet-200 bg-violet-50 text-violet-700',
+  legacy: 'border-slate-200 bg-slate-50 text-slate-600',
+};
+
+const getPointBreakdownItems = (breakdown: ReturnType<typeof getDailyPointBreakdown>): DailyPointBreakdownItem[] =>
+  Array.isArray(breakdown.pointItems)
+    ? breakdown.pointItems.filter((item) => item.points > 0)
     : [];
 
-  if (eventLabels.length > 0) {
-    return Array.from(new Set(eventLabels)).join(' · ');
+const sumPointBreakdownItems = (
+  items: DailyPointBreakdownItem[],
+  tone: DailyPointBreakdownItemTone
+): number =>
+  items.reduce((total, item) => total + (item.tone === tone ? item.points : 0), 0);
+
+const getPointBreakdownFallbackLabel = (tone: DailyPointBreakdownItemTone): string => {
+  if (tone === 'box') return '상자';
+  if (tone === 'rank') return '랭킹';
+  if (tone === 'plan') return '계획 완수';
+  if (tone === 'adjustment') return '포인트 조정';
+  return '이전 기록';
+};
+
+const formatPointBreakdownItemAmount = (item: DailyPointBreakdownItem): string => {
+  const sign = item.direction === 'subtract' ? '-' : '+';
+  return `${sign}${formatPointsInPt(item.points)}`;
+};
+
+const formatPointBreakdownItemDetail = (item: DailyPointBreakdownItem): string => {
+  const label = item.label.trim() || getPointBreakdownFallbackLabel(item.tone);
+  const reason = item.reason?.trim();
+  const detail = `${label} ${formatPointBreakdownItemAmount(item)}`;
+  return reason ? `${detail} · ${reason}` : detail;
+};
+
+function formatPointBreakdownDetail(breakdown: ReturnType<typeof getDailyPointBreakdown>): string {
+  const pointItems = getPointBreakdownItems(breakdown);
+
+  if (pointItems.length > 0) {
+    return pointItems.map(formatPointBreakdownItemDetail).join(' · ');
   }
 
   return [
@@ -873,10 +916,28 @@ const summarizePointHistoryRows = (rows: PointHistoryRow[]): PointHistorySummary
       studyBoxPoints: acc.studyBoxPoints + row.studyBoxPoints,
       rankPoints: acc.rankPoints + row.rankPoints,
       otherPoints: acc.otherPoints + row.otherPoints,
+      planPoints: acc.planPoints + row.planPoints,
+      adjustmentPoints: acc.adjustmentPoints + row.adjustmentPoints,
+      legacyPoints: acc.legacyPoints + row.legacyPoints,
       earners: acc.earners + (row.totalPoints > 0 ? 1 : 0),
     }),
-    EMPTY_POINT_HISTORY_SUMMARY
+    { ...EMPTY_POINT_HISTORY_SUMMARY }
   );
+
+const formatPointHistorySummaryDetail = (summary: PointHistorySummary): string => {
+  const knownOtherPoints = summary.planPoints + summary.adjustmentPoints + summary.legacyPoints;
+  const uncategorizedOtherPoints = Math.max(0, summary.otherPoints - knownOtherPoints);
+  const parts = [
+    `상자 ${formatPointsInPt(summary.studyBoxPoints)}`,
+    `랭킹 ${formatPointsInPt(summary.rankPoints)}`,
+    summary.planPoints > 0 ? `계획완수 ${formatPointsInPt(summary.planPoints)}` : '',
+    summary.adjustmentPoints > 0 ? `조정 ${formatPointsInPt(summary.adjustmentPoints)}` : '',
+    summary.legacyPoints > 0 ? `이전 기록 ${formatPointsInPt(summary.legacyPoints)}` : '',
+    uncategorizedOtherPoints > 0 ? `기타 ${formatPointsInPt(uncategorizedOtherPoints)}` : '',
+  ].filter(Boolean);
+
+  return parts.join(' · ');
+};
 
 const parseKstDayRange = (dateKey: string): { startAtMs: number; endAtMs: number } | null => {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(dateKey)) return null;
@@ -2202,14 +2263,26 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
           const totals = dateKeys.reduce(
             (acc, dateKey) => {
               const breakdown = getMemberDailyPointBreakdown(member.id, dateKey);
+              const breakdownItems = getPointBreakdownItems(breakdown);
               return {
                 totalPoints: acc.totalPoints + breakdown.totalPoints,
                 studyBoxPoints: acc.studyBoxPoints + breakdown.studyBoxPoints,
                 rankPoints: acc.rankPoints + breakdown.rankPoints,
                 otherPoints: acc.otherPoints + breakdown.otherPoints,
+                planPoints: acc.planPoints + sumPointBreakdownItems(breakdownItems, 'plan'),
+                adjustmentPoints: acc.adjustmentPoints + sumPointBreakdownItems(breakdownItems, 'adjustment'),
+                legacyPoints: acc.legacyPoints + sumPointBreakdownItems(breakdownItems, 'legacy'),
               };
             },
-            { totalPoints: 0, studyBoxPoints: 0, rankPoints: 0, otherPoints: 0 }
+            {
+              totalPoints: 0,
+              studyBoxPoints: 0,
+              rankPoints: 0,
+              otherPoints: 0,
+              planPoints: 0,
+              adjustmentPoints: 0,
+              legacyPoints: 0,
+            }
           );
 
           return {
@@ -2220,6 +2293,9 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
             studyBoxPoints: totals.studyBoxPoints,
             rankPoints: totals.rankPoints,
             otherPoints: totals.otherPoints,
+            planPoints: totals.planPoints,
+            adjustmentPoints: totals.adjustmentPoints,
+            legacyPoints: totals.legacyPoints,
           };
         })
         .sort((left, right) => {
@@ -2236,6 +2312,7 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
             .map((member): PointHistoryGrantRow | null => {
               const breakdown = getMemberDailyPointBreakdown(member.id, dateKey);
               if (breakdown.totalPoints <= 0) return null;
+              const breakdownItems = getPointBreakdownItems(breakdown);
 
               return {
                 key: `${dateKey}-${member.id}`,
@@ -2247,7 +2324,11 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
                 studyBoxPoints: breakdown.studyBoxPoints,
                 rankPoints: breakdown.rankPoints,
                 otherPoints: breakdown.otherPoints,
+                planPoints: sumPointBreakdownItems(breakdownItems, 'plan'),
+                adjustmentPoints: sumPointBreakdownItems(breakdownItems, 'adjustment'),
+                legacyPoints: sumPointBreakdownItems(breakdownItems, 'legacy'),
                 detail: formatPointBreakdownDetail(breakdown),
+                breakdownItems,
               };
             })
             .filter((row): row is PointHistoryGrantRow => Boolean(row))
@@ -2262,9 +2343,12 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
               studyBoxPoints: acc.studyBoxPoints + row.studyBoxPoints,
               rankPoints: acc.rankPoints + row.rankPoints,
               otherPoints: acc.otherPoints + row.otherPoints,
+              planPoints: acc.planPoints + row.planPoints,
+              adjustmentPoints: acc.adjustmentPoints + row.adjustmentPoints,
+              legacyPoints: acc.legacyPoints + row.legacyPoints,
               earners: acc.earners + 1,
             }),
-            EMPTY_POINT_HISTORY_SUMMARY
+            { ...EMPTY_POINT_HISTORY_SUMMARY }
           );
 
           return { dateKey, grants, ...summary };
@@ -9765,8 +9849,7 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
                     {selectedPointHistoryData.headlineLabel} 총 {formatPointsInPt(selectedPointHistoryData.summary.totalPoints)} 지급
                   </DialogTitle>
                   <DialogDescription className="text-sm font-medium text-white/76">
-                    상자 {formatPointsInPt(selectedPointHistoryData.summary.studyBoxPoints)} · 랭킹 {formatPointsInPt(selectedPointHistoryData.summary.rankPoints)}
-                    {selectedPointHistoryData.summary.otherPoints > 0 ? ` · 이전 기록 ${formatPointsInPt(selectedPointHistoryData.summary.otherPoints)}` : ''}
+                    {formatPointHistorySummaryDetail(selectedPointHistoryData.summary)}
                   </DialogDescription>
                 </DialogHeader>
               </div>
@@ -9793,7 +9876,7 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
                         <p className="admin-kpi-number mt-2 text-[1.45rem] text-[#14295F]">{formatPointsInPt(dataset.summary.totalPoints)}</p>
                         <p className="mt-2 text-xs font-bold text-[#5c6e97]">지급 학생 {dataset.summary.earners}명</p>
                         <p className="mt-1 text-[11px] font-semibold text-[#7A88A8]">
-                          상자 {formatPointsInPt(dataset.summary.studyBoxPoints)} · 랭킹 {formatPointsInPt(dataset.summary.rankPoints)}
+                          {formatPointHistorySummaryDetail(dataset.summary)}
                         </p>
                       </button>
                     );
@@ -9836,6 +9919,9 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
                                 <p className="mt-1 text-[11px] font-bold text-[#6E7EA3]">
                                   지급 학생 {day.earners}명 · 클릭하면 학생별 전체 내역
                                 </p>
+                                <p className="mt-1 text-[11px] font-black text-[#2554D7]">
+                                  {formatPointHistorySummaryDetail(day)}
+                                </p>
                               </div>
                               <div className="flex shrink-0 items-center gap-2">
                                 <Badge className="border-none bg-[#14295F] px-3 py-1 text-[11px] font-black text-white">
@@ -9850,16 +9936,19 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
                               {topGrants.map((grant, index) => (
                                 <div
                                   key={`top-${grant.key}`}
-                                  className="flex items-center justify-between gap-3 rounded-[1rem] border border-[#E4ECFF] bg-white px-3 py-2.5"
+                                  className="flex items-start justify-between gap-3 rounded-[1rem] border border-[#E4ECFF] bg-white px-3 py-2.5"
                                 >
-                                  <div className="flex min-w-0 flex-wrap items-center gap-2">
-                                    <Badge className={cn('h-5 rounded-full border-none px-2 text-[10px] font-black', index === 0 ? 'bg-[#FF7A16] text-white' : 'bg-[#EEF4FF] text-[#2554D7]')}>
-                                      {index + 1}위
-                                    </Badge>
-                                    <p className="truncate text-sm font-black text-[#14295F]">{grant.studentName}</p>
-                                    <Badge className="h-5 rounded-full border-none bg-[#EEF4FF] px-2 text-[10px] font-black text-[#2554D7]">
-                                      {grant.className}
-                                    </Badge>
+                                  <div className="min-w-0 flex-1">
+                                    <div className="flex min-w-0 flex-wrap items-center gap-2">
+                                      <Badge className={cn('h-5 rounded-full border-none px-2 text-[10px] font-black', index === 0 ? 'bg-[#FF7A16] text-white' : 'bg-[#EEF4FF] text-[#2554D7]')}>
+                                        {index + 1}위
+                                      </Badge>
+                                      <p className="truncate text-sm font-black text-[#14295F]">{grant.studentName}</p>
+                                      <Badge className="h-5 rounded-full border-none bg-[#EEF4FF] px-2 text-[10px] font-black text-[#2554D7]">
+                                        {grant.className}
+                                      </Badge>
+                                    </div>
+                                    <p className="mt-1 break-keep text-[11px] font-bold leading-5 text-[#6E7EA3]">{grant.detail}</p>
                                   </div>
                                   <div className="flex shrink-0 items-center gap-2">
                                     <p className="text-sm font-black text-emerald-700">{formatPointsInPt(grant.totalPoints)}</p>
@@ -9896,6 +9985,21 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
                                         </Badge>
                                       </div>
                                       <p className="mt-1 break-keep text-[11px] font-bold leading-5 text-[#6E7EA3]">{grant.detail}</p>
+                                      {grant.breakdownItems.length > 0 ? (
+                                        <div className="mt-2 flex flex-wrap gap-1.5">
+                                          {grant.breakdownItems.map((item) => (
+                                            <span
+                                              key={`${grant.key}-${item.key}`}
+                                              className={cn(
+                                                'inline-flex max-w-full rounded-xl border px-2.5 py-1.5 text-left text-[10px] font-black leading-4',
+                                                POINT_HISTORY_TONE_BADGE_CLASS[item.tone]
+                                              )}
+                                            >
+                                              {formatPointBreakdownItemDetail(item)}
+                                            </span>
+                                          ))}
+                                        </div>
+                                      ) : null}
                                     </div>
                                     <div className="flex shrink-0 items-center gap-2">
                                       <p className="text-sm font-black text-emerald-700">{formatPointsInPt(grant.totalPoints)}</p>
@@ -9924,7 +10028,7 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
                 </div>
 
                 <div className="rounded-[1.35rem] border border-[#DCE7FF] bg-white px-4 py-3 text-xs font-bold leading-5 text-[#5c6e97]">
-                  학생별 전체 내역은 위 일자 카드를 눌렀을 때만 펼쳐집니다. 기본 화면에는 일자별 합계와 그날 포인트 TOP 3만 표시합니다.
+                  기본 화면에는 일자별 합계와 TOP 3 상세를 표시하고, 일자 카드를 누르면 학생별 전체 내역이 펼쳐집니다.
                 </div>
               </div>
               <DialogFooter className="border-t border-[#DCE7FF] bg-white px-5 py-4">
