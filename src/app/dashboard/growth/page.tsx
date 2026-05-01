@@ -449,6 +449,7 @@ export default function GrowthPage() {
   const openingBoxHoursRef = useRef<Set<number>>(new Set());
   const pendingBoxOpenHoursRef = useRef<Map<string, Set<number>>>(new Map());
   const isFlushingBoxOpensRef = useRef(false);
+  const retriedCachedBoxOpenKeyRef = useRef<string | null>(null);
   const [hydratedClaimCacheKey, setHydratedClaimCacheKey] = useState<string | null>(null);
 
   const progressRef = useMemoFirebase(() => {
@@ -997,7 +998,7 @@ export default function GrowthPage() {
     const nextDayStatus = {
       ...todayStatus,
       claimedStudyBoxes: nextClaimedBoxes,
-      openedStudyBoxes: normalizeStudyBoxHours(openedBoxes),
+      openedStudyBoxes: normalizeStudyBoxHours(persistedOpenedBoxes),
       studyBoxRewards: nextRewardEntries,
     };
 
@@ -1053,6 +1054,7 @@ export default function GrowthPage() {
     openedBoxes,
     activeMembership?.id,
     persistedClaimedBoxes,
+    persistedOpenedBoxes,
     persistedRewardEntries,
     progress?.pointsBalance,
     progressRef,
@@ -1083,6 +1085,7 @@ export default function GrowthPage() {
     if (batches.length === 0) return;
 
     isFlushingBoxOpensRef.current = true;
+    let shouldContinueFlush = false;
     try {
       for (const batch of batches) {
         const result = await openStudyRewardBoxesSecure({
@@ -1130,6 +1133,7 @@ export default function GrowthPage() {
           }
         }
       }
+      shouldContinueFlush = pendingBoxOpenHoursRef.current.size > 0;
     } catch (error) {
       console.error('[point-track] reward box batch open failed', error);
       toast({
@@ -1139,8 +1143,41 @@ export default function GrowthPage() {
       });
     } finally {
       isFlushingBoxOpensRef.current = false;
+      if (shouldContinueFlush) {
+        window.setTimeout(() => {
+          void flushPendingBoxOpens();
+        }, 250);
+      }
     }
   };
+
+  useEffect(() => {
+    if (!activeMembership?.id || !studentUid || !activeStudyDayKey || !studyBoxCacheUid) return;
+
+    const cachedOpenedBoxes = readStudyBoxOpenedCache(studyBoxCacheUid, activeStudyDayKey);
+    const unsyncedOpenedBoxes = normalizeStudyBoxHours(
+      cachedOpenedBoxes.filter(
+        (hour) => persistedClaimedBoxes.includes(hour) && !persistedOpenedBoxes.includes(hour)
+      )
+    );
+    if (unsyncedOpenedBoxes.length === 0) return;
+
+    const retryKey = `${activeStudyDayKey}:${unsyncedOpenedBoxes.join(',')}:${persistedOpenedBoxes.join(',')}`;
+    if (retriedCachedBoxOpenKeyRef.current === retryKey) return;
+    retriedCachedBoxOpenKeyRef.current = retryKey;
+
+    const pendingHours = pendingBoxOpenHoursRef.current.get(activeStudyDayKey) ?? new Set<number>();
+    unsyncedOpenedBoxes.forEach((hour) => pendingHours.add(hour));
+    pendingBoxOpenHoursRef.current.set(activeStudyDayKey, pendingHours);
+    void flushPendingBoxOpens();
+  }, [
+    activeMembership?.id,
+    activeStudyDayKey,
+    persistedClaimedBoxes,
+    persistedOpenedBoxes,
+    studentUid,
+    studyBoxCacheUid,
+  ]);
 
   const openVault = (hour?: number, mode: 'today' | 'carryover' = 'today') => {
     if (totalAvailableBoxes <= 0) return;
@@ -1243,6 +1280,7 @@ export default function GrowthPage() {
         }, 1800);
         timeoutsRef.current.push(clearFloating);
       }
+      void flushPendingBoxOpens();
     }, REWARD_TEXT_REVEAL_DELAY_MS);
 
     timeoutsRef.current.push(revealTimeout);

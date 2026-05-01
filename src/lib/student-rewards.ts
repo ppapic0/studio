@@ -239,6 +239,34 @@ function getDailyPointEventToneTotals(value: unknown): Record<DailyPointBreakdow
   return totals;
 }
 
+function getStudyBoxHourFromPointEvent(event: Record<string, any>): number | null {
+  const source = typeof event.source === 'string' ? event.source : '';
+  if (source !== 'study_box') return null;
+
+  const rawHour = Number(event.hour ?? event.milestone);
+  if (Number.isFinite(rawHour) && rawHour >= 1 && rawHour <= 8) {
+    return Math.round(rawHour);
+  }
+
+  const label = typeof event.label === 'string' ? event.label.trim() : '';
+  const labelMatch = label.match(/^(\d+)\s*시간\s*상자$/);
+  const labelHour = Number(labelMatch?.[1]);
+  if (Number.isFinite(labelHour) && labelHour >= 1 && labelHour <= 8) {
+    return Math.round(labelHour);
+  }
+
+  return null;
+}
+
+function getStudyBoxOpenedHoursFromPointEvents(value: unknown): number[] {
+  if (!Array.isArray(value)) return [];
+  return normalizeStudyBoxHourValues(
+    value
+      .map((event) => (event && typeof event === 'object' ? getStudyBoxHourFromPointEvent(event as Record<string, any>) : null))
+      .filter((hour): hour is number => hour !== null)
+  );
+}
+
 function getPlanCompletionRewardCount(dayStatus?: Record<string, any>): number {
   const storedCount = Number(dayStatus?.planCompletionRewardCount ?? 0);
   if (Number.isFinite(storedCount) && storedCount > 0) {
@@ -419,44 +447,50 @@ export function getRankRewardPoints(dayStatus?: Record<string, any>): number {
 function inferOpenedStudyBoxHours(dayStatus?: Record<string, any>): number[] {
   const claimedStudyBoxes = getClaimedStudyBoxes(dayStatus);
   const explicitOpenedStudyBoxes = normalizeStudyBoxHourValues(dayStatus?.openedStudyBoxes);
+  const eventOpenedStudyBoxes = getStudyBoxOpenedHoursFromPointEvents(dayStatus?.pointEvents);
+  const openedStudyBoxes = normalizeStudyBoxHourValues([...explicitOpenedStudyBoxes, ...eventOpenedStudyBoxes]);
 
-  if (claimedStudyBoxes.length === 0) return explicitOpenedStudyBoxes;
+  if (claimedStudyBoxes.length === 0) return openedStudyBoxes;
 
   const rewardByHour = new Map<number, number>();
   normalizeStoredStudyBoxRewardEntries(dayStatus?.studyBoxRewards).forEach((entry) => {
     rewardByHour.set(entry.milestone, Math.max(0, Math.floor(entry.awardedPoints)));
   });
 
-  if (explicitOpenedStudyBoxes.some((hour) => !rewardByHour.has(hour))) {
-    return explicitOpenedStudyBoxes;
+  if (openedStudyBoxes.some((hour) => !rewardByHour.has(hour))) {
+    return openedStudyBoxes;
   }
 
   const persistedDailyPointAmount = Number(dayStatus?.dailyPointAmount ?? 0);
+  const eventToneTotals = getDailyPointEventToneTotals(dayStatus?.pointEvents);
+  const planPoints = Math.max(eventToneTotals.plan, getPlanCompletionFallbackPoints(dayStatus));
   const studyBoxAwardedPoints = Math.max(
     0,
+    eventToneTotals.box,
     Math.floor(Number.isFinite(persistedDailyPointAmount) ? persistedDailyPointAmount : 0)
       - getRankRewardPoints(dayStatus)
+      - planPoints
   );
-  const explicitOpenedStudyBoxPoints = explicitOpenedStudyBoxes.reduce(
+  const explicitOpenedStudyBoxPoints = openedStudyBoxes.reduce(
     (total, hour) => total + (rewardByHour.get(hour) ?? 0),
     0
   );
   const remainingAwardedStudyBoxPoints = Math.max(0, studyBoxAwardedPoints - explicitOpenedStudyBoxPoints);
   const missingClaimedStudyBoxes = claimedStudyBoxes.filter(
-    (hour) => !explicitOpenedStudyBoxes.includes(hour) && rewardByHour.has(hour)
+    (hour) => !openedStudyBoxes.includes(hour) && rewardByHour.has(hour)
   );
 
-  if (missingClaimedStudyBoxes.length === 0) return explicitOpenedStudyBoxes;
+  if (missingClaimedStudyBoxes.length === 0) return openedStudyBoxes;
 
   const missingClaimedRewardTotal = missingClaimedStudyBoxes.reduce(
     (total, hour) => total + (rewardByHour.get(hour) ?? 0),
     0
   );
   if (missingClaimedRewardTotal > 0 && remainingAwardedStudyBoxPoints < missingClaimedRewardTotal) {
-    return explicitOpenedStudyBoxes;
+    return openedStudyBoxes;
   }
 
-  return normalizeStudyBoxHourValues([...explicitOpenedStudyBoxes, ...missingClaimedStudyBoxes]);
+  return normalizeStudyBoxHourValues([...openedStudyBoxes, ...missingClaimedStudyBoxes]);
 }
 
 function coerceStudyBoxHourValue(value: unknown): number | null {

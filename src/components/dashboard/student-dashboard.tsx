@@ -1350,6 +1350,7 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
   const pendingHomeBoxOpenHoursRef = useRef<Map<string, Set<number>>>(new Map());
   const isFlushingHomeBoxOpensRef = useRef(false);
   const activeHomeBoxRevealKeyRef = useRef<string | null>(null);
+  const retriedCachedHomeBoxOpenKeyRef = useRef<string | null>(null);
   const homeLiveClaimKeyRef = useRef<string | null>(null);
   const autoRequestDateRef = useRef('');
   const [homeClaimedBoxes, setHomeClaimedBoxes] = useState<number[]>([]);
@@ -3449,6 +3450,7 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
     if (batches.length === 0) return;
 
     isFlushingHomeBoxOpensRef.current = true;
+    let shouldContinueFlush = false;
     try {
       for (const batch of batches) {
         const result = await openStudyRewardBoxesSecure({
@@ -3502,6 +3504,7 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
           }
         }
       }
+      shouldContinueFlush = pendingHomeBoxOpenHoursRef.current.size > 0;
     } catch (error) {
       logHandledClientIssue('[student-track] home reward box flush failed', error);
       toast({
@@ -3511,6 +3514,11 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
       });
     } finally {
       isFlushingHomeBoxOpensRef.current = false;
+      if (shouldContinueFlush) {
+        window.setTimeout(() => {
+          void flushPendingHomeBoxOpens();
+        }, 250);
+      }
     }
   }, [
     activeMembership?.id,
@@ -3520,6 +3528,35 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
     studyBoxClaimCacheKey,
     toast,
     writeCarryoverOpenedCache,
+  ]);
+
+  useEffect(() => {
+    if (!activeMembership?.id || !studentUid || !activeStudyDayKey || !studyBoxCacheUid) return;
+
+    const cachedOpenedBoxes = readStudyBoxOpenedCache(studyBoxCacheUid, activeStudyDayKey);
+    const unsyncedOpenedBoxes = normalizeStudyBoxHours(
+      cachedOpenedBoxes.filter(
+        (hour) => persistedClaimedBoxes.includes(hour) && !persistedOpenedBoxes.includes(hour)
+      )
+    );
+    if (unsyncedOpenedBoxes.length === 0) return;
+
+    const retryKey = `${activeStudyDayKey}:${unsyncedOpenedBoxes.join(',')}:${persistedOpenedBoxes.join(',')}`;
+    if (retriedCachedHomeBoxOpenKeyRef.current === retryKey) return;
+    retriedCachedHomeBoxOpenKeyRef.current = retryKey;
+
+    const pendingHours = pendingHomeBoxOpenHoursRef.current.get(activeStudyDayKey) ?? new Set<number>();
+    unsyncedOpenedBoxes.forEach((hour) => pendingHours.add(hour));
+    pendingHomeBoxOpenHoursRef.current.set(activeStudyDayKey, pendingHours);
+    void flushPendingHomeBoxOpens();
+  }, [
+    activeMembership?.id,
+    activeStudyDayKey,
+    flushPendingHomeBoxOpens,
+    persistedClaimedBoxes,
+    persistedOpenedBoxes,
+    studentUid,
+    studyBoxCacheUid,
   ]);
 
   const openVault = useCallback((hour?: number) => {
@@ -3610,6 +3647,7 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
           hours: nextOpenedBoxes,
         });
       }
+      void flushPendingHomeBoxOpens();
     }, HOME_REWARD_TEXT_REVEAL_DELAY_MS);
 
     homeBoxTimeoutsRef.current.push(revealId);
@@ -3620,6 +3658,7 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
     activeVaultDateKey,
     homeBoxStage,
     queuePendingHomeBoxOpen,
+    flushPendingHomeBoxOpens,
     resolvedCarryoverOpenedBoxes,
     selectedHomeBox,
     studentUid,
