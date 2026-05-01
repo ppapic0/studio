@@ -10129,6 +10129,8 @@ async function resolveOpenStudyStartMsFromAttendanceEvidence(params: {
     return Math.max(bounds.startMs, openStartMs);
   }
 
+  const activeStudyStartedAtMs = toMillisSafe(params.seatData.activeStudyStartedAt);
+  const seatUpdatedAtMs = toMillisSafe(params.seatData.updatedAt);
   const [statSnaps, daySnaps] = await Promise.all([
     Promise.all(
       evidenceDateKeys.map((dateKey) =>
@@ -10156,8 +10158,18 @@ async function resolveOpenStudyStartMsFromAttendanceEvidence(params: {
       return toMillisSafe(dayData.lastSessionEndAt);
     })
   );
+  if (
+    activeStudyStartedAtMs > 0 &&
+    activeStudyStartedAtMs < params.nowMs &&
+    (!lastSessionEndMs || activeStudyStartedAtMs > lastSessionEndMs)
+  ) {
+    return Math.max(bounds.startMs, activeStudyStartedAtMs);
+  }
   if (statCheckInMs > 0 && statCheckInMs < params.nowMs && statCheckInMs > lastSessionEndMs) {
     return Math.max(bounds.startMs, statCheckInMs);
+  }
+  if (seatUpdatedAtMs > 0 && seatUpdatedAtMs < params.nowMs && (!lastSessionEndMs || seatUpdatedAtMs > lastSessionEndMs)) {
+    return Math.max(bounds.startMs, seatUpdatedAtMs);
   }
 
   return 0;
@@ -10294,24 +10306,36 @@ async function applyAttendanceStatusTransition(
       })
     : toMillisSafe(preflightSeatData.lastCheckInAt);
   let finalized: FinalizeStudySessionResult | null = null;
+  const isLeavingActiveStudy = preflightStatus === "studying" && nextStatus !== "studying";
+  const sessionFinalizeSkipReason =
+    isLeavingActiveStudy && preflightStartMs <= 0
+      ? "missing_open_session_start"
+      : isLeavingActiveStudy && nowMs <= preflightStartMs
+        ? "open_session_start_not_before_transition"
+        : null;
   const shouldAllowCheckoutWithoutSession =
     preflightStatus === "studying" &&
     nextStatus === "absent" &&
-    (preflightStartMs <= 0 || nowMs <= preflightStartMs);
+    Boolean(sessionFinalizeSkipReason);
+  const shouldAllowAwayWithoutSession =
+    preflightStatus === "studying" &&
+    (nextStatus === "away" || nextStatus === "break") &&
+    Boolean(sessionFinalizeSkipReason);
+  const shouldAllowTransitionWithoutSession = shouldAllowCheckoutWithoutSession || shouldAllowAwayWithoutSession;
 
-  if (preflightStatus === "studying" && nextStatus !== "studying" && preflightStartMs <= 0 && !shouldAllowCheckoutWithoutSession) {
+  if (isLeavingActiveStudy && preflightStartMs <= 0 && !shouldAllowTransitionWithoutSession) {
     throw new functions.https.HttpsError("failed-precondition", "Open study session start is missing.", {
       userMessage: "공부 시작 시간을 찾지 못해 외출 처리할 수 없습니다. 관리자에게 세션 보정을 요청해 주세요.",
     });
   }
 
-  if (preflightStatus === "studying" && nextStatus !== "studying" && nowMs <= preflightStartMs && !shouldAllowCheckoutWithoutSession) {
+  if (isLeavingActiveStudy && nowMs <= preflightStartMs && !shouldAllowTransitionWithoutSession) {
     throw new functions.https.HttpsError("failed-precondition", "Open study session start is not before transition time.", {
       userMessage: "공부 시작 시간이 현재 시간보다 늦어 외출 처리할 수 없습니다. 잠시 후 다시 시도해 주세요.",
     });
   }
 
-  if (preflightStatus === "studying" && nextStatus !== "studying" && !shouldAllowCheckoutWithoutSession) {
+  if (isLeavingActiveStudy && !shouldAllowTransitionWithoutSession) {
     finalized = await finalizeStudySession({
       db,
       centerId,
@@ -10358,7 +10382,7 @@ async function applyAttendanceStatusTransition(
       };
     }
 
-    if (prevStatus === "studying" && nextStatus !== "studying" && !finalized && !shouldAllowCheckoutWithoutSession) {
+    if (prevStatus === "studying" && nextStatus !== "studying" && !finalized && !shouldAllowTransitionWithoutSession) {
       throw new functions.https.HttpsError("failed-precondition", "Open study session was not finalized.", {
         userMessage: "진행 중인 공부 세션을 먼저 저장하지 못해 외출 처리할 수 없습니다. 다시 시도해 주세요.",
       });
@@ -10549,6 +10573,9 @@ async function applyAttendanceStatusTransition(
         statPatch.checkoutSessionMissing = true;
       }
     }
+    if (eventType === "away_start" && shouldAllowAwayWithoutSession) {
+      statPatch.awaySessionMissing = true;
+    }
     transaction.set(statRef, statPatch, { merge: true });
 
     if (eventType && eventRef) {
@@ -10565,7 +10592,7 @@ async function applyAttendanceStatusTransition(
         statusBefore: prevStatus,
         statusAfter: nextStatus,
         ...buildAttendanceEventAwayPatch(eventAwayContext),
-        ...(shouldAllowCheckoutWithoutSession ? { sessionFinalizeSkipped: true, sessionFinalizeSkipReason: "missing_open_session_start" } : {}),
+        ...(sessionFinalizeSkipReason ? { sessionFinalizeSkipped: true, sessionFinalizeSkipReason } : {}),
         ...(params.actorUid ? { actorUid: params.actorUid } : {}),
       });
     }
