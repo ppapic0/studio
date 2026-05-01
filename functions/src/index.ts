@@ -11007,8 +11007,19 @@ function getKioskActionAwayKind(action: KioskAttendanceQueueAction): AttendanceA
   return null;
 }
 
-function shouldSuppressParentSmsForKioskAction(action: KioskAttendanceQueueAction): boolean {
-  return action === "away_start";
+function getKioskRequestedAwayKind(
+  action: KioskAttendanceQueueAction,
+  value: unknown
+): AttendanceAwayKind | null {
+  const requestedAwayKind = normalizeAttendanceAwayKind(value);
+  return requestedAwayKind || getKioskActionAwayKind(action);
+}
+
+function shouldSuppressParentSmsForKioskAwayKind(
+  action: KioskAttendanceQueueAction,
+  awayKind: AttendanceAwayKind | null
+): boolean {
+  return (awayKind || getKioskActionAwayKind(action)) === "short";
 }
 
 function isKioskActionAllowedFromStatus(
@@ -11378,6 +11389,8 @@ async function processKioskAttendanceQueueItem(
     }
 
     const nextStatus = getKioskActionNextStatus(action);
+    const requestedAwayKind = getKioskRequestedAwayKind(action, queueData.awayKind);
+    const suppressParentSms = shouldSuppressParentSmsForKioskAwayKind(action, requestedAwayKind);
     const current = await resolveKioskQueueSeatStatus({ db, centerId, studentId, seatId });
     if (current.status !== expectedStatus) {
       if (current.status === nextStatus) {
@@ -11428,8 +11441,8 @@ async function processKioskAttendanceQueueItem(
       actorUid: asTrimmedString(queueData.requestedByUid) || null,
       seatId: current.seatId || seatId,
       seatHint,
-      awayKind: getKioskActionAwayKind(action),
-      suppressParentSms: shouldSuppressParentSmsForKioskAction(action),
+      awayKind: requestedAwayKind,
+      suppressParentSms,
       nowMs: effectiveActionAtMs,
     });
 
@@ -11644,6 +11657,8 @@ async function processKioskAttendanceQueueItemInlineFast(params: {
   }
 
   const nextStatus = getKioskActionNextStatus(action);
+  const requestedAwayKind = getKioskRequestedAwayKind(action, queueData.awayKind);
+  const suppressParentSms = shouldSuppressParentSmsForKioskAwayKind(action, requestedAwayKind);
   await queueRef.set({
     status: "processing",
     processingStartedAt: nowTs,
@@ -11721,8 +11736,8 @@ async function processKioskAttendanceQueueItemInlineFast(params: {
       actorUid: asTrimmedString(queueData.requestedByUid) || null,
       seatId: current.seatId || seatId,
       seatHint,
-      awayKind: getKioskActionAwayKind(action),
-      suppressParentSms: shouldSuppressParentSmsForKioskAction(action),
+      awayKind: requestedAwayKind,
+      suppressParentSms,
       nowMs: effectiveActionAtMs,
     });
     const verification = await verifyKioskAttendanceQueueResult({
@@ -11931,6 +11946,8 @@ export const submitKioskAttendanceActionFast = functions.region(region).runWith(
   const nextStatus = getKioskActionNextStatus(action);
   const actionId = idempotencyKey;
   const queueRef = db.doc(`centers/${centerId}/kioskAttendanceQueue/${actionId}`);
+  const requestedAwayKind = getKioskRequestedAwayKind(action, data?.awayKind);
+  const suppressParentSms = shouldSuppressParentSmsForKioskAwayKind(action, requestedAwayKind);
 
   try {
     await assertKioskAttendanceQueueCaller({ db, centerId, authUid: context.auth.uid });
@@ -11956,8 +11973,8 @@ export const submitKioskAttendanceActionFast = functions.region(region).runWith(
       studentId,
       pin,
       action,
-      awayKind: getKioskActionAwayKind(action),
-      suppressParentSms: shouldSuppressParentSmsForKioskAction(action),
+      awayKind: requestedAwayKind,
+      suppressParentSms,
       expectedStatus,
       statusAtEnqueue: current.status,
       nextStatus,
@@ -12067,8 +12084,8 @@ export const submitKioskAttendanceActionFast = functions.region(region).runWith(
       actorUid: context.auth.uid,
       seatId: current.seatId || requestedSeatId,
       seatHint,
-      awayKind: getKioskActionAwayKind(action),
-      suppressParentSms: shouldSuppressParentSmsForKioskAction(action),
+      awayKind: requestedAwayKind,
+      suppressParentSms,
       nowMs: actionTime.actionAtMs,
     });
     const verification = await verifyKioskAttendanceQueueResult({
@@ -12153,8 +12170,8 @@ export const submitKioskAttendanceActionFast = functions.region(region).runWith(
         studentId,
         pin,
         action,
-        awayKind: getKioskActionAwayKind(action),
-        suppressParentSms: shouldSuppressParentSmsForKioskAction(action),
+        awayKind: requestedAwayKind,
+        suppressParentSms,
         expectedStatus: expectedStatusInput || "absent",
         nextStatus,
         idempotencyKey,
@@ -12256,6 +12273,8 @@ export const enqueueKioskAttendanceActionSecure = functions.region(region).runWi
       });
     }
     const resolvedAction = action;
+    const requestedAwayKind = getKioskRequestedAwayKind(resolvedAction, data?.awayKind);
+    const suppressParentSms = shouldSuppressParentSmsForKioskAwayKind(resolvedAction, requestedAwayKind);
 
     await assertKioskAttendanceQueueCaller({ db, centerId, authUid: context.auth.uid });
     await assertKioskPinMatchesStudent({ db, centerId, studentId, pin });
@@ -12293,8 +12312,8 @@ export const enqueueKioskAttendanceActionSecure = functions.region(region).runWi
         studentId,
         pin,
         action: resolvedAction,
-        awayKind: getKioskActionAwayKind(resolvedAction),
-        suppressParentSms: shouldSuppressParentSmsForKioskAction(resolvedAction),
+        awayKind: requestedAwayKind,
+        suppressParentSms,
         expectedStatus,
         statusAtEnqueue: current.status,
         nextStatus: getKioskActionNextStatus(resolvedAction),

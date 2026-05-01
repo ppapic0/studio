@@ -2,12 +2,14 @@ import { httpsCallable, type Functions } from 'firebase/functions';
 import type { AttendanceCurrent } from '@/lib/types';
 
 export type KioskAttendanceAction = 'check_in' | 'away_start' | 'away_start_long' | 'away_end' | 'check_out';
+export type KioskAttendanceAwayKind = 'short' | 'long';
 
 export type EnqueueKioskAttendanceActionInput = {
   centerId: string;
   studentId: string;
   pin: string;
   action: KioskAttendanceAction;
+  awayKind?: KioskAttendanceAwayKind | null;
   expectedStatus: AttendanceCurrent['status'];
   seatId?: string | null;
   seatHint?: {
@@ -39,6 +41,7 @@ export type SubmitKioskAttendanceActionFastInput = {
   studentId: string;
   pin: string;
   action: KioskAttendanceAction;
+  awayKind?: KioskAttendanceAwayKind | null;
   expectedStatus: AttendanceCurrent['status'];
   seatId?: string | null;
   seatHint?: {

@@ -35,6 +35,7 @@ import {
   submitKioskAttendanceActionFast,
   type EnqueueKioskAttendanceActionResult,
   type KioskAttendanceAction,
+  type KioskAttendanceAwayKind,
   type SubmitKioskAttendanceActionFastInput,
   type SubmitKioskAttendanceActionFastResult,
 } from '@/lib/kiosk-attendance-actions';
@@ -181,6 +182,16 @@ function getNextStatusForAction(action: KioskAttendanceAction): AttendanceStatus
   if (action === 'check_in' || action === 'away_end') return 'studying';
   if (action === 'away_start' || action === 'away_start_long') return 'away';
   return 'absent';
+}
+
+function getSubmissionActionForAction(action: KioskAttendanceAction): KioskAttendanceAction {
+  return action === 'away_start_long' ? 'away_start' : action;
+}
+
+function getAwayKindForAction(action: KioskAttendanceAction): KioskAttendanceAwayKind | null {
+  if (action === 'away_start') return 'short';
+  if (action === 'away_start_long') return 'long';
+  return null;
 }
 
 function getSeatActivityRank(status?: AttendanceStatus) {
@@ -883,6 +894,8 @@ export default function KioskPage() {
   const retryFailedAction = useCallback((item: KioskFailedOutboxItem) => {
     const retryPayload: SubmitKioskAttendanceActionFastInput = {
       ...item.payload,
+      action: getSubmissionActionForAction(item.payload.action),
+      awayKind: item.payload.awayKind || getAwayKindForAction(item.payload.action),
       pin: normalizeKioskPin(item.payload.pin),
       idempotencyKey: createIdempotencyKey(),
       clientActionAtMillis: item.payload.clientActionAtMillis || item.createdAt || Date.now(),
@@ -1105,6 +1118,7 @@ export default function KioskPage() {
 
     const config = ACTIONS[action];
     const nextStatus = getNextStatusForAction(action);
+    const submissionAction = getSubmissionActionForAction(action);
     const idempotencyKey = createIdempotencyKey();
     const queuedSeatLabel =
       seat.seatLabel ||
@@ -1115,7 +1129,8 @@ export default function KioskPage() {
       centerId,
       studentId,
       pin: actionPin,
-      action,
+      action: submissionAction,
+      awayKind: getAwayKindForAction(action),
       expectedStatus: status,
       seatId: seat.id,
       seatHint: {

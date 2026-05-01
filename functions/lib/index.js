@@ -8778,8 +8778,12 @@ function getKioskActionAwayKind(action) {
         return "long";
     return null;
 }
-function shouldSuppressParentSmsForKioskAction(action) {
-    return action === "away_start";
+function getKioskRequestedAwayKind(action, value) {
+    const requestedAwayKind = normalizeAttendanceAwayKind(value);
+    return requestedAwayKind || getKioskActionAwayKind(action);
+}
+function shouldSuppressParentSmsForKioskAwayKind(action, awayKind) {
+    return (awayKind || getKioskActionAwayKind(action)) === "short";
 }
 function isKioskActionAllowedFromStatus(action, status) {
     if (action === "check_in")
@@ -9068,6 +9072,8 @@ async function processKioskAttendanceQueueItem(db, centerId, actionId) {
             throw new functions.https.HttpsError("invalid-argument", "Invalid kiosk queue action payload.");
         }
         const nextStatus = getKioskActionNextStatus(action);
+        const requestedAwayKind = getKioskRequestedAwayKind(action, queueData.awayKind);
+        const suppressParentSms = shouldSuppressParentSmsForKioskAwayKind(action, requestedAwayKind);
         const current = await resolveKioskQueueSeatStatus({ db, centerId, studentId, seatId });
         if (current.status !== expectedStatus) {
             if (current.status === nextStatus) {
@@ -9116,8 +9122,8 @@ async function processKioskAttendanceQueueItem(db, centerId, actionId) {
             actorUid: asTrimmedString(queueData.requestedByUid) || null,
             seatId: current.seatId || seatId,
             seatHint,
-            awayKind: getKioskActionAwayKind(action),
-            suppressParentSms: shouldSuppressParentSmsForKioskAction(action),
+            awayKind: requestedAwayKind,
+            suppressParentSms,
             nowMs: effectiveActionAtMs,
         });
         const verification = await verifyKioskAttendanceQueueResult({
@@ -9297,6 +9303,8 @@ async function processKioskAttendanceQueueItemInlineFast(params) {
         });
     }
     const nextStatus = getKioskActionNextStatus(action);
+    const requestedAwayKind = getKioskRequestedAwayKind(action, queueData.awayKind);
+    const suppressParentSms = shouldSuppressParentSmsForKioskAwayKind(action, requestedAwayKind);
     await queueRef.set({
         status: "processing",
         processingStartedAt: nowTs,
@@ -9373,8 +9381,8 @@ async function processKioskAttendanceQueueItemInlineFast(params) {
             actorUid: asTrimmedString(queueData.requestedByUid) || null,
             seatId: current.seatId || seatId,
             seatHint,
-            awayKind: getKioskActionAwayKind(action),
-            suppressParentSms: shouldSuppressParentSmsForKioskAction(action),
+            awayKind: requestedAwayKind,
+            suppressParentSms,
             nowMs: effectiveActionAtMs,
         });
         const verification = await verifyKioskAttendanceQueueResult({
@@ -9530,6 +9538,8 @@ exports.submitKioskAttendanceActionFast = functions.region(region).runWith({
     const nextStatus = getKioskActionNextStatus(action);
     const actionId = idempotencyKey;
     const queueRef = db.doc(`centers/${centerId}/kioskAttendanceQueue/${actionId}`);
+    const requestedAwayKind = getKioskRequestedAwayKind(action, data === null || data === void 0 ? void 0 : data.awayKind);
+    const suppressParentSms = shouldSuppressParentSmsForKioskAwayKind(action, requestedAwayKind);
     try {
         await assertKioskAttendanceQueueCaller({ db, centerId, authUid: context.auth.uid });
         await assertKioskPinMatchesStudent({ db, centerId, studentId, pin });
@@ -9550,7 +9560,8 @@ exports.submitKioskAttendanceActionFast = functions.region(region).runWith({
         const baseQueuePayload = Object.assign(Object.assign({ centerId,
             studentId,
             pin,
-            action, awayKind: getKioskActionAwayKind(action), suppressParentSms: shouldSuppressParentSmsForKioskAction(action), expectedStatus, statusAtEnqueue: current.status, nextStatus, seatId: current.seatId || requestedSeatId, seatHint,
+            action, awayKind: requestedAwayKind, suppressParentSms,
+            expectedStatus, statusAtEnqueue: current.status, nextStatus, seatId: current.seatId || requestedSeatId, seatHint,
             idempotencyKey, inlinePreferred: true, status: "processing", attemptCount: 1, processingMode: "fast_direct", requestedByUid: context.auth.uid, source: "kiosk", clientActionAt: admin.firestore.Timestamp.fromMillis(actionTime.actionAtMs), clientActionAtMillis: Math.max(0, Math.floor((_b = parseFiniteNumber(data === null || data === void 0 ? void 0 : data.clientActionAtMillis)) !== null && _b !== void 0 ? _b : 0)), acceptedAt: acceptedAtTs, effectiveActionAt: admin.firestore.Timestamp.fromMillis(actionTime.actionAtMs), effectiveActionAtMillis: actionTime.actionAtMs, actionTimeSource: actionTime.source }, (actionTime.correctionReason ? { actionTimeCorrectionReason: actionTime.correctionReason } : {})), { processingStartedAt: acceptedAtTs, leaseExpiresAt: admin.firestore.Timestamp.fromMillis(acceptedAtMs + KIOSK_ATTENDANCE_LOCK_TTL_MS), createdAt: admin.firestore.FieldValue.serverTimestamp(), updatedAt: admin.firestore.FieldValue.serverTimestamp() });
         await queueRef.set(baseQueuePayload, { merge: false });
         if (current.status !== expectedStatus) {
@@ -9629,8 +9640,8 @@ exports.submitKioskAttendanceActionFast = functions.region(region).runWith({
             actorUid: context.auth.uid,
             seatId: current.seatId || requestedSeatId,
             seatHint,
-            awayKind: getKioskActionAwayKind(action),
-            suppressParentSms: shouldSuppressParentSmsForKioskAction(action),
+            awayKind: requestedAwayKind,
+            suppressParentSms,
             nowMs: actionTime.actionAtMs,
         });
         const verification = await verifyKioskAttendanceQueueResult({
@@ -9711,8 +9722,8 @@ exports.submitKioskAttendanceActionFast = functions.region(region).runWith({
                 studentId,
                 pin,
                 action,
-                awayKind: getKioskActionAwayKind(action),
-                suppressParentSms: shouldSuppressParentSmsForKioskAction(action),
+                awayKind: requestedAwayKind,
+                suppressParentSms,
                 expectedStatus: expectedStatusInput || "absent",
                 nextStatus,
                 idempotencyKey,
@@ -9807,6 +9818,8 @@ exports.enqueueKioskAttendanceActionSecure = functions.region(region).runWith({
             });
         }
         const resolvedAction = action;
+        const requestedAwayKind = getKioskRequestedAwayKind(resolvedAction, data === null || data === void 0 ? void 0 : data.awayKind);
+        const suppressParentSms = shouldSuppressParentSmsForKioskAwayKind(resolvedAction, requestedAwayKind);
         await assertKioskAttendanceQueueCaller({ db, centerId, authUid: context.auth.uid });
         await assertKioskPinMatchesStudent({ db, centerId, studentId, pin });
         const acceptedAtMs = Date.now();
@@ -9838,7 +9851,8 @@ exports.enqueueKioskAttendanceActionSecure = functions.region(region).runWith({
             }
             transaction.set(queueRef, Object.assign(Object.assign({ centerId,
                 studentId,
-                pin, action: resolvedAction, awayKind: getKioskActionAwayKind(resolvedAction), suppressParentSms: shouldSuppressParentSmsForKioskAction(resolvedAction), expectedStatus, statusAtEnqueue: current.status, nextStatus: getKioskActionNextStatus(resolvedAction), seatId: current.seatId || requestedSeatId, seatHint,
+                pin, action: resolvedAction, awayKind: requestedAwayKind, suppressParentSms,
+                expectedStatus, statusAtEnqueue: current.status, nextStatus: getKioskActionNextStatus(resolvedAction), seatId: current.seatId || requestedSeatId, seatHint,
                 idempotencyKey, inlinePreferred: true, status: "queued", attemptCount: 0, requestedByUid: ((_a = context.auth) === null || _a === void 0 ? void 0 : _a.uid) || null, source: "kiosk", clientActionAt: admin.firestore.Timestamp.fromMillis(actionTime.actionAtMs), clientActionAtMillis: Math.max(0, Math.floor((_b = parseFiniteNumber(data === null || data === void 0 ? void 0 : data.clientActionAtMillis)) !== null && _b !== void 0 ? _b : 0)), acceptedAt: acceptedAtTs, effectiveActionAt: admin.firestore.Timestamp.fromMillis(actionTime.actionAtMs), effectiveActionAtMillis: actionTime.actionAtMs, actionTimeSource: actionTime.source }, (actionTime.correctionReason ? { actionTimeCorrectionReason: actionTime.correctionReason } : {})), { createdAt: admin.firestore.FieldValue.serverTimestamp(), updatedAt: admin.firestore.FieldValue.serverTimestamp() }));
             return {
                 actionId: queueRef.id,
