@@ -334,6 +334,7 @@ export interface StudentScheduleDoc {
   inTime: string;
   outTime: string;
   isAbsent: boolean;
+  isAutonomousAttendance?: boolean;
   outings: StudentScheduleOuting[];
   recommendedStudyMinutes?: number | null;
   recommendedWeeklyDays?: number | null;
@@ -369,6 +370,7 @@ export interface StudentScheduleTemplate {
   defaultExcursionEndAt: string | null;
   defaultExcursionReason?: string | null;
   note?: string | null;
+  isAutonomousAttendance?: boolean;
   classScheduleId?: string | null;
   classScheduleName?: string | null;
   active: boolean;

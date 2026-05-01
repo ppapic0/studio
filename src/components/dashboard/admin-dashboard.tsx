@@ -126,6 +126,7 @@ import {
   updateManualStudySessionSecure,
 } from '@/lib/study-session-actions';
 import { getStudySessionDurationMinutes } from '@/lib/study-session-time';
+import { isAutonomousAttendanceDate } from '@/lib/korean-public-holidays';
 import {
   buildCounselingTrackOverview,
   type DashboardCounselTrackTab,
@@ -178,6 +179,7 @@ type FocusWeeklyScheduleDraft = {
   label: string;
   dateKey: string;
   enabled: boolean;
+  isAutonomous: boolean;
   inTime: string;
   outTime: string;
   awayStartTime: string;
@@ -320,17 +322,22 @@ const toScheduleTimeDraft = (value: string | null | undefined, fallback = ''): s
 
 const buildFocusWeeklyScheduleDrafts = (baseDate?: Date | null): FocusWeeklyScheduleDraft[] => {
   const weekStart = baseDate ? startOfWeek(baseDate, { weekStartsOn: 1 }) : null;
-  return FOCUS_WEEKLY_SCHEDULE_DAYS.map((day, index) => ({
-    weekday: day.weekday,
-    label: day.label,
-    dateKey: weekStart ? format(addDays(weekStart, index), 'yyyy-MM-dd') : '',
-    enabled: false,
-    inTime: '',
-    outTime: '',
-    awayStartTime: '',
-    awayEndTime: '',
-    awayReason: '',
-  }));
+  return FOCUS_WEEKLY_SCHEDULE_DAYS.map((day, index) => {
+    const date = weekStart ? addDays(weekStart, index) : null;
+    const isAutonomous = isAutonomousAttendanceDate(date);
+    return {
+      weekday: day.weekday,
+      label: day.label,
+      dateKey: date ? format(date, 'yyyy-MM-dd') : '',
+      enabled: isAutonomous,
+      isAutonomous,
+      inTime: '',
+      outTime: '',
+      awayStartTime: '',
+      awayEndTime: '',
+      awayReason: '',
+    };
+  });
 };
 
 const toFocusWeeklyAttendanceDraft = (draft: FocusWeeklyScheduleDraft): AttendanceScheduleDraft => ({
@@ -354,6 +361,11 @@ const getStudentScheduleTemplateTimestampMs = (template: StudentScheduleTemplate
     || toTimestampDateSafe(template.createdAt)?.getTime()
     || 0
   );
+};
+
+const getFocusWeeklyScheduleMode = (draft: FocusWeeklyScheduleDraft): 'scheduled' | 'autonomous' | 'absent' => {
+  if (!draft.enabled) return 'absent';
+  return draft.isAutonomous ? 'autonomous' : 'scheduled';
 };
 
 const scheduleTimeToMinutes = (value: string): number | null => {
@@ -4885,7 +4897,8 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
 
   function renderFocusScheduleDialog() {
     const studentName = selectedFocusStudent?.name || selectedFocusOperationsSummary?.student?.name || '학생';
-    const enabledCount = focusWeeklyScheduleDrafts.filter((draft) => draft.enabled).length;
+    const scheduledCount = focusWeeklyScheduleDrafts.filter((draft) => draft.enabled && !draft.isAutonomous).length;
+    const autonomousCount = focusWeeklyScheduleDrafts.filter((draft) => draft.enabled && draft.isAutonomous).length;
 
     return (
       <Dialog
@@ -4922,13 +4935,14 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
                   </p>
                 </div>
                 <Badge className="h-7 rounded-full border-none bg-white px-3 text-[10px] font-black text-emerald-700">
-                  등원 {enabledCount}일
+                  정규 {scheduledCount}일 · 자율 {autonomousCount}일
                 </Badge>
               </div>
             </div>
 
             <div className="mt-4 grid gap-3">
               {focusWeeklyScheduleDrafts.map((dayDraft) => {
+                const mode = getFocusWeeklyScheduleMode(dayDraft);
                 const outingEnabled = Boolean(
                   dayDraft.awayStartTime || dayDraft.awayEndTime || dayDraft.awayReason.trim()
                 );
@@ -4937,7 +4951,11 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
                     key={dayDraft.weekday}
                     className={cn(
                       'rounded-[1.25rem] border px-4 py-4 shadow-[0_16px_34px_-30px_rgba(20,41,95,0.24)]',
-                      dayDraft.enabled ? 'border-[#DCE7FF] bg-white' : 'border-[#E5EAF5] bg-white/72'
+                      mode === 'scheduled'
+                        ? 'border-[#DCE7FF] bg-white'
+                        : mode === 'autonomous'
+                          ? 'border-sky-200 bg-sky-50/80'
+                          : 'border-[#E5EAF5] bg-white/72'
                     )}
                   >
                     <div className="flex flex-wrap items-center justify-between gap-3">
@@ -4945,7 +4963,11 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
                         <span
                           className={cn(
                             'inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-[1rem] text-sm font-black',
-                            dayDraft.enabled ? 'bg-[#14295F] text-white' : 'bg-[#EEF2F8] text-[#7A88A6]'
+                            mode === 'scheduled'
+                              ? 'bg-[#14295F] text-white'
+                              : mode === 'autonomous'
+                                ? 'bg-sky-600 text-white'
+                                : 'bg-[#EEF2F8] text-[#7A88A6]'
                           )}
                         >
                           {dayDraft.label}
@@ -4957,39 +4979,71 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
                           </p>
                         </div>
                       </div>
-                      <Button
-                        type="button"
-                        size="sm"
-                        variant={dayDraft.enabled ? 'default' : 'outline'}
-                        className={cn(
-                          'h-9 rounded-xl px-3 text-[11px] font-black',
-                          dayDraft.enabled
-                            ? 'bg-[#14295F] text-white hover:bg-[#10224C]'
-                            : 'border-[#FFD0C2] bg-[#FFF5F2] text-[#D54E2B] hover:bg-[#FFE9E2]'
-                        )}
-                        onClick={() =>
-                          updateFocusWeeklyScheduleDraft(
-                            dayDraft.weekday,
-                            dayDraft.enabled
-                              ? { enabled: false }
-                              : {
-                                  enabled: true,
-                                  inTime: dayDraft.inTime || FOCUS_SCHEDULE_DEFAULT_ARRIVAL_TIME,
-                                  outTime: dayDraft.outTime || FOCUS_SCHEDULE_DEFAULT_DEPARTURE_TIME,
-                                }
-                          )
-                        }
-                      >
-                        {dayDraft.enabled ? (
-                          <CheckCircle2 className="mr-1.5 h-3.5 w-3.5" />
-                        ) : (
-                          <UserX className="mr-1.5 h-3.5 w-3.5" />
-                        )}
-                        {dayDraft.enabled ? '등원' : '미등원'}
-                      </Button>
+                      <div className="grid grid-cols-3 gap-1.5 rounded-xl border border-[#DCE7FF] bg-white p-1">
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant={mode === 'scheduled' ? 'default' : 'ghost'}
+                          className={cn(
+                            'h-8 rounded-lg px-2 text-[10px] font-black',
+                            mode === 'scheduled'
+                              ? 'bg-[#14295F] text-white hover:bg-[#10224C]'
+                              : 'text-[#5C6E97] hover:bg-[#EEF4FF]'
+                          )}
+                          onClick={() =>
+                            updateFocusWeeklyScheduleDraft(dayDraft.weekday, {
+                              enabled: true,
+                              isAutonomous: false,
+                              inTime: dayDraft.inTime || FOCUS_SCHEDULE_DEFAULT_ARRIVAL_TIME,
+                              outTime: dayDraft.outTime || FOCUS_SCHEDULE_DEFAULT_DEPARTURE_TIME,
+                            })
+                          }
+                        >
+                          <CheckCircle2 className="mr-1 h-3.5 w-3.5" />
+                          정규
+                        </Button>
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant={mode === 'autonomous' ? 'default' : 'ghost'}
+                          className={cn(
+                            'h-8 rounded-lg px-2 text-[10px] font-black',
+                            mode === 'autonomous'
+                              ? 'bg-sky-600 text-white hover:bg-sky-700'
+                              : 'text-[#5C6E97] hover:bg-sky-50'
+                          )}
+                          onClick={() =>
+                            updateFocusWeeklyScheduleDraft(dayDraft.weekday, {
+                              enabled: true,
+                              isAutonomous: true,
+                              awayStartTime: '',
+                              awayEndTime: '',
+                              awayReason: '',
+                            })
+                          }
+                        >
+                          <Clock className="mr-1 h-3.5 w-3.5" />
+                          자율
+                        </Button>
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant={mode === 'absent' ? 'default' : 'ghost'}
+                          className={cn(
+                            'h-8 rounded-lg px-2 text-[10px] font-black',
+                            mode === 'absent'
+                              ? 'bg-[#D54E2B] text-white hover:bg-[#BF4426]'
+                              : 'text-[#5C6E97] hover:bg-[#FFF5F2]'
+                          )}
+                          onClick={() => updateFocusWeeklyScheduleDraft(dayDraft.weekday, { enabled: false, isAutonomous: false })}
+                        >
+                          <UserX className="mr-1 h-3.5 w-3.5" />
+                          미등원
+                        </Button>
+                      </div>
                     </div>
 
-                    {dayDraft.enabled ? (
+                    {mode === 'scheduled' ? (
                       <>
                         <div className="mt-3 grid gap-3 md:grid-cols-4">
                           <div className="flex flex-col gap-2">
@@ -5058,6 +5112,10 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
                           </div>
                         </div>
                       </>
+                    ) : mode === 'autonomous' ? (
+                      <div className="mt-3 rounded-xl border border-sky-200 bg-white px-3 py-2 text-[11px] font-bold leading-5 text-sky-700">
+                        자율등원으로 저장합니다. 등원 예정 시간을 강제하지 않고, 입실하면 출석으로만 반영됩니다.
+                      </div>
                     ) : (
                       <div className="mt-3 rounded-xl border border-[#FFE0D5] bg-[#FFF8F5] px-3 py-2 text-[11px] font-bold leading-5 text-[#B44D2D]">
                         미등원 요일로 저장합니다. 기존 반복 등원 템플릿에서는 이 요일이 제외됩니다.
@@ -7743,10 +7801,11 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
     const signal = selectedFocusOperationsSummary.signal || attendanceSeatSignalsByStudentId.get(selectedFocusStudentId) || null;
     const todayWeekday = today?.getDay();
     const seedDrafts = buildFocusWeeklyScheduleDrafts(today).map((draft) => {
-      if (draft.weekday !== todayWeekday) return draft;
+      if (draft.weekday !== todayWeekday || draft.isAutonomous) return draft;
       return {
         ...draft,
         enabled: true,
+        isAutonomous: false,
         inTime: toScheduleTimeDraft(
           signal?.routineExpectedArrivalTime || selectedFocusOperationsSummary.plannedArrival,
           FOCUS_SCHEDULE_DEFAULT_ARRIVAL_TIME
@@ -7794,11 +7853,24 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
         currentDrafts.map((draft) => {
           const template = templateByWeekday.get(draft.weekday);
           if (!template) return draft;
+          if (template.isAutonomousAttendance || template.source === 'admin-autonomous-attendance') {
+            return {
+              ...draft,
+              enabled: true,
+              isAutonomous: true,
+              inTime: '',
+              outTime: '',
+              awayStartTime: '',
+              awayEndTime: '',
+              awayReason: '',
+            };
+          }
           const hasExcursion = template.hasExcursionDefault !== false
             && Boolean(template.defaultExcursionStartAt || template.defaultExcursionEndAt || template.defaultExcursionReason);
           return {
             ...draft,
             enabled: true,
+            isAutonomous: false,
             inTime: toScheduleTimeDraft(template.arrivalPlannedAt, FOCUS_SCHEDULE_DEFAULT_ARRIVAL_TIME),
             outTime: toScheduleTimeDraft(template.departurePlannedAt, FOCUS_SCHEDULE_DEFAULT_DEPARTURE_TIME),
             awayStartTime: hasExcursion ? toScheduleTimeDraft(template.defaultExcursionStartAt || '', '') : '',
@@ -7842,7 +7914,9 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
       awayReason: draft.awayReason.trim(),
     }));
     const enabledDrafts = weeklyDrafts.filter((draft) => draft.enabled);
-    for (const dayDraft of enabledDrafts) {
+    const scheduledDrafts = enabledDrafts.filter((draft) => !draft.isAutonomous);
+    const autonomousDrafts = enabledDrafts.filter((draft) => draft.isAutonomous);
+    for (const dayDraft of scheduledDrafts) {
       const validationMessage = validateFocusScheduleDraft(toFocusWeeklyAttendanceDraft(dayDraft));
       if (validationMessage) {
         toast({
@@ -7894,16 +7968,16 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
         const templateId = `admin-weekly-${centerId}-${dayDraft.weekday}`;
         const baseDraft = toFocusWeeklyAttendanceDraft(dayDraft);
         if (dayDraft.enabled) {
-          const templateOutings = normalizeOutings(baseDraft);
+          const templateOutings = dayDraft.isAutonomous ? [] : normalizeOutings(baseDraft);
           const templatePrimaryOuting = templateOutings[0] || null;
           batch.set(
             doc(firestore, 'users', studentId, 'scheduleTemplates', templateId),
             {
               centerId,
-              name: `${dayDraft.label}요일 등원 일정`,
+              name: dayDraft.isAutonomous ? `${dayDraft.label}요일 자율등원` : `${dayDraft.label}요일 등원 일정`,
               weekdays: [dayDraft.weekday],
-              arrivalPlannedAt: baseDraft.inTime,
-              departurePlannedAt: baseDraft.outTime,
+              arrivalPlannedAt: dayDraft.isAutonomous ? '' : baseDraft.inTime,
+              departurePlannedAt: dayDraft.isAutonomous ? '' : baseDraft.outTime,
               academyNameDefault: null,
               academyStartAtDefault: null,
               academyEndAtDefault: null,
@@ -7912,11 +7986,12 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
               defaultExcursionEndAt: templatePrimaryOuting?.endTime || null,
               defaultExcursionReason: templatePrimaryOuting?.reason || null,
               note: null,
+              isAutonomousAttendance: dayDraft.isAutonomous,
               classScheduleId: null,
-              classScheduleName: null,
+              classScheduleName: dayDraft.isAutonomous ? '자율등원' : null,
               active: true,
               timezone: 'Asia/Seoul',
-              source: 'admin-weekly-attendance',
+              source: dayDraft.isAutonomous ? 'admin-autonomous-attendance' : 'admin-weekly-attendance',
               adminEdited: true,
               adminEditedAt: savedAt,
               adminEditedByUid: editorUid,
@@ -7929,8 +8004,21 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
 
         if (!dayDraft.dateKey || dayDraft.dateKey < todayKey) return;
 
-        const scheduleDraft = dayDraft.enabled ? baseDraft : toAbsentScheduleDraft(baseDraft);
-        const outings = normalizeOutings(scheduleDraft);
+        const isAutonomousSchedule = dayDraft.enabled && dayDraft.isAutonomous;
+        const scheduleDraft = isAutonomousSchedule
+          ? {
+              ...baseDraft,
+              inTime: '',
+              outTime: '',
+              awayStartTime: '',
+              awayEndTime: '',
+              awayReason: '',
+              awaySlots: [],
+            }
+          : dayDraft.enabled
+            ? baseDraft
+            : toAbsentScheduleDraft(baseDraft);
+        const outings = isAutonomousSchedule ? [] : normalizeOutings(scheduleDraft);
         const primaryOuting = outings[0] || null;
         const isTodaySchedule = dayDraft.dateKey === todayKey;
         const scheduleStatus: StudentScheduleDoc['status'] = dayDraft.enabled
@@ -7961,6 +8049,7 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
             inTime: scheduleDraft.inTime,
             outTime: scheduleDraft.outTime,
             isAbsent: !dayDraft.enabled,
+            isAutonomousAttendance: isAutonomousSchedule,
             status: scheduleStatus,
             hasExcursion: outings.length > 0,
             excursionStartAt: primaryOuting?.startTime || null,
@@ -7969,6 +8058,8 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
             outings,
             source: dayDraft.enabled ? 'regular-routine' : 'manual',
             recurrenceSourceId: dayDraft.enabled ? templateId : null,
+            classScheduleId: isAutonomousSchedule ? null : deleteField(),
+            classScheduleName: isAutonomousSchedule ? '자율등원' : deleteField(),
             adminEdited: true,
             adminEditedAt: savedAt,
             adminEditedByUid: editorUid,
@@ -8003,6 +8094,7 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
             scheduleEditedByAdminAt: savedAt,
             scheduleEditedByAdminUid: editorUid,
             scheduleEditPenaltyWaived: true,
+            isAutonomousAttendance: isAutonomousSchedule,
             adminDirectEditNoPenalty: true,
             penaltyApplied: false,
             penaltyPointsDelta: 0,
@@ -8034,6 +8126,7 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
             dateKey: dayDraft.dateKey,
             expectedArrivalTime: scheduleDraft.inTime,
             plannedDepartureTime: scheduleDraft.outTime,
+            isAutonomousAttendance: isAutonomousSchedule,
             hasExcursion: outings.length > 0,
             excursionStartAt: primaryOuting?.startTime || null,
             excursionEndAt: primaryOuting?.endTime || null,
@@ -8084,13 +8177,14 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
       await batch.commit();
       setLiveTickMs(Date.now());
       resetFocusScheduleDialog();
-      const attendingLabels = enabledDrafts.map((draft) => draft.label).join(', ') || '없음';
+      const scheduledLabels = scheduledDrafts.map((draft) => draft.label).join(', ') || '없음';
+      const autonomousLabels = autonomousDrafts.map((draft) => draft.label).join(', ') || '없음';
       const offCount = weeklyDrafts.length - enabledDrafts.length;
       toast({
         title: '주간 등원일정을 저장했습니다.',
         description: waivedRoutinePenaltyPoints > 0
           ? `${studentName} 학생 주간 일정과 루틴 미작성 벌점 ${waivedRoutinePenaltyPoints}점을 함께 정리했습니다.`
-          : `${studentName} 학생 등원 ${enabledDrafts.length}일(${attendingLabels}) · 미등원 ${offCount}일로 반영했습니다.`,
+          : `${studentName} 학생 정규 ${scheduledDrafts.length}일(${scheduledLabels}) · 자율 ${autonomousDrafts.length}일(${autonomousLabels}) · 미등원 ${offCount}일로 반영했습니다.`,
       });
     } catch (error) {
       logHandledClientIssue('[admin-dashboard] focus weekly schedule save failed', error);

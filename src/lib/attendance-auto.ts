@@ -36,6 +36,7 @@ export const ROUTINE_MISSING_PENALTY_POINTS = 1;
 export interface AttendanceRoutineInfo {
   hasRoutine: boolean;
   isNoAttendanceDay: boolean;
+  isAutonomousAttendance?: boolean;
   expectedArrivalTime: string | null;
   plannedDepartureTime?: string | null;
   classScheduleName?: string | null;
@@ -142,10 +143,22 @@ export function buildAttendanceRoutineInfoFromScheduleDoc(
     | 'inTime'
     | 'outTime'
     | 'isAbsent'
+    | 'isAutonomousAttendance'
     | 'status'
     | 'classScheduleName'
   >
 ): AttendanceRoutineInfo {
+  if (schedule.isAutonomousAttendance) {
+    return {
+      hasRoutine: true,
+      isNoAttendanceDay: false,
+      isAutonomousAttendance: true,
+      expectedArrivalTime: null,
+      plannedDepartureTime: null,
+      classScheduleName: schedule.classScheduleName || '자율등원',
+    };
+  }
+
   return {
     hasRoutine: true,
     isNoAttendanceDay: Boolean(schedule.isAbsent || schedule.status === 'absent'),
@@ -158,9 +171,20 @@ export function buildAttendanceRoutineInfoFromScheduleDoc(
 export function buildAttendanceRoutineInfoFromScheduleTemplate(
   template: Pick<
     StudentScheduleTemplate,
-    'arrivalPlannedAt' | 'departurePlannedAt' | 'classScheduleName'
+    'arrivalPlannedAt' | 'departurePlannedAt' | 'classScheduleName' | 'isAutonomousAttendance'
   >
 ): AttendanceRoutineInfo {
+  if (template.isAutonomousAttendance) {
+    return {
+      hasRoutine: true,
+      isNoAttendanceDay: false,
+      isAutonomousAttendance: true,
+      expectedArrivalTime: null,
+      plannedDepartureTime: null,
+      classScheduleName: template.classScheduleName || '자율등원',
+    };
+  }
+
   return {
     hasRoutine: true,
     isNoAttendanceDay: false,
@@ -383,9 +407,10 @@ export async function syncAutoAttendanceRecord(params: {
     return { status: existing.status || 'requested', wrote: false, reason: 'manual_override' };
   }
 
-  const routine = isAutonomousAttendanceDate(studyDayDate)
+  const fetchedRoutine = await fetchAttendanceRoutineInfo(firestore, centerId, studentId, dateKey, weekKey, studyDayDate);
+  const routine = isAutonomousAttendanceDate(studyDayDate) && !fetchedRoutine.hasRoutine
     ? undefined
-    : await fetchAttendanceRoutineInfo(firestore, centerId, studentId, dateKey, weekKey, studyDayDate);
+    : fetchedRoutine;
   const studyLogInfo = await fetchStudyLogInfo(firestore, centerId, studentId, dateKey);
   const existingCheckedAt = toDateSafe(existing?.checkInAt || existing?.updatedAt);
   const firstCheckedAt = pickEarliestDate(existingCheckedAt, checkInAt) || checkInAt || existingCheckedAt;

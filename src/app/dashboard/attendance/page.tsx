@@ -113,6 +113,7 @@ type StudyLogSummary = {
 type TodayScheduleInfo = {
   hasRoutine: boolean;
   isNoAttendanceDay: boolean;
+  isAutonomousAttendance?: boolean;
   expectedArrivalTime: string | null;
   plannedDepartureTime: string | null;
   hasExcursion: boolean;
@@ -134,6 +135,24 @@ function getScheduleTemplateTimestampMs(template: StudentScheduleTemplate) {
 }
 
 function buildTodayScheduleInfoFromTemplate(template: StudentScheduleTemplate): TodayScheduleInfo {
+  if (template.isAutonomousAttendance) {
+    return {
+      hasRoutine: true,
+      isNoAttendanceDay: false,
+      isAutonomousAttendance: true,
+      expectedArrivalTime: null,
+      plannedDepartureTime: null,
+      hasExcursion: false,
+      excursionStartAt: null,
+      excursionEndAt: null,
+      scheduleMovementSummary: null,
+      classScheduleName: template.classScheduleName || '자율등원',
+      scheduleUpdatedAt: toDateSafe(template.updatedAt || template.createdAt),
+      scheduleStatus: 'scheduled',
+      actualArrivalAt: null,
+    };
+  }
+
   const hasExcursion = Boolean(
     template.hasExcursionDefault &&
     template.defaultExcursionStartAt &&
@@ -322,11 +341,6 @@ export default function AttendancePage() {
       setRoutineLoading(false);
       return;
     }
-    if (isAutonomousAttendanceDay) {
-      setAttendanceRoutineMap({});
-      setRoutineLoading(false);
-      return;
-    }
 
     let cancelled = false;
     const weekday = selectedWeekdayValue;
@@ -355,6 +369,27 @@ export default function AttendancePage() {
                 }
               } catch (templateError) {
                 logHandledClientIssue('[attendance] schedule template fallback failed', templateError);
+              }
+
+              if (isAutonomousAttendanceDay) {
+                return [
+                  student.id,
+                  {
+                    hasRoutine: true,
+                    isNoAttendanceDay: false,
+                    isAutonomousAttendance: true,
+                    expectedArrivalTime: null,
+                    plannedDepartureTime: null,
+                    hasExcursion: false,
+                    excursionStartAt: null,
+                    excursionEndAt: null,
+                    scheduleMovementSummary: null,
+                    classScheduleName: '자율등원',
+                    scheduleUpdatedAt: null,
+                    scheduleStatus: null,
+                    actualArrivalAt: null,
+                  },
+                ] as const;
               }
 
               const defaultTrackSchedule = buildStudyRoomClassSchedulesForClassName(centerId, student.className)
@@ -737,7 +772,6 @@ export default function AttendancePage() {
     return mapped;
   }, [attendanceCurrentDocs]);
   const todayScheduleMap = useMemo(() => {
-    if (isAutonomousAttendanceDay) return new Map<string, TodayScheduleInfo>();
     const mapped = new Map<string, TodayScheduleInfo>();
     (todaySchedules || []).forEach((schedule) => {
       if (!schedule.uid) return;
@@ -751,20 +785,21 @@ export default function AttendancePage() {
       mapped.set(schedule.uid, {
         hasRoutine: true,
         isNoAttendanceDay: Boolean(schedule.isAbsent || schedule.status === 'absent'),
-        expectedArrivalTime: schedule.arrivalPlannedAt || schedule.inTime || null,
-        plannedDepartureTime: schedule.departurePlannedAt || schedule.outTime || null,
+        isAutonomousAttendance: Boolean(schedule.isAutonomousAttendance),
+        expectedArrivalTime: schedule.isAutonomousAttendance ? null : schedule.arrivalPlannedAt || schedule.inTime || null,
+        plannedDepartureTime: schedule.isAutonomousAttendance ? null : schedule.departurePlannedAt || schedule.outTime || null,
         hasExcursion: Boolean(schedule.hasExcursion || scheduleMovementSummary),
         excursionStartAt: schedule.excursionStartAt || null,
         excursionEndAt: schedule.excursionEndAt || null,
         scheduleMovementSummary,
-        classScheduleName: schedule.classScheduleName || null,
+        classScheduleName: schedule.classScheduleName || (schedule.isAutonomousAttendance ? '자율등원' : null),
         scheduleUpdatedAt: toDateSafe(schedule.updatedAt || schedule.createdAt),
         scheduleStatus: schedule.status || null,
         actualArrivalAt: toDateSafe(schedule.actualArrivalAt),
       });
     });
     return mapped;
-  }, [isAutonomousAttendanceDay, todaySchedules]);
+  }, [todaySchedules]);
 
   const attendanceDisplayMap = useMemo(() => {
     const mapped = new Map<string, { status: DisplayAttendanceStatus; checkedAt: Date | null }>();

@@ -310,6 +310,18 @@ function buildScheduleMovementInfoFromLegacyTitles(scheduleTitles: string[]): Sc
 }
 
 function buildRoutineInfoFromSchedule(schedule: StudentScheduleDoc): AttendanceRoutineInfoWithMovement {
+  if (schedule.isAutonomousAttendance) {
+    return {
+      hasRoutine: true,
+      isNoAttendanceDay: false,
+      isAutonomousAttendance: true,
+      expectedArrivalTime: null,
+      plannedDepartureTime: null,
+      classScheduleName: schedule.classScheduleName || '자율등원',
+      ...EMPTY_SCHEDULE_MOVEMENT_INFO,
+    };
+  }
+
   return {
     hasRoutine: true,
     isNoAttendanceDay: Boolean(schedule.isAbsent || schedule.status === 'absent'),
@@ -336,6 +348,18 @@ function buildRoutineInfoFromSchedule(schedule: StudentScheduleDoc): AttendanceR
 }
 
 function buildRoutineInfoFromTemplate(template: StudentScheduleTemplate): AttendanceRoutineInfoWithMovement {
+  if (template.isAutonomousAttendance) {
+    return {
+      hasRoutine: true,
+      isNoAttendanceDay: false,
+      isAutonomousAttendance: true,
+      expectedArrivalTime: null,
+      plannedDepartureTime: null,
+      classScheduleName: template.classScheduleName || '자율등원',
+      ...EMPTY_SCHEDULE_MOVEMENT_INFO,
+    };
+  }
+
   return {
     hasRoutine: true,
     isNoAttendanceDay: false,
@@ -343,6 +367,18 @@ function buildRoutineInfoFromTemplate(template: StudentScheduleTemplate): Attend
     plannedDepartureTime: template.departurePlannedAt || null,
     classScheduleName: template.classScheduleName || null,
     ...buildScheduleMovementInfoFromTemplate(template),
+  };
+}
+
+function buildAutonomousRoutineInfo(): AttendanceRoutineInfoWithMovement {
+  return {
+    hasRoutine: true,
+    isNoAttendanceDay: false,
+    isAutonomousAttendance: true,
+    expectedArrivalTime: null,
+    plannedDepartureTime: null,
+    classScheduleName: '자율등원',
+    ...EMPTY_SCHEDULE_MOVEMENT_INFO,
   };
 }
 
@@ -518,12 +554,6 @@ export function useCenterAdminAttendanceBoard({
       setRoutineLoading(false);
       return;
     }
-    if (isAutonomousAttendanceDay) {
-      setRoutineInfoByStudentId({});
-      setRoutineLoading(false);
-      return;
-    }
-
     let cancelled = false;
     const loadRoutineInfo = async () => {
       setRoutineLoading(true);
@@ -557,6 +587,10 @@ export function useCenterAdminAttendanceBoard({
               }
             } catch (templateError) {
               logHandledClientIssue('[center-admin-attendance-board] schedule template fallback failed', templateError);
+            }
+
+            if (isAutonomousAttendanceDay) {
+              return [member.id, buildAutonomousRoutineInfo()] as const;
             }
 
             const defaultTrackSchedule = buildStudyRoomClassSchedulesForClassName(centerId, member.className)
@@ -746,10 +780,8 @@ export function useCenterAdminAttendanceBoard({
         const member = memberById.get(studentId);
         const todayStat = todayStatsByStudentId.get(studentId);
         const rawRoutineInfo = routineInfoByStudentId[studentId];
-        const todaySchedule = isAutonomousAttendanceDay ? undefined : todayScheduleByStudentId.get(studentId);
-        const routineInfo = isAutonomousAttendanceDay
-          ? undefined
-          : rawRoutineInfo || (todaySchedule ? buildRoutineInfoFromSchedule(todaySchedule) : undefined);
+        const todaySchedule = todayScheduleByStudentId.get(studentId);
+        const routineInfo = rawRoutineInfo || (todaySchedule ? buildRoutineInfoFromSchedule(todaySchedule) : undefined);
         const scheduleMovementInfo = routineInfo?.isNoAttendanceDay ? EMPTY_SCHEDULE_MOVEMENT_INFO : routineInfo || EMPTY_SCHEDULE_MOVEMENT_INFO;
         const todayRecord = todayRecordByStudentId.get(studentId);
         const todayEventsForStudent = todayEventsByStudentId.get(studentId) || [];
@@ -992,7 +1024,6 @@ export function useCenterAdminAttendanceBoard({
       });
   }, [
     historySummaryByStudentId,
-    isAutonomousAttendanceDay,
     memberById,
     nowMs,
     resolvedAttendanceList,
