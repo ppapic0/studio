@@ -294,6 +294,63 @@ function pushMissingBreakdownItemsFromFallback({
   return missingRemaining;
 }
 
+function isSpecificStudyBoxLabel(label: string) {
+  return /^\d+시간 상자$/.test(label.trim());
+}
+
+function pushMissingStudyBoxBreakdownItems({
+  items,
+  fallbackItems,
+  keyPrefix,
+  missingPoints,
+}: {
+  items: DailyPointBreakdownItem[];
+  fallbackItems: DailyPointBreakdownItem[];
+  keyPrefix: string;
+  missingPoints: number;
+}) {
+  const specificEventLabels = new Set(
+    items
+      .filter((item) => item.tone === 'box' && isSpecificStudyBoxLabel(item.label))
+      .map((item) => item.label)
+  );
+  let genericCoveredPoints = items.reduce((sum, item) => {
+    if (item.tone !== 'box' || isSpecificStudyBoxLabel(item.label)) return sum;
+    return sum + Math.max(0, Math.floor(item.points));
+  }, 0);
+  let missingRemaining = Math.max(0, Math.floor(missingPoints));
+  if (missingRemaining <= 0) return 0;
+
+  fallbackItems.forEach((fallbackItem) => {
+    if (missingRemaining <= 0) return;
+    if (specificEventLabels.has(fallbackItem.label)) return;
+
+    const fallbackPoints = Math.max(0, Math.floor(fallbackItem.points));
+    if (fallbackPoints <= 0) return;
+
+    if (genericCoveredPoints >= fallbackPoints) {
+      genericCoveredPoints -= fallbackPoints;
+      return;
+    }
+
+    const uncoveredFallbackPoints = fallbackPoints - genericCoveredPoints;
+    genericCoveredPoints = 0;
+    const pointsToAppend = Math.min(missingRemaining, uncoveredFallbackPoints);
+    if (pointsToAppend <= 0) return;
+
+    pushBreakdownItem(
+      items,
+      `${keyPrefix}-${fallbackItem.key}`,
+      fallbackItem.label,
+      pointsToAppend,
+      fallbackItem.tone
+    );
+    missingRemaining -= pointsToAppend;
+  });
+
+  return missingRemaining;
+}
+
 function getRankRewardBreakdownItems(dayStatus: Record<string, any> | undefined, maxPoints: number): DailyPointBreakdownItem[] {
   const items: DailyPointBreakdownItem[] = [];
   let remaining = Math.max(0, Math.floor(maxPoints));
@@ -329,13 +386,7 @@ export function getRankRewardPoints(dayStatus?: Record<string, any>): number {
 function inferOpenedStudyBoxHours(dayStatus?: Record<string, any>): number[] {
   const claimedStudyBoxes = getClaimedStudyBoxes(dayStatus);
   const explicitOpenedStudyBoxes = normalizeStudyBoxHourValues(dayStatus?.openedStudyBoxes);
-  const hasExplicitOpenedStudyBoxes = Boolean(
-    dayStatus &&
-    typeof dayStatus === 'object' &&
-    Object.prototype.hasOwnProperty.call(dayStatus, 'openedStudyBoxes')
-  );
 
-  if (hasExplicitOpenedStudyBoxes) return explicitOpenedStudyBoxes;
   if (claimedStudyBoxes.length === 0) return explicitOpenedStudyBoxes;
 
   const rewardByHour = new Map<number, number>();
@@ -350,29 +401,32 @@ function inferOpenedStudyBoxHours(dayStatus?: Record<string, any>): number[] {
   const persistedDailyPointAmount = Number(dayStatus?.dailyPointAmount ?? 0);
   const studyBoxAwardedPoints = Math.max(
     0,
-    Math.floor(Number.isFinite(persistedDailyPointAmount) ? persistedDailyPointAmount : 0) - getRankRewardPoints(dayStatus)
+    Math.floor(Number.isFinite(persistedDailyPointAmount) ? persistedDailyPointAmount : 0)
+      - getRankRewardPoints(dayStatus)
+      - getPlanCompletionFallbackPoints(dayStatus)
   );
   const explicitOpenedStudyBoxPoints = explicitOpenedStudyBoxes.reduce(
     (total, hour) => total + (rewardByHour.get(hour) ?? 0),
     0
   );
-  const remainingAwardedStudyBoxPoints = Math.max(0, studyBoxAwardedPoints - explicitOpenedStudyBoxPoints);
+  let remainingAwardedStudyBoxPoints = Math.max(0, studyBoxAwardedPoints - explicitOpenedStudyBoxPoints);
   const missingClaimedStudyBoxes = claimedStudyBoxes.filter(
     (hour) => !explicitOpenedStudyBoxes.includes(hour) && rewardByHour.has(hour)
   );
 
   if (missingClaimedStudyBoxes.length === 0) return explicitOpenedStudyBoxes;
 
-  const missingClaimedRewardTotal = missingClaimedStudyBoxes.reduce(
-    (total, hour) => total + (rewardByHour.get(hour) ?? 0),
-    0
-  );
+  const inferredOpenedStudyBoxes: number[] = [];
+  for (const hour of missingClaimedStudyBoxes) {
+    const rewardPoints = rewardByHour.get(hour) ?? 0;
+    if (rewardPoints <= 0) continue;
+    if (remainingAwardedStudyBoxPoints < rewardPoints) break;
 
-  if (missingClaimedRewardTotal > 0 && remainingAwardedStudyBoxPoints < missingClaimedRewardTotal) {
-    return explicitOpenedStudyBoxes;
+    inferredOpenedStudyBoxes.push(hour);
+    remainingAwardedStudyBoxPoints -= rewardPoints;
   }
 
-  return normalizeStudyBoxHourValues([...explicitOpenedStudyBoxes, ...missingClaimedStudyBoxes]);
+  return normalizeStudyBoxHourValues([...explicitOpenedStudyBoxes, ...inferredOpenedStudyBoxes]);
 }
 
 function coerceStudyBoxHourValue(value: unknown): number | null {
@@ -572,6 +626,31 @@ export function getDailyStudyBoxAwardPoints(dayStatus?: Record<string, any>): nu
   return getOpenedStudyBoxes(dayStatus).reduce((total, hour) => total + (rewardByHour.get(hour) ?? 0), 0);
 }
 
+function getStudyBoxRewardBreakdownItems(dayStatus: Record<string, any> | undefined, maxPoints: number): DailyPointBreakdownItem[] {
+  const items: DailyPointBreakdownItem[] = [];
+  let remaining = Math.max(0, Math.floor(maxPoints));
+  if (remaining <= 0) return items;
+
+  const rewardByHour = new Map<number, StudyBoxReward>();
+  normalizeStoredStudyBoxRewardEntries(dayStatus?.studyBoxRewards).forEach((entry) => {
+    rewardByHour.set(entry.milestone, entry);
+  });
+
+  getOpenedStudyBoxes(dayStatus).forEach((hour) => {
+    if (remaining <= 0) return;
+
+    const reward = rewardByHour.get(hour);
+    const rewardPoints = getNormalizedRewardAmount(reward?.awardedPoints);
+    if (rewardPoints <= 0) return;
+
+    const points = Math.min(remaining, rewardPoints);
+    pushBreakdownItem(items, `study-box-${hour}`, `${hour}시간 상자`, points, 'box');
+    remaining -= points;
+  });
+
+  return items;
+}
+
 function getStoredStudyBoxRewardTotal(dayStatus?: Record<string, any>): number {
   return normalizeStoredStudyBoxRewardEntries(dayStatus?.studyBoxRewards).reduce(
     (total, entry) => total + Math.max(0, Math.floor(entry.awardedPoints)),
@@ -611,7 +690,15 @@ export function getDailyPointBreakdown(dayStatus?: Record<string, any>) {
       Math.max(0, studyBoxPoints - studyBoxEventPoints),
       Math.max(0, totalPoints - sumBreakdownItemPoints(pointItems))
     );
-    pushBreakdownItem(pointItems, 'study-box-record', '상자', missingStudyBoxPoints, 'box');
+    if (missingStudyBoxPoints > 0) {
+      const remainingMissingStudyBoxPoints = pushMissingStudyBoxBreakdownItems({
+        items: pointItems,
+        fallbackItems: getStudyBoxRewardBreakdownItems(dayStatus, studyBoxPoints),
+        keyPrefix: 'inferred',
+        missingPoints: missingStudyBoxPoints,
+      });
+      pushBreakdownItem(pointItems, 'study-box-record', '상자', remainingMissingStudyBoxPoints, 'box');
+    }
 
     const eventTotal = sumBreakdownItemPoints(pointItems);
     const hasPlanCompletionEvent = pointItems.some((item) => item.tone === 'plan');
@@ -646,7 +733,15 @@ export function getDailyPointBreakdown(dayStatus?: Record<string, any>) {
   }
 
   const fallbackItems: DailyPointBreakdownItem[] = [];
-  pushBreakdownItem(fallbackItems, 'study-box-opened', '상자', studyBoxPoints, 'box');
+  const studyBoxBreakdownItems = getStudyBoxRewardBreakdownItems(dayStatus, studyBoxPoints);
+  studyBoxBreakdownItems.forEach((item) => fallbackItems.push(item));
+  pushBreakdownItem(
+    fallbackItems,
+    'study-box-opened',
+    '상자',
+    Math.max(0, studyBoxPoints - sumBreakdownItemPoints(studyBoxBreakdownItems)),
+    'box'
+  );
   getRankRewardBreakdownItems(dayStatus, rankPoints).forEach((item) => fallbackItems.push(item));
 
   const planCompletionPoints = Math.min(nonPrimaryPoints, getPlanCompletionFallbackPoints(dayStatus));
