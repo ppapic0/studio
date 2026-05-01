@@ -12,8 +12,14 @@ import { ResponsiveContainer, XAxis, YAxis, Tooltip, CartesianGrid, AreaChart, A
 import { Loader2, ArrowLeft, ArrowUpRight, Building2, Zap, Settings2, Activity, CheckCircle2, ShieldCheck, LayoutGrid, Save, Trash2, CalendarDays, BarChart3, MessageSquare, Clock3, PlusCircle, UserRound, AlertTriangle, Sparkles, ClipboardList, Timer, CalendarCheck2, TrendingUp, BookOpen, MessageSquareMore, PenTool, Coins } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { StudentProfile, StudyLogDay, GrowthProgress, CenterMembership, CounselingLog, CounselingReservation, StudyPlanItem, WithId, AttendanceCurrent, StudentNotification, DailyReport, AttendanceRequest, PenaltyLog, ParentActivityEvent, Invoice } from '@/lib/types';
+import { StudentProfile, StudyLogDay, GrowthProgress, CenterMembership, CounselingLog, CounselingLogStatus, CounselingReservation, StudyPlanItem, WithId, AttendanceCurrent, StudentNotification, DailyReport, AttendanceRequest, PenaltyLog, ParentActivityEvent, Invoice } from '@/lib/types';
 import { cn } from '@/lib/utils';
+import {
+  COUNSELING_LOG_STATUS_BADGE_CLASS,
+  COUNSELING_LOG_STATUS_OPTIONS,
+  buildCounselingLogNotificationMessage,
+  getCounselingLogStatusLabel,
+} from '@/lib/counseling-log';
 import { formatSeatLabel } from '@/lib/seat-layout';
 import { getDailyPointBreakdown, type DailyPointBreakdownItemTone } from '@/lib/student-rewards';
 import { getStudyDayDate } from '@/lib/study-day';
@@ -722,8 +728,14 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
   const [mobileInsightDialog, setMobileInsightDialog] = useState<MobileInsightView | null>(null);
 
   const [logType, setLogType] = useState<'academic' | 'life' | 'career'>('academic');
+  const [logStudyStatus, setLogStudyStatus] = useState<CounselingLogStatus>('normal');
+  const [logLifeStatus, setLogLifeStatus] = useState<CounselingLogStatus>('normal');
+  const [logEmotionStatus, setLogEmotionStatus] = useState<CounselingLogStatus>('normal');
   const [logContent, setLogContent] = useState('');
   const [logImprovement, setLogImprovement] = useState('');
+  const [logFreeMemo, setLogFreeMemo] = useState('');
+  const [logNextCounselingDate, setLogNextCounselingDate] = useState('');
+  const [logFollowUp, setLogFollowUp] = useState('');
   const [quickFeedbackMessage, setQuickFeedbackMessage] = useState('');
 
   const [aptDate, setAptDate] = useState(format(today, 'yyyy-MM-dd'));
@@ -1093,7 +1105,7 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
 
   const studentQuickFeedbacks = useMemo(() => {
     return (studentNotificationsRaw || [])
-      .filter((item) => item.type === 'one_line_feedback')
+      .filter((item) => item.type === 'one_line_feedback' && item.source !== 'counseling_log')
       .sort((a, b) => toTime(b.updatedAt || b.createdAt) - toTime(a.updatedAt || a.createdAt));
   }, [studentNotificationsRaw]);
 
@@ -2350,27 +2362,100 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
 
   const handleCreateCounselingLog = async () => {
     if (!firestore || !centerId || !student || !currentUser || !canWriteCounseling) return;
-    if (!logContent.trim()) {
-      toast({ variant: 'destructive', title: '상담 내용이 필요합니다.' });
+    const summary = logContent.trim();
+    const agreedAction = logImprovement.trim();
+    const freeMemo = logFreeMemo.trim();
+    const nextCounselingDate = logNextCounselingDate.trim();
+    const followUp = logFollowUp.trim();
+
+    if (!summary) {
+      toast({ variant: 'destructive', title: '상담요약이 필요합니다.' });
       return;
     }
 
     setIsSubmitting(true);
     try {
-      await addDoc(collection(firestore, 'centers', centerId, 'counselingLogs'), {
+      const createdAt = serverTimestamp();
+      const teacherName = currentUser.displayName || activeMembership?.displayName || '담당 선생님';
+      const notificationBody = buildCounselingLogNotificationMessage({
+        summary,
+        agreedAction,
+        freeMemo,
+        nextCounselingDate,
+        followUp,
+      });
+      const logRef = doc(collection(firestore, 'centers', centerId, 'counselingLogs'));
+      const batch = writeBatch(firestore);
+
+      batch.set(logRef, {
         studentId,
         studentName: student.name,
         teacherId: currentUser.uid,
-        teacherName: currentUser.displayName || '담당 선생님',
+        teacherName,
         type: logType,
-        content: logContent.trim(),
-        improvement: logImprovement.trim(),
+        content: summary,
+        improvement: agreedAction,
+        studyStatus: logStudyStatus,
+        lifeStatus: logLifeStatus,
+        emotionStatus: logEmotionStatus,
+        summary,
+        agreedAction,
+        freeMemo,
+        nextCounselingDate: nextCounselingDate || null,
+        followUp,
         readAt: null,
-        createdAt: serverTimestamp(),
+        createdAt,
+        updatedAt: createdAt,
       });
-      toast({ title: '상담 일지 저장 완료' });
+
+      batch.set(doc(collection(firestore, 'centers', centerId, 'studentNotifications')), {
+        centerId,
+        studentId,
+        teacherId: currentUser.uid,
+        teacherName,
+        type: 'one_line_feedback',
+        title: '상담일지 도착',
+        message: notificationBody,
+        source: 'counseling_log',
+        counselingLogId: logRef.id,
+        createdAt,
+        updatedAt: createdAt,
+      });
+
+      Array.from(new Set(student.parentUids || [])).forEach((parentUid) => {
+        if (!parentUid) return;
+        batch.set(doc(collection(firestore, 'centers', centerId, 'parentNotifications')), {
+          centerId,
+          studentId,
+          studentName: student.name,
+          parentUid,
+          teacherId: currentUser.uid,
+          teacherName,
+          type: 'counseling_done',
+          title: `${student.name} 상담일지 도착`,
+          body: notificationBody,
+          category: 'life',
+          priority: 'normal',
+          isRead: false,
+          isImportant: true,
+          source: 'counseling_log',
+          counselingLogId: logRef.id,
+          createdAt,
+          updatedAt: createdAt,
+        });
+      });
+
+      await batch.commit();
+      toast({ title: '상담 일지 저장 완료', description: '학생 알림과 학부모 알림까지 함께 전달했습니다.' });
+      setLogType('academic');
+      setLogStudyStatus('normal');
+      setLogLifeStatus('normal');
+      setLogEmotionStatus('normal');
       setLogContent('');
       setLogImprovement('');
+      setLogFreeMemo('');
+      setLogNextCounselingDate('');
+      setLogFollowUp('');
       setIsLogModalOpen(false);
     } catch (error) {
       console.error(error);
@@ -4413,6 +4498,16 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
                       log.studentQuestion?.trim() ||
                       (log.reservationId ? reservationQuestionById.get(log.reservationId)?.trim() : '') ||
                       '';
+                    const summary = log.summary?.trim() || log.content;
+                    const agreedAction = log.agreedAction?.trim() || log.improvement?.trim() || '';
+                    const freeMemo = log.freeMemo?.trim() || '';
+                    const nextCounselingDate = log.nextCounselingDate?.trim() || '';
+                    const followUp = log.followUp?.trim() || '';
+                    const statusBadges = [
+                      { label: '학습', value: log.studyStatus },
+                      { label: '생활', value: log.lifeStatus },
+                      { label: '정서', value: log.emotionStatus },
+                    ].filter((item): item is { label: string; value: CounselingLogStatus } => Boolean(item.value));
                     return (
                     <div key={log.id} className={cn("rounded-xl border border-[#dbe7ff] bg-white px-3 py-3 shadow-sm", isAnalysisPresentation && "analysis-record-card")}>
                       <div className="flex flex-wrap items-center gap-2 mb-1.5">
@@ -4436,14 +4531,37 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
                         <span className="text-xs font-bold text-[#5c6e97]">{log.createdAt ? format(log.createdAt.toDate(), 'yyyy.MM.dd HH:mm', { locale: ko }) : '작성 시각 없음'}</span>
                         <span className="text-xs font-bold text-[#5c6e97]">· {log.teacherName || '담당 선생님'}</span>
                       </div>
+                      {statusBadges.length > 0 && (
+                        <div className="mb-2 flex flex-wrap gap-1.5">
+                          {statusBadges.map((item) => (
+                            <Badge
+                              key={item.label}
+                              variant="outline"
+                              className={cn(
+                                'h-6 rounded-full px-2 text-[9px] font-black',
+                                COUNSELING_LOG_STATUS_BADGE_CLASS[item.value]
+                              )}
+                            >
+                              {item.label} {getCounselingLogStatusLabel(item.value)}
+                            </Badge>
+                          ))}
+                        </div>
+                      )}
                       {studentQuestion && (
                         <div className="mb-2 rounded-lg border border-sky-200 bg-sky-50 px-2.5 py-2">
                           <p className="mb-1 text-[10px] font-black uppercase tracking-widest text-sky-700">학생 질문</p>
                           <p className="text-sm font-bold leading-relaxed text-sky-900 whitespace-pre-wrap">{studentQuestion}</p>
                         </div>
                       )}
-                      <p className="text-sm font-bold leading-relaxed text-[#14295F]">{log.content}</p>
-                      {log.improvement && <div className="mt-2 rounded-lg bg-emerald-50 px-2.5 py-2 text-xs font-semibold text-emerald-700">개선 포인트: {log.improvement}</div>}
+                      <p className="text-sm font-bold leading-relaxed text-[#14295F] whitespace-pre-wrap">{summary}</p>
+                      {agreedAction && <div className="mt-2 rounded-lg bg-emerald-50 px-2.5 py-2 text-xs font-semibold text-emerald-700 whitespace-pre-wrap">합의액션: {agreedAction}</div>}
+                      {freeMemo && <div className="mt-2 rounded-lg bg-[#F7FAFF] px-2.5 py-2 text-xs font-semibold text-[#5c6e97] whitespace-pre-wrap">자유메모: {freeMemo}</div>}
+                      {(nextCounselingDate || followUp) && (
+                        <div className="mt-2 rounded-lg border border-[#DCE7FF] bg-white px-2.5 py-2 text-xs font-semibold text-[#14295F]">
+                          {nextCounselingDate ? <p>다음상담예정일: {nextCounselingDate}</p> : null}
+                          {followUp ? <p className="mt-1">팔로업: {followUp}</p> : null}
+                        </div>
+                      )}
                     </div>
                     );
                   })
@@ -5806,7 +5924,7 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
       </Dialog>
 
         <Dialog open={isLogModalOpen} onOpenChange={setIsLogModalOpen}>
-          <DialogContent className="rounded-[2rem] border-none p-0 overflow-hidden shadow-2xl sm:max-w-lg">
+          <DialogContent className="flex max-h-[90vh] flex-col overflow-hidden rounded-[2rem] border-none p-0 shadow-2xl sm:max-w-3xl">
             <div className="bg-[linear-gradient(135deg,#14295F_0%,#173D8B_58%,#2554D4_100%)] px-6 py-5 text-white">
               <DialogHeader>
                 <div className="mb-3 flex flex-wrap items-center gap-2">
@@ -5822,17 +5940,53 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
                 </div>
                 <DialogTitle className="text-2xl font-black tracking-tight">상담 일지 작성</DialogTitle>
                 <DialogDescription className="font-semibold text-white/80">
-                  예약, 최근 피드백, 다음 실행 포인트를 연결해 기록을 남깁니다.
+                  오늘 상태, 상담 내용, 다음 일정을 저장하면 학생과 학부모 알림으로 함께 전달됩니다.
                 </DialogDescription>
               </DialogHeader>
             </div>
-            <div className="space-y-4 bg-white px-6 py-5">
+            <div className="flex-1 space-y-4 overflow-y-auto bg-white px-6 py-5">
               <div className="rounded-[1.35rem] border border-[#D7E4FF] bg-[#F8FBFF] px-4 py-3 text-sm font-semibold leading-6 text-[#14295F]">
                 학생 질문, 오늘 반응, 다음 실행 포인트를 한 흐름으로 남기면 학생 360 상담 기록과 같은 맥락으로 이어집니다.
               </div>
-              <div className="space-y-1.5"><Label className="text-[10px] font-black uppercase text-[#5c6e97]">상담 유형</Label><Select value={logType} onValueChange={(value) => setLogType(value as typeof logType)}><SelectTrigger className="h-11 rounded-xl border-[#dbe7ff] text-[#14295F]"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="academic">학습 상담</SelectItem><SelectItem value="life">생활 상담</SelectItem><SelectItem value="career">진로 상담</SelectItem></SelectContent></Select></div>
-              <div className="space-y-1.5"><Label className="text-[10px] font-black uppercase text-[#5c6e97]">상담 내용</Label><Textarea value={logContent} onChange={(event) => setLogContent(event.target.value)} placeholder="핵심 상담 내용을 입력하세요." className="min-h-[120px] rounded-xl border-[#dbe7ff] text-[#14295F]" /></div>
-              <div className="space-y-1.5"><Label className="text-[10px] font-black uppercase text-[#5c6e97]">개선 포인트</Label><Textarea value={logImprovement} onChange={(event) => setLogImprovement(event.target.value)} placeholder="향후 실행 포인트를 기록하세요." className="min-h-[90px] rounded-xl border-[#dbe7ff] text-[#14295F]" /></div>
+              <div className="grid gap-3 sm:grid-cols-4">
+                <div className="space-y-1.5">
+                  <Label className="text-[10px] font-black uppercase text-[#5c6e97]">상담 유형</Label>
+                  <Select value={logType} onValueChange={(value) => setLogType(value as typeof logType)}>
+                    <SelectTrigger className="h-11 rounded-xl border-[#dbe7ff] text-[#14295F]"><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="academic">학습 상담</SelectItem>
+                      <SelectItem value="life">생활 상담</SelectItem>
+                      <SelectItem value="career">진로 상담</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                {([
+                  ['학습', logStudyStatus, setLogStudyStatus],
+                  ['생활', logLifeStatus, setLogLifeStatus],
+                  ['정서', logEmotionStatus, setLogEmotionStatus],
+                ] as const).map(([label, value, setter]) => (
+                  <div key={label} className="space-y-1.5">
+                    <Label className="text-[10px] font-black uppercase text-[#5c6e97]">{label}</Label>
+                    <Select value={value} onValueChange={(nextValue) => setter(nextValue as CounselingLogStatus)}>
+                      <SelectTrigger className="h-11 rounded-xl border-[#dbe7ff] text-[#14295F]"><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        {COUNSELING_LOG_STATUS_OPTIONS.map((option) => (
+                          <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                ))}
+              </div>
+              <div className="grid gap-3 sm:grid-cols-2">
+                <div className="space-y-1.5"><Label className="text-[10px] font-black uppercase text-[#5c6e97]">상담요약</Label><Textarea value={logContent} onChange={(event) => setLogContent(event.target.value)} placeholder="핵심 상담 내용을 입력하세요." className="min-h-[120px] rounded-xl border-[#dbe7ff] text-[#14295F]" /></div>
+                <div className="space-y-1.5"><Label className="text-[10px] font-black uppercase text-[#5c6e97]">합의액션</Label><Textarea value={logImprovement} onChange={(event) => setLogImprovement(event.target.value)} placeholder="향후 실행 포인트를 기록하세요." className="min-h-[120px] rounded-xl border-[#dbe7ff] text-[#14295F]" /></div>
+              </div>
+              <div className="space-y-1.5"><Label className="text-[10px] font-black uppercase text-[#5c6e97]">자유메모</Label><Textarea value={logFreeMemo} onChange={(event) => setLogFreeMemo(event.target.value)} placeholder="추가로 공유할 내용을 적어주세요." className="min-h-[90px] rounded-xl border-[#dbe7ff] text-[#14295F]" /></div>
+              <div className="grid gap-3 sm:grid-cols-[220px_1fr]">
+                <div className="space-y-1.5"><Label className="text-[10px] font-black uppercase text-[#5c6e97]">다음상담예정일</Label><Input type="date" value={logNextCounselingDate} onChange={(event) => setLogNextCounselingDate(event.target.value)} className="h-11 rounded-xl border-[#dbe7ff] text-[#14295F]" /></div>
+                <div className="space-y-1.5"><Label className="text-[10px] font-black uppercase text-[#5c6e97]">팔로업</Label><Input value={logFollowUp} onChange={(event) => setLogFollowUp(event.target.value)} placeholder="예: 다음 주 영어 독해 루틴 확인" className="h-11 rounded-xl border-[#dbe7ff] text-[#14295F]" /></div>
+              </div>
             </div>
             <DialogFooter className="border-t border-[#dbe7ff] bg-[#f8fbff] p-6">
               <div className="flex w-full gap-3">

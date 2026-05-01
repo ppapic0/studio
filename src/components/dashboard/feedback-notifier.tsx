@@ -29,6 +29,7 @@ export function FeedbackNotifier() {
 
   const [notification, setNotification] = useState<StudentNotification | null>(null);
   const [isOpen, setIsOpen] = useState(false);
+  const isCounselingLog = notification?.source === 'counseling_log';
 
   const markAsRead = async (item: StudentNotification | null) => {
     if (!firestore || !activeMembership || !item || item.readAt) return;
@@ -75,17 +76,19 @@ export function FeedbackNotifier() {
           <DialogHeader className="relative z-10">
             <div className="mb-3 flex items-center gap-2">
               <Badge className="border-none bg-white/15 text-white font-black text-[10px] tracking-[0.18em] uppercase whitespace-nowrap">
-                한 줄 피드백
+                {isCounselingLog ? '상담일지' : '한 줄 피드백'}
               </Badge>
             </div>
             <DialogTitle className="flex items-center gap-3 text-3xl font-black tracking-tight">
               <div className="rounded-2xl bg-white/14 p-2">
                 <MessageSquareMore className="h-5 w-5" />
               </div>
-              새 피드백이 도착했어요
+              {isCounselingLog ? '새 상담일지가 도착했어요' : '새 피드백이 도착했어요'}
             </DialogTitle>
             <DialogDescription className="text-sm font-semibold text-white/70">
-              선생님이 오늘 학습 흐름에 맞춰 짧고 중요한 코멘트를 남겼습니다.
+              {isCounselingLog
+                ? '선생님이 상담요약과 다음 액션을 공유했습니다.'
+                : '선생님이 오늘 학습 흐름에 맞춰 짧고 중요한 코멘트를 남겼습니다.'}
             </DialogDescription>
           </DialogHeader>
         </div>

@@ -92,7 +92,7 @@ import { useAppContext } from '@/contexts/app-context';
 import { useMemoFirebase } from '@/hooks/use-memo-firebase';
 import { addDoc, collection, query, where, Timestamp, doc, limit, getDoc, getDocs, orderBy, serverTimestamp, documentId, writeBatch, deleteField, increment } from 'firebase/firestore';
 import { httpsCallable } from 'firebase/functions';
-import { AttendanceCurrent, AttendanceRequest, CounselingReservation, DailyStudentStat, DailyReport, CenterMembership, InviteCode, GrowthProgress, ParentActivityEvent, CounselingLog, LayoutRoomConfig, StudentProfile, StudentScheduleDoc, StudyLogDay, OpenClawIntegrationDoc, OpenClawSnapshotRecordCounts, PointBoostEvent, StudyPlanItem, WebsiteSeatHoldRequest } from '@/lib/types';
+import { AttendanceCurrent, AttendanceRequest, CounselingReservation, DailyStudentStat, DailyReport, CenterMembership, InviteCode, GrowthProgress, ParentActivityEvent, CounselingLog, CounselingLogStatus, LayoutRoomConfig, StudentProfile, StudentScheduleDoc, StudyLogDay, OpenClawIntegrationDoc, OpenClawSnapshotRecordCounts, PointBoostEvent, StudyPlanItem, WebsiteSeatHoldRequest } from '@/lib/types';
 import { format, subDays } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { logHandledClientIssue } from '@/lib/handled-client-log';
@@ -134,6 +134,10 @@ import {
   getCommunicationKindLabel,
   normalizeParentCommunicationRecord,
 } from '@/lib/dashboard-communications';
+import {
+  COUNSELING_LOG_STATUS_OPTIONS,
+  buildCounselingLogNotificationMessage,
+} from '@/lib/counseling-log';
 import {
   buildSeatId,
   formatSeatLabel,
@@ -991,6 +995,17 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
   const [focusScheduleAwayReasonDraft, setFocusScheduleAwayReasonDraft] = useState('');
   const [focusScheduleSavingMode, setFocusScheduleSavingMode] = useState<'save' | 'absent' | null>(null);
   const isFocusScheduleSaving = focusScheduleSavingMode !== null;
+  const [isFocusCounselingDialogOpen, setIsFocusCounselingDialogOpen] = useState(false);
+  const [focusCounselingType, setFocusCounselingType] = useState<'academic' | 'life' | 'career'>('academic');
+  const [focusCounselingStudyStatus, setFocusCounselingStudyStatus] = useState<CounselingLogStatus>('normal');
+  const [focusCounselingLifeStatus, setFocusCounselingLifeStatus] = useState<CounselingLogStatus>('normal');
+  const [focusCounselingEmotionStatus, setFocusCounselingEmotionStatus] = useState<CounselingLogStatus>('normal');
+  const [focusCounselingSummary, setFocusCounselingSummary] = useState('');
+  const [focusCounselingAgreedAction, setFocusCounselingAgreedAction] = useState('');
+  const [focusCounselingFreeMemo, setFocusCounselingFreeMemo] = useState('');
+  const [focusCounselingNextDate, setFocusCounselingNextDate] = useState('');
+  const [focusCounselingFollowUp, setFocusCounselingFollowUp] = useState('');
+  const [isFocusCounselingSaving, setIsFocusCounselingSaving] = useState(false);
   const [focusPhoneEditMode, setFocusPhoneEditMode] = useState<'student' | 'parent' | null>(null);
   const [focusStudentPhoneDraft, setFocusStudentPhoneDraft] = useState('');
   const [focusParentPhoneDraft, setFocusParentPhoneDraft] = useState('');
@@ -1078,6 +1093,8 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
   const canAdjustStudentPoints = canAccessAdminOnlyOperations;
   const canEditFocusSchedule =
     canAccessAdminOnlyOperations;
+  const canWriteFocusCounseling =
+    activeMembership?.role === 'teacher' || canAccessAdminOnlyOperations;
   const todayKey = today ? format(today, 'yyyy-MM-dd') : '';
   const yesterdayKey = today ? format(subDays(today, 1), 'yyyy-MM-dd') : '';
   const selectedFocusPlanWeekKeys = useMemo(() => {
@@ -1158,6 +1175,17 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
     setFocusScheduleAwayEndDraft('');
     setFocusScheduleAwayReasonDraft('');
     setFocusScheduleSavingMode(null);
+    setIsFocusCounselingDialogOpen(false);
+    setFocusCounselingType('academic');
+    setFocusCounselingStudyStatus('normal');
+    setFocusCounselingLifeStatus('normal');
+    setFocusCounselingEmotionStatus('normal');
+    setFocusCounselingSummary('');
+    setFocusCounselingAgreedAction('');
+    setFocusCounselingFreeMemo('');
+    setFocusCounselingNextDate('');
+    setFocusCounselingFollowUp('');
+    setIsFocusCounselingSaving(false);
     setFocusPhoneEditMode(null);
     setFocusStudentPhoneDraft('');
     setFocusParentPhoneDraft('');
@@ -4966,6 +4994,155 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
     );
   }
 
+  function renderFocusCounselingDialog() {
+    const studentName = selectedFocusStudent?.name || selectedFocusOperationsSummary?.student?.name || '학생';
+
+    return (
+      <Dialog
+        open={isFocusCounselingDialogOpen}
+        onOpenChange={(open) => {
+          if (!open && !isFocusCounselingSaving) {
+            resetFocusCounselingDialog();
+          } else {
+            setIsFocusCounselingDialogOpen(open);
+          }
+        }}
+      >
+        <DialogContent motionPreset="dashboard-premium" className={cn(studioDialogContentClassName, 'max-h-[90vh] overflow-hidden sm:max-w-3xl')}>
+          <div className={studioDialogHeaderClassName}>
+            <DialogHeader className="text-left">
+              <div className="flex flex-wrap items-center gap-2">
+                <Badge className="border-none bg-white/18 px-2.5 py-1 text-[10px] font-black text-white">상담일지</Badge>
+                <Badge className="border-none bg-white px-2.5 py-1 text-[10px] font-black text-[#14295F]">
+                  {studentName}
+                </Badge>
+              </div>
+              <DialogTitle className="text-2xl font-black tracking-tight">상담일지 작성하기</DialogTitle>
+              <DialogDescription className="text-sm font-medium text-white/76">
+                오늘 상태, 상담 내용, 다음 일정을 저장하면 학생과 학부모 알림으로 함께 전달됩니다.
+              </DialogDescription>
+            </DialogHeader>
+          </div>
+
+          <div className="max-h-[calc(90vh-13rem)] overflow-y-auto bg-[linear-gradient(180deg,#F7FAFF_0%,#EEF4FF_100%)] px-5 py-5">
+            <div className="grid gap-3 sm:grid-cols-4">
+              <div className="flex flex-col gap-2">
+                <Label className="text-[11px] font-black uppercase tracking-[0.14em] text-[#5c6e97]">상담 유형</Label>
+                <Select value={focusCounselingType} onValueChange={(value) => setFocusCounselingType(value as typeof focusCounselingType)}>
+                  <SelectTrigger className="h-11 rounded-xl border-[#DCE7FF] bg-white font-bold text-[#14295F]">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="academic">학습 상담</SelectItem>
+                    <SelectItem value="life">생활 상담</SelectItem>
+                    <SelectItem value="career">진로 상담</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              {([
+                ['학습', focusCounselingStudyStatus, setFocusCounselingStudyStatus],
+                ['생활', focusCounselingLifeStatus, setFocusCounselingLifeStatus],
+                ['정서', focusCounselingEmotionStatus, setFocusCounselingEmotionStatus],
+              ] as const).map(([label, value, setter]) => (
+                <div key={label} className="flex flex-col gap-2">
+                  <Label className="text-[11px] font-black uppercase tracking-[0.14em] text-[#5c6e97]">{label}</Label>
+                  <Select value={value} onValueChange={(nextValue) => setter(nextValue as CounselingLogStatus)}>
+                    <SelectTrigger className="h-11 rounded-xl border-[#DCE7FF] bg-white font-bold text-[#14295F]">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {COUNSELING_LOG_STATUS_OPTIONS.map((option) => (
+                        <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              ))}
+            </div>
+
+            <div className="mt-4 grid gap-3 sm:grid-cols-2">
+              <div className="flex flex-col gap-2">
+                <Label className="text-[11px] font-black uppercase tracking-[0.14em] text-[#5c6e97]">상담요약</Label>
+                <Textarea
+                  value={focusCounselingSummary}
+                  onChange={(event) => setFocusCounselingSummary(event.target.value)}
+                  placeholder="오늘 상담의 핵심 내용을 적어주세요."
+                  className="min-h-[132px] rounded-xl border-[#DCE7FF] bg-white font-bold text-[#14295F] placeholder:text-[#7F91B3]"
+                />
+              </div>
+              <div className="flex flex-col gap-2">
+                <Label className="text-[11px] font-black uppercase tracking-[0.14em] text-[#5c6e97]">합의액션</Label>
+                <Textarea
+                  value={focusCounselingAgreedAction}
+                  onChange={(event) => setFocusCounselingAgreedAction(event.target.value)}
+                  placeholder="학생/가정/센터가 함께 실행할 다음 행동을 적어주세요."
+                  className="min-h-[132px] rounded-xl border-[#DCE7FF] bg-white font-bold text-[#14295F] placeholder:text-[#7F91B3]"
+                />
+              </div>
+            </div>
+
+            <div className="mt-4 flex flex-col gap-2">
+              <Label className="text-[11px] font-black uppercase tracking-[0.14em] text-[#5c6e97]">자유메모</Label>
+              <Textarea
+                value={focusCounselingFreeMemo}
+                onChange={(event) => setFocusCounselingFreeMemo(event.target.value)}
+                placeholder="추가로 공유할 내용을 적어주세요."
+                className="min-h-[96px] rounded-xl border-[#DCE7FF] bg-white font-bold text-[#14295F] placeholder:text-[#7F91B3]"
+              />
+            </div>
+
+            <div className="mt-4 grid gap-3 sm:grid-cols-[220px_1fr]">
+              <div className="flex flex-col gap-2">
+                <Label className="text-[11px] font-black uppercase tracking-[0.14em] text-[#5c6e97]">다음상담예정일</Label>
+                <Input
+                  type="date"
+                  value={focusCounselingNextDate}
+                  onChange={(event) => setFocusCounselingNextDate(event.target.value)}
+                  className="h-11 rounded-xl border-[#DCE7FF] bg-white font-bold text-[#14295F]"
+                />
+              </div>
+              <div className="flex flex-col gap-2">
+                <Label className="text-[11px] font-black uppercase tracking-[0.14em] text-[#5c6e97]">팔로업</Label>
+                <Input
+                  value={focusCounselingFollowUp}
+                  onChange={(event) => setFocusCounselingFollowUp(event.target.value)}
+                  placeholder="예: 다음 주 영어 독해 루틴 확인"
+                  className="h-11 rounded-xl border-[#DCE7FF] bg-white font-bold text-[#14295F] placeholder:text-[#7F91B3]"
+                />
+              </div>
+            </div>
+          </div>
+
+          <DialogFooter className="gap-2 border-t border-[#DCE7FF] bg-white px-5 py-4 sm:space-x-0">
+            <DialogClose asChild>
+              <Button
+                type="button"
+                variant="outline"
+                disabled={isFocusCounselingSaving}
+                className="rounded-xl border-[#DCE7FF] font-black text-[#14295F]"
+              >
+                취소
+              </Button>
+            </DialogClose>
+            <Button
+              type="button"
+              onClick={() => void handleSaveFocusCounselingLog()}
+              disabled={isFocusCounselingSaving || !canWriteFocusCounseling}
+              className="rounded-xl bg-[#14295F] font-black text-white hover:bg-[#10224C]"
+            >
+              {isFocusCounselingSaving ? (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              ) : (
+                <Save className="mr-2 h-4 w-4" />
+              )}
+              상담일지 저장
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    );
+  }
+
   function renderManualStudySessionDialog() {
     const studentName = selectedFocusStudent?.name || selectedFocusOperationsSummary?.student?.name || '학생';
 
@@ -7113,6 +7290,153 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
     setFocusScheduleAwayEndDraft('');
     setFocusScheduleAwayReasonDraft('');
   };
+  const resetFocusCounselingDialog = () => {
+    setIsFocusCounselingDialogOpen(false);
+    setFocusCounselingType('academic');
+    setFocusCounselingStudyStatus('normal');
+    setFocusCounselingLifeStatus('normal');
+    setFocusCounselingEmotionStatus('normal');
+    setFocusCounselingSummary('');
+    setFocusCounselingAgreedAction('');
+    setFocusCounselingFreeMemo('');
+    setFocusCounselingNextDate('');
+    setFocusCounselingFollowUp('');
+  };
+  const openFocusCounselingDialog = () => {
+    if (!selectedFocusStudentId) return;
+    if (!canWriteFocusCounseling) {
+      toast({
+        variant: 'destructive',
+        title: '상담일지 작성 권한이 없습니다.',
+        description: '선생님 또는 센터관리자 계정에서 작성할 수 있습니다.',
+      });
+      return;
+    }
+    setIsFocusCounselingDialogOpen(true);
+  };
+  const handleSaveFocusCounselingLog = async () => {
+    if (!firestore || !centerId || !selectedFocusStudentId || !user || !canWriteFocusCounseling) return;
+
+    const summary = focusCounselingSummary.trim();
+    const agreedAction = focusCounselingAgreedAction.trim();
+    const freeMemo = focusCounselingFreeMemo.trim();
+    const nextCounselingDate = focusCounselingNextDate.trim();
+    const followUp = focusCounselingFollowUp.trim();
+
+    if (!summary) {
+      toast({
+        variant: 'destructive',
+        title: '상담요약이 필요합니다.',
+        description: '학생과 학부모에게 전달될 핵심 상담 내용을 입력해 주세요.',
+      });
+      return;
+    }
+
+    const studentId = selectedFocusStudentId;
+    const studentProfile = studentsById.get(studentId) || selectedFocusOperationsSummary?.student || null;
+    const studentName =
+      selectedFocusStudent?.name
+      || studentProfile?.name
+      || studentMembersById.get(studentId)?.displayName
+      || '학생';
+    const teacherName = user.displayName || activeMembership?.displayName || '담당 선생님';
+    const notificationBody = buildCounselingLogNotificationMessage({
+      summary,
+      agreedAction,
+      freeMemo,
+      nextCounselingDate,
+      followUp,
+    });
+    const parentUidSet = new Set<string>();
+    (studentProfile?.parentUids || []).forEach((parentUid) => {
+      if (parentUid) parentUidSet.add(parentUid);
+    });
+    (parentMembers || []).forEach((member) => {
+      if (!member.id) return;
+      if ((studentProfile?.parentUids || []).includes(member.id) || (member.linkedStudentIds || []).includes(studentId)) {
+        parentUidSet.add(member.id);
+      }
+    });
+
+    setIsFocusCounselingSaving(true);
+    try {
+      const createdAt = serverTimestamp();
+      const logRef = doc(collection(firestore, 'centers', centerId, 'counselingLogs'));
+      const batch = writeBatch(firestore);
+
+      batch.set(logRef, {
+        studentId,
+        studentName,
+        teacherId: user.uid,
+        teacherName,
+        type: focusCounselingType,
+        content: summary,
+        improvement: agreedAction,
+        studyStatus: focusCounselingStudyStatus,
+        lifeStatus: focusCounselingLifeStatus,
+        emotionStatus: focusCounselingEmotionStatus,
+        summary,
+        agreedAction,
+        freeMemo,
+        nextCounselingDate: nextCounselingDate || null,
+        followUp,
+        readAt: null,
+        createdAt,
+        updatedAt: createdAt,
+      });
+
+      batch.set(doc(collection(firestore, 'centers', centerId, 'studentNotifications')), {
+        centerId,
+        studentId,
+        teacherId: user.uid,
+        teacherName,
+        type: 'one_line_feedback',
+        title: '상담일지 도착',
+        message: notificationBody,
+        source: 'counseling_log',
+        counselingLogId: logRef.id,
+        createdAt,
+        updatedAt: createdAt,
+      });
+
+      Array.from(parentUidSet).forEach((parentUid) => {
+        batch.set(doc(collection(firestore, 'centers', centerId, 'parentNotifications')), {
+          centerId,
+          studentId,
+          studentName,
+          parentUid,
+          teacherId: user.uid,
+          teacherName,
+          type: 'counseling_done',
+          title: `${studentName} 상담일지 도착`,
+          body: notificationBody,
+          category: 'life',
+          priority: 'normal',
+          isRead: false,
+          isImportant: true,
+          source: 'counseling_log',
+          counselingLogId: logRef.id,
+          createdAt,
+          updatedAt: createdAt,
+        });
+      });
+
+      await batch.commit();
+      toast({
+        title: '상담일지 저장 완료',
+        description: '학생 알림과 학부모 알림까지 함께 전달했습니다.',
+      });
+      resetFocusCounselingDialog();
+    } catch (error) {
+      toast({
+        variant: 'destructive',
+        title: '상담일지 저장 실패',
+        description: getCallableErrorMessage(error, '잠시 후 다시 시도해 주세요.'),
+      });
+    } finally {
+      setIsFocusCounselingSaving(false);
+    }
+  };
   const openFocusPhoneEditor = (mode: 'student' | 'parent') => {
     if (!canAccessAdminOnlyOperations) {
       toast({
@@ -9076,6 +9400,7 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
           {renderIntegratedClassroomSection()}
           {renderLayoutSeatActionDialog()}
           {renderFocusScheduleDialog()}
+          {renderFocusCounselingDialog()}
           {renderManualStudySessionDialog()}
           {renderEditStudySessionDialog()}
           {renderFocusAdjustmentDialog()}
@@ -10972,7 +11297,7 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
                       type="button"
                       disabled={!canEditFocusSchedule || isFocusScheduleSaving}
                       onClick={openFocusScheduleDialog}
-                      className="group min-w-0 rounded-2xl border border-[#FFD7BA] bg-[#FFF8F2] p-3 text-left transition hover:border-[#FF7A16]/60 hover:bg-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#FF7A16]/30 disabled:cursor-not-allowed disabled:opacity-70 sm:col-span-3"
+                      className="group min-w-0 rounded-2xl border border-[#FFD7BA] bg-[#FFF8F2] p-3 text-left transition hover:border-[#FF7A16]/60 hover:bg-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#FF7A16]/30 disabled:cursor-not-allowed disabled:opacity-70 sm:col-span-2"
                     >
                       <div className="flex items-center justify-between gap-2">
                         <p className="text-[10px] font-black uppercase tracking-[0.14em] text-[#C95A08]">오늘 외출 일정</p>
@@ -10983,6 +11308,23 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
                       {canEditFocusSchedule ? (
                         <p className="mt-1 truncate text-[10px] font-black text-[#C95A08]">눌러서 외출/학원 시간 수정</p>
                       ) : null}
+                    </button>
+                    <button
+                      type="button"
+                      disabled={!canWriteFocusCounseling || isFocusCounselingSaving}
+                      onClick={openFocusCounselingDialog}
+                      className="group min-w-0 rounded-2xl border border-[#DCE7FF] bg-white p-3 text-left transition hover:border-[#14295F]/25 hover:bg-[#F7FAFF] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#14295F]/20 disabled:cursor-not-allowed disabled:opacity-70"
+                    >
+                      <div className="flex items-center justify-between gap-2">
+                        <p className="text-[10px] font-black uppercase tracking-[0.14em] text-[#14295F]">상담일지 작성하기</p>
+                        {isFocusCounselingSaving ? (
+                          <Loader2 className="h-3.5 w-3.5 shrink-0 animate-spin text-[#14295F]" />
+                        ) : (
+                          <ClipboardCheck className="h-3.5 w-3.5 shrink-0 text-[#FF7A16]" />
+                        )}
+                      </div>
+                      <p className="mt-2 line-clamp-2 text-sm font-black leading-5 text-[#14295F]">학습·생활·정서 상태 기록</p>
+                      <p className="mt-1 truncate text-[11px] font-bold text-[#6E7EA3]">학생/학부모 알림으로 전달</p>
                     </button>
                     <div className="min-w-0 rounded-2xl border border-[#DCE7FF] bg-white p-3">
                       <div className="flex items-center justify-between gap-2">

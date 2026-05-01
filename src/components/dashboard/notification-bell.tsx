@@ -526,7 +526,7 @@ export function NotificationBell() {
               <DialogHeader>
                 <div className="mb-3 flex items-center gap-2">
                   <Badge className="border-none bg-white/15 text-white font-black text-[10px] tracking-[0.18em] uppercase whitespace-nowrap">
-                    선생님 피드백
+                    {selectedFeedback?.source === 'counseling_log' ? '상담일지' : '선생님 피드백'}
                   </Badge>
                 </div>
                 <DialogTitle className="flex items-center gap-3 text-2xl font-black tracking-tight">
@@ -536,7 +536,9 @@ export function NotificationBell() {
                   {selectedFeedback?.title || '한 줄 피드백'}
                 </DialogTitle>
                 <DialogDescription className="text-white/75 font-semibold">
-                  {selectedFeedback?.teacherName || '담당 선생님'} 선생님이 남긴 코멘트입니다.
+                  {selectedFeedback?.source === 'counseling_log'
+                    ? `${selectedFeedback?.teacherName || '담당 선생님'} 선생님이 공유한 상담 기록입니다.`
+                    : `${selectedFeedback?.teacherName || '담당 선생님'} 선생님이 남긴 코멘트입니다.`}
                 </DialogDescription>
               </DialogHeader>
             </div>

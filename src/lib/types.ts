@@ -1078,6 +1078,8 @@ export interface CounselingReservation {
   updatedAt: Timestamp;
 }
 
+export type CounselingLogStatus = 'good' | 'normal' | 'watch';
+
 export interface CounselingLog {
   id: string;
   studentId: string;
@@ -1087,12 +1089,21 @@ export interface CounselingLog {
   type: "academic" | "life" | "career";
   content: string;
   improvement: string;
+  studyStatus?: CounselingLogStatus;
+  lifeStatus?: CounselingLogStatus;
+  emotionStatus?: CounselingLogStatus;
+  summary?: string;
+  agreedAction?: string;
+  freeMemo?: string;
+  nextCounselingDate?: string | null;
+  followUp?: string;
   reservationId?: string;
   studentQuestion?: string;
   readAt?: Timestamp | null;
   readByUid?: string;
   readByRole?: 'student' | 'parent';
   createdAt: Timestamp;
+  updatedAt?: Timestamp;
 }
 
 export interface WebsiteConsultSlot {
@@ -1494,6 +1505,8 @@ export interface StudentNotification {
   type: 'one_line_feedback' | 'ranking_reward';
   title?: string;
   message: string;
+  source?: string;
+  counselingLogId?: string;
   rankingRange?: 'daily' | 'weekly' | 'monthly';
   rankingRank?: number;
   rankingRewardPoints?: number;
