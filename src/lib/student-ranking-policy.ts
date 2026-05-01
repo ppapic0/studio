@@ -1,3 +1,5 @@
+import { getKoreanPublicHolidayInfoByDateKey } from '@/lib/korean-public-holidays';
+
 export type StudentRankingRange = "daily" | "weekly" | "monthly";
 
 export type StudentRankRewardTier = {
@@ -112,8 +114,14 @@ function isWeekendCompetitionDate(date: Date) {
   return dayOfWeek === 0 || dayOfWeek === 6;
 }
 
+function isPublicHolidayCompetitionDate(date: Date) {
+  return Boolean(getKoreanPublicHolidayInfoByDateKey(toKstDateKey(date)));
+}
+
 function getCompetitionStartHour(targetDate: Date) {
-  return isWeekendCompetitionDate(targetDate) ? WEEKEND_DAILY_RANK_START_HOUR : WEEKDAY_DAILY_RANK_START_HOUR;
+  return isWeekendCompetitionDate(targetDate) || isPublicHolidayCompetitionDate(targetDate)
+    ? WEEKEND_DAILY_RANK_START_HOUR
+    : WEEKDAY_DAILY_RANK_START_HOUR;
 }
 
 function buildCompetitionWindow(targetDate: Date) {
@@ -213,7 +221,7 @@ export function eachKstDateOfInterval(startDate: Date, endDate: Date) {
 }
 
 export function getDailyRankWindowLabel() {
-  return "평일 17:00~01:00 · 토/일 08:00~01:00";
+  return "평일 17:00~01:00 · 토/일/공휴일 08:00~01:00";
 }
 
 export function getStudentRankRewardTiers(range: StudentRankingRange) {
