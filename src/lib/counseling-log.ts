@@ -18,6 +18,22 @@ export const COUNSELING_LOG_STATUS_BADGE_CLASS: Record<CounselingLogStatus, stri
   watch: 'border-[#FFD7BA] bg-[#FFF8F2] text-[#C95A08]',
 };
 
+export function getCounselingLogStatusItems({
+  studyStatus,
+  lifeStatus,
+  emotionStatus,
+}: {
+  studyStatus?: CounselingLogStatus | null;
+  lifeStatus?: CounselingLogStatus | null;
+  emotionStatus?: CounselingLogStatus | null;
+}) {
+  return [
+    studyStatus ? { label: '학습', value: studyStatus } : null,
+    lifeStatus ? { label: '생활', value: lifeStatus } : null,
+    emotionStatus ? { label: '정서', value: emotionStatus } : null,
+  ].filter((item): item is { label: string; value: CounselingLogStatus } => item !== null);
+}
+
 export function getCounselingLogStatusLabel(status?: CounselingLogStatus | null) {
   return status ? COUNSELING_LOG_STATUS_LABELS[status] || '-' : '-';
 }

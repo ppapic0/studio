@@ -82,6 +82,7 @@ import {
 import {
   type AttendanceCurrent,
   type AttendanceRequest,
+  type CounselingLog,
   type DailyReport,
   type GrowthProgress,
   type Invoice,
@@ -92,6 +93,11 @@ import {
   type StudyPlanItem,
   type StudentProfile,
 } from '@/lib/types';
+import {
+  COUNSELING_LOG_STATUS_BADGE_CLASS,
+  getCounselingLogStatusItems,
+  getCounselingLogStatusLabel,
+} from '@/lib/counseling-log';
 import {
   buildAwayTimeInsight,
   buildRhythmInsight,
@@ -2034,6 +2040,7 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
   const shouldLoadNotifications = isActive && !!centerId && !!studentId && !!user && (tab === 'home' || tab === 'communication');
   const shouldLoadReportArchive = isActive && !!studentId && isReportArchiveOpen;
   const shouldLoadParentCommunications = isActive && !!centerId && !!user && tab === 'communication';
+  const shouldLoadCounselingLogs = isActive && !!centerId && !!studentId && tab === 'communication';
   const shouldLoadInvoices = isActive && !!studentId && tab === 'billing';
 
   const todayLogRef = useMemoFirebase(() => (!firestore || !centerId || !studentId || !todayKey ? null : doc(firestore, 'centers', centerId, 'studyLogs', studentId, 'days', todayKey)), [firestore, centerId, studentId, todayKey]);
@@ -2410,6 +2417,17 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
   }, [firestore, centerId, user]);
   const { data: rawParentCommunications, isLoading: parentCommunicationsLoading } = useCollection<ParentCommunicationRecord>(parentCommunicationsQuery, {
     enabled: shouldLoadParentCommunications,
+  });
+
+  const parentCounselingLogsQuery = useMemoFirebase(() => {
+    if (!firestore || !centerId || !studentId) return null;
+    return query(
+      collection(firestore, 'centers', centerId, 'counselingLogs'),
+      where('studentId', '==', studentId)
+    );
+  }, [firestore, centerId, studentId]);
+  const { data: rawParentCounselingLogs, isLoading: parentCounselingLogsLoading } = useCollection<CounselingLog>(parentCounselingLogsQuery, {
+    enabled: shouldLoadCounselingLogs,
   });
 
   const penaltyLogsQuery = useMemoFirebase(() => {
@@ -3325,6 +3343,14 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
       return bMs - aMs;
     });
   }, [rawParentCommunications]);
+
+  const parentCounselingLogs = useMemo(() => {
+    return [...(rawParentCounselingLogs || [])].sort((a, b) => {
+      const aMs = toDateSafe((a as any).createdAt)?.getTime() || 0;
+      const bMs = toDateSafe((b as any).createdAt)?.getTime() || 0;
+      return bMs - aMs;
+    });
+  }, [rawParentCounselingLogs]);
 
   const selectedDateStudyPlans = useMemo(
     () => (selectedDatePlans || []).filter((item) => item.category === 'study' || !item.category),
@@ -4632,6 +4658,117 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
                   </div>
                 )}
               </Card>
+
+              <Card className={cn('rounded-[2.5rem] border border-[#ffdabc] bg-[linear-gradient(180deg,#fffefb_0%,#ffffff_62%,#fff5ec_100%)] p-5 shadow-[0_24px_46px_-38px_rgba(255,122,22,0.14)] sm:p-8', showEntryMotion && 'parent-card-enter parent-entry-delay-3')}>
+                <ParentSectionHeader
+                  icon={<FileText className="h-3.5 w-3.5" />}
+                  eyebrow="Counseling Log"
+                  title="상담일지"
+                  description="선생님이 작성한 상담요약, 합의액션, 자유메모와 다음 일정을 자세히 확인합니다."
+                  badges={
+                    <Badge variant="outline" className="h-6 rounded-full border border-[#ffe0bf] bg-white px-2.5 text-[10px] font-black text-[#9b6938]">
+                      {parentCounselingLogs.length}건
+                    </Badge>
+                  }
+                />
+
+                {parentCounselingLogsLoading ? (
+                  <div className="flex items-center justify-center py-16">
+                    <Loader2 className="h-8 w-8 animate-spin text-slate-300" />
+                  </div>
+                ) : parentCounselingLogs.length === 0 ? (
+                  <div className="mt-4 rounded-[1.6rem] border border-dashed border-slate-200 bg-slate-50/60 px-4 py-8 text-center text-[11px] font-bold text-slate-400">
+                    아직 공유된 상담일지가 없습니다.
+                  </div>
+                ) : (
+                  <div className="mt-5 space-y-3">
+                    {parentCounselingLogs.map((log) => {
+                      const createdAt = toDateSafe((log as any).createdAt);
+                      const createdAtLabel = createdAt ? format(createdAt, 'yyyy.MM.dd HH:mm', { locale: ko }) : '최근 상담';
+                      const typeLabel = log.type === 'academic' ? '학업' : log.type === 'life' ? '생활' : '진로';
+                      const summary = log.summary?.trim() || log.content?.trim() || '';
+                      const agreedAction = log.agreedAction?.trim() || log.improvement?.trim() || '';
+                      const freeMemo = log.freeMemo?.trim() || '';
+                      const nextCounselingDate = log.nextCounselingDate?.trim() || '';
+                      const followUp = log.followUp?.trim() || '';
+                      const studentQuestion = log.studentQuestion?.trim() || '';
+                      const statusItems = getCounselingLogStatusItems(log);
+
+                      return (
+                        <article
+                          key={log.id}
+                          className="rounded-[1.8rem] border border-[#ffe2c5] bg-[linear-gradient(180deg,#ffffff_0%,#fffaf4_100%)] p-4 shadow-[0_18px_34px_-30px_rgba(255,122,22,0.16)] sm:p-5"
+                        >
+                          <div className="flex flex-wrap items-center justify-between gap-2">
+                            <div className="flex flex-wrap items-center gap-2">
+                              <Badge variant="outline" className="h-6 rounded-full border-[#ffd9b7] bg-[#fff3e6] px-2.5 text-[10px] font-black text-[#c2610b]">
+                                {typeLabel}
+                              </Badge>
+                              <span className="text-[10px] font-black uppercase tracking-[0.12em] text-slate-400">{createdAtLabel}</span>
+                            </div>
+                            {log.teacherName && (
+                              <span className="rounded-full bg-[#14295F]/5 px-2.5 py-1 text-[10px] font-black text-[#14295F]">
+                                담당 {log.teacherName}
+                              </span>
+                            )}
+                          </div>
+
+                          {statusItems.length > 0 && (
+                            <div className="mt-3 flex flex-wrap gap-1.5">
+                              {statusItems.map((item) => (
+                                <Badge
+                                  key={`${log.id}-${item.label}`}
+                                  variant="outline"
+                                  className={cn('rounded-full px-2.5 py-1 text-[10px] font-black', COUNSELING_LOG_STATUS_BADGE_CLASS[item.value])}
+                                >
+                                  {item.label} {getCounselingLogStatusLabel(item.value)}
+                                </Badge>
+                              ))}
+                            </div>
+                          )}
+
+                          <div className="mt-4 grid gap-3">
+                            {studentQuestion && (
+                              <div className="rounded-[1.25rem] border border-sky-100 bg-sky-50/60 p-4">
+                                <p className="mb-1 text-[10px] font-black uppercase tracking-[0.16em] text-sky-700">학생 질문</p>
+                                <p className="whitespace-pre-wrap break-keep text-[13px] font-bold leading-relaxed text-sky-950">{studentQuestion}</p>
+                              </div>
+                            )}
+                            <div className="rounded-[1.25rem] border border-[#ffe4c9] bg-white/90 p-4">
+                              <p className="mb-1 text-[10px] font-black uppercase tracking-[0.16em] text-[#a06632]">상담요약</p>
+                              <p className="whitespace-pre-wrap break-keep text-[13px] font-bold leading-relaxed text-[#14295F] sm:text-sm">{summary}</p>
+                            </div>
+                            {agreedAction && (
+                              <div className="rounded-[1.25rem] border border-emerald-100 bg-emerald-50/70 p-4">
+                                <p className="mb-1 text-[10px] font-black uppercase tracking-[0.16em] text-emerald-700">합의액션</p>
+                                <p className="whitespace-pre-wrap break-keep text-[13px] font-bold leading-relaxed text-emerald-950 sm:text-sm">{agreedAction}</p>
+                              </div>
+                            )}
+                            {freeMemo && (
+                              <div className="rounded-[1.25rem] border border-[#e8ddff] bg-violet-50/60 p-4">
+                                <p className="mb-1 text-[10px] font-black uppercase tracking-[0.16em] text-violet-700">자유메모</p>
+                                <p className="whitespace-pre-wrap break-keep text-[13px] font-bold leading-relaxed text-[#14295F] sm:text-sm">{freeMemo}</p>
+                              </div>
+                            )}
+                            {(nextCounselingDate || followUp) && (
+                              <div className="rounded-[1.25rem] border border-orange-100 bg-orange-50/70 p-4">
+                                <p className="mb-1 text-[10px] font-black uppercase tracking-[0.16em] text-orange-700">다음 일정</p>
+                                {nextCounselingDate && (
+                                  <p className="text-[13px] font-black leading-relaxed text-orange-950 sm:text-sm">다음상담예정일: {nextCounselingDate}</p>
+                                )}
+                                {followUp && (
+                                  <p className="mt-1 whitespace-pre-wrap break-keep text-[13px] font-bold leading-relaxed text-orange-950/80 sm:text-sm">{followUp}</p>
+                                )}
+                              </div>
+                            )}
+                          </div>
+                        </article>
+                      );
+                    })}
+                  </div>
+                )}
+              </Card>
+
               <Card className={cn('rounded-[2.5rem] border border-[#ffdabc] bg-[linear-gradient(180deg,#fffefb_0%,#ffffff_66%,#fff4ea_100%)] p-5 shadow-[0_24px_46px_-38px_rgba(255,122,22,0.14)] sm:p-8', showEntryMotion && 'parent-card-enter parent-entry-delay-3')}>
                 <ParentSectionHeader
                   icon={<Send className="h-3.5 w-3.5" />}

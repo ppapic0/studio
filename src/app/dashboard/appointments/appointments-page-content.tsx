@@ -73,6 +73,11 @@ import { cn } from '@/lib/utils';
 import Link from 'next/link';
 import { isAdminRole, isTeacherOrAdminRole } from '@/lib/dashboard-access';
 import { getSafeErrorMessage } from '@/lib/exposed-error';
+import {
+  COUNSELING_LOG_STATUS_BADGE_CLASS,
+  getCounselingLogStatusItems,
+  getCounselingLogStatusLabel,
+} from '@/lib/counseling-log';
 
 type ParentCommunicationRecord = {
   id: string;
@@ -2158,6 +2163,20 @@ export function AppointmentsPageContent({
                       log.studentQuestion?.trim() ||
                       (log.reservationId ? reservationQuestionById.get(log.reservationId)?.trim() : '') ||
                       '';
+                    const summary = log.summary?.trim() || log.content?.trim() || '';
+                    const agreedAction = log.agreedAction?.trim() || log.improvement?.trim() || '';
+                    const freeMemo = log.freeMemo?.trim() || '';
+                    const nextCounselingDate = log.nextCounselingDate?.trim() || '';
+                    const followUp = log.followUp?.trim() || '';
+                    const statusItems = getCounselingLogStatusItems(log);
+                    const statusBadgeClass = (status: typeof statusItems[number]['value']) =>
+                      isStudentTrackTheme
+                        ? status === 'good'
+                          ? 'border-emerald-300/20 bg-emerald-300/12 text-emerald-100'
+                          : status === 'watch'
+                            ? 'border-orange-300/25 bg-orange-300/12 text-orange-100'
+                            : 'border-sky-300/20 bg-sky-300/12 text-sky-100'
+                        : COUNSELING_LOG_STATUS_BADGE_CLASS[status];
                     return (
                     <div key={log.id} className={cn(isStudentTrackTheme ? "surface-card surface-card--ghost on-dark rounded-[1.35rem] border-white/10 shadow-none" : isStaff ? "rounded-[1.5rem] border border-[#e2dcff] bg-[linear-gradient(135deg,#ffffff_0%,#faf7ff_52%,#eef4ff_100%)] mx-4 my-4 shadow-[0_20px_42px_-34px_rgba(79,84,215,0.18)]" : "hover:bg-muted/5 transition-colors", isMobile ? "p-5" : "p-6 sm:p-10")}>
                       <div className="flex flex-col gap-4">
@@ -2204,6 +2223,20 @@ export function AppointmentsPageContent({
                           </div>
                           {!isMobile && <span className={cn("text-[8px] font-black tracking-[0.3em]", isStudentTrackTheme ? "text-[var(--text-on-dark-muted)]/70" : isStaff ? "text-[#9badd3]" : "text-primary/30")}>상담 로그</span>}
                         </div>
+
+                        {statusItems.length > 0 && (
+                          <div className="flex flex-wrap gap-1.5">
+                            {statusItems.map((item) => (
+                              <Badge
+                                key={`${log.id}-${item.label}`}
+                                variant="outline"
+                                className={cn("rounded-full px-2.5 py-1 text-[10px] font-black", statusBadgeClass(item.value))}
+                              >
+                                {item.label} {getCounselingLogStatusLabel(item.value)}
+                              </Badge>
+                            ))}
+                          </div>
+                        )}
                         
                         <div className="space-y-3">
                           {studentQuestion && (
@@ -2215,14 +2248,37 @@ export function AppointmentsPageContent({
                             </div>
                           )}
                           <div className={cn(studentGhostPanelClass, isMobile ? "p-4" : "p-5")}>
-                            <p className={cn("font-bold leading-relaxed whitespace-pre-wrap break-keep", isMobile ? "text-sm" : "text-base", studentBodyTextClass)}>{log.content}</p>
+                            <p className={cn("mb-1 text-[10px] font-black uppercase tracking-widest", isStudentTrackTheme ? "text-[var(--text-accent-soft-fixed)]" : isStaff ? "text-[#5c6e97]" : "text-primary/70")}>상담요약</p>
+                            <p className={cn("font-bold leading-relaxed whitespace-pre-wrap break-keep", isMobile ? "text-sm" : "text-base", studentBodyTextClass)}>{summary}</p>
                           </div>
-                          {log.improvement && (
+                          {agreedAction && (
                             <div className={cn(isStudentTrackTheme ? "surface-card surface-card--ghost on-dark border-emerald-300/18 flex items-start gap-3" : isStaff ? "rounded-[1.25rem] border border-[#d7efe0] bg-[linear-gradient(135deg,#f3fbf6_0%,#ffffff_100%)] flex items-start gap-3" : "rounded-[1.25rem] bg-emerald-50 border border-emerald-100 flex items-start gap-3", isMobile ? "p-4" : "p-5")}>
                               <div className={cn("p-1.5 rounded-lg shrink-0", isStudentTrackTheme ? "bg-emerald-400/12" : isStaff ? "bg-white" : "bg-white shadow-sm")}><AlertCircle className={cn("h-3.5 w-3.5", isStudentTrackTheme ? "text-emerald-300" : isStaff ? "text-[#14295F]" : "text-emerald-600")} /></div>
                               <div className="space-y-0.5">
-                                <p className={cn("text-[9px] font-black uppercase tracking-widest leading-none", isStudentTrackTheme ? "text-emerald-300" : isStaff ? "text-[#5c6e97]" : "text-emerald-700")}>실천 권고</p>
-                                <p className={cn("font-bold leading-relaxed", isMobile ? "text-xs" : "text-sm", isStudentTrackTheme ? "text-emerald-100" : isStaff ? "text-[#14295F]" : "text-emerald-900")}>{log.improvement}</p>
+                                <p className={cn("text-[9px] font-black uppercase tracking-widest leading-none", isStudentTrackTheme ? "text-emerald-300" : isStaff ? "text-[#5c6e97]" : "text-emerald-700")}>합의액션</p>
+                                <p className={cn("font-bold leading-relaxed whitespace-pre-wrap break-keep", isMobile ? "text-xs" : "text-sm", isStudentTrackTheme ? "text-emerald-100" : isStaff ? "text-[#14295F]" : "text-emerald-900")}>{agreedAction}</p>
+                              </div>
+                            </div>
+                          )}
+                          {freeMemo && (
+                            <div className={cn(isStudentTrackTheme ? "surface-card surface-card--ghost on-dark border-white/10" : isStaff ? "rounded-[1.25rem] border border-[#eadfff] bg-white/90" : "rounded-[1.25rem] border border-[#eadfff] bg-violet-50/60", isMobile ? "p-4" : "p-5")}>
+                              <p className={cn("mb-1 text-[10px] font-black uppercase tracking-widest", isStudentTrackTheme ? "text-[var(--text-on-dark-muted)]" : isStaff ? "text-[#5c6e97]" : "text-violet-700")}>자유메모</p>
+                              <p className={cn("font-bold leading-relaxed whitespace-pre-wrap break-keep", isMobile ? "text-xs" : "text-sm", studentBodyTextClass)}>{freeMemo}</p>
+                            </div>
+                          )}
+                          {(nextCounselingDate || followUp) && (
+                            <div className={cn(isStudentTrackTheme ? "surface-card surface-card--ghost on-dark border-orange-300/20 flex items-start gap-3" : isStaff ? "rounded-[1.25rem] border border-[#ffe2c2] bg-[linear-gradient(135deg,#fff8ef_0%,#ffffff_100%)] flex items-start gap-3" : "rounded-[1.25rem] border border-orange-100 bg-orange-50/70 flex items-start gap-3", isMobile ? "p-4" : "p-5")}>
+                              <div className={cn("p-1.5 rounded-lg shrink-0", isStudentTrackTheme ? "bg-orange-300/12" : isStaff ? "bg-white" : "bg-white shadow-sm")}>
+                                <Calendar className={cn("h-3.5 w-3.5", isStudentTrackTheme ? "text-orange-200" : isStaff ? "text-[#14295F]" : "text-orange-600")} />
+                              </div>
+                              <div className="space-y-1">
+                                <p className={cn("text-[9px] font-black uppercase tracking-widest leading-none", isStudentTrackTheme ? "text-orange-200" : isStaff ? "text-[#5c6e97]" : "text-orange-700")}>다음 일정</p>
+                                {nextCounselingDate && (
+                                  <p className={cn("font-black leading-relaxed", isMobile ? "text-xs" : "text-sm", isStudentTrackTheme ? "text-orange-100" : isStaff ? "text-[#14295F]" : "text-orange-900")}>다음상담예정일: {nextCounselingDate}</p>
+                                )}
+                                {followUp && (
+                                  <p className={cn("font-bold leading-relaxed whitespace-pre-wrap break-keep", isMobile ? "text-xs" : "text-sm", isStudentTrackTheme ? "text-orange-100/90" : isStaff ? "text-[#5c6e97]" : "text-orange-900/80")}>{followUp}</p>
+                                )}
                               </div>
                             </div>
                           )}
