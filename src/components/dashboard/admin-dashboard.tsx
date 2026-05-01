@@ -92,8 +92,8 @@ import { useAppContext } from '@/contexts/app-context';
 import { useMemoFirebase } from '@/hooks/use-memo-firebase';
 import { addDoc, collection, query, where, Timestamp, doc, limit, getDoc, getDocs, orderBy, serverTimestamp, documentId, writeBatch, deleteField, increment } from 'firebase/firestore';
 import { httpsCallable } from 'firebase/functions';
-import { AttendanceCurrent, AttendanceRequest, CounselingReservation, DailyStudentStat, DailyReport, CenterMembership, InviteCode, GrowthProgress, ParentActivityEvent, CounselingLog, CounselingLogStatus, LayoutRoomConfig, StudentProfile, StudentScheduleDoc, StudyLogDay, OpenClawIntegrationDoc, OpenClawSnapshotRecordCounts, PointBoostEvent, StudyPlanItem, WebsiteSeatHoldRequest } from '@/lib/types';
-import { format, subDays } from 'date-fns';
+import { AttendanceCurrent, AttendanceRequest, CounselingReservation, DailyStudentStat, DailyReport, CenterMembership, InviteCode, GrowthProgress, ParentActivityEvent, CounselingLog, CounselingLogStatus, LayoutRoomConfig, StudentProfile, StudentScheduleDoc, StudentScheduleTemplate, StudyLogDay, OpenClawIntegrationDoc, OpenClawSnapshotRecordCounts, PointBoostEvent, StudyPlanItem, WebsiteSeatHoldRequest } from '@/lib/types';
+import { addDays, format, startOfWeek, subDays } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { logHandledClientIssue } from '@/lib/handled-client-log';
 import Link from 'next/link';
@@ -163,6 +163,27 @@ const FOCUS_SCHEDULE_DEFAULT_ARRIVAL_TIME = '18:00';
 const FOCUS_SCHEDULE_DEFAULT_DEPARTURE_TIME = '23:30';
 const FOCUS_PLAN_SUMMARY_DAY_COUNT = 3;
 const SCHEDULE_TIME_LABEL_PATTERN = /^([01]\d|2[0-3]):[0-5]\d$/;
+const FOCUS_WEEKLY_SCHEDULE_DAYS = [
+  { weekday: 1, label: '월' },
+  { weekday: 2, label: '화' },
+  { weekday: 3, label: '수' },
+  { weekday: 4, label: '목' },
+  { weekday: 5, label: '금' },
+  { weekday: 6, label: '토' },
+  { weekday: 0, label: '일' },
+] as const;
+
+type FocusWeeklyScheduleDraft = {
+  weekday: number;
+  label: string;
+  dateKey: string;
+  enabled: boolean;
+  inTime: string;
+  outTime: string;
+  awayStartTime: string;
+  awayEndTime: string;
+  awayReason: string;
+};
 
 type AdminSmsRecipientPreference = {
   id: string;
@@ -295,6 +316,44 @@ const isScheduleTimeLabel = (value?: string | null): value is string => {
 const toScheduleTimeDraft = (value: string | null | undefined, fallback = ''): string => {
   const normalized = String(value || '').trim();
   return isScheduleTimeLabel(normalized) ? normalized : fallback;
+};
+
+const buildFocusWeeklyScheduleDrafts = (baseDate?: Date | null): FocusWeeklyScheduleDraft[] => {
+  const weekStart = baseDate ? startOfWeek(baseDate, { weekStartsOn: 1 }) : null;
+  return FOCUS_WEEKLY_SCHEDULE_DAYS.map((day, index) => ({
+    weekday: day.weekday,
+    label: day.label,
+    dateKey: weekStart ? format(addDays(weekStart, index), 'yyyy-MM-dd') : '',
+    enabled: false,
+    inTime: '',
+    outTime: '',
+    awayStartTime: '',
+    awayEndTime: '',
+    awayReason: '',
+  }));
+};
+
+const toFocusWeeklyAttendanceDraft = (draft: FocusWeeklyScheduleDraft): AttendanceScheduleDraft => ({
+  inTime: draft.inTime.trim(),
+  outTime: draft.outTime.trim(),
+  academyName: '',
+  academyStartTime: '',
+  academyEndTime: '',
+  awayStartTime: draft.awayStartTime.trim(),
+  awayEndTime: draft.awayEndTime.trim(),
+  awayReason: draft.awayReason.trim(),
+  awaySlots: [],
+  isAbsent: false,
+  classScheduleId: null,
+  classScheduleName: null,
+});
+
+const getStudentScheduleTemplateTimestampMs = (template: StudentScheduleTemplate): number => {
+  return (
+    toTimestampDateSafe(template.updatedAt)?.getTime()
+    || toTimestampDateSafe(template.createdAt)?.getTime()
+    || 0
+  );
 };
 
 const scheduleTimeToMinutes = (value: string): number | null => {
@@ -989,12 +1048,10 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
   const [pointBoostMessageDraft, setPointBoostMessageDraft] = useState('');
   const [focusAttendanceActionSaving, setFocusAttendanceActionSaving] = useState<AttendanceCurrent['status'] | null>(null);
   const [isFocusScheduleDialogOpen, setIsFocusScheduleDialogOpen] = useState(false);
-  const [focusScheduleArrivalDraft, setFocusScheduleArrivalDraft] = useState('');
-  const [focusScheduleDepartureDraft, setFocusScheduleDepartureDraft] = useState('');
-  const [focusScheduleAwayStartDraft, setFocusScheduleAwayStartDraft] = useState('');
-  const [focusScheduleAwayEndDraft, setFocusScheduleAwayEndDraft] = useState('');
-  const [focusScheduleAwayReasonDraft, setFocusScheduleAwayReasonDraft] = useState('');
-  const [focusScheduleSavingMode, setFocusScheduleSavingMode] = useState<'save' | 'absent' | null>(null);
+  const [focusWeeklyScheduleDrafts, setFocusWeeklyScheduleDrafts] = useState<FocusWeeklyScheduleDraft[]>(() =>
+    buildFocusWeeklyScheduleDrafts(null)
+  );
+  const [focusScheduleSavingMode, setFocusScheduleSavingMode] = useState<'save' | null>(null);
   const isFocusScheduleSaving = focusScheduleSavingMode !== null;
   const [isFocusCounselingDialogOpen, setIsFocusCounselingDialogOpen] = useState(false);
   const [focusCounselingType, setFocusCounselingType] = useState<'academic' | 'life' | 'career'>('academic');
@@ -1170,11 +1227,7 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
     setIsEditStudySessionSaving(false);
     setDeletingStudySessionId(null);
     setIsFocusScheduleDialogOpen(false);
-    setFocusScheduleArrivalDraft('');
-    setFocusScheduleDepartureDraft('');
-    setFocusScheduleAwayStartDraft('');
-    setFocusScheduleAwayEndDraft('');
-    setFocusScheduleAwayReasonDraft('');
+    setFocusWeeklyScheduleDrafts(buildFocusWeeklyScheduleDrafts(today));
     setFocusScheduleSavingMode(null);
     setIsFocusCounselingDialogOpen(false);
     setFocusCounselingType('academic');
@@ -1194,7 +1247,7 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
     setIsFocusParentLinkCodeEditing(false);
     setFocusParentLinkCodeDraft('');
     setIsFocusParentLinkCodeSaving(false);
-  }, [selectedFocusStudentId, todayKey]);
+  }, [selectedFocusStudentId, today, todayKey]);
 
   useEffect(() => {
     hasHydratedRoomDraftsRef.current = false;
@@ -4832,9 +4885,7 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
 
   function renderFocusScheduleDialog() {
     const studentName = selectedFocusStudent?.name || selectedFocusOperationsSummary?.student?.name || '학생';
-    const outingEnabled = Boolean(
-      focusScheduleAwayStartDraft || focusScheduleAwayEndDraft || focusScheduleAwayReasonDraft.trim()
-    );
+    const enabledCount = focusWeeklyScheduleDrafts.filter((draft) => draft.enabled).length;
 
     return (
       <Dialog
@@ -4845,150 +4896,203 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
           }
         }}
       >
-        <DialogContent motionPreset="dashboard-premium" className={cn(studioDialogContentClassName, 'sm:max-w-2xl')}>
+        <DialogContent motionPreset="dashboard-premium" className={cn(studioDialogContentClassName, 'sm:max-w-4xl')}>
           <div className={studioDialogHeaderClassName}>
             <DialogHeader className="text-left">
               <div className="flex flex-wrap items-center gap-2">
-                <Badge className="border-none bg-white/18 px-2.5 py-1 text-[10px] font-black text-white">일정 수정</Badge>
+                <Badge className="border-none bg-white/18 px-2.5 py-1 text-[10px] font-black text-white">주간 등원일정 설정</Badge>
                 <Badge className="border-none bg-white px-2.5 py-1 text-[10px] font-black text-[#14295F]">
                   {studentName}
                 </Badge>
               </div>
-              <DialogTitle className="text-2xl font-black tracking-tight">오늘 등하원·외출 일정 수정</DialogTitle>
+              <DialogTitle className="text-2xl font-black tracking-tight">월~일 주간 등원일정 설정</DialogTitle>
               <DialogDescription className="text-sm font-medium text-white/76">
-                센터관리자가 직접 저장하는 당일 일정 수정은 출결 신청 벌점 흐름을 타지 않습니다.
+                요일별 등원 여부와 등하원·외출 시간을 저장합니다. 센터관리자 직접 설정은 벌점 흐름을 타지 않습니다.
               </DialogDescription>
             </DialogHeader>
           </div>
 
-          <div className="bg-[linear-gradient(180deg,#F7FAFF_0%,#EEF4FF_100%)] px-5 py-5">
-            <div className="grid gap-3 sm:grid-cols-2">
-              <div className="flex flex-col gap-2">
-                <Label className="text-[11px] font-black uppercase tracking-[0.14em] text-[#5c6e97]">등원 일정</Label>
-                <Input
-                  type="time"
-                  value={focusScheduleArrivalDraft}
-                  onChange={(event) => setFocusScheduleArrivalDraft(event.target.value)}
-                  className="h-11 rounded-xl border-[#DCE7FF] font-bold text-[#14295F]"
-                />
-              </div>
-              <div className="flex flex-col gap-2">
-                <Label className="text-[11px] font-black uppercase tracking-[0.14em] text-[#5c6e97]">하원 일정</Label>
-                <Input
-                  type="time"
-                  value={focusScheduleDepartureDraft}
-                  onChange={(event) => setFocusScheduleDepartureDraft(event.target.value)}
-                  className="h-11 rounded-xl border-[#DCE7FF] font-bold text-[#14295F]"
-                />
-              </div>
-            </div>
-
-            <div className={cn(
-              'mt-4 rounded-[1.25rem] border px-4 py-4',
-              outingEnabled ? 'border-[#FFD7BA] bg-[#FFF8F2]' : 'border-[#DCE7FF] bg-white'
-            )}>
+          <div className="max-h-[68vh] overflow-y-auto bg-[linear-gradient(180deg,#F7FAFF_0%,#EEF4FF_100%)] px-5 py-5">
+            <div className="rounded-[1.25rem] border border-emerald-200 bg-emerald-50 px-4 py-3">
               <div className="flex flex-wrap items-center justify-between gap-2">
-                <div className="min-w-0">
-                  <p className="text-[10px] font-black uppercase tracking-[0.14em] text-[#C95A08]">외출 일정</p>
-                  <p className="mt-1 text-xs font-bold text-[#5c6e97]">외출 시작과 복귀 예정 시간을 같이 입력합니다.</p>
+                <div>
+                  <p className="text-xs font-black text-emerald-800">주간 반복 설정</p>
+                  <p className="mt-1 text-[11px] font-bold leading-5 text-emerald-800">
+                    오늘 이전 기록은 유지하고, 반복 주간 템플릿과 이번 주 오늘 이후 일정만 반영합니다.
+                  </p>
                 </div>
-                {outingEnabled ? (
-                  <Button
-                    type="button"
-                    size="sm"
-                    variant="outline"
-                    className="h-8 rounded-xl border-[#FFD7BA] bg-white px-3 text-[10px] font-black text-[#C95A08]"
-                    onClick={() => {
-                      setFocusScheduleAwayStartDraft('');
-                      setFocusScheduleAwayEndDraft('');
-                      setFocusScheduleAwayReasonDraft('');
-                    }}
-                  >
-                    외출 비우기
-                  </Button>
-                ) : null}
-              </div>
-
-              <div className="mt-3 grid gap-3 sm:grid-cols-2">
-                <div className="flex flex-col gap-2">
-                  <Label className="text-[11px] font-black uppercase tracking-[0.14em] text-[#5c6e97]">외출 시작</Label>
-                  <Input
-                    type="time"
-                    value={focusScheduleAwayStartDraft}
-                    onChange={(event) => setFocusScheduleAwayStartDraft(event.target.value)}
-                    className="h-11 rounded-xl border-[#FFD7BA] bg-white font-bold text-[#14295F]"
-                  />
-                </div>
-                <div className="flex flex-col gap-2">
-                  <Label className="text-[11px] font-black uppercase tracking-[0.14em] text-[#5c6e97]">복귀 예정</Label>
-                  <Input
-                    type="time"
-                    value={focusScheduleAwayEndDraft}
-                    onChange={(event) => setFocusScheduleAwayEndDraft(event.target.value)}
-                    className="h-11 rounded-xl border-[#FFD7BA] bg-white font-bold text-[#14295F]"
-                  />
-                </div>
-              </div>
-
-              <div className="mt-3 flex flex-col gap-2">
-                <Label className="text-[11px] font-black uppercase tracking-[0.14em] text-[#5c6e97]">외출 사유</Label>
-                <Input
-                  value={focusScheduleAwayReasonDraft}
-                  onChange={(event) => setFocusScheduleAwayReasonDraft(event.target.value)}
-                  placeholder="예: 학원, 병원, 개인 외출"
-                  className="h-11 rounded-xl border-[#FFD7BA] bg-white font-bold text-[#14295F] placeholder:text-[#7F91B3]"
-                />
+                <Badge className="h-7 rounded-full border-none bg-white px-3 text-[10px] font-black text-emerald-700">
+                  등원 {enabledCount}일
+                </Badge>
               </div>
             </div>
 
-            <div className="mt-4 rounded-[1.25rem] border border-emerald-200 bg-emerald-50 px-4 py-3">
-              <p className="text-xs font-black text-emerald-800">당일 관리자 보정</p>
-              <p className="mt-1 text-[11px] font-bold leading-5 text-emerald-800">
-                저장 시 오늘 일정 문서를 직접 보정하고, 오늘 루틴 미작성 자동 벌점이 이미 잡혀 있으면 함께 정리합니다.
-              </p>
+            <div className="mt-4 grid gap-3">
+              {focusWeeklyScheduleDrafts.map((dayDraft) => {
+                const outingEnabled = Boolean(
+                  dayDraft.awayStartTime || dayDraft.awayEndTime || dayDraft.awayReason.trim()
+                );
+                return (
+                  <div
+                    key={dayDraft.weekday}
+                    className={cn(
+                      'rounded-[1.25rem] border px-4 py-4 shadow-[0_16px_34px_-30px_rgba(20,41,95,0.24)]',
+                      dayDraft.enabled ? 'border-[#DCE7FF] bg-white' : 'border-[#E5EAF5] bg-white/72'
+                    )}
+                  >
+                    <div className="flex flex-wrap items-center justify-between gap-3">
+                      <div className="flex min-w-0 items-center gap-3">
+                        <span
+                          className={cn(
+                            'inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-[1rem] text-sm font-black',
+                            dayDraft.enabled ? 'bg-[#14295F] text-white' : 'bg-[#EEF2F8] text-[#7A88A6]'
+                          )}
+                        >
+                          {dayDraft.label}
+                        </span>
+                        <div className="min-w-0">
+                          <p className="text-sm font-black text-[#14295F]">{dayDraft.label}요일</p>
+                          <p className="mt-0.5 text-[11px] font-bold text-[#6E7EA3]">
+                            {dayDraft.dateKey || '이번 주 날짜 없음'}
+                          </p>
+                        </div>
+                      </div>
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant={dayDraft.enabled ? 'default' : 'outline'}
+                        className={cn(
+                          'h-9 rounded-xl px-3 text-[11px] font-black',
+                          dayDraft.enabled
+                            ? 'bg-[#14295F] text-white hover:bg-[#10224C]'
+                            : 'border-[#FFD0C2] bg-[#FFF5F2] text-[#D54E2B] hover:bg-[#FFE9E2]'
+                        )}
+                        onClick={() =>
+                          updateFocusWeeklyScheduleDraft(
+                            dayDraft.weekday,
+                            dayDraft.enabled
+                              ? { enabled: false }
+                              : {
+                                  enabled: true,
+                                  inTime: dayDraft.inTime || FOCUS_SCHEDULE_DEFAULT_ARRIVAL_TIME,
+                                  outTime: dayDraft.outTime || FOCUS_SCHEDULE_DEFAULT_DEPARTURE_TIME,
+                                }
+                          )
+                        }
+                      >
+                        {dayDraft.enabled ? (
+                          <CheckCircle2 className="mr-1.5 h-3.5 w-3.5" />
+                        ) : (
+                          <UserX className="mr-1.5 h-3.5 w-3.5" />
+                        )}
+                        {dayDraft.enabled ? '등원' : '미등원'}
+                      </Button>
+                    </div>
+
+                    {dayDraft.enabled ? (
+                      <>
+                        <div className="mt-3 grid gap-3 md:grid-cols-4">
+                          <div className="flex flex-col gap-2">
+                            <Label className="text-[10px] font-black uppercase tracking-[0.14em] text-[#5c6e97]">등원</Label>
+                            <Input
+                              type="time"
+                              value={dayDraft.inTime}
+                              onChange={(event) => updateFocusWeeklyScheduleDraft(dayDraft.weekday, { inTime: event.target.value })}
+                              className="h-10 rounded-xl border-[#DCE7FF] font-bold text-[#14295F]"
+                            />
+                          </div>
+                          <div className="flex flex-col gap-2">
+                            <Label className="text-[10px] font-black uppercase tracking-[0.14em] text-[#5c6e97]">하원</Label>
+                            <Input
+                              type="time"
+                              value={dayDraft.outTime}
+                              onChange={(event) => updateFocusWeeklyScheduleDraft(dayDraft.weekday, { outTime: event.target.value })}
+                              className="h-10 rounded-xl border-[#DCE7FF] font-bold text-[#14295F]"
+                            />
+                          </div>
+                          <div className="flex flex-col gap-2">
+                            <Label className="text-[10px] font-black uppercase tracking-[0.14em] text-[#C95A08]">외출 시작</Label>
+                            <Input
+                              type="time"
+                              value={dayDraft.awayStartTime}
+                              onChange={(event) => updateFocusWeeklyScheduleDraft(dayDraft.weekday, { awayStartTime: event.target.value })}
+                              className="h-10 rounded-xl border-[#FFD7BA] bg-[#FFFDFC] font-bold text-[#14295F]"
+                            />
+                          </div>
+                          <div className="flex flex-col gap-2">
+                            <Label className="text-[10px] font-black uppercase tracking-[0.14em] text-[#C95A08]">복귀 예정</Label>
+                            <Input
+                              type="time"
+                              value={dayDraft.awayEndTime}
+                              onChange={(event) => updateFocusWeeklyScheduleDraft(dayDraft.weekday, { awayEndTime: event.target.value })}
+                              className="h-10 rounded-xl border-[#FFD7BA] bg-[#FFFDFC] font-bold text-[#14295F]"
+                            />
+                          </div>
+                        </div>
+                        <div className="mt-3 flex flex-col gap-2">
+                          <Label className="text-[10px] font-black uppercase tracking-[0.14em] text-[#C95A08]">외출 사유</Label>
+                          <div className="flex flex-col gap-2 sm:flex-row">
+                            <Input
+                              value={dayDraft.awayReason}
+                              onChange={(event) => updateFocusWeeklyScheduleDraft(dayDraft.weekday, { awayReason: event.target.value })}
+                              placeholder="예: 학원, 병원, 개인 외출"
+                              className="h-10 rounded-xl border-[#FFD7BA] bg-[#FFFDFC] font-bold text-[#14295F] placeholder:text-[#7F91B3]"
+                            />
+                            {outingEnabled ? (
+                              <Button
+                                type="button"
+                                size="sm"
+                                variant="outline"
+                                className="h-10 shrink-0 rounded-xl border-[#FFD7BA] bg-white px-3 text-[10px] font-black text-[#C95A08]"
+                                onClick={() =>
+                                  updateFocusWeeklyScheduleDraft(dayDraft.weekday, {
+                                    awayStartTime: '',
+                                    awayEndTime: '',
+                                    awayReason: '',
+                                  })
+                                }
+                              >
+                                외출 비우기
+                              </Button>
+                            ) : null}
+                          </div>
+                        </div>
+                      </>
+                    ) : (
+                      <div className="mt-3 rounded-xl border border-[#FFE0D5] bg-[#FFF8F5] px-3 py-2 text-[11px] font-bold leading-5 text-[#B44D2D]">
+                        미등원 요일로 저장합니다. 기존 반복 등원 템플릿에서는 이 요일이 제외됩니다.
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
             </div>
           </div>
 
-          <DialogFooter className="gap-2 border-t border-[#DCE7FF] bg-white px-5 py-4 sm:justify-between sm:space-x-0">
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => void handleSaveFocusSchedule('absent')}
-              disabled={isFocusScheduleSaving || !canEditFocusSchedule}
-              className="rounded-xl border-[#FFD0C2] bg-[#FFF5F2] font-black text-[#D54E2B] hover:bg-[#FFE9E2]"
-            >
-              {focusScheduleSavingMode === 'absent' ? (
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              ) : (
-                <UserX className="mr-2 h-4 w-4" />
-              )}
-              오늘 미등원
-            </Button>
-            <div className="flex flex-col-reverse gap-2 sm:flex-row">
-              <DialogClose asChild>
-                <Button
-                  type="button"
-                  variant="outline"
-                  disabled={isFocusScheduleSaving}
-                  className="rounded-xl border-[#DCE7FF] font-black text-[#14295F]"
-                >
-                  취소
-                </Button>
-              </DialogClose>
+          <DialogFooter className="gap-2 border-t border-[#DCE7FF] bg-white px-5 py-4">
+            <DialogClose asChild>
               <Button
                 type="button"
-                onClick={() => void handleSaveFocusSchedule('save')}
-                disabled={isFocusScheduleSaving || !canEditFocusSchedule}
-                className="rounded-xl bg-[#14295F] font-black text-white hover:bg-[#10224C]"
+                variant="outline"
+                disabled={isFocusScheduleSaving}
+                className="rounded-xl border-[#DCE7FF] font-black text-[#14295F]"
               >
-                {focusScheduleSavingMode === 'save' ? (
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                ) : (
-                  <Save className="mr-2 h-4 w-4" />
-                )}
-                일정 저장
+                취소
               </Button>
-            </div>
+            </DialogClose>
+            <Button
+              type="button"
+              onClick={() => void handleSaveFocusSchedule()}
+              disabled={isFocusScheduleSaving || !canEditFocusSchedule}
+              className="rounded-xl bg-[#14295F] font-black text-white hover:bg-[#10224C]"
+            >
+              {focusScheduleSavingMode === 'save' ? (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              ) : (
+                <Save className="mr-2 h-4 w-4" />
+              )}
+              주간 등원일정 저장
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -7285,11 +7389,16 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
   };
   const resetFocusScheduleDialog = () => {
     setIsFocusScheduleDialogOpen(false);
-    setFocusScheduleArrivalDraft('');
-    setFocusScheduleDepartureDraft('');
-    setFocusScheduleAwayStartDraft('');
-    setFocusScheduleAwayEndDraft('');
-    setFocusScheduleAwayReasonDraft('');
+    setFocusWeeklyScheduleDrafts(buildFocusWeeklyScheduleDrafts(today));
+    setFocusScheduleSavingMode(null);
+  };
+  const updateFocusWeeklyScheduleDraft = (
+    weekday: number,
+    patch: Partial<Omit<FocusWeeklyScheduleDraft, 'weekday' | 'label' | 'dateKey'>>
+  ) => {
+    setFocusWeeklyScheduleDrafts((previousDrafts) =>
+      previousDrafts.map((draft) => (draft.weekday === weekday ? { ...draft, ...patch } : draft))
+    );
   };
   const resetFocusCounselingDialog = () => {
     setIsFocusCounselingDialogOpen(false);
@@ -7620,42 +7729,99 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
       setIsFocusParentLinkCodeSaving(false);
     }
   };
-  const openFocusScheduleDialog = () => {
+  const openFocusScheduleDialog = async () => {
     if (!selectedFocusStudentId || !selectedFocusOperationsSummary) return;
     if (!canEditFocusSchedule) {
       toast({
         variant: 'destructive',
-        title: '일정 수정 권한이 없습니다.',
-        description: '센터관리자 계정에서만 학생 당일 일정을 수정할 수 있습니다.',
+        title: '주간 등원일정 설정 권한이 없습니다.',
+        description: '센터관리자 계정에서만 학생 주간 등원일정을 설정할 수 있습니다.',
       });
       return;
     }
 
     const signal = selectedFocusOperationsSummary.signal || attendanceSeatSignalsByStudentId.get(selectedFocusStudentId) || null;
-    setFocusScheduleArrivalDraft(
-      toScheduleTimeDraft(
-        signal?.routineExpectedArrivalTime || selectedFocusOperationsSummary.plannedArrival,
-        FOCUS_SCHEDULE_DEFAULT_ARRIVAL_TIME
-      )
-    );
-    setFocusScheduleDepartureDraft(
-      toScheduleTimeDraft(
-        signal?.plannedDepartureTime || selectedFocusOperationsSummary.plannedDeparture,
-        FOCUS_SCHEDULE_DEFAULT_DEPARTURE_TIME
-      )
-    );
-    setFocusScheduleAwayStartDraft(toScheduleTimeDraft(signal?.excursionStartAt || '', ''));
-    setFocusScheduleAwayEndDraft(toScheduleTimeDraft(signal?.excursionEndAt || '', ''));
-    setFocusScheduleAwayReasonDraft(signal?.excursionReason || '');
+    const todayWeekday = today?.getDay();
+    const seedDrafts = buildFocusWeeklyScheduleDrafts(today).map((draft) => {
+      if (draft.weekday !== todayWeekday) return draft;
+      return {
+        ...draft,
+        enabled: true,
+        inTime: toScheduleTimeDraft(
+          signal?.routineExpectedArrivalTime || selectedFocusOperationsSummary.plannedArrival,
+          FOCUS_SCHEDULE_DEFAULT_ARRIVAL_TIME
+        ),
+        outTime: toScheduleTimeDraft(
+          signal?.plannedDepartureTime || selectedFocusOperationsSummary.plannedDeparture,
+          FOCUS_SCHEDULE_DEFAULT_DEPARTURE_TIME
+        ),
+        awayStartTime: toScheduleTimeDraft(signal?.excursionStartAt || '', ''),
+        awayEndTime: toScheduleTimeDraft(signal?.excursionEndAt || '', ''),
+        awayReason: signal?.excursionReason || '',
+      };
+    });
+
+    setFocusWeeklyScheduleDrafts(seedDrafts);
     setIsFocusScheduleDialogOpen(true);
+
+    if (!firestore || !centerId) return;
+    try {
+      const templateSnapshot = await getDocs(
+        query(collection(firestore, 'users', selectedFocusStudentId, 'scheduleTemplates'), where('centerId', '==', centerId))
+      );
+      const templateByWeekday = new Map<number, StudentScheduleTemplate>();
+      templateSnapshot.docs
+        .map((templateDoc) => ({
+          id: templateDoc.id,
+          ...(templateDoc.data() as StudentScheduleTemplate),
+        }))
+        .filter((template) => template.active !== false)
+        .forEach((template) => {
+          const weekdays = Array.isArray(template.weekdays) ? template.weekdays : [];
+          weekdays.forEach((weekday) => {
+            if (!FOCUS_WEEKLY_SCHEDULE_DAYS.some((day) => day.weekday === weekday)) return;
+            const previousTemplate = templateByWeekday.get(weekday);
+            if (
+              !previousTemplate
+              || getStudentScheduleTemplateTimestampMs(template) >= getStudentScheduleTemplateTimestampMs(previousTemplate)
+            ) {
+              templateByWeekday.set(weekday, template);
+            }
+          });
+        });
+
+      setFocusWeeklyScheduleDrafts((currentDrafts) =>
+        currentDrafts.map((draft) => {
+          const template = templateByWeekday.get(draft.weekday);
+          if (!template) return draft;
+          const hasExcursion = template.hasExcursionDefault !== false
+            && Boolean(template.defaultExcursionStartAt || template.defaultExcursionEndAt || template.defaultExcursionReason);
+          return {
+            ...draft,
+            enabled: true,
+            inTime: toScheduleTimeDraft(template.arrivalPlannedAt, FOCUS_SCHEDULE_DEFAULT_ARRIVAL_TIME),
+            outTime: toScheduleTimeDraft(template.departurePlannedAt, FOCUS_SCHEDULE_DEFAULT_DEPARTURE_TIME),
+            awayStartTime: hasExcursion ? toScheduleTimeDraft(template.defaultExcursionStartAt || '', '') : '',
+            awayEndTime: hasExcursion ? toScheduleTimeDraft(template.defaultExcursionEndAt || '', '') : '',
+            awayReason: hasExcursion ? template.defaultExcursionReason || '' : '',
+          };
+        })
+      );
+    } catch (error) {
+      logHandledClientIssue('[admin-dashboard] focus weekly schedule templates load failed', error);
+      toast({
+        title: '기존 주간 일정 불러오기 실패',
+        description: '오늘 일정 기준으로 창을 열었습니다. 저장은 정상적으로 다시 시도할 수 있습니다.',
+      });
+    }
   };
-  const handleSaveFocusSchedule = async (mode: 'save' | 'absent' = 'save') => {
+  const handleSaveFocusSchedule = async () => {
     if (!firestore || !centerId || !selectedFocusStudentId || !todayKey) return;
     if (!canEditFocusSchedule) {
       toast({
         variant: 'destructive',
-        title: '일정 수정 권한이 없습니다.',
-        description: '센터관리자 계정에서만 학생 당일 일정을 수정할 수 있습니다.',
+        title: '주간 등원일정 설정 권한이 없습니다.',
+        description: '센터관리자 계정에서만 학생 주간 등원일정을 설정할 수 있습니다.',
       });
       return;
     }
@@ -7667,164 +7833,235 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
       || studentsById.get(studentId)?.name
       || studentMembersById.get(studentId)?.displayName
       || '학생';
-    const isAbsentMode = mode === 'absent';
-    const baseDraft: AttendanceScheduleDraft = {
-      inTime: focusScheduleArrivalDraft.trim(),
-      outTime: focusScheduleDepartureDraft.trim(),
-      academyName: '',
-      academyStartTime: '',
-      academyEndTime: '',
-      awayStartTime: focusScheduleAwayStartDraft.trim(),
-      awayEndTime: focusScheduleAwayEndDraft.trim(),
-      awayReason: focusScheduleAwayReasonDraft.trim(),
-      awaySlots: [],
-      isAbsent: false,
-      classScheduleId: null,
-      classScheduleName: null,
-    };
-    const draft = isAbsentMode ? toAbsentScheduleDraft(baseDraft) : baseDraft;
-    const validationMessage = isAbsentMode ? null : validateFocusScheduleDraft(draft);
-    if (validationMessage) {
-      toast({
-        variant: 'destructive',
-        title: '일정 확인 필요',
-        description: validationMessage,
-      });
-      return;
+    const weeklyDrafts = focusWeeklyScheduleDrafts.map((draft) => ({
+      ...draft,
+      inTime: draft.inTime.trim(),
+      outTime: draft.outTime.trim(),
+      awayStartTime: draft.awayStartTime.trim(),
+      awayEndTime: draft.awayEndTime.trim(),
+      awayReason: draft.awayReason.trim(),
+    }));
+    const enabledDrafts = weeklyDrafts.filter((draft) => draft.enabled);
+    for (const dayDraft of enabledDrafts) {
+      const validationMessage = validateFocusScheduleDraft(toFocusWeeklyAttendanceDraft(dayDraft));
+      if (validationMessage) {
+        toast({
+          variant: 'destructive',
+          title: `${dayDraft.label}요일 일정 확인 필요`,
+          description: validationMessage,
+        });
+        return;
+      }
     }
 
-    const outings = normalizeOutings(draft);
-    const primaryOuting = outings[0] || null;
     const savedAt = serverTimestamp();
     const editorUid = user?.uid || null;
     const editorName = user?.displayName || activeMembership?.displayName || '센터관리자';
-    const scheduleStatus = isAbsentMode
-      ? 'absent'
-      : getScheduleStatusFromFocusStatus(
-          selectedFocusOperationsSummary?.currentStatus,
-          selectedFocusOperationsSummary?.firstCheckInLabel
-        );
-    const shouldClearExcusedAbsentRecord =
-      !isAbsentMode && selectedFocusOperationsSummary?.signal?.attendanceDisplayStatus === 'excused_absent';
-    const schedulePayload: Record<string, unknown> = {
-      uid: studentId,
-      studentName,
-      centerId,
-      dateKey: todayKey,
-      timezone: 'Asia/Seoul',
-      arrivalPlannedAt: draft.inTime,
-      departurePlannedAt: draft.outTime,
-      inTime: draft.inTime,
-      outTime: draft.outTime,
-      isAbsent: isAbsentMode,
-      status: scheduleStatus,
-      hasExcursion: outings.length > 0,
-      excursionStartAt: primaryOuting?.startTime || null,
-      excursionEndAt: primaryOuting?.endTime || null,
-      excursionReason: primaryOuting?.reason || null,
-      outings,
-      source: 'manual',
-      adminEdited: true,
-      adminEditedAt: savedAt,
-      adminEditedByUid: editorUid,
-      adminEditedByName: editorName,
-      adminDirectEditNoPenalty: true,
-      penaltyApplied: false,
-      penaltyPointsDelta: 0,
-      penaltyWaived: true,
-      sameDayAdminEditPenaltyWaived: true,
-      updatedAt: savedAt,
-      ...(isAbsentMode
-        ? {
-            actualArrivalAt: null,
-            actualDepartureAt: null,
-            classScheduleId: null,
-            classScheduleName: null,
-            note: null,
-            recurrenceSourceId: null,
-            recommendedStudyMinutes: null,
-            recommendedWeeklyDays: null,
-          }
-        : {}),
-    };
 
-    setFocusScheduleSavingMode(mode);
+    setFocusScheduleSavingMode('save');
     try {
-      const routinePenaltySnapshot = await getDocs(
-        query(
-          collection(firestore, 'centers', centerId, 'penaltyLogs'),
-          where('studentId', '==', studentId),
-          where('source', '==', 'routine_missing'),
-          limit(20)
-        )
-      );
+      const [routinePenaltySnapshot, templateSnapshot] = await Promise.all([
+        getDocs(
+          query(
+            collection(firestore, 'centers', centerId, 'penaltyLogs'),
+            where('studentId', '==', studentId),
+            where('source', '==', 'routine_missing'),
+            limit(20)
+          )
+        ),
+        getDocs(query(collection(firestore, 'users', studentId, 'scheduleTemplates'), where('centerId', '==', centerId))),
+      ]);
       const batch = writeBatch(firestore);
-      batch.set(
-        doc(firestore, 'users', studentId, 'schedules', todayKey),
-        schedulePayload,
-        { merge: true }
+      const activeTemplateIds = new Set(
+        enabledDrafts.map((draft) => `admin-weekly-${centerId}-${draft.weekday}`)
       );
-      batch.set(
-        doc(firestore, 'centers', centerId, 'attendanceRecords', todayKey, 'students', studentId),
-        {
-          centerId,
-          studentId,
-          studentName,
-          dateKey: todayKey,
-          scheduleEditedByAdminAt: savedAt,
-          scheduleEditedByAdminUid: editorUid,
-          scheduleEditPenaltyWaived: true,
-          adminDirectEditNoPenalty: true,
-          penaltyApplied: false,
-          penaltyPointsDelta: 0,
-          penaltyWaived: true,
-          ...(isAbsentMode
-            ? {
-                status: 'excused_absent',
-                statusSource: 'manual',
-                statusUpdatedAt: savedAt,
-              }
-            : shouldClearExcusedAbsentRecord
+      templateSnapshot.docs.forEach((templateDoc) => {
+        if (activeTemplateIds.has(templateDoc.id)) return;
+        batch.set(
+          templateDoc.ref,
+          {
+            active: false,
+            deactivatedByAdmin: true,
+            deactivatedByAdminAt: savedAt,
+            deactivatedByAdminUid: editorUid,
+            updatedAt: savedAt,
+          },
+          { merge: true }
+        );
+      });
+
+      weeklyDrafts.forEach((dayDraft) => {
+        const templateId = `admin-weekly-${centerId}-${dayDraft.weekday}`;
+        const baseDraft = toFocusWeeklyAttendanceDraft(dayDraft);
+        if (dayDraft.enabled) {
+          const templateOutings = normalizeOutings(baseDraft);
+          const templatePrimaryOuting = templateOutings[0] || null;
+          batch.set(
+            doc(firestore, 'users', studentId, 'scheduleTemplates', templateId),
+            {
+              centerId,
+              name: `${dayDraft.label}요일 등원 일정`,
+              weekdays: [dayDraft.weekday],
+              arrivalPlannedAt: baseDraft.inTime,
+              departurePlannedAt: baseDraft.outTime,
+              academyNameDefault: null,
+              academyStartAtDefault: null,
+              academyEndAtDefault: null,
+              hasExcursionDefault: templateOutings.length > 0,
+              defaultExcursionStartAt: templatePrimaryOuting?.startTime || null,
+              defaultExcursionEndAt: templatePrimaryOuting?.endTime || null,
+              defaultExcursionReason: templatePrimaryOuting?.reason || null,
+              note: null,
+              classScheduleId: null,
+              classScheduleName: null,
+              active: true,
+              timezone: 'Asia/Seoul',
+              source: 'admin-weekly-attendance',
+              adminEdited: true,
+              adminEditedAt: savedAt,
+              adminEditedByUid: editorUid,
+              adminEditedByName: editorName,
+              updatedAt: savedAt,
+            },
+            { merge: true }
+          );
+        }
+
+        if (!dayDraft.dateKey || dayDraft.dateKey < todayKey) return;
+
+        const scheduleDraft = dayDraft.enabled ? baseDraft : toAbsentScheduleDraft(baseDraft);
+        const outings = normalizeOutings(scheduleDraft);
+        const primaryOuting = outings[0] || null;
+        const isTodaySchedule = dayDraft.dateKey === todayKey;
+        const scheduleStatus: StudentScheduleDoc['status'] = dayDraft.enabled
+          ? isTodaySchedule
+            ? getScheduleStatusFromFocusStatus(
+                selectedFocusOperationsSummary?.currentStatus,
+                selectedFocusOperationsSummary?.firstCheckInLabel
+              )
+            : 'scheduled'
+          : 'absent';
+        const shouldClearExcusedAbsentRecord =
+          dayDraft.enabled
+          && (
+            !isTodaySchedule
+            || selectedFocusOperationsSummary?.signal?.attendanceDisplayStatus === 'excused_absent'
+          );
+
+        batch.set(
+          doc(firestore, 'users', studentId, 'schedules', dayDraft.dateKey),
+          {
+            uid: studentId,
+            studentName,
+            centerId,
+            dateKey: dayDraft.dateKey,
+            timezone: 'Asia/Seoul',
+            arrivalPlannedAt: scheduleDraft.inTime,
+            departurePlannedAt: scheduleDraft.outTime,
+            inTime: scheduleDraft.inTime,
+            outTime: scheduleDraft.outTime,
+            isAbsent: !dayDraft.enabled,
+            status: scheduleStatus,
+            hasExcursion: outings.length > 0,
+            excursionStartAt: primaryOuting?.startTime || null,
+            excursionEndAt: primaryOuting?.endTime || null,
+            excursionReason: primaryOuting?.reason || null,
+            outings,
+            source: dayDraft.enabled ? 'regular-routine' : 'manual',
+            recurrenceSourceId: dayDraft.enabled ? templateId : null,
+            adminEdited: true,
+            adminEditedAt: savedAt,
+            adminEditedByUid: editorUid,
+            adminEditedByName: editorName,
+            adminDirectEditNoPenalty: true,
+            penaltyApplied: false,
+            penaltyPointsDelta: 0,
+            penaltyWaived: true,
+            sameDayAdminEditPenaltyWaived: true,
+            updatedAt: savedAt,
+            ...(!dayDraft.enabled
               ? {
-                  status: deleteField(),
-                  statusSource: deleteField(),
-                  statusUpdatedAt: deleteField(),
+                  actualArrivalAt: null,
+                  actualDepartureAt: null,
+                  classScheduleId: null,
+                  classScheduleName: null,
+                  note: null,
+                  recommendedStudyMinutes: null,
+                  recommendedWeeklyDays: null,
                 }
               : {}),
-          routineMissingAtCheckIn: deleteField(),
-          routineMissingPenaltyApplied: deleteField(),
-          updatedAt: savedAt,
-        },
-        { merge: true }
-      );
-      batch.set(
-        doc(firestore, 'centers', centerId, 'dailyStudentStats', todayKey, 'students', studentId),
-        {
-          centerId,
-          studentId,
-          dateKey: todayKey,
-          expectedArrivalTime: draft.inTime,
-          plannedDepartureTime: draft.outTime,
-          hasExcursion: outings.length > 0,
-          excursionStartAt: primaryOuting?.startTime || null,
-          excursionEndAt: primaryOuting?.endTime || null,
-          excursionReason: primaryOuting?.reason || null,
-          scheduleEditedByAdminAt: savedAt,
-          scheduleEditedByAdminUid: editorUid,
-          scheduleEditPenaltyWaived: true,
-          adminDirectEditNoPenalty: true,
-          penaltyApplied: false,
-          penaltyPointsDelta: 0,
-          penaltyWaived: true,
-          updatedAt: savedAt,
-        },
-        { merge: true }
-      );
+          },
+          { merge: true }
+        );
+        batch.set(
+          doc(firestore, 'centers', centerId, 'attendanceRecords', dayDraft.dateKey, 'students', studentId),
+          {
+            centerId,
+            studentId,
+            studentName,
+            dateKey: dayDraft.dateKey,
+            scheduleEditedByAdminAt: savedAt,
+            scheduleEditedByAdminUid: editorUid,
+            scheduleEditPenaltyWaived: true,
+            adminDirectEditNoPenalty: true,
+            penaltyApplied: false,
+            penaltyPointsDelta: 0,
+            penaltyWaived: true,
+            ...(!dayDraft.enabled
+              ? {
+                  status: 'excused_absent',
+                  statusSource: 'manual',
+                  statusUpdatedAt: savedAt,
+                }
+              : shouldClearExcusedAbsentRecord
+                ? {
+                    status: deleteField(),
+                    statusSource: deleteField(),
+                    statusUpdatedAt: deleteField(),
+                  }
+                : {}),
+            routineMissingAtCheckIn: deleteField(),
+            routineMissingPenaltyApplied: deleteField(),
+            updatedAt: savedAt,
+          },
+          { merge: true }
+        );
+        batch.set(
+          doc(firestore, 'centers', centerId, 'dailyStudentStats', dayDraft.dateKey, 'students', studentId),
+          {
+            centerId,
+            studentId,
+            dateKey: dayDraft.dateKey,
+            expectedArrivalTime: scheduleDraft.inTime,
+            plannedDepartureTime: scheduleDraft.outTime,
+            hasExcursion: outings.length > 0,
+            excursionStartAt: primaryOuting?.startTime || null,
+            excursionEndAt: primaryOuting?.endTime || null,
+            excursionReason: primaryOuting?.reason || null,
+            scheduleEditedByAdminAt: savedAt,
+            scheduleEditedByAdminUid: editorUid,
+            scheduleEditPenaltyWaived: true,
+            adminDirectEditNoPenalty: true,
+            penaltyApplied: false,
+            penaltyPointsDelta: 0,
+            penaltyWaived: true,
+            updatedAt: savedAt,
+          },
+          { merge: true }
+        );
+      });
 
       let waivedRoutinePenaltyPoints = 0;
+      const editableWeekDateKeys = new Set(
+        weeklyDrafts
+          .map((draft) => draft.dateKey)
+          .filter((dateKey): dateKey is string => Boolean(dateKey && dateKey >= todayKey))
+      );
       routinePenaltySnapshot.docs.forEach((penaltyDoc) => {
         const penaltyData = penaltyDoc.data() as Record<string, unknown>;
-        if (!isRoutineMissingPenaltyForDate(penaltyData, todayKey)) return;
+        if (!Array.from(editableWeekDateKeys).some((dateKey) => isRoutineMissingPenaltyForDate(penaltyData, dateKey))) {
+          return;
+        }
         const pointsDelta = Math.max(0, Math.round(Number(penaltyData.pointsDelta || 0)));
         waivedRoutinePenaltyPoints += pointsDelta;
         batch.delete(penaltyDoc.ref);
@@ -7837,6 +8074,7 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
             routineMissingPenaltyWaivedAt: savedAt,
             routineMissingPenaltyWaivedByUid: editorUid,
             routineMissingPenaltyWaivedDateKey: todayKey,
+            routineMissingPenaltyWaivedDateKeys: Array.from(editableWeekDateKeys),
             updatedAt: savedAt,
           },
           { merge: true }
@@ -7846,19 +8084,19 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
       await batch.commit();
       setLiveTickMs(Date.now());
       resetFocusScheduleDialog();
+      const attendingLabels = enabledDrafts.map((draft) => draft.label).join(', ') || '없음';
+      const offCount = weeklyDrafts.length - enabledDrafts.length;
       toast({
-        title: isAbsentMode ? '오늘 미등원으로 설정했습니다.' : '오늘 일정을 저장했습니다.',
+        title: '주간 등원일정을 저장했습니다.',
         description: waivedRoutinePenaltyPoints > 0
-          ? `${studentName} 학생 일정과 루틴 미작성 벌점 ${waivedRoutinePenaltyPoints}점을 함께 정리했습니다.`
-          : isAbsentMode
-            ? `${studentName} 학생의 오늘 등원 계획을 비우고 미등원으로 반영했습니다.`
-            : `${studentName} 학생의 등하원·외출 일정을 벌점 없이 반영했습니다.`,
+          ? `${studentName} 학생 주간 일정과 루틴 미작성 벌점 ${waivedRoutinePenaltyPoints}점을 함께 정리했습니다.`
+          : `${studentName} 학생 등원 ${enabledDrafts.length}일(${attendingLabels}) · 미등원 ${offCount}일로 반영했습니다.`,
       });
     } catch (error) {
-      logHandledClientIssue('[admin-dashboard] focus schedule save failed', error);
+      logHandledClientIssue('[admin-dashboard] focus weekly schedule save failed', error);
       toast({
         variant: 'destructive',
-        title: '일정 저장 실패',
+        title: '주간 등원일정 저장 실패',
         description: getCallableErrorMessage(error, '잠시 후 다시 시도해 주세요.'),
       });
     } finally {
@@ -11098,7 +11336,7 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
                         size="sm"
                         variant="outline"
                         disabled={!canEditFocusSchedule || isFocusScheduleSaving}
-                        onClick={openFocusScheduleDialog}
+                        onClick={() => void openFocusScheduleDialog()}
                         className="h-8 rounded-full border-[#DCE7FF] bg-white px-3 text-[11px] font-black text-[#14295F] hover:bg-[#EEF4FF]"
                       >
                         {isFocusScheduleSaving ? (
@@ -11106,13 +11344,13 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
                         ) : (
                           <Settings2 className="mr-1.5 h-3.5 w-3.5" />
                         )}
-                        일정 수정
+                        주간 등원일정 설정
                       </Button>
                     </div>
                   </div>
                   {canEditFocusSchedule ? (
                     <div className="mt-3 rounded-[1.15rem] border border-[#CDEFD9] bg-emerald-50 px-3 py-2 text-[11px] font-black leading-5 text-emerald-800">
-                      아래 오늘 등원 일정/하원 일정 카드를 눌러 바로 수정할 수 있습니다. 센터관리자 직접 수정은 벌점을 부여하지 않습니다.
+                      월~일까지 주간 등원 여부와 등하원·외출 시간을 설정할 수 있습니다. 센터관리자 직접 설정은 벌점을 부여하지 않습니다.
                     </div>
                   ) : null}
 
@@ -11251,7 +11489,7 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
                     <button
                       type="button"
                       disabled={!canEditFocusSchedule || isFocusScheduleSaving}
-                      onClick={openFocusScheduleDialog}
+                      onClick={() => void openFocusScheduleDialog()}
                       className="group min-w-0 rounded-2xl border border-[#DCE7FF] bg-[#F7FAFF] p-3 text-left transition hover:border-[#FF7A16]/45 hover:bg-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#FF7A16]/30 disabled:cursor-not-allowed disabled:opacity-70"
                     >
                       <div className="flex items-center justify-between gap-2">
@@ -11270,7 +11508,7 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
                     <button
                       type="button"
                       disabled={!canEditFocusSchedule || isFocusScheduleSaving}
-                      onClick={openFocusScheduleDialog}
+                      onClick={() => void openFocusScheduleDialog()}
                       className="group min-w-0 rounded-2xl border border-[#DCE7FF] bg-[#F7FAFF] p-3 text-left transition hover:border-[#FF7A16]/45 hover:bg-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#FF7A16]/30 disabled:cursor-not-allowed disabled:opacity-70"
                     >
                       <div className="flex items-center justify-between gap-2">
@@ -11297,7 +11535,7 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
                     <button
                       type="button"
                       disabled={!canEditFocusSchedule || isFocusScheduleSaving}
-                      onClick={openFocusScheduleDialog}
+                      onClick={() => void openFocusScheduleDialog()}
                       className="group min-w-0 rounded-2xl border border-[#FFD7BA] bg-[#FFF8F2] p-3 text-left transition hover:border-[#FF7A16]/60 hover:bg-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#FF7A16]/30 disabled:cursor-not-allowed disabled:opacity-70 sm:col-span-2"
                     >
                       <div className="flex items-center justify-between gap-2">
