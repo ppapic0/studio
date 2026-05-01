@@ -161,6 +161,7 @@ const MANUAL_PARENT_SMS_UID = '__manual_parent__';
 const STUDENT_SMS_FALLBACK_UID = '__student__';
 const FOCUS_SCHEDULE_DEFAULT_ARRIVAL_TIME = '18:00';
 const FOCUS_SCHEDULE_DEFAULT_DEPARTURE_TIME = '23:30';
+const FOCUS_PLAN_SUMMARY_DAY_COUNT = 3;
 const SCHEDULE_TIME_LABEL_PATTERN = /^([01]\d|2[0-3]):[0-5]\d$/;
 
 type AdminSmsRecipientPreference = {
@@ -1100,7 +1101,7 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
   const selectedFocusPlanWeekKeys = useMemo(() => {
     if (!today) return { current: '', previous: '' };
     const current = format(today, "yyyy-'W'II");
-    const previous = format(subDays(today, 6), "yyyy-'W'II");
+    const previous = format(subDays(today, FOCUS_PLAN_SUMMARY_DAY_COUNT - 1), "yyyy-'W'II");
     return {
       current,
       previous: previous === current ? '' : previous,
@@ -3234,8 +3235,8 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
       };
     }
 
-    const recentDateKeys = Array.from({ length: 7 }, (_, index) =>
-      format(subDays(today, 6 - index), 'yyyy-MM-dd')
+    const recentDateKeys = Array.from({ length: FOCUS_PLAN_SUMMARY_DAY_COUNT }, (_, index) =>
+      format(subDays(today, FOCUS_PLAN_SUMMARY_DAY_COUNT - 1 - index), 'yyyy-MM-dd')
     );
     const recentDateKeySet = new Set(recentDateKeys);
     const dedupedPlans = new Map<string, StudyPlanItem>();
@@ -11582,7 +11583,7 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
                         <div className="min-w-0">
                           <div className="flex items-center gap-1.5 text-[#2554D7]">
                             <History className="h-3.5 w-3.5" />
-                            <p className="text-[11px] font-black text-[#14295F]">최근 7일 계획</p>
+                            <p className="text-[11px] font-black text-[#14295F]">최근 3일 계획</p>
                           </div>
                           <p className="mt-1 text-[10px] font-bold text-[#6E7EA3]">
                             일자별 계획 완료 흐름
