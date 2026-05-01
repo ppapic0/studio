@@ -217,13 +217,39 @@ function createIdempotencyKey() {
   return `kiosk_${Date.now()}_${Math.random().toString(36).slice(2, 12)}`;
 }
 
+function normalizeKioskPin(value: unknown) {
+  return (getTrimmedString(value) || '').replace(/\D/g, '');
+}
+
+function isKnownKioskAction(value: unknown): value is KioskAttendanceAction {
+  return typeof value === 'string' && Object.prototype.hasOwnProperty.call(ACTIONS, value);
+}
+
+function isValidKioskPayload(value: unknown): value is SubmitKioskAttendanceActionFastInput {
+  if (!value || typeof value !== 'object') return false;
+  const payload = value as SubmitKioskAttendanceActionFastInput;
+  return Boolean(
+    getTrimmedString(payload.centerId) &&
+    getTrimmedString(payload.studentId) &&
+    normalizeKioskPin(payload.pin).length === 6 &&
+    isKnownKioskAction(payload.action) &&
+    getTrimmedString(payload.idempotencyKey)
+  );
+}
+
+function isValidKioskOutboxItem(value: unknown): value is KioskFastOutboxItem {
+  if (!value || typeof value !== 'object') return false;
+  const item = value as KioskFastOutboxItem;
+  return Boolean(getTrimmedString(item.id) && isValidKioskPayload(item.payload));
+}
+
 function readFastOutbox(): KioskFastOutboxItem[] {
   if (typeof window === 'undefined') return [];
   try {
     const parsed = JSON.parse(window.localStorage.getItem(FAST_OUTBOX_STORAGE_KEY) || '[]');
     return Array.isArray(parsed)
       ? parsed
-          .filter((item) => item?.id && item?.payload?.idempotencyKey)
+          .filter(isValidKioskOutboxItem)
           .slice(0, MAX_OUTBOX_ITEMS)
       : [];
   } catch {
@@ -242,7 +268,10 @@ function readFailedOutbox(): KioskFailedOutboxItem[] {
     const parsed = JSON.parse(window.localStorage.getItem(FAILED_OUTBOX_STORAGE_KEY) || '[]');
     return Array.isArray(parsed)
       ? parsed
-          .filter((item) => item?.id && item?.payload?.idempotencyKey)
+          .filter((item): item is KioskFailedOutboxItem => (
+            isValidKioskOutboxItem(item) &&
+            Number.isFinite(Number((item as KioskFailedOutboxItem).failedAt))
+          ))
           .slice(0, MAX_OUTBOX_ITEMS)
       : [];
   } catch {
@@ -300,6 +329,10 @@ function getKioskErrorCode(error: unknown) {
   const code = (error as { code?: unknown })?.code;
   if (typeof code !== 'string') return '';
   return code.trim().replace(/^functions\//, '');
+}
+
+function isInvalidArgumentKioskSubmissionError(error: unknown) {
+  return getKioskErrorCode(error) === 'invalid-argument';
 }
 
 function isRetryableKioskSubmissionError(error: unknown) {
@@ -715,6 +748,52 @@ export default function KioskPage() {
     syncFailedCount();
   }, [syncFailedCount]);
 
+  const submitLongAwayCompatibilityFallback = useCallback(async (
+    payload: SubmitKioskAttendanceActionFastInput,
+    error: unknown,
+    meta?: KioskFastOutboxMeta
+  ): Promise<{ handled: boolean; result: SubmitKioskAttendanceActionFastResult | null }> => {
+    if (!functions || payload.action !== 'away_start_long' || !isInvalidArgumentKioskSubmissionError(error)) {
+      return { handled: false, result: null };
+    }
+
+    const legacyPayload: SubmitKioskAttendanceActionFastInput = {
+      ...payload,
+      action: 'away_start',
+    };
+
+    try {
+      const result = normalizeQueuedAttendanceResult(
+        await enqueueKioskAttendanceActionSecure(functions, legacyPayload)
+      );
+      if (result.state === 'stale') {
+        saveActionFailure(
+          payload,
+          result.userMessage || '출결 상태가 이미 바뀌었습니다. 번호를 다시 입력해 확인해 주세요.',
+          meta,
+          'stale'
+        );
+        return { handled: true, result };
+      }
+
+      removeActionFromRetry(payload.idempotencyKey);
+      return { handled: true, result };
+    } catch (fallbackError) {
+      if (isRetryableKioskSubmissionError(fallbackError)) {
+        saveActionForRetry(
+          legacyPayload,
+          getKioskErrorMessage(fallbackError),
+          {
+            ...meta,
+            actionLabel: meta?.actionLabel || ACTIONS.away_start_long.label,
+          }
+        );
+        return { handled: true, result: null };
+      }
+      return { handled: false, result: null };
+    }
+  }, [functions, removeActionFromRetry, saveActionFailure, saveActionForRetry]);
+
   const submitFastPayload = useCallback(async (
     payload: SubmitKioskAttendanceActionFastInput,
     options: { quiet?: boolean; outboxMeta?: KioskFastOutboxMeta } = {}
@@ -763,6 +842,15 @@ export default function KioskPage() {
           removeActionFromRetry(payload.idempotencyKey);
           return fallbackResult;
         } catch (fallbackError) {
+          const compatibilityFallback = await submitLongAwayCompatibilityFallback(
+            payload,
+            fallbackError,
+            options.outboxMeta
+          );
+          if (compatibilityFallback.handled) {
+            return compatibilityFallback.result;
+          }
+
           if (isRetryableKioskSubmissionError(fallbackError)) {
             saveActionForRetry(payload, getKioskErrorMessage(fallbackError));
           } else {
@@ -777,11 +865,52 @@ export default function KioskPage() {
       } else if (isRetryableKioskSubmissionError(error)) {
         saveActionForRetry(payload, getKioskErrorMessage(error));
       } else {
+        const compatibilityFallback = await submitLongAwayCompatibilityFallback(
+          payload,
+          error,
+          options.outboxMeta
+        );
+        if (compatibilityFallback.handled) {
+          return compatibilityFallback.result;
+        }
+
         saveActionFailure(payload, getKioskErrorMessage(error), options.outboxMeta, getKioskErrorCode(error));
       }
       return null;
     }
-  }, [functions, removeActionFromRetry, saveActionFailure, saveActionForRetry]);
+  }, [functions, removeActionFromRetry, saveActionFailure, saveActionForRetry, submitLongAwayCompatibilityFallback]);
+
+  const retryFailedAction = useCallback((item: KioskFailedOutboxItem) => {
+    const retryPayload: SubmitKioskAttendanceActionFastInput = {
+      ...item.payload,
+      pin: normalizeKioskPin(item.payload.pin),
+      idempotencyKey: createIdempotencyKey(),
+      clientActionAtMillis: item.payload.clientActionAtMillis || item.createdAt || Date.now(),
+    };
+
+    if (!isValidKioskPayload(retryPayload)) {
+      toast({
+        variant: 'destructive',
+        title: '재전송 불가',
+        description: '저장된 출결 정보가 부족합니다. 번호를 다시 입력해 처리해 주세요.',
+      });
+      writeFailedOutbox(readFailedOutbox().filter((failedItem) => failedItem.id !== item.id));
+      syncFailedCount();
+      return;
+    }
+
+    writeFailedOutbox(readFailedOutbox().filter((failedItem) => failedItem.id !== item.id));
+    syncFailedCount();
+    void submitFastPayload(retryPayload, {
+      outboxMeta: {
+        studentName: item.studentName,
+        studentSchool: item.studentSchool,
+        studentGrade: item.studentGrade,
+        actionLabel: item.actionLabel,
+        seatLabel: item.seatLabel,
+      },
+    });
+  }, [submitFastPayload, syncFailedCount, toast]);
 
   const flushOutbox = useCallback(async () => {
     if (flushingOutboxRef.current) return;
@@ -942,6 +1071,18 @@ export default function KioskPage() {
 
   const handleAction = useCallback((action: KioskAttendanceAction) => {
     if (!centerId || !selectedStudent || pendingActionRef.current) return;
+    const actionPin = normalizeKioskPin(selectedStudent.parentLinkCode || pin);
+    const studentId = getTrimmedString(selectedStudent.id);
+    if (!studentId || actionPin.length !== 6) {
+      toast({
+        variant: 'destructive',
+        title: '번호 확인 필요',
+        description: '학생 번호 확인이 풀렸습니다. 번호 6자리를 다시 입력해 주세요.',
+      });
+      resetKiosk();
+      return;
+    }
+
     const seat = resolveSeatForStudent(selectedStudent);
     if (!seat) {
       toast({
@@ -972,8 +1113,8 @@ export default function KioskPage() {
       (seat.seatNo ? `${seat.seatNo}번` : '');
     const payload: SubmitKioskAttendanceActionFastInput = {
       centerId,
-      studentId: selectedStudent.id,
-      pin,
+      studentId,
+      pin: actionPin,
       action,
       expectedStatus: status,
       seatId: seat.id,
@@ -1123,6 +1264,16 @@ export default function KioskPage() {
                             {item.lastError}
                           </p>
                         ) : null}
+                        <button
+                          type="button"
+                          onClick={() => retryFailedAction(item)}
+                          className={cn(
+                            kioskTouchClass,
+                            'mt-2 rounded-full border border-rose-200 bg-white px-3 py-1.5 text-[10px] font-black text-rose-600 transition-colors hover:bg-rose-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-300'
+                          )}
+                        >
+                          다시 보내기
+                        </button>
                       </div>
                     ))}
                   </div>
