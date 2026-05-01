@@ -27,15 +27,6 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import { Textarea } from '@/components/ui/textarea';
-import {
-  AlertDialog,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from '@/components/ui/alert-dialog';
 import { 
   FileText, 
   Search, 
@@ -473,7 +464,9 @@ export default function DailyReportsPage() {
   };
 
   const handleTrustReviewOpenChange = (open: boolean) => {
-    if (!open) {
+    if (open) {
+      scheduleReportFocus([() => trustReviewCancelButtonRef.current], 0);
+    } else {
       moveTrustReviewFocusToWriteModal();
     }
     setIsTrustReviewOpen(open);
@@ -951,7 +944,7 @@ export default function DailyReportsPage() {
       if (warnings.length > 0) {
         blurActiveReportElement();
         setTrustReviewWarnings(warnings);
-        setIsTrustReviewOpen(true);
+        handleTrustReviewOpenChange(true);
         return;
       }
     }
@@ -976,6 +969,7 @@ export default function DailyReportsPage() {
 
       toast({ title: status === 'sent' ? "발송 완료" : "저장 완료" });
       setTrustReviewWarnings([]);
+      blurActiveReportElement();
       isClosingWriteModalRef.current = true;
       setIsTrustReviewOpen(false);
       setIsWriteModalOpen(false);
@@ -1424,79 +1418,97 @@ export default function DailyReportsPage() {
               </Button>
             </div>
           </DialogFooter>
-        </DialogContent>
-      </Dialog>
 
-      <AlertDialog open={isTrustReviewOpen} onOpenChange={handleTrustReviewOpenChange}>
-        <AlertDialogContent
-          onOpenAutoFocus={(event) => {
-            event.preventDefault();
-            trustReviewCancelButtonRef.current?.focus({ preventScroll: true });
-          }}
-          onCloseAutoFocus={(event) => {
-            event.preventDefault();
-            moveTrustReviewFocusToWriteModal();
-          }}
-          className="daily-report-instant-close rounded-[2rem] border-none bg-white p-0 shadow-2xl sm:max-w-xl"
-        >
-          <div className="bg-[#14295F] px-6 py-5 text-white">
-            <AlertDialogHeader className="space-y-2 text-left">
-              <AlertDialogTitle className="font-black tracking-tight text-white">
-                발송 전 표현 확인
-              </AlertDialogTitle>
-              <AlertDialogDescription className="text-sm font-bold leading-6 text-white/76">
-                학부모와 학생에게 보이는 리포트입니다. 아래 표현이 의도한 톤인지 한 번 더 확인해 주세요.
-              </AlertDialogDescription>
-            </AlertDialogHeader>
-          </div>
-          <div className="space-y-4 px-6 py-5">
-            <div className="rounded-2xl border border-amber-100 bg-amber-50 px-4 py-3">
-              <p className="text-sm font-black leading-6 text-amber-900">
-                다음 부분을 확인하셨나요?
-              </p>
-            </div>
-            <div className="max-h-[42vh] space-y-3 overflow-y-auto pr-1">
-              {trustReviewWarnings.map((warning) => (
-                <div key={warning.id} className="rounded-2xl border border-slate-100 bg-slate-50 px-4 py-3">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <Badge className="rounded-full border-none bg-white px-2.5 py-1 text-[10px] font-black text-[#14295F]">
-                      {warning.source}
-                    </Badge>
-                    <Badge className="rounded-full border-none bg-rose-50 px-2.5 py-1 text-[10px] font-black text-rose-700">
-                      {warning.keyword}
-                    </Badge>
+          {isTrustReviewOpen && (
+            <div
+              className="absolute inset-0 z-50 flex items-center justify-center bg-slate-950/45 p-4 backdrop-blur-sm"
+              role="presentation"
+            >
+              <div
+                role="alertdialog"
+                aria-modal="true"
+                aria-labelledby="daily-report-trust-review-title"
+                aria-describedby="daily-report-trust-review-description"
+                tabIndex={-1}
+                onKeyDown={(event) => {
+                  if (event.key === 'Escape') {
+                    event.preventDefault();
+                    handleTrustReviewOpenChange(false);
+                  }
+                }}
+                className="w-full max-w-xl overflow-hidden rounded-[2rem] border-none bg-white p-0 shadow-2xl"
+              >
+                <div className="bg-[#14295F] px-6 py-5 text-white">
+                  <div className="space-y-2 text-left">
+                    <h2
+                      id="daily-report-trust-review-title"
+                      className="text-lg font-black tracking-tight text-white"
+                    >
+                      발송 전 표현 확인
+                    </h2>
+                    <p
+                      id="daily-report-trust-review-description"
+                      className="text-sm font-bold leading-6 text-white/76"
+                    >
+                      학부모와 학생에게 보이는 리포트입니다. 아래 표현이 의도한 톤인지 한 번 더 확인해 주세요.
+                    </p>
                   </div>
-                  <p className="mt-2 text-sm font-bold leading-6 text-slate-800 break-keep">
-                    “{warning.snippet}”
+                </div>
+                <div className="space-y-4 px-6 py-5">
+                  <div className="rounded-2xl border border-amber-100 bg-amber-50 px-4 py-3">
+                    <p className="text-sm font-black leading-6 text-amber-900">
+                      다음 부분을 확인하셨나요?
+                    </p>
+                  </div>
+                  <div className="max-h-[42vh] space-y-3 overflow-y-auto pr-1">
+                    {trustReviewWarnings.map((warning) => (
+                      <div key={warning.id} className="rounded-2xl border border-slate-100 bg-slate-50 px-4 py-3">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <Badge className="rounded-full border-none bg-white px-2.5 py-1 text-[10px] font-black text-[#14295F]">
+                            {warning.source}
+                          </Badge>
+                          <Badge className="rounded-full border-none bg-rose-50 px-2.5 py-1 text-[10px] font-black text-rose-700">
+                            {warning.keyword}
+                          </Badge>
+                        </div>
+                        <p className="mt-2 text-sm font-bold leading-6 text-slate-800 break-keep">
+                          “{warning.snippet}”
+                        </p>
+                      </div>
+                    ))}
+                  </div>
+                  <p className="text-xs font-bold leading-5 text-slate-500">
+                    표현이 괜찮다면 그대로 발송하고, 톤이 강하면 리포트 본문이나 교사 관찰 노트를 부드럽게 수정한 뒤 발송해 주세요.
                   </p>
                 </div>
-              ))}
+                <div className="flex flex-col-reverse gap-2 border-t border-slate-100 bg-slate-50 px-6 py-4 sm:flex-row sm:justify-end">
+                  <Button
+                    ref={trustReviewCancelButtonRef}
+                    type="button"
+                    variant="outline"
+                    onClick={() => handleTrustReviewOpenChange(false)}
+                    className="mt-0 h-11 rounded-xl border-slate-200 bg-white px-5 font-black text-slate-700"
+                  >
+                    다시 확인할게요
+                  </Button>
+                  <Button
+                    type="button"
+                    onClick={() => {
+                      blurActiveReportElement();
+                      void handleSaveReport('sent', { skipTrustReview: true });
+                    }}
+                    disabled={isSaving}
+                    className="h-11 rounded-xl bg-[#14295F] px-5 font-black text-white hover:bg-[#1c397a]"
+                  >
+                    {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Send className="mr-2 h-4 w-4" />}
+                    확인 후 발송
+                  </Button>
+                </div>
+              </div>
             </div>
-            <p className="text-xs font-bold leading-5 text-slate-500">
-              표현이 괜찮다면 그대로 발송하고, 톤이 강하면 리포트 본문이나 교사 관찰 노트를 부드럽게 수정한 뒤 발송해 주세요.
-            </p>
-          </div>
-          <AlertDialogFooter className="gap-2 border-t border-slate-100 bg-slate-50 px-6 py-4 sm:space-x-0">
-            <AlertDialogCancel
-              ref={trustReviewCancelButtonRef}
-              className="mt-0 h-11 rounded-xl border-slate-200 bg-white px-5 font-black text-slate-700"
-            >
-              다시 확인할게요
-            </AlertDialogCancel>
-            <Button
-              type="button"
-              onClick={() => {
-                void handleSaveReport('sent', { skipTrustReview: true });
-              }}
-              disabled={isSaving}
-              className="h-11 rounded-xl bg-[#14295F] px-5 font-black text-white hover:bg-[#1c397a]"
-            >
-              {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Send className="mr-2 h-4 w-4" />}
-              확인 후 발송
-            </Button>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
