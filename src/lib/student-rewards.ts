@@ -206,6 +206,39 @@ function normalizeDailyPointEventItems(value: unknown, maxTotal: number): DailyP
   return items;
 }
 
+function getDailyPointEventToneTotals(value: unknown): Record<DailyPointBreakdownItemTone, number> {
+  const totals: Record<DailyPointBreakdownItemTone, number> = {
+    box: 0,
+    rank: 0,
+    plan: 0,
+    legacy: 0,
+    adjustment: 0,
+  };
+  if (!Array.isArray(value)) return totals;
+
+  const seenKeys = new Set<string>();
+  value.forEach((event, index) => {
+    if (!event || typeof event !== 'object') return;
+
+    const keySource = typeof (event as Record<string, any>).id === 'string'
+      ? (event as Record<string, any>).id.trim()
+      : '';
+    const key = keySource || `point-event-${index}`;
+    if (seenKeys.has(key)) return;
+    seenKeys.add(key);
+
+    const points = getNormalizedRewardAmount((event as Record<string, any>).points);
+    if (points <= 0) return;
+
+    const source = typeof (event as Record<string, any>).source === 'string'
+      ? (event as Record<string, any>).source
+      : '';
+    totals[getDailyPointEventTone(source)] += points;
+  });
+
+  return totals;
+}
+
 function getPlanCompletionRewardCount(dayStatus?: Record<string, any>): number {
   const storedCount = Number(dayStatus?.planCompletionRewardCount ?? 0);
   if (Number.isFinite(storedCount) && storedCount > 0) {
@@ -403,30 +436,27 @@ function inferOpenedStudyBoxHours(dayStatus?: Record<string, any>): number[] {
     0,
     Math.floor(Number.isFinite(persistedDailyPointAmount) ? persistedDailyPointAmount : 0)
       - getRankRewardPoints(dayStatus)
-      - getPlanCompletionFallbackPoints(dayStatus)
   );
   const explicitOpenedStudyBoxPoints = explicitOpenedStudyBoxes.reduce(
     (total, hour) => total + (rewardByHour.get(hour) ?? 0),
     0
   );
-  let remainingAwardedStudyBoxPoints = Math.max(0, studyBoxAwardedPoints - explicitOpenedStudyBoxPoints);
+  const remainingAwardedStudyBoxPoints = Math.max(0, studyBoxAwardedPoints - explicitOpenedStudyBoxPoints);
   const missingClaimedStudyBoxes = claimedStudyBoxes.filter(
     (hour) => !explicitOpenedStudyBoxes.includes(hour) && rewardByHour.has(hour)
   );
 
   if (missingClaimedStudyBoxes.length === 0) return explicitOpenedStudyBoxes;
 
-  const inferredOpenedStudyBoxes: number[] = [];
-  for (const hour of missingClaimedStudyBoxes) {
-    const rewardPoints = rewardByHour.get(hour) ?? 0;
-    if (rewardPoints <= 0) continue;
-    if (remainingAwardedStudyBoxPoints < rewardPoints) break;
-
-    inferredOpenedStudyBoxes.push(hour);
-    remainingAwardedStudyBoxPoints -= rewardPoints;
+  const missingClaimedRewardTotal = missingClaimedStudyBoxes.reduce(
+    (total, hour) => total + (rewardByHour.get(hour) ?? 0),
+    0
+  );
+  if (missingClaimedRewardTotal > 0 && remainingAwardedStudyBoxPoints < missingClaimedRewardTotal) {
+    return explicitOpenedStudyBoxes;
   }
 
-  return normalizeStudyBoxHourValues([...explicitOpenedStudyBoxes, ...inferredOpenedStudyBoxes]);
+  return normalizeStudyBoxHourValues([...explicitOpenedStudyBoxes, ...missingClaimedStudyBoxes]);
 }
 
 function coerceStudyBoxHourValue(value: unknown): number | null {
@@ -558,25 +588,26 @@ export function getOpenedStudyBoxes(dayStatus?: Record<string, any>): number[] {
 
 export function getDailyAwardedPointTotal(dayStatus?: Record<string, any>): number {
   const earnedPointTotal = getDailyStudyBoxAwardPoints(dayStatus) + getRankRewardPoints(dayStatus);
+  const eventToneTotals = getDailyPointEventToneTotals(dayStatus?.pointEvents);
+  const eventPrimaryPoints = eventToneTotals.box + eventToneTotals.rank;
+  const eventPlanPoints = Math.max(eventToneTotals.plan, getPlanCompletionFallbackPoints(dayStatus));
+  const eventBackedTotal = Math.max(earnedPointTotal, eventPrimaryPoints) + eventPlanPoints + eventToneTotals.legacy;
   const hasStoredDailyPointAmount = Boolean(
     dayStatus &&
     typeof dayStatus === 'object' &&
     Object.prototype.hasOwnProperty.call(dayStatus, 'dailyPointAmount')
   );
   const total = Number(dayStatus?.dailyPointAmount);
+  const storedDailyPointAmount = hasStoredDailyPointAmount && Number.isFinite(total)
+    ? Math.max(0, Math.floor(total))
+    : 0;
   if (hasManualPointAdjustment(dayStatus)) {
     const manualDelta = getManualPointAdjustmentDelta(dayStatus);
-    if (hasStoredDailyPointAmount && Number.isFinite(total)) {
-      return Math.floor(total);
-    }
-    return earnedPointTotal + manualDelta;
+    const manualAdjustedEventTotal = Math.max(0, eventBackedTotal + manualDelta);
+    return Math.max(storedDailyPointAmount, manualAdjustedEventTotal);
   }
 
-  if (hasStoredDailyPointAmount && Number.isFinite(total)) {
-    return Math.max(0, Math.floor(total));
-  }
-
-  return earnedPointTotal;
+  return Math.max(storedDailyPointAmount, eventBackedTotal);
 }
 
 function hasManualPointAdjustment(dayStatus?: Record<string, any>): boolean {

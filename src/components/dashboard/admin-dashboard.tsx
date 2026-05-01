@@ -864,9 +864,23 @@ const POINT_HISTORY_TONE_BADGE_CLASS: Record<DailyPointBreakdownItemTone, string
   legacy: 'border-slate-200 bg-slate-50 text-slate-600',
 };
 
+const POINT_HISTORY_TONE_DISPLAY_ORDER: Record<DailyPointBreakdownItemTone, number> = {
+  box: 0,
+  rank: 1,
+  plan: 2,
+  adjustment: 3,
+  legacy: 4,
+};
+
 const getPointBreakdownItems = (breakdown: ReturnType<typeof getDailyPointBreakdown>): DailyPointBreakdownItem[] =>
   Array.isArray(breakdown.pointItems)
-    ? breakdown.pointItems.filter((item) => item.points > 0)
+    ? breakdown.pointItems
+        .filter((item) => item.points > 0)
+        .sort((left, right) => {
+          const toneRankDelta = POINT_HISTORY_TONE_DISPLAY_ORDER[left.tone] - POINT_HISTORY_TONE_DISPLAY_ORDER[right.tone];
+          if (toneRankDelta !== 0) return toneRankDelta;
+          return left.label.localeCompare(right.label, 'ko');
+        })
     : [];
 
 const sumPointBreakdownItems = (
