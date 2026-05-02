@@ -694,6 +694,21 @@ service cloud.firestore {
         allow write: if isCenterAdmin(centerId);
       }
 
+      match /smsQueue/{queueId} {
+        allow read: if isTeacherOrAdmin(centerId);
+        allow write: if isCenterAdmin(centerId);
+      }
+
+      match /smsLogs/{logId} {
+        allow read: if isTeacherOrAdmin(centerId);
+        allow write: if isCenterAdmin(centerId);
+      }
+
+      match /smsRecipientPreferences/{preferenceId} {
+        allow read: if isTeacherOrAdmin(centerId);
+        allow write: if isCenterAdmin(centerId);
+      }
+
       match /settings/{settingId} {
         allow read: if isCenterAdmin(centerId)
           || (settingId == 'giftishow' && isActiveMember(centerId));

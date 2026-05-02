@@ -5389,6 +5389,25 @@ function isAdminRole(role: unknown): boolean {
   return adminRoles.has(raw) || normalizeMembershipRoleValue(raw) === "centerAdmin";
 }
 
+async function assertSmsConsoleCaller(
+  db: admin.firestore.Firestore,
+  centerId: string,
+  authUid: string,
+  actionLabel: string
+): Promise<string> {
+  const membership = await resolveCenterMembershipRole(db, centerId, authUid);
+  if (
+    !membership.role ||
+    !isActiveMembershipStatus(membership.status) ||
+    (membership.role !== "teacher" && !isAdminRole(membership.role))
+  ) {
+    throw new functions.https.HttpsError("permission-denied", `Only active teachers or admins can ${actionLabel}.`, {
+      userMessage: "센터 관리자 또는 선생님만 문자 콘솔을 사용할 수 있습니다.",
+    });
+  }
+  return membership.role;
+}
+
 function chunkArray<T>(items: T[], size: number): T[][] {
   if (size <= 0) return [items];
   const chunks: T[][] = [];
@@ -8446,11 +8465,7 @@ export const retrySmsQueueItem = functions.region(region).https.onCall(async (da
     throw new functions.https.HttpsError("invalid-argument", "centerId와 queueId가 필요합니다.");
   }
 
-  const callerMemberSnap = await db.doc(`centers/${centerId}/members/${context.auth.uid}`).get();
-  const callerRole = callerMemberSnap.exists ? callerMemberSnap.data()?.role : null;
-  if (!isAdminRole(callerRole)) {
-    throw new functions.https.HttpsError("permission-denied", "센터 관리자만 재시도할 수 있습니다.");
-  }
+  await assertSmsConsoleCaller(db, centerId, context.auth.uid, "retry SMS queue items");
 
   const queueRef = db.doc(`centers/${centerId}/smsQueue/${queueId}`);
   const queueSnap = await queueRef.get();
@@ -8551,11 +8566,7 @@ export const cancelSmsQueueItem = functions.region(region).https.onCall(async (d
     throw new functions.https.HttpsError("invalid-argument", "centerId와 queueId가 필요합니다.");
   }
 
-  const callerMemberSnap = await db.doc(`centers/${centerId}/members/${context.auth.uid}`).get();
-  const callerRole = callerMemberSnap.exists ? callerMemberSnap.data()?.role : null;
-  if (!isAdminRole(callerRole)) {
-    throw new functions.https.HttpsError("permission-denied", "센터 관리자만 취소할 수 있습니다.");
-  }
+  await assertSmsConsoleCaller(db, centerId, context.auth.uid, "cancel SMS queue items");
 
   const queueRef = db.doc(`centers/${centerId}/smsQueue/${queueId}`);
   const queueSnap = await queueRef.get();
@@ -8703,11 +8714,7 @@ export const sendManualStudentSms = functions.region(region).https.onCall(async 
     throw new functions.https.HttpsError("invalid-argument", `수동 문자 내용이 ${SMS_BYTE_LIMIT}byte를 넘었습니다.`);
   }
 
-  const callerMemberSnap = await db.doc(`centers/${centerId}/members/${context.auth.uid}`).get();
-  const callerRole = callerMemberSnap.exists ? callerMemberSnap.data()?.role : null;
-  if (!isAdminRole(callerRole)) {
-    throw new functions.https.HttpsError("permission-denied", "센터 관리자만 수동 문자를 발송할 수 있습니다.");
-  }
+  await assertSmsConsoleCaller(db, centerId, context.auth.uid, "send manual SMS messages");
 
   const studentSnap = await db.doc(`centers/${centerId}/students/${studentId}`).get();
   if (!studentSnap.exists) {
@@ -8770,11 +8777,7 @@ export const sendBulkManualSms = functions.region(region).runWith({
     throw new functions.https.HttpsError("invalid-argument", `전체 문자 내용이 ${SMS_BYTE_LIMIT}byte를 넘었습니다.`);
   }
 
-  const callerMemberSnap = await db.doc(`centers/${centerId}/members/${context.auth.uid}`).get();
-  const callerRole = callerMemberSnap.exists ? callerMemberSnap.data()?.role : null;
-  if (!isAdminRole(callerRole)) {
-    throw new functions.https.HttpsError("permission-denied", "센터 관리자만 전체 문자를 발송할 수 있습니다.");
-  }
+  await assertSmsConsoleCaller(db, centerId, context.auth.uid, "send bulk manual SMS messages");
 
   const settings = await loadNotificationSettings(db, centerId);
   const recipientResult = await collectBulkManualSmsRecipients(db, centerId, audience);
@@ -8980,8 +8983,13 @@ export const notifyAttendanceSms = functions.region(region).https.onCall(async (
   }
 
   const nowKst = toKstDate();
-  const callerMemberSnap = await db.doc(`centers/${centerId}/members/${context.auth.uid}`).get();
-  const callerRole = callerMemberSnap.exists ? callerMemberSnap.data()?.role : null;
+  const callerMembership = await resolveCenterMembershipRole(db, centerId, context.auth.uid);
+  const callerRole = callerMembership.role;
+  if (!callerRole || !isActiveMembershipStatus(callerMembership.status)) {
+    throw new functions.https.HttpsError("permission-denied", "Inactive membership.", {
+      userMessage: "현재 계정 상태로는 문자를 발송할 수 없습니다.",
+    });
+  }
   const isTeacherOrAdminCaller = callerRole === "teacher" || isAdminRole(callerRole);
   const forceResend = data?.force === true && isTeacherOrAdminCaller;
   const requestedEventAt = isTeacherOrAdminCaller ? toKstDateFromUnknownTimestamp(data?.eventAt) : null;

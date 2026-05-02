@@ -4028,6 +4028,17 @@ function isAdminRole(role) {
     const raw = role.trim();
     return adminRoles.has(raw) || normalizeMembershipRoleValue(raw) === "centerAdmin";
 }
+async function assertSmsConsoleCaller(db, centerId, authUid, actionLabel) {
+    const membership = await resolveCenterMembershipRole(db, centerId, authUid);
+    if (!membership.role ||
+        !isActiveMembershipStatus(membership.status) ||
+        (membership.role !== "teacher" && !isAdminRole(membership.role))) {
+        throw new functions.https.HttpsError("permission-denied", `Only active teachers or admins can ${actionLabel}.`, {
+            userMessage: "센터 관리자 또는 선생님만 문자 콘솔을 사용할 수 있습니다.",
+        });
+    }
+    return membership.role;
+}
 function chunkArray(items, size) {
     if (size <= 0)
         return [items];
@@ -6629,7 +6640,6 @@ exports.saveNotificationSettingsSecure = functions.region(region).https.onCall(a
     };
 });
 exports.retrySmsQueueItem = functions.region(region).https.onCall(async (data, context) => {
-    var _a;
     const db = admin.firestore();
     if (!context.auth) {
         throw new functions.https.HttpsError("unauthenticated", "로그인이 필요합니다.");
@@ -6639,11 +6649,7 @@ exports.retrySmsQueueItem = functions.region(region).https.onCall(async (data, c
     if (!centerId || !queueId) {
         throw new functions.https.HttpsError("invalid-argument", "centerId와 queueId가 필요합니다.");
     }
-    const callerMemberSnap = await db.doc(`centers/${centerId}/members/${context.auth.uid}`).get();
-    const callerRole = callerMemberSnap.exists ? (_a = callerMemberSnap.data()) === null || _a === void 0 ? void 0 : _a.role : null;
-    if (!isAdminRole(callerRole)) {
-        throw new functions.https.HttpsError("permission-denied", "센터 관리자만 재시도할 수 있습니다.");
-    }
+    await assertSmsConsoleCaller(db, centerId, context.auth.uid, "retry SMS queue items");
     const queueRef = db.doc(`centers/${centerId}/smsQueue/${queueId}`);
     const queueSnap = await queueRef.get();
     if (!queueSnap.exists) {
@@ -6724,7 +6730,7 @@ exports.retrySmsQueueItem = functions.region(region).https.onCall(async (data, c
     return { ok: true, status: initialStatus.status };
 });
 exports.cancelSmsQueueItem = functions.region(region).https.onCall(async (data, context) => {
-    var _a, _b;
+    var _a;
     const db = admin.firestore();
     if (!context.auth) {
         throw new functions.https.HttpsError("unauthenticated", "로그인이 필요합니다.");
@@ -6734,17 +6740,13 @@ exports.cancelSmsQueueItem = functions.region(region).https.onCall(async (data, 
     if (!centerId || !queueId) {
         throw new functions.https.HttpsError("invalid-argument", "centerId와 queueId가 필요합니다.");
     }
-    const callerMemberSnap = await db.doc(`centers/${centerId}/members/${context.auth.uid}`).get();
-    const callerRole = callerMemberSnap.exists ? (_a = callerMemberSnap.data()) === null || _a === void 0 ? void 0 : _a.role : null;
-    if (!isAdminRole(callerRole)) {
-        throw new functions.https.HttpsError("permission-denied", "센터 관리자만 취소할 수 있습니다.");
-    }
+    await assertSmsConsoleCaller(db, centerId, context.auth.uid, "cancel SMS queue items");
     const queueRef = db.doc(`centers/${centerId}/smsQueue/${queueId}`);
     const queueSnap = await queueRef.get();
     if (!queueSnap.exists) {
         throw new functions.https.HttpsError("not-found", "큐 문서를 찾을 수 없습니다.");
     }
-    const currentStatus = String(((_b = queueSnap.data()) === null || _b === void 0 ? void 0 : _b.status) || "");
+    const currentStatus = String(((_a = queueSnap.data()) === null || _a === void 0 ? void 0 : _a.status) || "");
     if (!["queued", "pending_provider", "failed"].includes(currentStatus)) {
         throw new functions.https.HttpsError("failed-precondition", "취소 가능한 상태가 아닙니다.");
     }
@@ -6843,7 +6845,7 @@ exports.updateSmsRecipientPreference = functions.region(region).https.onCall(asy
     return { ok: true };
 });
 exports.sendManualStudentSms = functions.region(region).https.onCall(async (data, context) => {
-    var _a, _b;
+    var _a;
     const db = admin.firestore();
     if (!context.auth) {
         throw new functions.https.HttpsError("unauthenticated", "로그인이 필요합니다.");
@@ -6860,16 +6862,12 @@ exports.sendManualStudentSms = functions.region(region).https.onCall(async (data
     if (calculateSmsBytes(message) > SMS_BYTE_LIMIT) {
         throw new functions.https.HttpsError("invalid-argument", `수동 문자 내용이 ${SMS_BYTE_LIMIT}byte를 넘었습니다.`);
     }
-    const callerMemberSnap = await db.doc(`centers/${centerId}/members/${context.auth.uid}`).get();
-    const callerRole = callerMemberSnap.exists ? (_a = callerMemberSnap.data()) === null || _a === void 0 ? void 0 : _a.role : null;
-    if (!isAdminRole(callerRole)) {
-        throw new functions.https.HttpsError("permission-denied", "센터 관리자만 수동 문자를 발송할 수 있습니다.");
-    }
+    await assertSmsConsoleCaller(db, centerId, context.auth.uid, "send manual SMS messages");
     const studentSnap = await db.doc(`centers/${centerId}/students/${studentId}`).get();
     if (!studentSnap.exists) {
         throw new functions.https.HttpsError("not-found", "학생 정보를 찾을 수 없습니다.");
     }
-    const studentName = asTrimmedString((_b = studentSnap.data()) === null || _b === void 0 ? void 0 : _b.name, "학생");
+    const studentName = asTrimmedString((_a = studentSnap.data()) === null || _a === void 0 ? void 0 : _a.name, "학생");
     const settings = await loadNotificationSettings(db, centerId);
     const queueResult = await queueCustomParentSmsNotification(db, {
         centerId,
@@ -6901,7 +6899,6 @@ exports.sendBulkManualSms = functions.region(region).runWith({
     timeoutSeconds: 540,
     memory: "1GB",
 }).https.onCall(async (data, context) => {
-    var _a;
     const db = admin.firestore();
     if (!context.auth) {
         throw new functions.https.HttpsError("unauthenticated", "로그인이 필요합니다.");
@@ -6920,11 +6917,7 @@ exports.sendBulkManualSms = functions.region(region).runWith({
     if (calculateSmsBytes(message) > SMS_BYTE_LIMIT) {
         throw new functions.https.HttpsError("invalid-argument", `전체 문자 내용이 ${SMS_BYTE_LIMIT}byte를 넘었습니다.`);
     }
-    const callerMemberSnap = await db.doc(`centers/${centerId}/members/${context.auth.uid}`).get();
-    const callerRole = callerMemberSnap.exists ? (_a = callerMemberSnap.data()) === null || _a === void 0 ? void 0 : _a.role : null;
-    if (!isAdminRole(callerRole)) {
-        throw new functions.https.HttpsError("permission-denied", "센터 관리자만 전체 문자를 발송할 수 있습니다.");
-    }
+    await assertSmsConsoleCaller(db, centerId, context.auth.uid, "send bulk manual SMS messages");
     const settings = await loadNotificationSettings(db, centerId);
     const recipientResult = await collectBulkManualSmsRecipients(db, centerId, audience);
     const selectionMatchedRecipients = recipientResult.recipients.filter((recipient) => selectedRecipientKeys.size === 0 || selectedRecipientKeys.has(recipient.recipientKey));
@@ -7085,7 +7078,7 @@ exports.scheduledSmsQueueDispatcher = smsDispatcherFunctions
     return null;
 });
 exports.notifyAttendanceSms = functions.region(region).https.onCall(async (data, context) => {
-    var _a, _b;
+    var _a;
     const db = admin.firestore();
     if (!context.auth) {
         throw new functions.https.HttpsError("unauthenticated", "로그인이 필요합니다.");
@@ -7104,8 +7097,13 @@ exports.notifyAttendanceSms = functions.region(region).https.onCall(async (data,
         });
     }
     const nowKst = toKstDate();
-    const callerMemberSnap = await db.doc(`centers/${centerId}/members/${context.auth.uid}`).get();
-    const callerRole = callerMemberSnap.exists ? (_a = callerMemberSnap.data()) === null || _a === void 0 ? void 0 : _a.role : null;
+    const callerMembership = await resolveCenterMembershipRole(db, centerId, context.auth.uid);
+    const callerRole = callerMembership.role;
+    if (!callerRole || !isActiveMembershipStatus(callerMembership.status)) {
+        throw new functions.https.HttpsError("permission-denied", "Inactive membership.", {
+            userMessage: "현재 계정 상태로는 문자를 발송할 수 없습니다.",
+        });
+    }
     const isTeacherOrAdminCaller = callerRole === "teacher" || isAdminRole(callerRole);
     const forceResend = (data === null || data === void 0 ? void 0 : data.force) === true && isTeacherOrAdminCaller;
     const requestedEventAt = isTeacherOrAdminCaller ? toKstDateFromUnknownTimestamp(data === null || data === void 0 ? void 0 : data.eventAt) : null;
@@ -7130,7 +7128,7 @@ exports.notifyAttendanceSms = functions.region(region).https.onCall(async (data,
             userMessage: "학생 정보를 찾을 수 없습니다.",
         });
     }
-    const studentNameRaw = (_b = studentSnap.data()) === null || _b === void 0 ? void 0 : _b.name;
+    const studentNameRaw = (_a = studentSnap.data()) === null || _a === void 0 ? void 0 : _a.name;
     const studentName = typeof studentNameRaw === "string" && studentNameRaw.trim() ? studentNameRaw.trim() : "학생";
     if (isStudentSelfCaller) {
         const todayKey = toStudyDayKey(nowKst);

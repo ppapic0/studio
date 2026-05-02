@@ -25,7 +25,7 @@ import { useCollection, useDoc, useFirestore, useFunctions, useMemoFirebase } fr
 import { useAppContext } from '@/contexts/app-context';
 import { useToast } from '@/hooks/use-toast';
 import { shouldExcludeFromSmsQueries } from '@/lib/counseling-demo';
-import { canManageSettings } from '@/lib/dashboard-access';
+import { canManageSettings, isTeacherOrAdminRole } from '@/lib/dashboard-access';
 import { getStudyDayContext, getStudyDayKey } from '@/lib/study-day';
 import type { AttendanceCurrent, NotificationSettings } from '@/lib/types';
 import { cn } from '@/lib/utils';
@@ -768,6 +768,7 @@ export default function NotificationSettingsPage() {
 
   const centerId = activeMembership?.id;
   const isAdmin = canManageSettings(activeMembership?.role);
+  const canUseSmsConsole = isTeacherOrAdminRole(activeMembership?.role);
 
   const [form, setForm] = useState(DEFAULT_FORM);
   const [smsApiKeyInput, setSmsApiKeyInput] = useState('');
@@ -822,96 +823,96 @@ export default function NotificationSettingsPage() {
   );
 
   const smsQueueQuery = useMemoFirebase(() => {
-    if (!firestore || !centerId || !isAdmin) return null;
+    if (!firestore || !centerId || !canUseSmsConsole) return null;
     return query(collection(firestore, 'centers', centerId, 'smsQueue'), orderBy('createdAt', 'desc'), limit(400));
-  }, [firestore, centerId, isAdmin]);
-  const { data: smsQueueRaw } = useCollection<SmsQueueRow>(smsQueueQuery, { enabled: isAdmin });
+  }, [firestore, centerId, canUseSmsConsole]);
+  const { data: smsQueueRaw } = useCollection<SmsQueueRow>(smsQueueQuery, { enabled: canUseSmsConsole });
 
   const smsDeliveryLogsQuery = useMemoFirebase(() => {
-    if (!firestore || !centerId || !isAdmin) return null;
+    if (!firestore || !centerId || !canUseSmsConsole) return null;
     return query(collection(firestore, 'centers', centerId, 'smsDeliveryLogs'), orderBy('createdAt', 'desc'), limit(1200));
-  }, [firestore, centerId, isAdmin]);
-  const { data: smsDeliveryLogsRaw } = useCollection<SmsDeliveryLogRow>(smsDeliveryLogsQuery, { enabled: isAdmin });
+  }, [firestore, centerId, canUseSmsConsole]);
+  const { data: smsDeliveryLogsRaw } = useCollection<SmsDeliveryLogRow>(smsDeliveryLogsQuery, { enabled: canUseSmsConsole });
   const smsDeliveryLogsFinalRows = useMemo(
     () => collapseSmsDeliveryLogAttempts(smsDeliveryLogsRaw || []),
     [smsDeliveryLogsRaw]
   );
 
   const todaySmsQueueQuery = useMemoFirebase(() => {
-    if (!firestore || !centerId || !isAdmin || !todayDateKey) return null;
+    if (!firestore || !centerId || !canUseSmsConsole || !todayDateKey) return null;
     return query(
       collection(firestore, 'centers', centerId, 'smsQueue'),
       where('dateKey', '==', todayDateKey),
       limit(1500)
     );
-  }, [firestore, centerId, isAdmin, todayDateKey]);
-  const { data: todaySmsQueueRaw } = useCollection<SmsQueueRow>(todaySmsQueueQuery, { enabled: isAdmin });
+  }, [firestore, centerId, canUseSmsConsole, todayDateKey]);
+  const { data: todaySmsQueueRaw } = useCollection<SmsQueueRow>(todaySmsQueueQuery, { enabled: canUseSmsConsole });
 
   const todaySmsDeliveryLogsQuery = useMemoFirebase(() => {
-    if (!firestore || !centerId || !isAdmin || !todayDateKey) return null;
+    if (!firestore || !centerId || !canUseSmsConsole || !todayDateKey) return null;
     return query(
       collection(firestore, 'centers', centerId, 'smsDeliveryLogs'),
       where('dateKey', '==', todayDateKey),
       limit(2000)
     );
-  }, [firestore, centerId, isAdmin, todayDateKey]);
-  const { data: todaySmsDeliveryLogsRaw } = useCollection<SmsDeliveryLogRow>(todaySmsDeliveryLogsQuery, { enabled: isAdmin });
+  }, [firestore, centerId, canUseSmsConsole, todayDateKey]);
+  const { data: todaySmsDeliveryLogsRaw } = useCollection<SmsDeliveryLogRow>(todaySmsDeliveryLogsQuery, { enabled: canUseSmsConsole });
   const todaySmsDeliveryLogsFinalRows = useMemo(
     () => collapseSmsDeliveryLogAttempts(todaySmsDeliveryLogsRaw || []),
     [todaySmsDeliveryLogsRaw]
   );
 
   const legacySmsLogsQuery = useMemoFirebase(() => {
-    if (!firestore || !centerId || !isAdmin) return null;
+    if (!firestore || !centerId || !canUseSmsConsole) return null;
     return query(collection(firestore, 'centers', centerId, 'smsLogs'), orderBy('createdAt', 'desc'), limit(120));
-  }, [firestore, centerId, isAdmin]);
-  const { data: legacySmsLogsRaw } = useCollection<LegacySmsLogRow>(legacySmsLogsQuery, { enabled: isAdmin });
+  }, [firestore, centerId, canUseSmsConsole]);
+  const { data: legacySmsLogsRaw } = useCollection<LegacySmsLogRow>(legacySmsLogsQuery, { enabled: canUseSmsConsole });
 
   const studentsQuery = useMemoFirebase(() => {
-    if (!firestore || !centerId || !isAdmin) return null;
+    if (!firestore || !centerId || !canUseSmsConsole) return null;
     return query(collection(firestore, 'centers', centerId, 'students'), limit(500));
-  }, [firestore, centerId, isAdmin]);
-  const { data: studentsRaw } = useCollection<StudentDoc>(studentsQuery, { enabled: isAdmin });
+  }, [firestore, centerId, canUseSmsConsole]);
+  const { data: studentsRaw } = useCollection<StudentDoc>(studentsQuery, { enabled: canUseSmsConsole });
 
   const membersQuery = useMemoFirebase(() => {
-    if (!firestore || !centerId || !isAdmin) return null;
+    if (!firestore || !centerId || !canUseSmsConsole) return null;
     return query(collection(firestore, 'centers', centerId, 'members'), limit(800));
-  }, [firestore, centerId, isAdmin]);
-  const { data: membersRaw } = useCollection<MemberDoc>(membersQuery, { enabled: isAdmin });
+  }, [firestore, centerId, canUseSmsConsole]);
+  const { data: membersRaw } = useCollection<MemberDoc>(membersQuery, { enabled: canUseSmsConsole });
 
   const preferencesQuery = useMemoFirebase(() => {
-    if (!firestore || !centerId || !isAdmin) return null;
+    if (!firestore || !centerId || !canUseSmsConsole) return null;
     return query(collection(firestore, 'centers', centerId, 'smsRecipientPreferences'), limit(800));
-  }, [firestore, centerId, isAdmin]);
-  const { data: preferencesRaw } = useCollection<SmsRecipientPreferenceDoc>(preferencesQuery, { enabled: isAdmin });
+  }, [firestore, centerId, canUseSmsConsole]);
+  const { data: preferencesRaw } = useCollection<SmsRecipientPreferenceDoc>(preferencesQuery, { enabled: canUseSmsConsole });
 
   const attendanceRecordsTodayQuery = useMemoFirebase(() => {
-    if (!firestore || !centerId || !isAdmin) return null;
+    if (!firestore || !centerId || !canUseSmsConsole) return null;
     return query(collection(firestore, 'centers', centerId, 'attendanceRecords', todayDateKey, 'students'), limit(800));
-  }, [firestore, centerId, isAdmin, todayDateKey]);
-  const { data: attendanceRecordsTodayRaw } = useCollection<AttendanceRecordRow>(attendanceRecordsTodayQuery, { enabled: isAdmin });
+  }, [firestore, centerId, canUseSmsConsole, todayDateKey]);
+  const { data: attendanceRecordsTodayRaw } = useCollection<AttendanceRecordRow>(attendanceRecordsTodayQuery, { enabled: canUseSmsConsole });
 
   const attendanceDailyStatsTodayQuery = useMemoFirebase(() => {
-    if (!firestore || !centerId || !isAdmin) return null;
+    if (!firestore || !centerId || !canUseSmsConsole) return null;
     return query(collection(firestore, 'centers', centerId, 'attendanceDailyStats', todayDateKey, 'students'), limit(800));
-  }, [firestore, centerId, isAdmin, todayDateKey]);
-  const { data: attendanceDailyStatsTodayRaw } = useCollection<AttendanceDailyStatRow>(attendanceDailyStatsTodayQuery, { enabled: isAdmin });
+  }, [firestore, centerId, canUseSmsConsole, todayDateKey]);
+  const { data: attendanceDailyStatsTodayRaw } = useCollection<AttendanceDailyStatRow>(attendanceDailyStatsTodayQuery, { enabled: canUseSmsConsole });
 
   const attendanceCurrentQuery = useMemoFirebase(() => {
-    if (!firestore || !centerId || !isAdmin) return null;
+    if (!firestore || !centerId || !canUseSmsConsole) return null;
     return query(collection(firestore, 'centers', centerId, 'attendanceCurrent'), limit(1200));
-  }, [firestore, centerId, isAdmin]);
-  const { data: attendanceCurrentRaw } = useCollection<AttendanceCurrentRow>(attendanceCurrentQuery, { enabled: isAdmin });
+  }, [firestore, centerId, canUseSmsConsole]);
+  const { data: attendanceCurrentRaw } = useCollection<AttendanceCurrentRow>(attendanceCurrentQuery, { enabled: canUseSmsConsole });
 
   const attendanceEventsTodayQuery = useMemoFirebase(() => {
-    if (!firestore || !centerId || !isAdmin) return null;
+    if (!firestore || !centerId || !canUseSmsConsole) return null;
     return query(
       collection(firestore, 'centers', centerId, 'attendanceEvents'),
       where('dateKey', '==', todayDateKey),
       limit(1200)
     );
-  }, [firestore, centerId, isAdmin, todayDateKey]);
-  const { data: attendanceEventsTodayRaw } = useCollection<AttendanceEventRow>(attendanceEventsTodayQuery, { enabled: isAdmin });
+  }, [firestore, centerId, canUseSmsConsole, todayDateKey]);
+  const { data: attendanceEventsTodayRaw } = useCollection<AttendanceEventRow>(attendanceEventsTodayQuery, { enabled: canUseSmsConsole });
 
   useEffect(() => {
     if (!settingsDoc) return;
@@ -1992,7 +1993,7 @@ export default function NotificationSettingsPage() {
   };
 
   const handleSendBulkSms = async () => {
-    if (!functions || !centerId || !isAdmin) return;
+    if (!functions || !centerId || !canUseSmsConsole) return;
     if (!bulkSmsMessageForSend) {
       toast({
         variant: 'destructive',
@@ -2070,16 +2071,16 @@ export default function NotificationSettingsPage() {
     );
   }
 
-  if (!isAdmin) return null;
+  if (!canUseSmsConsole) return null;
 
   return (
     <div className={cn('mx-auto flex w-full max-w-7xl flex-col gap-6 px-4 pb-24', isMobile ? 'pt-1' : 'pt-4')}>
       <header className="space-y-1">
         <h1 className="flex items-center gap-2 text-3xl font-black tracking-tighter text-primary">
-          <BellRing className="h-7 w-7" /> 문자 알림 설정
+          <BellRing className="h-7 w-7" /> {isAdmin ? '문자 알림 설정' : '문자 콘솔'}
         </h1>
         <p className="text-xs font-bold uppercase tracking-[0.25em] text-muted-foreground/60">
-          단문/장문 발송 · 직접 발송 · 수신 제어 · 30일 히스토리
+          {isAdmin ? '단문/장문 발송 · 직접 발송 · 수신 제어 · 30일 히스토리' : '문자 발송 · 학생별 현황 · 수신 제어 · 히스토리'}
         </p>
       </header>
 
@@ -2094,12 +2095,17 @@ export default function NotificationSettingsPage() {
           { label: '학생 발송 보기', icon: <MessageSquare className="h-4 w-4" />, onClick: () => setHistoryTab('by-student') },
           { label: '수신 제어', icon: <ShieldCheck className="h-4 w-4" />, onClick: () => setRecipientSearchTerm('') },
           { label: '리드상담', icon: <Megaphone className="h-4 w-4" />, href: '/dashboard/leads' },
-          { label: '수익분석', icon: <TrendingUp className="h-4 w-4" />, href: '/dashboard/revenue' },
-          { label: '리포트 생성', icon: <Save className="h-4 w-4" />, href: '/dashboard/reports' },
+          ...(isAdmin
+            ? [
+                { label: '수익분석', icon: <TrendingUp className="h-4 w-4" />, href: '/dashboard/revenue' },
+                { label: '리포트 생성', icon: <Save className="h-4 w-4" />, href: '/dashboard/reports' },
+              ]
+            : []),
           { label: '출결 이동', icon: <Clock3 className="h-4 w-4" />, href: '/dashboard/attendance' },
         ]}
       />
 
+      {isAdmin ? (
       <Card className="rounded-[2rem] border-none shadow-xl ring-1 ring-black/[0.04]">
         <CardHeader className="border-b bg-muted/10">
           <CardTitle className="flex items-center gap-2 text-xl font-black tracking-tight">
@@ -2265,6 +2271,7 @@ export default function NotificationSettingsPage() {
           </div>
       </CardContent>
       </Card>
+      ) : null}
 
       <Card className="rounded-[2rem] border-none shadow-xl ring-1 ring-black/[0.04]">
         <CardHeader className="border-b bg-muted/10">
@@ -2441,16 +2448,18 @@ export default function NotificationSettingsPage() {
                 <Badge className="border-none bg-slate-100 text-slate-700 font-black">{operationalWindowLabel}</Badge>
               </div>
             </div>
-            <Button
-              type="button"
-              variant="outline"
-              className="h-10 shrink-0 rounded-xl border-orange-200 bg-white font-black text-orange-700 hover:bg-orange-50"
-              onClick={() => void handleRepairTodayAttendanceSms()}
-              disabled={isRepairingTodaySms || isLoading}
-            >
-              {isRepairingTodaySms ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCcw className="h-4 w-4" />}
-              운영일 보정·누락 복구
-            </Button>
+            {isAdmin ? (
+              <Button
+                type="button"
+                variant="outline"
+                className="h-10 shrink-0 rounded-xl border-orange-200 bg-white font-black text-orange-700 hover:bg-orange-50"
+                onClick={() => void handleRepairTodayAttendanceSms()}
+                disabled={isRepairingTodaySms || isLoading}
+              >
+                {isRepairingTodaySms ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCcw className="h-4 w-4" />}
+                운영일 보정·누락 복구
+              </Button>
+            ) : null}
           </div>
         </CardHeader>
         <CardContent className="space-y-5 p-6">
@@ -2935,6 +2944,8 @@ export default function NotificationSettingsPage() {
         </CardContent>
       </Card>
 
+      {isAdmin ? (
+        <>
       <Card className="rounded-[2rem] border-none shadow-xl ring-1 ring-black/[0.04]">
         <CardHeader className="border-b bg-muted/10">
           <div className="flex flex-wrap items-center justify-between gap-3">
@@ -3006,6 +3017,8 @@ export default function NotificationSettingsPage() {
           </div>
         </CardContent>
       </Card>
+        </>
+      ) : null}
       <Card className="rounded-[2rem] border-none shadow-xl ring-1 ring-black/[0.04]">
         <CardHeader className="border-b bg-muted/10">
           <CardTitle className="text-xl font-black tracking-tight">히스토리</CardTitle>
@@ -3085,10 +3098,12 @@ export default function NotificationSettingsPage() {
           </div>
         </CardContent>
       </Card>
-      <Button onClick={() => void handleSave()} disabled={isSaving || isLoading} className="h-14 rounded-2xl text-lg font-black shadow-xl gap-2">
-        {(isSaving || isLoading) ? <Loader2 className="h-5 w-5 animate-spin" /> : <Save className="h-5 w-5" />}
-        설정 저장
-      </Button>
+      {isAdmin ? (
+        <Button onClick={() => void handleSave()} disabled={isSaving || isLoading} className="h-14 rounded-2xl text-lg font-black shadow-xl gap-2">
+          {(isSaving || isLoading) ? <Loader2 className="h-5 w-5 animate-spin" /> : <Save className="h-5 w-5" />}
+          설정 저장
+        </Button>
+      ) : null}
     </div>
   );
 }

@@ -1242,6 +1242,8 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
     activeMembership?.role === 'teacher' || canAccessAdminOnlyOperations;
   const canWriteFocusCounseling =
     activeMembership?.role === 'teacher' || canAccessAdminOnlyOperations;
+  const canUseSmsConsole =
+    activeMembership?.role === 'teacher' || canAccessAdminOnlyOperations;
   const todayKey = today ? format(today, 'yyyy-MM-dd') : '';
   const yesterdayKey = today ? format(subDays(today, 1), 'yyyy-MM-dd') : '';
   const selectedFocusPlanWeekKeys = useMemo(() => {
@@ -4147,19 +4149,14 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
           description: '미처리 요청과 반복 지각 학생을 봅니다.',
           icon: ClipboardCheck,
         },
-        canAccessAdminOnlyOperations
-          ? {
-              href: '/dashboard/settings/notifications',
-              label: '문자 콘솔',
-              description: '오늘 문자 접수와 발송 상태를 확인합니다.',
-              icon: MessageSquare,
-            }
-          : {
-              href: '/dashboard/appointments',
-              label: '상담 / 소통',
-              description: '상담 예약과 보호자 소통 흐름을 확인합니다.',
-              icon: MessageSquare,
-            },
+        {
+          href: '/dashboard/settings/notifications',
+          label: '문자 콘솔',
+          description: canAccessAdminOnlyOperations
+            ? '오늘 문자 접수와 발송 상태를 확인합니다.'
+            : '문자 발송과 학생별 발송 상태를 확인합니다.',
+          icon: MessageSquare,
+        },
         {
           href: '/dashboard/leads',
           label: '리드 / 상담',
@@ -4167,6 +4164,15 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
           icon: Megaphone,
         },
       ];
+
+      if (!canAccessAdminOnlyOperations) {
+        links.push({
+          href: '/dashboard/appointments',
+          label: '상담 / 소통',
+          description: '상담 예약과 보호자 소통 흐름을 확인합니다.',
+          icon: MessageSquare,
+        });
+      }
 
       if (canAccessAdminOnlyOperations) {
         links.push({
@@ -5996,6 +6002,9 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
     { label: '실시간 교실', icon: <LayoutGrid className="h-4 w-4" />, onClick: handleScrollToLiveClassroom },
     { label: '학생 360', icon: <Users className="h-4 w-4" />, href: '/dashboard/teacher/students' },
     { label: '출결 KPI', icon: <ClipboardCheck className="h-4 w-4" />, href: '/dashboard/attendance' },
+    ...(canUseSmsConsole
+      ? [{ label: '문자 콘솔', icon: <MessageSquare className="h-4 w-4" />, href: '/dashboard/settings/notifications' }]
+      : []),
     { label: '리드 / 상담', icon: <Megaphone className="h-4 w-4" />, href: '/dashboard/leads' },
     ...(canAccessAdminOnlyOperations
       ? [{ label: '수익 분석', icon: <TrendingUp className="h-4 w-4" />, href: '/dashboard/revenue' }]
