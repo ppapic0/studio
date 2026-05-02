@@ -226,6 +226,11 @@ type AdminSmsDeliveryLog = {
   suppressedReason?: string | null;
 };
 
+type FocusScheduleTemplateWithAudit = StudentScheduleTemplate & {
+  adminEditedAt?: Timestamp | Date | null;
+  deactivatedByAdminAt?: Timestamp | Date | null;
+};
+
 type FocusStudySessionDoc = {
   id: string;
   startTime?: unknown;
@@ -397,6 +402,39 @@ const getStudentScheduleTemplateTimestampMs = (template: StudentScheduleTemplate
     || toTimestampDateSafe(template.createdAt)?.getTime()
     || 0
   );
+};
+
+const getFocusScheduleTemplateAuditDate = (template: FocusScheduleTemplateWithAudit): Date | null => {
+  const dates = [
+    template.updatedAt,
+    template.adminEditedAt,
+    template.deactivatedByAdminAt,
+    template.createdAt,
+  ]
+    .map(toTimestampDateSafe)
+    .filter((date): date is Date => Boolean(date));
+
+  return dates.reduce<Date | null>((latest, date) => (
+    !latest || date.getTime() > latest.getTime() ? date : latest
+  ), null);
+};
+
+const formatKoreanElapsedTime = (date: Date | null, currentMs: number): string => {
+  if (!date) return '최종수정 기록 없음';
+  const baseMs = currentMs > 0 ? currentMs : Date.now();
+  const diffMinutes = Math.max(0, Math.floor((baseMs - date.getTime()) / 60000));
+  if (diffMinutes < 1) return '방금 전';
+
+  const days = Math.floor(diffMinutes / (24 * 60));
+  const hours = Math.floor((diffMinutes % (24 * 60)) / 60);
+  const minutes = diffMinutes % 60;
+  const parts: string[] = [];
+
+  if (days > 0) parts.push(`${days}일`);
+  if (hours > 0) parts.push(`${hours}시간`);
+  if (minutes > 0 || parts.length === 0) parts.push(`${minutes}분`);
+
+  return `${parts.join(' ')} 전`;
 };
 
 const getFocusWeeklyScheduleMode = (draft: FocusWeeklyScheduleDraft): 'scheduled' | 'autonomous' | 'absent' => {
@@ -1333,6 +1371,21 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
     useCollection<FocusStudySessionDoc>(selectedFocusTodaySessionsQuery, {
       enabled: isActive && Boolean(selectedFocusStudentId && todayKey),
     });
+
+  const selectedFocusScheduleTemplatesQuery = useMemoFirebase(() => {
+    if (!firestore || !centerId || !selectedFocusStudentId) return null;
+    return query(
+      collection(firestore, 'users', selectedFocusStudentId, 'scheduleTemplates'),
+      where('centerId', '==', centerId)
+    );
+  }, [firestore, centerId, selectedFocusStudentId]);
+  const {
+    data: selectedFocusScheduleTemplates,
+    isLoading: selectedFocusScheduleTemplatesLoading,
+    error: selectedFocusScheduleTemplatesError,
+  } = useCollection<FocusScheduleTemplateWithAudit>(selectedFocusScheduleTemplatesQuery, {
+    enabled: isActive && Boolean(selectedFocusStudentId),
+  });
 
   useEffect(() => {
     setIsManualStudySessionDialogOpen(false);
@@ -3424,6 +3477,58 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
     ? format(selectedFocusMemoUpdatedAt, 'yyyy.MM.dd HH:mm')
     : '아직 저장된 메모 없음';
   const selectedFocusMemoUpdatedBy = selectedFocusStudentProfile?.operationsMemoUpdatedByName?.trim() || '운영팀';
+  const selectedFocusWeeklyScheduleStatus = useMemo(() => {
+    const templates = selectedFocusScheduleTemplates || [];
+    const latestUpdatedAt = templates.reduce<Date | null>((latest, template) => {
+      const auditDate = getFocusScheduleTemplateAuditDate(template);
+      if (!auditDate) return latest;
+      return !latest || auditDate.getTime() > latest.getTime() ? auditDate : latest;
+    }, null);
+    const scheduledWeekdays = new Set<number>();
+    const autonomousWeekdays = new Set<number>();
+    const allowedWeekdays = new Set<number>(FOCUS_WEEKLY_SCHEDULE_DAYS.map((day) => day.weekday));
+
+    templates
+      .filter((template) => template.active !== false)
+      .forEach((template) => {
+        const weekdays = Array.isArray(template.weekdays) ? template.weekdays : [];
+        const isAutonomous = Boolean(template.isAutonomousAttendance || template.source === 'admin-autonomous-attendance');
+        weekdays.forEach((weekday) => {
+          if (!allowedWeekdays.has(weekday)) return;
+          if (isAutonomous) {
+            autonomousWeekdays.add(weekday);
+          } else {
+            scheduledWeekdays.add(weekday);
+          }
+        });
+      });
+
+    const activeDayLabels = FOCUS_WEEKLY_SCHEDULE_DAYS
+      .filter((day) => scheduledWeekdays.has(day.weekday) || autonomousWeekdays.has(day.weekday))
+      .map((day) => day.label);
+    const configured = activeDayLabels.length > 0;
+    const updatedRelativeLabel = latestUpdatedAt
+      ? `최종수정 ${formatKoreanElapsedTime(latestUpdatedAt, now)}`
+      : '최종수정 기록 없음';
+    const updatedExactLabel = latestUpdatedAt ? format(latestUpdatedAt, 'yyyy.MM.dd HH:mm') : '';
+    const isLoadingInitial = selectedFocusScheduleTemplatesLoading && selectedFocusScheduleTemplates === null;
+
+    return {
+      configured,
+      loading: isLoadingInitial,
+      hasError: Boolean(selectedFocusScheduleTemplatesError),
+      scheduledDayCount: scheduledWeekdays.size,
+      autonomousDayCount: autonomousWeekdays.size,
+      activeDayLabels,
+      updatedRelativeLabel,
+      updatedExactLabel,
+    };
+  }, [
+    now,
+    selectedFocusScheduleTemplates,
+    selectedFocusScheduleTemplatesError,
+    selectedFocusScheduleTemplatesLoading,
+  ]);
 
   useEffect(() => {
     setIsFocusStudentMemoEditing(false);
@@ -11526,6 +11631,33 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
                       <Badge className="h-8 rounded-full border-none bg-[#14295F] px-3 text-[11px] font-black text-white">
                         문자 {selectedFocusOperationsSummary.smsLogs.length}건
                       </Badge>
+                      <Badge
+                        className={cn(
+                          'inline-flex h-8 items-center gap-1.5 rounded-full border px-3 text-[11px] font-black',
+                          selectedFocusWeeklyScheduleStatus.loading
+                            ? 'border-[#DCE7FF] bg-white text-[#5C6E97]'
+                            : selectedFocusWeeklyScheduleStatus.hasError
+                              ? 'border-rose-200 bg-rose-50 text-rose-700'
+                              : selectedFocusWeeklyScheduleStatus.configured
+                                ? 'border-emerald-200 bg-emerald-50 text-emerald-800'
+                                : 'border-amber-200 bg-amber-50 text-amber-800'
+                        )}
+                      >
+                        {selectedFocusWeeklyScheduleStatus.loading ? (
+                          <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                        ) : selectedFocusWeeklyScheduleStatus.configured ? (
+                          <CheckCircle2 className="h-3.5 w-3.5" />
+                        ) : (
+                          <AlertTriangle className="h-3.5 w-3.5" />
+                        )}
+                        {selectedFocusWeeklyScheduleStatus.loading
+                          ? '일정 확인 중'
+                          : selectedFocusWeeklyScheduleStatus.hasError
+                            ? '확인 실패'
+                            : selectedFocusWeeklyScheduleStatus.configured
+                              ? '일정 설정됨'
+                              : '일정 미설정'}
+                      </Badge>
                       <Button
                         type="button"
                         size="sm"
@@ -11544,8 +11676,39 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
                     </div>
                   </div>
                   {canEditFocusSchedule ? (
-                    <div className="mt-3 rounded-[1.15rem] border border-[#CDEFD9] bg-emerald-50 px-3 py-2 text-[11px] font-black leading-5 text-emerald-800">
-                      월~일까지 주간 등원 여부와 등하원·외출 시간을 설정할 수 있습니다. 센터관리자/선생님 직접 설정은 벌점을 부여하지 않습니다.
+                    <div
+                      className={cn(
+                        'mt-3 rounded-[1.15rem] border px-3 py-2 text-[11px] font-black leading-5',
+                        selectedFocusWeeklyScheduleStatus.loading
+                          ? 'border-[#DCE7FF] bg-[#F7FAFF] text-[#5C6E97]'
+                          : selectedFocusWeeklyScheduleStatus.hasError
+                            ? 'border-rose-200 bg-rose-50 text-rose-700'
+                            : selectedFocusWeeklyScheduleStatus.configured
+                              ? 'border-[#CDEFD9] bg-emerald-50 text-emerald-800'
+                              : 'border-amber-200 bg-amber-50 text-amber-800'
+                      )}
+                    >
+                      <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                        <span>
+                          {selectedFocusWeeklyScheduleStatus.loading
+                            ? '주간 등원일정 상태를 확인하고 있습니다.'
+                            : selectedFocusWeeklyScheduleStatus.hasError
+                              ? '주간 등원일정 상태를 불러오지 못했습니다.'
+                              : selectedFocusWeeklyScheduleStatus.configured
+                                ? `정규 ${selectedFocusWeeklyScheduleStatus.scheduledDayCount}일 · 자율 ${selectedFocusWeeklyScheduleStatus.autonomousDayCount}일${
+                                    selectedFocusWeeklyScheduleStatus.activeDayLabels.length > 0
+                                      ? ` · ${selectedFocusWeeklyScheduleStatus.activeDayLabels.join(', ')}`
+                                      : ''
+                                  }`
+                                : '저장된 활성 주간 등원일정이 없습니다.'}
+                        </span>
+                        <span className="text-[10px] font-black opacity-75">
+                          {selectedFocusWeeklyScheduleStatus.updatedRelativeLabel}
+                          {selectedFocusWeeklyScheduleStatus.updatedExactLabel
+                            ? ` · ${selectedFocusWeeklyScheduleStatus.updatedExactLabel}`
+                            : ''}
+                        </span>
+                      </div>
                     </div>
                   ) : null}
 
