@@ -32,7 +32,6 @@ import {
   MapPin,
   CalendarDays,
   Loader2,
-  CreditCard,
   X,
 } from 'lucide-react';
 import {
@@ -85,7 +84,6 @@ import {
   type CounselingLog,
   type DailyReport,
   type GrowthProgress,
-  type Invoice,
   type PenaltyLog,
   type ParentActivityEvent,
   type StudyLogDay,
@@ -104,7 +102,6 @@ import {
   buildStartEndInsight,
   buildWeeklyStudyInsight,
 } from '@/lib/learning-insights';
-import { getInvoiceCollectionEndDate } from '@/lib/invoice-collection-window';
 import { sumStudySessionDurationMinutes } from '@/lib/study-session-time';
 import {
   PENALTY_RECOVERY_INTERVAL_DAYS,
@@ -455,7 +452,7 @@ const PARENT_HOME_METRIC_TONE_STYLES: Record<ParentMetricTone, ParentHomeMetricT
   },
 };
 
-const PARENT_PORTAL_TABS: ParentPortalTab[] = ['home', 'studyDetail', 'data', 'communication', 'billing'];
+const PARENT_PORTAL_TABS: ParentPortalTab[] = ['home', 'studyDetail', 'data', 'communication'];
 const PARENT_POST_LOGIN_ENTRY_MOTION_KEY = 'track-parent-dashboard-entry';
 const PARENT_POST_LOGIN_ENTRY_MAX_AGE_MS = 15000;
 
@@ -483,12 +480,6 @@ const PARENT_DASHBOARD_TAB_META = {
     shortLabel: '소통',
     description: '센터 공지, 알림, 상담과 문의를 한 흐름으로 확인합니다.',
     icon: MessageCircle,
-  },
-  billing: {
-    label: '수납 센터',
-    shortLabel: '수납',
-    description: '대표 청구서와 결제 현황을 가장 빠르게 확인하는 탭입니다.',
-    icon: CreditCard,
   },
 } as const;
 
@@ -854,7 +845,6 @@ function ParentDashboardTabRail({
   totalMinutes,
   unreadRecentCount,
   reportsCount,
-  hasOutstandingInvoice,
   showEntryMotion,
 }: {
   tab: ParentPortalTab;
@@ -867,7 +857,6 @@ function ParentDashboardTabRail({
   totalMinutes: number;
   unreadRecentCount: number;
   reportsCount: number;
-  hasOutstandingInvoice: boolean;
   showEntryMotion: boolean;
 }) {
   const currentTabMeta =
@@ -919,7 +908,7 @@ function ParentDashboardTabRail({
             )}
           </div>
 
-          <div className="grid grid-cols-2 gap-2 sm:grid-cols-4 lg:w-[27rem]">
+          <div className="grid grid-cols-1 gap-2 sm:grid-cols-3 lg:w-[22rem]">
             <div className="rounded-[1.35rem] border border-[#ffd6ab]/28 bg-[linear-gradient(180deg,rgba(255,255,255,0.16)_0%,rgba(255,244,230,0.10)_100%)] px-3 py-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.12)] backdrop-blur-sm">
               <p className="text-[9px] font-black uppercase tracking-[0.16em] text-white">오늘 공부</p>
               <p className="mt-2 text-[1rem] font-black text-white">{toHm(totalMinutes)}</p>
@@ -932,15 +921,11 @@ function ParentDashboardTabRail({
               <p className="text-[9px] font-black uppercase tracking-[0.16em] text-white">리포트</p>
               <p className="mt-2 text-[1rem] font-black text-white">{reportsCount}건</p>
             </div>
-            <div className="rounded-[1.35rem] border border-[#ffd6ab]/28 bg-[linear-gradient(180deg,rgba(255,255,255,0.16)_0%,rgba(255,244,230,0.10)_100%)] px-3 py-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.12)] backdrop-blur-sm">
-              <p className="text-[9px] font-black uppercase tracking-[0.16em] text-white">수납 상태</p>
-              <p className="mt-2 text-[1rem] font-black text-white">{hasOutstandingInvoice ? '확인 필요' : '안정'}</p>
-            </div>
           </div>
         </div>
 
         <div className="rounded-[1.7rem] border border-[#ffd1a0]/20 bg-[linear-gradient(180deg,rgba(255,255,255,0.10)_0%,rgba(255,244,231,0.08)_100%)] p-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.1)] backdrop-blur-sm">
-          <div className="grid grid-cols-2 gap-2 sm:grid-cols-5">
+          <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
             {PARENT_PORTAL_TABS.map((item) => {
               const meta = PARENT_DASHBOARD_TAB_META[item as keyof typeof PARENT_DASHBOARD_TAB_META];
               const TabIcon = meta.icon;
@@ -1618,11 +1603,6 @@ function getParentLegendChipClass(level: ParentCalendarFlowLevel) {
   return 'border-[#1D8A4C] bg-[#1D8A4C] text-white';
 }
 
-function formatWon(value: number) {
-  const safe = Number.isFinite(value) ? Math.max(0, Math.round(value)) : 0;
-  return `₩${safe.toLocaleString()}`;
-}
-
 function minutesToAxisLabel(value: number) {
   const safeMinutes = Math.max(0, Math.round(Number(value || 0)));
   if (safeMinutes >= 60) {
@@ -1645,43 +1625,6 @@ function hourToClockLabel(value: number) {
 function toSignedPercentLabel(value: number) {
   const safeValue = Math.round(Number(value || 0));
   return `${safeValue > 0 ? '+' : ''}${safeValue}%`;
-}
-
-type InvoiceStatusMeta = {
-  label: string;
-  mobileLabel: string;
-  className: string;
-};
-
-function getInvoiceStatusMeta(status: Invoice['status']): InvoiceStatusMeta | null {
-  if (status === 'paid') {
-    return {
-      label: '수납 완료',
-      mobileLabel: '완납',
-      className: 'bg-emerald-100 text-emerald-700 border-emerald-200',
-    };
-  }
-  if (status === 'overdue') {
-    return {
-      label: '미납',
-      mobileLabel: '미납',
-      className: 'bg-rose-100 text-rose-700 border-rose-200',
-    };
-  }
-  if (status === 'issued') {
-    return {
-      label: '청구',
-      mobileLabel: '미납',
-      className: 'bg-amber-100 text-amber-700 border-amber-200',
-    };
-  }
-  return null;
-}
-
-function getInvoiceTrackLabel(category?: Invoice['trackCategory']) {
-  if (category === 'academy') return '트랙 국어 수납';
-  if (category === 'studyRoom') return '트랙 스터디센터 수납';
-  return '센터 수납';
 }
 
 const QUICK_REQUEST_TEMPLATES: Record<ParentQuickRequestKey, string> = {
@@ -2036,12 +1979,11 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
       (linkedStudentIds.length > 1 ? '자녀 선택' : '자녀'),
     [linkedStudents, student?.name, studentId, linkedStudentIds.length]
   );
-  const shouldLoadStudyAnalytics = isActive && !!centerId && !!studentId && tab !== 'communication' && tab !== 'billing';
+  const shouldLoadStudyAnalytics = isActive && !!centerId && !!studentId && tab !== 'communication';
   const shouldLoadNotifications = isActive && !!centerId && !!studentId && !!user && (tab === 'home' || tab === 'communication');
   const shouldLoadReportArchive = isActive && !!studentId && isReportArchiveOpen;
   const shouldLoadParentCommunications = isActive && !!centerId && !!user && tab === 'communication';
   const shouldLoadCounselingLogs = isActive && !!centerId && !!studentId && tab === 'communication';
-  const shouldLoadInvoices = isActive && !!studentId && tab === 'billing';
 
   const todayLogRef = useMemoFirebase(() => (!firestore || !centerId || !studentId || !todayKey ? null : doc(firestore, 'centers', centerId, 'studyLogs', studentId, 'days', todayKey)), [firestore, centerId, studentId, todayKey]);
   const { data: todayLog } = useDoc<StudyLogDay>(todayLogRef, { enabled: isActive && !!studentId });
@@ -2435,80 +2377,6 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
     return query(collection(firestore, 'centers', centerId, 'penaltyLogs'), where('studentId', '==', studentId), limit(120));
   }, [firestore, centerId, studentId]);
   const { data: penaltyLogs } = useCollection<PenaltyLog>(penaltyLogsQuery, { enabled: shouldLoadStudyAnalytics });
-
-  const invoicesQuery = useMemoFirebase(() => {
-    if (!firestore || !centerId || !studentId) return null;
-    return query(
-      collection(firestore, 'centers', centerId, 'invoices'),
-      where('studentId', '==', studentId),
-      limit(120)
-    );
-  }, [firestore, centerId, studentId]);
-  const { data: studentInvoices } = useCollection<Invoice>(invoicesQuery, { enabled: shouldLoadInvoices });
-
-  const sortedInvoices = useMemo(() => {
-    return [...(studentInvoices || [])].sort((a, b) => {
-      const aDate =
-        toDateSafe((a as any).cycleEndDate)?.getTime() ??
-        toDateSafe((a as any).createdAt)?.getTime() ??
-        0;
-      const bDate =
-        toDateSafe((b as any).cycleEndDate)?.getTime() ??
-        toDateSafe((b as any).createdAt)?.getTime() ??
-        0;
-      return bDate - aDate;
-    });
-  }, [studentInvoices]);
-
-  const displayInvoices = useMemo(
-    () => sortedInvoices.filter((invoice) => invoice.status !== 'void' && invoice.status !== 'refunded'),
-    [sortedInvoices]
-  );
-  const hasOutstandingInvoice = useMemo(
-    () => displayInvoices.some((invoice) => invoice.status === 'issued' || invoice.status === 'overdue'),
-    [displayInvoices]
-  );
-  const primaryInvoice = useMemo(
-    () => displayInvoices.find((invoice) => invoice.status === 'issued' || invoice.status === 'overdue') || displayInvoices[0] || null,
-    [displayInvoices]
-  );
-  const secondaryInvoices = useMemo(
-    () => (primaryInvoice ? displayInvoices.filter((invoice) => invoice.id !== primaryInvoice.id) : []),
-    [displayInvoices, primaryInvoice]
-  );
-
-  const billingSummary = useMemo(() => {
-    return displayInvoices.reduce(
-      (acc, invoice) => {
-        const amount = Number(invoice.finalPrice || 0);
-        if (!Number.isFinite(amount) || amount <= 0) return acc;
-
-        acc.billed += amount;
-        if (invoice.status === 'paid') {
-          acc.paid += amount;
-        }
-        if (invoice.status === 'overdue') {
-          acc.overdue += amount;
-        }
-        return acc;
-      },
-      { billed: 0, paid: 0, overdue: 0 }
-    );
-  }, [displayInvoices]);
-
-  const mobileBillingStatusMeta = useMemo(() => {
-    if (displayInvoices.length === 0) return null;
-    if (!hasOutstandingInvoice) {
-      return {
-        label: '완납',
-        className: 'bg-emerald-100 text-emerald-700 border-emerald-200',
-      };
-    }
-    return {
-      label: '미납',
-      className: 'bg-rose-100 text-rose-700 border-rose-200',
-    };
-  }, [displayInvoices, hasOutstandingInvoice]);
 
   const studyPlans = (todayPlans || []).filter((item) => item.category === 'study' || !item.category);
   const persistedTodayMinutes = Math.max(0, Number(todayLog?.totalMinutes || 0));
@@ -3631,7 +3499,6 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
             totalMinutes={totalMinutes}
             unreadRecentCount={unreadRecentCount}
             reportsCount={reportsArchive.length}
-            hasOutstandingInvoice={Boolean(primaryInvoice && (primaryInvoice.status === 'issued' || primaryInvoice.status === 'overdue'))}
             showEntryMotion={showEntryMotion}
           />
         ) : null}
@@ -4927,222 +4794,6 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
                   </div>
                 )}
               </Card>
-            </TabsContent>
-
-            <TabsContent value="billing" className="parent-tab-panel mt-0 space-y-4 sm:space-y-5">
-              <Card className={cn('overflow-hidden rounded-[2.4rem] border border-[#ffdabc] bg-[linear-gradient(180deg,#fffefb_0%,#ffffff_58%,#fff3e8_100%)] p-5 shadow-[0_30px_60px_-42px_rgba(255,122,22,0.18)] sm:p-6', showEntryMotion && 'parent-card-enter parent-entry-delay-2')}>
-                <div className="space-y-5">
-                  <ParentSectionHeader
-                    icon={<CreditCard className="h-3.5 w-3.5" />}
-                    eyebrow="Billing"
-                    title="수납"
-                    badges={
-                      <>
-                        <Badge variant="outline" className="h-7 rounded-full border border-[#ffe0bf] bg-white px-3 text-[10px] font-black text-[#9f6b39] shadow-sm">
-                          실시간 연동
-                        </Badge>
-                        {mobileBillingStatusMeta && (
-                          <Badge variant="outline" className={cn('h-7 rounded-full border px-3 text-[10px] font-black shadow-sm', mobileBillingStatusMeta.className)}>
-                            {mobileBillingStatusMeta.label}
-                          </Badge>
-                        )}
-                      </>
-                    }
-                  />
-
-                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-                    <div className="rounded-[1.65rem] border border-[#ffe0c1] bg-[linear-gradient(180deg,#fffefb_0%,#fff5eb_100%)] px-4 py-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.9),0_18px_30px_-24px_rgba(255,122,22,0.14)]">
-                      <div className="flex items-center justify-between gap-2">
-                        <p className="text-[11px] font-black uppercase tracking-[0.16em] text-[#b86a1c]">청구금액</p>
-                        <div className="h-2.5 w-2.5 rounded-full bg-[#FF7A16]" />
-                      </div>
-                      <p className="dashboard-number mt-3 whitespace-nowrap text-[1.45rem] leading-none text-[#14295F] sm:text-[1.6rem]">
-                        {formatWon(billingSummary.billed)}
-                      </p>
-                    </div>
-                    <div className="rounded-[1.65rem] border border-emerald-200 bg-[linear-gradient(180deg,#f9fffc_0%,#ecfff6_100%)] px-4 py-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.9),0_18px_30px_-24px_rgba(16,185,129,0.16)]">
-                      <div className="flex items-center justify-between gap-2">
-                        <p className="text-[11px] font-black uppercase tracking-[0.16em] text-emerald-700">수납 완료</p>
-                        <div className="h-2.5 w-2.5 rounded-full bg-emerald-500" />
-                      </div>
-                      <p className="dashboard-number mt-3 whitespace-nowrap text-[1.45rem] leading-none text-emerald-700 sm:text-[1.6rem]">
-                        {formatWon(billingSummary.paid)}
-                      </p>
-                    </div>
-                    <div className="rounded-[1.65rem] border border-rose-200 bg-[linear-gradient(180deg,#fffdfd_0%,#fff4f4_100%)] px-4 py-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.9),0_18px_30px_-24px_rgba(244,63,94,0.15)]">
-                      <div className="flex items-center justify-between gap-2">
-                        <p className="text-[11px] font-black uppercase tracking-[0.16em] text-rose-700">미납 금액</p>
-                        <div className="h-2.5 w-2.5 rounded-full bg-rose-500" />
-                      </div>
-                      <p className="dashboard-number mt-3 whitespace-nowrap text-[1.45rem] leading-none text-rose-700 sm:text-[1.6rem]">
-                        {formatWon(billingSummary.overdue)}
-                      </p>
-                    </div>
-                  </div>
-                </div>
-              </Card>
-
-              {primaryInvoice ? (
-                <div className="space-y-4">
-                  {(() => {
-                    const invoice = primaryInvoice;
-                    const invoiceDueDate = getInvoiceCollectionEndDate(invoice);
-                    const statusMeta = getInvoiceStatusMeta(invoice.status);
-                    const isActionable = invoice.status === 'issued' || invoice.status === 'overdue';
-
-                    return (
-                      <Card className="overflow-hidden rounded-[2.3rem] border border-[#ffdabc] bg-[linear-gradient(135deg,#fffefb_0%,#ffffff_58%,#fff3e8_100%)] p-5 shadow-[0_30px_62px_-42px_rgba(255,122,22,0.18)] sm:p-6">
-                        <div className="space-y-5">
-                          <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-                            <div className="min-w-0 space-y-3">
-                              <div className="flex flex-wrap items-center gap-2">
-                                <Badge variant="outline" className="h-7 rounded-full border border-[#ffe0bf] bg-white px-3 text-[10px] font-black text-[#9f6b39] shadow-sm">
-                                  대표 청구서
-                                </Badge>
-                                <Badge variant="outline" className="h-7 rounded-full border border-slate-200 bg-slate-50 px-3 text-[10px] font-black text-slate-600 shadow-sm">
-                                  {getInvoiceTrackLabel(invoice.trackCategory)}
-                                </Badge>
-                                {statusMeta && (
-                                  <Badge variant="outline" className={cn('h-7 rounded-full border px-3 text-[10px] font-black shadow-sm', statusMeta.className)}>
-                                    <span className="md:hidden">{statusMeta.mobileLabel}</span>
-                                    <span className="hidden md:inline">{statusMeta.label}</span>
-                                  </Badge>
-                                )}
-                              </div>
-
-                              <div className="space-y-2">
-                                <h3 className="min-w-0 truncate text-[1.55rem] font-black leading-none tracking-tight text-[#14295F] sm:text-[1.85rem]">
-                                  {invoice.studentName || student?.name || '학생'}
-                                </h3>
-                                <p className="text-[14px] font-bold leading-relaxed text-slate-600">
-                                  {isActionable ? '가장 먼저 확인하실 청구서를 상단에 정리했습니다.' : '최근 결제 완료된 청구서를 기준으로 정리했습니다.'}
-                                </p>
-                              </div>
-                            </div>
-
-                            <div className="rounded-[1.7rem] border border-[#ffe0bf] bg-white/94 px-5 py-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.9),0_22px_34px_-26px_rgba(255,122,22,0.14)]">
-                              <p className="text-[10px] font-black uppercase tracking-[0.16em] text-[#b76a1d]">결제 금액</p>
-                              <p className="dashboard-number mt-2 whitespace-nowrap text-[2rem] leading-none text-[#14295F] sm:text-[2.5rem]">
-                                {formatWon(Number(invoice.finalPrice || 0))}
-                              </p>
-                            </div>
-                          </div>
-
-                          <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-                            <div className="rounded-[1.3rem] border border-[#ffe1c3] bg-white/92 px-4 py-3 shadow-[0_14px_26px_-22px_rgba(255,122,22,0.1)]">
-                              <p className="text-[10px] font-black uppercase tracking-[0.14em] text-slate-400">청구 상태</p>
-                              <p className="mt-2 text-sm font-black text-[#14295F]">{statusMeta?.label || '상태 확인중'}</p>
-                            </div>
-                            <div className="rounded-[1.3rem] border border-[#ffe1c3] bg-white/92 px-4 py-3 shadow-[0_14px_26px_-22px_rgba(255,122,22,0.1)]">
-                              <p className="text-[10px] font-black uppercase tracking-[0.14em] text-slate-400">결제 마감일</p>
-                              <p className="mt-2 text-sm font-black text-[#14295F]">
-                                {invoiceDueDate ? format(invoiceDueDate, 'yyyy.MM.dd', { locale: ko }) : '미정'}
-                              </p>
-                            </div>
-                            <div className="rounded-[1.3rem] border border-[#ffe1c3] bg-white/92 px-4 py-3 shadow-[0_14px_26px_-22px_rgba(255,122,22,0.1)]">
-                              <p className="text-[10px] font-black uppercase tracking-[0.14em] text-slate-400">결제 방식</p>
-                              <p className="mt-2 text-sm font-black text-[#14295F]">앱 내 결제 추후 오픈</p>
-                            </div>
-                          </div>
-
-                          {isActionable ? (
-                            <div className="space-y-2">
-                              <div className="inline-flex h-14 w-full items-center justify-center gap-2 rounded-[1.25rem] border border-[#ffd4ad] bg-[linear-gradient(180deg,#fff4e7_0%,#ffe7ce_100%)] text-[15px] font-black text-[#b86a1c] shadow-[inset_0_1px_0_rgba(255,255,255,0.92),0_18px_30px_-22px_rgba(255,122,22,0.16)]">
-                                <CreditCard className="h-4 w-4" />
-                                추후 오픈
-                              </div>
-                            </div>
-                          ) : (
-                            <div className="rounded-[1.4rem] border border-emerald-200 bg-[linear-gradient(180deg,#f8fffb_0%,#effcf5_100%)] px-4 py-4 text-center shadow-[inset_0_1px_0_rgba(255,255,255,0.9)]">
-                              <p className="text-[11px] font-black uppercase tracking-[0.14em] text-emerald-700">결제 완료</p>
-                              <p className="mt-2 text-sm font-bold leading-relaxed text-emerald-900">
-                                현재 대표 청구서는 수납이 완료되었습니다. 필요 시 아래 이력에서 이전 청구서를 확인할 수 있어요.
-                              </p>
-                            </div>
-                          )}
-                        </div>
-                      </Card>
-                    );
-                  })()}
-
-                  {secondaryInvoices.length > 0 && (
-                    <div className="space-y-3">
-                      <div className="flex items-center justify-between gap-2 px-1">
-                        <div>
-                          <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#a06b38]">청구 이력</p>
-                          <p className="mt-1 text-sm font-bold text-slate-500">이전 또는 추가 청구서를 함께 확인할 수 있어요.</p>
-                        </div>
-                        <Badge variant="outline" className="h-7 rounded-full border border-slate-200 bg-white px-3 text-[10px] font-black text-slate-500">
-                          {secondaryInvoices.length}건
-                        </Badge>
-                      </div>
-
-                      <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
-                        {secondaryInvoices.map((invoice) => {
-                          const invoiceDueDate = getInvoiceCollectionEndDate(invoice);
-                          const statusMeta = getInvoiceStatusMeta(invoice.status);
-                          const isActionable = invoice.status === 'issued' || invoice.status === 'overdue';
-
-                          return (
-                            <Card key={invoice.id} className="rounded-[1.75rem] border border-[#ffe2c5] bg-[linear-gradient(180deg,#ffffff_0%,#fff8f1_100%)] p-5 shadow-[0_20px_38px_-30px_rgba(255,122,22,0.12)]">
-                              <div className="space-y-4">
-                                <div className="flex items-start justify-between gap-3">
-                                  <div className="min-w-0 space-y-2">
-                                    <div className="flex flex-wrap items-center gap-2">
-                                      <Badge variant="outline" className="h-6 border border-slate-200 bg-slate-50 px-2 text-[10px] font-black text-slate-600">
-                                        {getInvoiceTrackLabel(invoice.trackCategory)}
-                                      </Badge>
-                                      {statusMeta && (
-                                        <Badge variant="outline" className={cn('h-6 border px-2 text-[10px] font-black', statusMeta.className)}>
-                                          {statusMeta.mobileLabel}
-                                        </Badge>
-                                      )}
-                                    </div>
-                                    <p className="min-w-0 truncate text-[1.1rem] font-black leading-none tracking-tight text-[#14295F]">
-                                      {invoice.studentName || student?.name || '학생'}
-                                    </p>
-                                    <p className="text-[13px] font-bold text-slate-500">
-                                      마감일 {invoiceDueDate ? format(invoiceDueDate, 'yyyy.MM.dd', { locale: ko }) : '미정'}
-                                    </p>
-                                  </div>
-                                  <p className="dashboard-number shrink-0 whitespace-nowrap text-[1.6rem] leading-none text-[#14295F]">
-                                    {formatWon(Number(invoice.finalPrice || 0))}
-                                  </p>
-                                </div>
-
-                                {isActionable ? (
-                                  <div className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-[1rem] border border-[#ffd8b3] bg-[linear-gradient(180deg,#fff5ea_0%,#ffe9d4_100%)] text-[14px] font-black text-[#b86a1c] shadow-[inset_0_1px_0_rgba(255,255,255,0.92),0_16px_26px_-22px_rgba(255,122,22,0.14)]">
-                                    <CreditCard className="h-4 w-4" />
-                                    추후 오픈
-                                  </div>
-                                ) : (
-                                  <div className="rounded-[1rem] border border-emerald-100 bg-emerald-50/70 px-4 py-3 text-center text-[12px] font-black text-emerald-700">
-                                    결제 완료
-                                  </div>
-                                )}
-                              </div>
-                            </Card>
-                          );
-                        })}
-                      </div>
-                    </div>
-                  )}
-                </div>
-              ) : (
-                <Card className="rounded-[2rem] border border-[#ffe2c5] bg-[linear-gradient(180deg,#ffffff_0%,#fff8f1_100%)] p-6 text-center shadow-[0_20px_40px_-32px_rgba(255,122,22,0.12)]">
-                  <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-[1.2rem] border border-[#ffd8ae] bg-[linear-gradient(135deg,#fff4e6_0%,#ffd8af_100%)] shadow-sm">
-                    <CreditCard className="h-6 w-6 text-[#FF7A16]" />
-                  </div>
-                  <p className="mt-4 text-base font-black text-[#14295F]">현재 발행된 청구서가 없습니다.</p>
-                </Card>
-              )}
-
-              <div className="rounded-[1.7rem] border border-emerald-200 bg-[linear-gradient(180deg,#fbfffd_0%,#f0fcf5_100%)] px-5 py-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.9),0_18px_28px_-24px_rgba(16,185,129,0.14)]">
-                <p className="text-[11px] font-black uppercase tracking-[0.16em] text-emerald-700">안심 안내</p>
-                <p className="mt-2 text-[14px] font-bold leading-relaxed text-emerald-900">
-                  감사합니다. 결제와 수납 현황은 실시간으로 반영되며, 필요한 경우 센터에서 추가 안내를 드립니다.
-                </p>
-              </div>
             </TabsContent>
 
             <TabsContent value="notifications" className="parent-tab-panel mt-0 space-y-3">
