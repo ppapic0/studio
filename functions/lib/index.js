@@ -445,6 +445,27 @@ function getPointEventAwardTotal(dayStatus, source) {
         .filter((entry) => entry.source === source)
         .reduce((total, entry) => total + Math.max(0, Math.floor(entry.points)), 0);
 }
+function getCreditedStudyBoxPointTotal(dayStatus) {
+    var _a;
+    const dailyPointAmount = Math.max(0, Math.floor((_a = parseFiniteNumber(dayStatus.dailyPointAmount)) !== null && _a !== void 0 ? _a : 0));
+    const nonStudyBoxPointTotal = getRankRewardAwardTotal(dayStatus) + getPlanCompletionAwardTotal(dayStatus);
+    return Math.max(0, getPointEventAwardTotal(dayStatus, "study_box"), dailyPointAmount - nonStudyBoxPointTotal);
+}
+function getStudyBoxRewardPointsForHour(rewardEntries, hour, fallbackReward) {
+    var _a, _b, _c, _d, _e;
+    const storedReward = (_a = rewardEntries.find((entry) => entry.milestone === hour)) !== null && _a !== void 0 ? _a : null;
+    const awardedPoints = Math.max(0, Math.floor((_b = parseFiniteNumber(storedReward === null || storedReward === void 0 ? void 0 : storedReward.awardedPoints)) !== null && _b !== void 0 ? _b : 0), Math.floor((_c = parseFiniteNumber(fallbackReward === null || fallbackReward === void 0 ? void 0 : fallbackReward.awardedPoints)) !== null && _c !== void 0 ? _c : 0), Math.floor((_d = parseFiniteNumber(storedReward === null || storedReward === void 0 ? void 0 : storedReward.basePoints)) !== null && _d !== void 0 ? _d : 0), Math.floor((_e = parseFiniteNumber(fallbackReward === null || fallbackReward === void 0 ? void 0 : fallbackReward.basePoints)) !== null && _e !== void 0 ? _e : 0));
+    return awardedPoints;
+}
+function getMissingStudyBoxCreditDelta(params) {
+    const hour = Math.max(1, Math.min(8, Math.round(params.hour)));
+    if (!params.openedStudyBoxes.includes(hour))
+        return 0;
+    const creditedStudyBoxPoints = getCreditedStudyBoxPointTotal(params.dayStatus);
+    if (creditedStudyBoxPoints > 0)
+        return 0;
+    return getStudyBoxRewardPointsForHour(params.rewardEntries, hour, params.fallbackReward);
+}
 function getPlanCompletionAwardTotal(dayStatus) {
     var _a;
     const eventPoints = getPointEventAwardTotal(dayStatus, "plan_completion");
@@ -12144,10 +12165,19 @@ exports.openStudyRewardBoxSecure = functions.region(region).https.onCall(async (
         const resolvedReward = alreadyOpened
             ? (storedReward !== null && storedReward !== void 0 ? storedReward : reward)
             : Object.assign(Object.assign({}, rewardBase), { awardedPoints: Math.max(0, Math.round(Math.max(0, Math.floor(rewardBase.basePoints)) * boostMultiplier)), multiplier: boostMultiplier, earnedAt: earnedAtMs ? new Date(earnedAtMs).toISOString() : null, boostEventId });
+        const missingStudyBoxCreditDelta = alreadyOpened
+            ? getMissingStudyBoxCreditDelta({
+                dayStatus: currentDayStatus,
+                openedStudyBoxes,
+                rewardEntries: storedRewardEntries,
+                hour,
+                fallbackReward: resolvedReward,
+            })
+            : 0;
         const awardClamp = alreadyOpened
-            ? { currentAwardedTotal: getDailyAwardedPointTotal(currentDayStatus), remainingPoints: 0, awardedPoints: 0 }
+            ? { currentAwardedTotal: getDailyAwardedPointTotal(currentDayStatus), remainingPoints: 0, awardedPoints: missingStudyBoxCreditDelta }
             : clampDailyPointAward(currentDayStatus, resolvedReward.awardedPoints);
-        const awardedDelta = alreadyOpened ? 0 : awardClamp.awardedPoints;
+        const awardedDelta = alreadyOpened ? missingStudyBoxCreditDelta : awardClamp.awardedPoints;
         const creditedReward = alreadyOpened
             ? resolvedReward
             : Object.assign(Object.assign({}, resolvedReward), { awardedPoints: awardedDelta });
@@ -12350,11 +12380,20 @@ exports.openStudyRewardBoxesSecure = functions.region(region).https.onCall(async
             const resolvedReward = alreadyOpened
                 ? (storedReward !== null && storedReward !== void 0 ? storedReward : plan.reward)
                 : Object.assign(Object.assign({}, rewardBase), { awardedPoints: Math.max(0, Math.round(Math.max(0, Math.floor(rewardBase.basePoints)) * plan.boostMultiplier)), multiplier: plan.boostMultiplier, earnedAt: plan.earnedAtMs ? new Date(plan.earnedAtMs).toISOString() : null, boostEventId: plan.boostEventId });
+            const missingStudyBoxCreditDelta = alreadyOpened
+                ? getMissingStudyBoxCreditDelta({
+                    dayStatus: currentDayStatus,
+                    openedStudyBoxes: nextOpenedStudyBoxes,
+                    rewardEntries: nextRewardEntries,
+                    hour: plan.hour,
+                    fallbackReward: resolvedReward,
+                })
+                : 0;
             const remainingDailyPoints = alreadyOpened
                 ? 0
                 : Math.max(0, DAILY_POINT_EARN_CAP - initialAwardedTotal - awardedTotalDelta);
             const awardedDelta = alreadyOpened
-                ? 0
+                ? missingStudyBoxCreditDelta
                 : Math.min(Math.max(0, Math.floor(resolvedReward.awardedPoints)), remainingDailyPoints);
             const creditedReward = alreadyOpened
                 ? resolvedReward

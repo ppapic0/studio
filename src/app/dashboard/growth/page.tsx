@@ -58,6 +58,7 @@ import {
   buildDeterministicStudyBoxReward,
   getAvailableStudyBoxMilestones,
   getClaimedStudyBoxes,
+  getDailyAwardedPointTotal,
   getDailyPointBreakdown,
   getOpenedStudyBoxes,
   getRemainingCarryoverStudyBoxHours,
@@ -137,6 +138,43 @@ function isValidKoreanMobilePhone(raw: string): boolean {
 
 function formatGiftishowPoints(value?: number | null) {
   return `${Math.max(0, Number(value || 0)).toLocaleString()}P`;
+}
+
+function getGiftishowOrderPointDeduction(order: GiftishowOrder) {
+  if (!Array.isArray(order.pointEvents)) return 0;
+
+  return order.pointEvents.reduce((total, event) => {
+    const points = Math.max(0, Math.floor(Number(event?.points || 0)));
+    if (event?.type === 'deduct') return total + points;
+    if (event?.type === 'refund') return total - points;
+    return total;
+  }, 0);
+}
+
+function hasGrowthProgressPointData(progress?: GrowthProgress | null) {
+  if (!progress) return false;
+  if (Number(progress.pointsBalance || 0) > 0) return true;
+  if (Number(progress.totalPointsEarned || 0) > 0) return true;
+  return Object.keys(progress.dailyPointStatus || {}).length > 0;
+}
+
+function mergeGrowthProgress(primary?: GrowthProgress | null, fallback?: GrowthProgress | null): GrowthProgress | undefined {
+  if (!primary) return fallback ?? undefined;
+  if (!fallback) return primary;
+  if (!hasGrowthProgressPointData(primary) && hasGrowthProgressPointData(fallback)) return fallback;
+  if (!hasGrowthProgressPointData(fallback)) return primary;
+
+  return {
+    ...fallback,
+    ...primary,
+    dailyPointStatus: {
+      ...(fallback.dailyPointStatus || {}),
+      ...(primary.dailyPointStatus || {}),
+    },
+    pointsBalance: Math.max(Number(primary.pointsBalance || 0), Number(fallback.pointsBalance || 0)),
+    totalPointsEarned: Math.max(Number(primary.totalPointsEarned || 0), Number(fallback.totalPointsEarned || 0)),
+    stats: primary.stats || fallback.stats,
+  };
 }
 
 function toTimestampMs(value?: { toDate?: () => Date } | null) {
@@ -473,7 +511,19 @@ export default function GrowthPage() {
     if (!firestore || !activeMembership || !studentUid) return null;
     return doc(firestore, 'centers', activeMembership.id, 'growthProgress', studentUid);
   }, [firestore, activeMembership?.id, studentUid]);
-  const { data: progress, isLoading } = useDoc<GrowthProgress>(progressRef);
+  const { data: primaryProgress, isLoading: isPrimaryProgressLoading } = useDoc<GrowthProgress>(progressRef);
+  const fallbackProgressRef = useMemoFirebase(() => {
+    if (!firestore || !activeMembership || !authUid || authUid === studentUid) return null;
+    return doc(firestore, 'centers', activeMembership.id, 'growthProgress', authUid);
+  }, [firestore, activeMembership?.id, authUid, studentUid]);
+  const { data: fallbackProgress, isLoading: isFallbackProgressLoading } = useDoc<GrowthProgress>(fallbackProgressRef, {
+    enabled: Boolean(fallbackProgressRef),
+  });
+  const progress = useMemo(
+    () => mergeGrowthProgress(primaryProgress, fallbackProgress),
+    [fallbackProgress, primaryProgress]
+  );
+  const isLoading = isPrimaryProgressLoading || (Boolean(fallbackProgressRef) && isFallbackProgressLoading && !progress);
 
   const userProfileRef = useMemoFirebase(() => {
     if (!firestore || !user) return null;
@@ -655,10 +705,6 @@ export default function GrowthPage() {
     setCarryoverOpenedBoxes(normalizeStudyBoxHours([...persistedCarryoverOpenedBoxes, ...cachedOpenedBoxes]));
   }, [persistedCarryoverOpenedBoxes, previousStudyDayKey, studyBoxCacheUid]);
 
-  useEffect(() => {
-    setPointBalance(Math.max(0, Number(progress?.pointsBalance || 0)));
-  }, [progress?.pointsBalance]);
-
   const resolvedStudentPhone = useMemo(() => {
     return normalizePhone(
       extractPhoneNumber(studentProfile) || userProfile?.phoneNumber || activeMembership?.phoneNumber || ''
@@ -684,6 +730,30 @@ export default function GrowthPage() {
     () => sortGiftishowOrdersByRecent(giftishowOrdersRaw || []),
     [giftishowOrdersRaw]
   );
+  const resolvedPointBalance = useMemo(() => {
+    const storedBalance = Number(progress?.pointsBalance);
+    const normalizedStoredBalance = Number.isFinite(storedBalance) ? Math.max(0, Math.floor(storedBalance)) : 0;
+    if (normalizedStoredBalance > 0) return normalizedStoredBalance;
+
+    const storedTotalEarned = Number(progress?.totalPointsEarned);
+    const dailyPointStatus = progress?.dailyPointStatus || {};
+    const dailyStatusEarned = Object.values(dailyPointStatus).reduce((total, dayStatus) => {
+      return total + getDailyAwardedPointTotal((dayStatus || {}) as Record<string, any>);
+    }, 0);
+    const fallbackEarned = Math.max(
+      0,
+      Number.isFinite(storedTotalEarned) ? Math.floor(storedTotalEarned) : 0,
+      Math.floor(dailyStatusEarned)
+    );
+    const redeemedPoints = giftishowOrders.reduce((total, order) => total + getGiftishowOrderPointDeduction(order), 0);
+
+    return Math.max(0, fallbackEarned - Math.max(0, redeemedPoints));
+  }, [giftishowOrders, progress?.dailyPointStatus, progress?.pointsBalance, progress?.totalPointsEarned]);
+
+  useEffect(() => {
+    setPointBalance(resolvedPointBalance);
+  }, [resolvedPointBalance]);
+
   const studyBoxManualRows = useMemo(() => {
     const earlyWeights = new Map(getStudyBoxRarityWeights(1).map((entry) => [entry.rarity, entry.weight]));
     const lateWeights = new Map(getStudyBoxRarityWeights(5).map((entry) => [entry.rarity, entry.weight]));
