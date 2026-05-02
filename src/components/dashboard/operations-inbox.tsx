@@ -133,7 +133,7 @@ function InteractiveShell({
   children: ReactNode;
 }) {
   if (!onClick) {
-    return <div className={className}>{children}</div>;
+    return <div className={cn('w-full min-w-0', className)}>{children}</div>;
   }
 
   return (
@@ -141,7 +141,7 @@ function InteractiveShell({
       type="button"
       onClick={onClick}
       className={cn(
-        'text-left transition-[transform,border-color,box-shadow] hover:-translate-y-0.5',
+        'w-full min-w-0 text-left transition-[transform,border-color,box-shadow] hover:-translate-y-0.5',
         className
       )}
     >
