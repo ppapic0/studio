@@ -155,6 +155,7 @@ import {
   toAbsentScheduleDraft,
   validateScheduleDraft,
 } from '@/features/schedules/lib/scheduleModel';
+import { resolveLegacySchedulePlanItemDeleteAction } from '@/features/schedules/lib/legacySchedulePlanItems';
 import { buildMainPlanRecommendations, type MainPlanRecommendation } from '@/features/planner/lib/buildMainPlanRecommendations';
 import { resolveStudentTargetDailyMinutesOrFallback } from '@/lib/student-target-minutes';
 import {
@@ -3840,15 +3841,56 @@ export default function StudyPlanPage() {
   const handleDeleteTask = async (item: WithId<StudyPlanItem>) => {
     if (isPast || !firestore || !user || !activeMembership || !studentUid || !isStudent || !weekKey) return;
 
-    await deleteDoc(doc(firestore, 'centers', activeMembership.id, 'plans', studentUid, 'weeks', weekKey, 'items', item.id));
-    if (item.category === 'schedule' && isToday) {
-      await applySameDayRoutinePenalty('당일 출석 루틴 삭제');
+    const itemRef = doc(firestore, 'centers', activeMembership.id, 'plans', studentUid, 'weeks', weekKey, 'items', item.id);
+
+    try {
+      let handledFromScheduleSource = false;
+
+      if (item.category === 'schedule' && selectedDateKey) {
+        const scheduleRef = doc(firestore, 'users', studentUid, 'schedules', selectedDateKey);
+        let scheduleDoc: StudentScheduleDoc | null = selectedScheduleDoc ? (selectedScheduleDoc as StudentScheduleDoc) : null;
+
+        if (!scheduleDoc) {
+          const scheduleSnap = await getDoc(scheduleRef);
+          scheduleDoc = scheduleSnap.exists() ? scheduleSnap.data() as StudentScheduleDoc : null;
+        }
+
+        const deleteAction = resolveLegacySchedulePlanItemDeleteAction(scheduleDoc, item.title);
+        if (deleteAction.kind === 'clear-schedule') {
+          await deleteDoc(scheduleRef);
+          await syncLegacyScheduleItems(selectedDateKey, null);
+          handledFromScheduleSource = true;
+        } else if (deleteAction.kind === 'update-schedule') {
+          await updateDoc(scheduleRef, {
+            ...deleteAction.patch,
+            updatedAt: serverTimestamp(),
+          });
+          await syncLegacyScheduleItems(selectedDateKey, deleteAction.nextSchedule);
+          handledFromScheduleSource = true;
+        }
+      }
+
+      if (!handledFromScheduleSource) {
+        await deleteDoc(itemRef);
+      }
+
+      if (item.category === 'schedule' && isToday) {
+        await applySameDayRoutinePenalty('당일 출석 루틴 삭제');
+        toast({
+          title: `당일 루틴 수정으로 벌점 ${SAME_DAY_ROUTINE_PENALTY_POINTS}점 반영`,
+          description: '당일 출석 루틴은 수정 가능하지만 벌점이 자동 반영됩니다.',
+        });
+      }
       toast({
-        title: `당일 루틴 수정으로 벌점 ${SAME_DAY_ROUTINE_PENALTY_POINTS}점 반영`,
-        description: '당일 출석 루틴은 수정 가능하지만 벌점이 자동 반영됩니다.',
+        title: item.category === 'schedule' ? '루틴이 삭제되었습니다.' : '항목이 삭제되었습니다.',
+      });
+    } catch (error: any) {
+      toast({
+        variant: 'destructive',
+        title: '항목 삭제 실패',
+        description: getSafeErrorMessage(error, '선택한 항목을 삭제하지 못했습니다.'),
       });
     }
-    toast({ title: "항목이 삭제되었습니다." });
   };
 
   const handleApplyTasksToAllWeekdaysLegacy = async () => {

@@ -22,7 +22,7 @@ import {
   setDoc,
   limit,
 } from 'firebase/firestore';
-import { StudyLogDay, StudyPlanItem, WithId, GrowthProgress, LeaderboardEntry, DailyReport } from '@/lib/types';
+import { StudyLogDay, StudyPlanItem, WithId, GrowthProgress, LeaderboardEntry, DailyReport, StudentScheduleDoc } from '@/lib/types';
 import { 
   format, 
   startOfMonth, 
@@ -117,6 +117,7 @@ import { RoutineComposerCard } from '@/components/dashboard/student-planner/rout
 import { StudyComposerCard } from '@/components/dashboard/student-planner/study-composer-card';
 import { PlanItemCard } from '@/components/dashboard/student-planner/plan-item-card';
 import { ScheduleItemCard } from '@/components/dashboard/student-planner/schedule-item-card';
+import { resolveLegacySchedulePlanItemDeleteAction } from '@/features/schedules/lib/legacySchedulePlanItems';
 
 type LinkedStudentOption = {
   id: string;
@@ -1181,9 +1182,50 @@ export default function StudyHistoryPage() {
     if (isParent || !firestore || !user || !activeMembership || !selectedDateForPlan || !targetUid) return;
     try {
       const isToday = isSameDay(selectedDateForPlan, new Date());
-
+      const dateKey = format(selectedDateForPlan, 'yyyy-MM-dd');
       const weekKey = format(selectedDateForPlan, "yyyy-'W'II");
-      await deleteDoc(doc(firestore, 'centers', activeMembership.id, 'plans', targetUid, 'weeks', weekKey, 'items', item.id));
+      const itemRef = doc(firestore, 'centers', activeMembership.id, 'plans', targetUid, 'weeks', weekKey, 'items', item.id);
+      let handledFromScheduleSource = false;
+
+      if (item.category === 'schedule') {
+        const scheduleRef = doc(firestore, 'users', targetUid, 'schedules', dateKey);
+        const scheduleSnap = await getDoc(scheduleRef);
+        const scheduleDoc = scheduleSnap.exists() ? scheduleSnap.data() as StudentScheduleDoc : null;
+        const deleteAction = resolveLegacySchedulePlanItemDeleteAction(scheduleDoc, item.title);
+
+        if (deleteAction.kind === 'clear-schedule') {
+          const itemsRef = collection(
+            firestore,
+            'centers',
+            activeMembership.id,
+            'plans',
+            targetUid,
+            'weeks',
+            weekKey,
+            'items'
+          );
+          const scheduleItemsSnapshot = await getDocs(
+            query(itemsRef, where('dateKey', '==', dateKey), where('category', '==', 'schedule'))
+          );
+          const batch = writeBatch(firestore);
+          batch.delete(scheduleRef);
+          scheduleItemsSnapshot.docs.forEach((docSnap) => batch.delete(doc(itemsRef, docSnap.id)));
+          await batch.commit();
+          handledFromScheduleSource = true;
+        } else if (deleteAction.kind === 'update-schedule') {
+          await updateDoc(scheduleRef, {
+            ...deleteAction.patch,
+            updatedAt: serverTimestamp(),
+          });
+          await deleteDoc(itemRef);
+          handledFromScheduleSource = true;
+        }
+      }
+
+      if (!handledFromScheduleSource) {
+        await deleteDoc(itemRef);
+      }
+
       if (item.category === 'schedule' && isToday) {
         await applySameDayRoutinePenalty('당일 출석 루틴 삭제');
         toast({

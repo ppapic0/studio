@@ -249,16 +249,24 @@ export function StudyPlanSheet({
         const subjectLabel = editDraft.subject === 'etc'
           ? editDraft.subjectLabel.trim() || fallbackCustomSubjectLabel
           : null;
+        const studyPlanMode = editDraft.studyPlanMode;
+        const targetMinutes = studyPlanMode === 'time' || editDraft.enableVolumeMinutes
+          ? Math.max(0, Math.round(Number(editDraft.targetMinutes) || 0))
+          : 0;
+        const targetAmount = studyPlanMode === 'volume'
+          ? Math.max(0, Math.round(Number(editDraft.targetAmount) || 0))
+          : 0;
+        const amountUnit = studyPlanMode === 'volume' && targetAmount > 0 ? editDraft.amountUnit : null;
 
         await onUpdateStudyTask(task, {
           title: trimmedTitle,
           subject: editDraft.subject || 'etc',
           subjectLabel,
-          studyPlanMode: 'volume',
-          targetMinutes: 0,
-          targetAmount: 0,
-          amountUnit: null,
-          amountUnitLabel: null,
+          studyPlanMode,
+          targetMinutes,
+          targetAmount,
+          amountUnit,
+          amountUnitLabel: amountUnit === '직접입력' ? editDraft.amountUnitLabel.trim() || '단위' : null,
         });
       } else {
         const task = personalTasks.find((item) => item.id === editDraft.id);

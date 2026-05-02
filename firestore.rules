@@ -263,13 +263,62 @@ service cloud.firestore {
 
     function isAllowedSelfPlanItemCreate(centerId, studentId) {
       return isSelfCenterMember(centerId, studentId)
-        && request.resource.data.category != 'schedule';
+        && (request.resource.data.studentId == null || request.resource.data.studentId == request.auth.uid)
+        && (request.resource.data.centerId == null || request.resource.data.centerId == centerId);
     }
 
     function isAllowedSelfPlanItemUpdate(centerId, studentId) {
       return isSelfCenterMember(centerId, studentId)
-        && resource.data.category != 'schedule'
-        && request.resource.data.category != 'schedule';
+        && (resource.data.studentId == null || resource.data.studentId == request.auth.uid)
+        && (request.resource.data.studentId == null || request.resource.data.studentId == request.auth.uid)
+        && (resource.data.centerId == null || resource.data.centerId == centerId)
+        && (request.resource.data.centerId == null || request.resource.data.centerId == centerId);
+    }
+
+    function isAllowedSelfPlanItemDelete(centerId, studentId) {
+      return isSelfCenterMember(centerId, studentId)
+        && (resource.data.studentId == null || resource.data.studentId == request.auth.uid)
+        && (resource.data.centerId == null || resource.data.centerId == centerId);
+    }
+
+    function isAllowedSelfScheduleCreate(userId, dateKey) {
+      return isSignedIn()
+        && request.auth.uid == userId
+        && request.resource.data.uid == userId
+        && request.resource.data.dateKey == dateKey
+        && request.resource.data.centerId != null
+        && isSelfCenterMember(request.resource.data.centerId, userId);
+    }
+
+    function isAllowedSelfScheduleUpdate(userId, dateKey) {
+      return isSignedIn()
+        && request.auth.uid == userId
+        && request.resource.data.uid == userId
+        && request.resource.data.dateKey == dateKey
+        && request.resource.data.centerId != null
+        && (resource.data.centerId == null || request.resource.data.centerId == resource.data.centerId)
+        && isSelfCenterMember(request.resource.data.centerId, userId);
+    }
+
+    function isAllowedSelfScheduleDelete(userId) {
+      return isSignedIn()
+        && request.auth.uid == userId
+        && resource.data.centerId != null
+        && isSelfCenterMember(resource.data.centerId, userId);
+    }
+
+    function isAllowedSelfScheduleTemplateWrite(userId) {
+      return isSignedIn()
+        && request.auth.uid == userId
+        && request.resource.data.centerId != null
+        && isSelfCenterMember(request.resource.data.centerId, userId);
+    }
+
+    function isAllowedSelfScheduleTemplateDelete(userId) {
+      return isSignedIn()
+        && request.auth.uid == userId
+        && resource.data.centerId != null
+        && isSelfCenterMember(resource.data.centerId, userId);
     }
 
     match /users/{userId} {
@@ -282,16 +331,19 @@ service cloud.firestore {
           && isTeacherOrAdmin(request.resource.data.centerId)
           && centerHasStudent(request.resource.data.centerId, userId)
           && request.resource.data.uid == userId
-          && request.resource.data.dateKey == dateKey;
+          && request.resource.data.dateKey == dateKey
+          || isAllowedSelfScheduleCreate(userId, dateKey);
         allow update: if request.resource.data.centerId != null
           && (resource.data.centerId == null || request.resource.data.centerId == resource.data.centerId)
           && isTeacherOrAdmin(request.resource.data.centerId)
           && centerHasStudent(request.resource.data.centerId, userId)
           && request.resource.data.uid == userId
-          && request.resource.data.dateKey == dateKey;
+          && request.resource.data.dateKey == dateKey
+          || isAllowedSelfScheduleUpdate(userId, dateKey);
         allow delete: if resource.data.centerId != null
           && isTeacherOrAdmin(resource.data.centerId)
-          && centerHasStudent(resource.data.centerId, userId);
+          && centerHasStudent(resource.data.centerId, userId)
+          || isAllowedSelfScheduleDelete(userId);
       }
 
       match /scheduleTemplates/{templateId} {
@@ -299,14 +351,17 @@ service cloud.firestore {
           || (resource.data.centerId != null && isTeacherOrAdmin(resource.data.centerId));
         allow create: if request.resource.data.centerId != null
           && isTeacherOrAdmin(request.resource.data.centerId)
-          && centerHasStudent(request.resource.data.centerId, userId);
+          && centerHasStudent(request.resource.data.centerId, userId)
+          || isAllowedSelfScheduleTemplateWrite(userId);
         allow update: if request.resource.data.centerId != null
           && (resource.data.centerId == null || request.resource.data.centerId == resource.data.centerId)
           && isTeacherOrAdmin(request.resource.data.centerId)
-          && centerHasStudent(request.resource.data.centerId, userId);
+          && centerHasStudent(request.resource.data.centerId, userId)
+          || isAllowedSelfScheduleTemplateWrite(userId);
         allow delete: if resource.data.centerId != null
           && isTeacherOrAdmin(resource.data.centerId)
-          && centerHasStudent(resource.data.centerId, userId);
+          && centerHasStudent(resource.data.centerId, userId)
+          || isAllowedSelfScheduleTemplateDelete(userId);
       }
 
       match /plannerDiagnostics/{diagnosisId} {
@@ -423,7 +478,8 @@ service cloud.firestore {
           || isAllowedSelfPlanItemCreate(centerId, studentId);
         allow update: if isTeacherOrAdmin(centerId)
           || isAllowedSelfPlanItemUpdate(centerId, studentId);
-        allow delete: if isCenterAdmin(centerId);
+        allow delete: if isTeacherOrAdmin(centerId)
+          || isAllowedSelfPlanItemDelete(centerId, studentId);
       }
 
       match /parentAiCache/{studentId}/days/{dateKey} {
