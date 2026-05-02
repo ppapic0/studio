@@ -1238,6 +1238,8 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
   const canAdjustStudentPoints = canAccessAdminOnlyOperations;
   const canEditFocusSchedule =
     activeMembership?.role === 'teacher' || canAccessAdminOnlyOperations;
+  const canEditFocusContact =
+    activeMembership?.role === 'teacher' || canAccessAdminOnlyOperations;
   const canWriteFocusCounseling =
     activeMembership?.role === 'teacher' || canAccessAdminOnlyOperations;
   const todayKey = today ? format(today, 'yyyy-MM-dd') : '';
@@ -7704,11 +7706,11 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
     }
   };
   const openFocusPhoneEditor = (mode: 'student' | 'parent') => {
-    if (!canAccessAdminOnlyOperations) {
+    if (!canEditFocusContact) {
       toast({
         variant: 'destructive',
         title: '번호 수정 권한이 없습니다.',
-        description: '센터관리자 계정에서만 학생/학부모 번호를 수정할 수 있습니다.',
+        description: '센터관리자 또는 선생님 계정에서 학생/학부모 번호를 수정할 수 있습니다.',
       });
       return;
     }
@@ -7723,11 +7725,11 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
   };
   const handleSaveFocusStudentPhone = async () => {
     if (!functions || !centerId || !selectedFocusStudentId) return;
-    if (!canAccessAdminOnlyOperations) {
+    if (!canEditFocusContact) {
       toast({
         variant: 'destructive',
         title: '번호 수정 권한이 없습니다.',
-        description: '센터관리자 계정에서만 학생 번호를 수정할 수 있습니다.',
+        description: '센터관리자 또는 선생님 계정에서 학생 번호를 수정할 수 있습니다.',
       });
       return;
     }
@@ -7767,11 +7769,11 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
   };
   const handleSaveFocusParentPhone = async () => {
     if (!functions || !centerId || !selectedFocusStudentId) return;
-    if (!canAccessAdminOnlyOperations) {
+    if (!canEditFocusContact) {
       toast({
         variant: 'destructive',
         title: '번호 수정 권한이 없습니다.',
-        description: '센터관리자 계정에서만 학부모 번호를 수정할 수 있습니다.',
+        description: '센터관리자 또는 선생님 계정에서 학부모 번호를 수정할 수 있습니다.',
       });
       return;
     }
@@ -11806,7 +11808,7 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
                           <Phone className="h-3.5 w-3.5" />
                           <p className="text-[10px] font-black uppercase tracking-[0.14em]">학생 번호</p>
                         </div>
-                        {canAccessAdminOnlyOperations && focusPhoneEditMode !== 'student' ? (
+                        {canEditFocusContact && focusPhoneEditMode !== 'student' ? (
                           <Button
                             type="button"
                             size="sm"
@@ -11862,7 +11864,7 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
                           <Phone className="h-3.5 w-3.5" />
                           <p className="text-[10px] font-black uppercase tracking-[0.14em]">어머님 번호</p>
                         </div>
-                        {canAccessAdminOnlyOperations && focusPhoneEditMode !== 'parent' ? (
+                        {canEditFocusContact && focusPhoneEditMode !== 'parent' ? (
                           <Button
                             type="button"
                             size="sm"

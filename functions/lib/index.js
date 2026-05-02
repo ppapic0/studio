@@ -4877,9 +4877,9 @@ exports.updateStudentAccount = functions.region(region).https.onCall(async (data
             userMessage: "상태 값이 올바르지 않습니다. 재원/휴원/퇴원 중에서 선택해 주세요.",
         });
     }
-    if (phoneNumberProvided && !isAdminCaller) {
-        throw new functions.https.HttpsError("permission-denied", "Only admins can change student phone numbers.", {
-            userMessage: "학생 전화번호 변경은 센터 관리자만 가능합니다.",
+    if (phoneNumberProvided && !canEditOtherStudent) {
+        throw new functions.https.HttpsError("permission-denied", "Only teachers or admins can change student phone numbers.", {
+            userMessage: "학생 전화번호 변경은 센터 관리자 또는 선생님만 가능합니다.",
         });
     }
     if (phoneNumberProvided && phoneNumber !== null && String(phoneNumber).trim() && !normalizedPhoneNumber) {
@@ -4915,7 +4915,7 @@ exports.updateStudentAccount = functions.region(region).https.onCall(async (data
     }
     const timestamp = admin.firestore.Timestamp.now();
     const logPhoneNumberChangeIfNeeded = async () => {
-        if (!isAdminCaller || !phoneNumberProvided)
+        if (!canEditOtherStudent || !phoneNumberProvided)
             return;
         try {
             await writeStudentPhoneNumberAuditLog({
@@ -6759,7 +6759,7 @@ exports.cancelSmsQueueItem = functions.region(region).https.onCall(async (data, 
     return { ok: true };
 });
 exports.updateSmsRecipientPreference = functions.region(region).https.onCall(async (data, context) => {
-    var _a, _b, _c, _d, _e;
+    var _a, _b, _c, _d;
     const db = admin.firestore();
     if (!context.auth) {
         throw new functions.https.HttpsError("unauthenticated", "로그인이 필요합니다.");
@@ -6777,10 +6777,11 @@ exports.updateSmsRecipientPreference = functions.region(region).https.onCall(asy
     if (!centerId || !studentId || !parentUid) {
         throw new functions.https.HttpsError("invalid-argument", "centerId, studentId, parentUid가 필요합니다.");
     }
-    const callerMemberSnap = await db.doc(`centers/${centerId}/members/${context.auth.uid}`).get();
-    const callerRole = callerMemberSnap.exists ? (_a = callerMemberSnap.data()) === null || _a === void 0 ? void 0 : _a.role : null;
-    if (!isAdminRole(callerRole)) {
-        throw new functions.https.HttpsError("permission-denied", "센터 관리자만 수신 설정을 수정할 수 있습니다.");
+    const callerMembership = await resolveCenterMembershipRole(db, centerId, context.auth.uid);
+    if (!callerMembership.role ||
+        !isActiveMembershipStatus(callerMembership.status) ||
+        (callerMembership.role !== "teacher" && !isAdminRole(callerMembership.role))) {
+        throw new functions.https.HttpsError("permission-denied", "센터 관리자 또는 선생님만 수신 설정을 수정할 수 있습니다.");
     }
     const studentSnap = await db.doc(`centers/${centerId}/students/${studentId}`).get();
     if (!studentSnap.exists) {
@@ -6826,8 +6827,8 @@ exports.updateSmsRecipientPreference = functions.region(region).https.onCall(asy
         db.doc(`users/${parentUid}`).get(),
         db.doc(`centers/${centerId}/members/${parentUid}`).get(),
     ]);
-    const parentName = asTrimmedString(((_b = memberSnap.data()) === null || _b === void 0 ? void 0 : _b.displayName) || ((_c = userSnap.data()) === null || _c === void 0 ? void 0 : _c.displayName) || "학부모");
-    const phoneNumber = normalizePhoneNumber(((_d = userSnap.data()) === null || _d === void 0 ? void 0 : _d.phoneNumber) || ((_e = memberSnap.data()) === null || _e === void 0 ? void 0 : _e.phoneNumber) || phoneNumberOverride);
+    const parentName = asTrimmedString(((_a = memberSnap.data()) === null || _a === void 0 ? void 0 : _a.displayName) || ((_b = userSnap.data()) === null || _b === void 0 ? void 0 : _b.displayName) || "학부모");
+    const phoneNumber = normalizePhoneNumber(((_c = userSnap.data()) === null || _c === void 0 ? void 0 : _c.phoneNumber) || ((_d = memberSnap.data()) === null || _d === void 0 ? void 0 : _d.phoneNumber) || phoneNumberOverride);
     await db.doc(`centers/${centerId}/smsRecipientPreferences/${buildSmsRecipientPreferenceId(studentId, parentUid)}`).set({
         studentId,
         studentName,

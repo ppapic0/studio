@@ -6450,9 +6450,9 @@ export const updateStudentAccount = functions.region(region).https.onCall(async 
     });
   }
 
-  if (phoneNumberProvided && !isAdminCaller) {
-    throw new functions.https.HttpsError("permission-denied", "Only admins can change student phone numbers.", {
-      userMessage: "학생 전화번호 변경은 센터 관리자만 가능합니다.",
+  if (phoneNumberProvided && !canEditOtherStudent) {
+    throw new functions.https.HttpsError("permission-denied", "Only teachers or admins can change student phone numbers.", {
+      userMessage: "학생 전화번호 변경은 센터 관리자 또는 선생님만 가능합니다.",
     });
   }
 
@@ -6494,7 +6494,7 @@ export const updateStudentAccount = functions.region(region).https.onCall(async 
 
   const timestamp = admin.firestore.Timestamp.now();
   const logPhoneNumberChangeIfNeeded = async () => {
-    if (!isAdminCaller || !phoneNumberProvided) return;
+    if (!canEditOtherStudent || !phoneNumberProvided) return;
 
     try {
       await writeStudentPhoneNumberAuditLog({
@@ -8602,10 +8602,13 @@ export const updateSmsRecipientPreference = functions.region(region).https.onCal
     throw new functions.https.HttpsError("invalid-argument", "centerId, studentId, parentUid가 필요합니다.");
   }
 
-  const callerMemberSnap = await db.doc(`centers/${centerId}/members/${context.auth.uid}`).get();
-  const callerRole = callerMemberSnap.exists ? callerMemberSnap.data()?.role : null;
-  if (!isAdminRole(callerRole)) {
-    throw new functions.https.HttpsError("permission-denied", "센터 관리자만 수신 설정을 수정할 수 있습니다.");
+  const callerMembership = await resolveCenterMembershipRole(db, centerId, context.auth.uid);
+  if (
+    !callerMembership.role ||
+    !isActiveMembershipStatus(callerMembership.status) ||
+    (callerMembership.role !== "teacher" && !isAdminRole(callerMembership.role))
+  ) {
+    throw new functions.https.HttpsError("permission-denied", "센터 관리자 또는 선생님만 수신 설정을 수정할 수 있습니다.");
   }
 
   const studentSnap = await db.doc(`centers/${centerId}/students/${studentId}`).get();
