@@ -72,12 +72,18 @@ import {
 } from '@/lib/student-rewards';
 import { getCurrentStudyDayLiveSeconds, getStudyDayContext, isStudyBoxCarryoverOpenable } from '@/lib/study-day';
 import { readStudyBoxOpenedCache, writeStudyBoxOpenedCache } from '@/lib/study-box-opened-cache';
-import { openStudyRewardBoxesSecure } from '@/lib/study-box-actions';
+import {
+  openStudyRewardBoxSecure,
+  openStudyRewardBoxesSecure,
+  type OpenStudyRewardBoxSecureResult,
+  type OpenStudyRewardBoxesSecureResult,
+} from '@/lib/study-box-actions';
 import { GiftishowOrder, GiftishowProduct, GiftishowSettings, GrowthProgress, PointBoostEvent, StudyLogDay } from '@/lib/types';
 import { cn } from '@/lib/utils';
 
 const REWARD_BOX_BURST_DELAY_MS = 420;
 const REWARD_TEXT_REVEAL_DELAY_MS = 620;
+const REWARD_PERSIST_REVEAL_GRACE_MS = 1200;
 const POINT_BREAKDOWN_CHIP_CLASS = {
   box: 'bg-[#FFF3E2] text-[#915A1E]',
   rank: 'bg-[#EAF1FF] text-[#3357A5]',
@@ -298,6 +304,7 @@ function buildRewardBoxes({
   centerId,
   studentId,
   dateKey,
+  readyFromEarnedHours = false,
 }: {
   earnedHours: number;
   claimedHours: number[];
@@ -306,6 +313,7 @@ function buildRewardBoxes({
   centerId?: string | null;
   studentId?: string | null;
   dateKey?: string | null;
+  readyFromEarnedHours?: boolean;
 }) {
   const claimedSet = new Set(claimedHours);
   const openedSet = new Set(openedHours);
@@ -314,9 +322,10 @@ function buildRewardBoxes({
 
   return Array.from({ length: 8 }, (_, index) => {
     const hour = index + 1;
+    const isEarnedReady = readyFromEarnedHours && hour <= cappedEarned;
     const state: BoxState = openedSet.has(hour)
       ? 'opened'
-      : claimedSet.has(hour)
+      : claimedSet.has(hour) || isEarnedReady
         ? 'ready'
         : hour === nextHour && cappedEarned < 8
           ? 'charging'
@@ -525,8 +534,12 @@ export default function GrowthPage() {
   const todayLog = useMemo(() => {
     return (seasonStudyLogs || []).find((log) => log.dateKey === activeStudyDayKey) || null;
   }, [activeStudyDayKey, seasonStudyLogs]);
+  const previousStudyDayLog = useMemo(() => {
+    return (seasonStudyLogs || []).find((log) => log.dateKey === previousStudyDayKey) || null;
+  }, [previousStudyDayKey, seasonStudyLogs]);
 
   const todayMinutes = getEffectiveStudyLogMinutes(todayLog);
+  const previousStudyDayMinutes = getEffectiveStudyLogMinutes(previousStudyDayLog);
   const weeklyMinutes = useMemo(() => {
     const keys = new Set(Array.from({ length: 7 }, (_, index) => format(subDays(activeStudyDayDate, index), 'yyyy-MM-dd')));
     return (seasonStudyLogs || [])
@@ -874,6 +887,7 @@ export default function GrowthPage() {
     return map;
   }, [persistedCarryoverRewardEntries]);
   const earnedBoxes = Math.min(8, Math.floor(liveTodaySeconds / 3600));
+  const previousStudyDayEarnedBoxes = Math.min(8, Math.floor(Math.max(0, previousStudyDayMinutes) / 60));
   const currentCycleSeconds = earnedBoxes >= 8 ? 3600 : liveTodaySeconds % 3600;
   const nextBoxSecondsLeft = earnedBoxes >= 8 ? 0 : Math.max(0, 3600 - currentCycleSeconds);
   const progressPercent = earnedBoxes >= 8 ? 100 : Math.max(4, (currentCycleSeconds / 3600) * 100);
@@ -897,6 +911,7 @@ export default function GrowthPage() {
         centerId: activeMembership?.id,
         studentId: studentUid,
         dateKey: activeStudyDayKey,
+        readyFromEarnedHours: true,
       }),
     [activeMembership?.id, activeStudyDayKey, renderableTodayStudyBoxState, rewardByHour, studentUid]
   );
@@ -998,7 +1013,7 @@ export default function GrowthPage() {
     const nextDayStatus = {
       ...todayStatus,
       claimedStudyBoxes: nextClaimedBoxes,
-      openedStudyBoxes: normalizeStudyBoxHours(persistedOpenedBoxes),
+      openedStudyBoxes: normalizeStudyBoxHours([...persistedOpenedBoxes, ...openedBoxes]),
       studyBoxRewards: nextRewardEntries,
     };
 
@@ -1073,6 +1088,114 @@ export default function GrowthPage() {
     pendingBoxOpenHoursRef.current.set(dateKey, pendingHours);
   };
 
+  const removePendingBoxOpens = (dateKey: string, hours: number[]) => {
+    const currentPendingHours = pendingBoxOpenHoursRef.current.get(dateKey);
+    if (!currentPendingHours) return;
+
+    hours.forEach((hour) => currentPendingHours.delete(hour));
+    if (currentPendingHours.size === 0) {
+      pendingBoxOpenHoursRef.current.delete(dateKey);
+    }
+  };
+
+  const applyStudyBoxOpenPersistenceResult = (
+    dateKey: string,
+    result: OpenStudyRewardBoxSecureResult | OpenStudyRewardBoxesSecureResult
+  ) => {
+    const nextOpenedBoxes = Array.isArray(result.openedStudyBoxes)
+      ? normalizeStudyBoxHours(result.openedStudyBoxes)
+      : null;
+    const nextClaimedBoxes = Array.isArray(result.claimedStudyBoxes)
+      ? normalizeStudyBoxHours(result.claimedStudyBoxes)
+      : null;
+    const persistedRewards: StudyBoxReward[] = [];
+
+    if ('reward' in result && result.reward) {
+      persistedRewards.push(result.reward);
+    }
+    if ('rewards' in result && Array.isArray(result.rewards)) {
+      persistedRewards.push(...result.rewards);
+    }
+
+    if (dateKey === activeStudyDayKey) {
+      if (nextOpenedBoxes) {
+        setOpenedBoxes((prev) => {
+          const mergedOpenedBoxes = normalizeStudyBoxHours([...prev, ...nextOpenedBoxes]);
+          writeStudyBoxOpenedCache(studyBoxCacheUid, dateKey, mergedOpenedBoxes);
+          return mergedOpenedBoxes;
+        });
+      }
+      if (nextClaimedBoxes) {
+        setClaimedBoxes((prev) => {
+          const mergedClaimedBoxes = normalizeStudyBoxHours([...prev, ...nextClaimedBoxes]);
+          writeStudyBoxHoursCache(claimCacheKey, mergedClaimedBoxes);
+          return mergedClaimedBoxes;
+        });
+      }
+      if (persistedRewards.length > 0) {
+        setRewardEntries((prev) =>
+          persistedRewards.reduce((entries, reward) => upsertStudyBoxRewardEntry(entries, reward), prev)
+        );
+      }
+    } else if (nextOpenedBoxes) {
+      setCarryoverOpenedBoxes((prev) => {
+        const mergedOpenedBoxes = normalizeStudyBoxHours([...prev, ...nextOpenedBoxes]);
+        writeStudyBoxOpenedCache(studyBoxCacheUid, dateKey, mergedOpenedBoxes);
+        return mergedOpenedBoxes;
+      });
+    }
+
+    if (typeof result.pointsBalance === 'number') {
+      setPointBalance((current) => Math.max(current, result.pointsBalance || 0));
+    }
+  };
+
+  const markStudyBoxOpenLocally = (dateKey: string, hour: number, rewardEntry: StudyBoxReward) => {
+    queuePendingBoxOpen(dateKey, hour);
+
+    if (dateKey === activeStudyDayKey) {
+      setOpenedBoxes((prev) => {
+        const nextOpenedBoxes = normalizeStudyBoxHours([...prev, hour]);
+        writeStudyBoxOpenedCache(studyBoxCacheUid, dateKey, nextOpenedBoxes);
+        return nextOpenedBoxes;
+      });
+      setClaimedBoxes((prev) => {
+        const nextClaimedBoxes = normalizeStudyBoxHours([...prev, hour]);
+        writeStudyBoxHoursCache(claimCacheKey, nextClaimedBoxes);
+        return nextClaimedBoxes;
+      });
+      setRewardEntries((prev) => upsertStudyBoxRewardEntry(prev, rewardEntry));
+      return;
+    }
+
+    setCarryoverOpenedBoxes((prev) => {
+      const nextOpenedBoxes = normalizeStudyBoxHours([...prev, hour]);
+      writeStudyBoxOpenedCache(studyBoxCacheUid, dateKey, nextOpenedBoxes);
+      return nextOpenedBoxes;
+    });
+  };
+
+  const persistSingleStudyBoxOpen = async (dateKey: string, hour: number, rewardEntry: StudyBoxReward) => {
+    if (!activeMembership?.id || !studentUid) return null;
+
+    try {
+      const result = await openStudyRewardBoxSecure({
+        centerId: activeMembership.id,
+        studentId: studentUid,
+        dateKey,
+        hour,
+        reward: rewardEntry,
+      });
+      applyStudyBoxOpenPersistenceResult(dateKey, result);
+      removePendingBoxOpens(dateKey, [hour]);
+      return typeof result.reward?.awardedPoints === 'number' ? result.reward.awardedPoints : null;
+    } catch (error) {
+      console.warn('[point-track] reward box immediate open failed', error);
+      void flushPendingBoxOpens();
+      return null;
+    }
+  };
+
   const flushPendingBoxOpens = async () => {
     if (isFlushingBoxOpensRef.current || !activeMembership?.id || !studentUid) return;
     const batches = Array.from(pendingBoxOpenHoursRef.current.entries())
@@ -1094,44 +1217,8 @@ export default function GrowthPage() {
           dateKey: batch.dateKey,
           hours: batch.hours,
         });
-        const nextOpenedBoxes = Array.isArray(result.openedStudyBoxes)
-          ? normalizeStudyBoxHours(result.openedStudyBoxes)
-          : null;
-        const nextClaimedBoxes = Array.isArray(result.claimedStudyBoxes)
-          ? normalizeStudyBoxHours(result.claimedStudyBoxes)
-          : null;
-        const rewardEntries = Array.isArray(result.rewards) ? result.rewards : [];
-
-        if (batch.dateKey === activeStudyDayKey) {
-          if (nextOpenedBoxes) {
-            setOpenedBoxes(nextOpenedBoxes);
-            writeStudyBoxOpenedCache(studyBoxCacheUid, batch.dateKey, nextOpenedBoxes);
-          }
-          if (nextClaimedBoxes) {
-            setClaimedBoxes(nextClaimedBoxes);
-            writeStudyBoxHoursCache(claimCacheKey, nextClaimedBoxes);
-          }
-          if (rewardEntries.length > 0) {
-            setRewardEntries((prev) =>
-              rewardEntries.reduce((entries, reward) => upsertStudyBoxRewardEntry(entries, reward), prev)
-            );
-          }
-        } else if (nextOpenedBoxes) {
-          setCarryoverOpenedBoxes(nextOpenedBoxes);
-          writeStudyBoxOpenedCache(studyBoxCacheUid, batch.dateKey, nextOpenedBoxes);
-        }
-
-        if (typeof result.pointsBalance === 'number') {
-          setPointBalance((current) => Math.max(current, result.pointsBalance || 0));
-        }
-
-        const currentPendingHours = pendingBoxOpenHoursRef.current.get(batch.dateKey);
-        if (currentPendingHours) {
-          batch.hours.forEach((hour) => currentPendingHours.delete(hour));
-          if (currentPendingHours.size === 0) {
-            pendingBoxOpenHoursRef.current.delete(batch.dateKey);
-          }
-        }
+        applyStudyBoxOpenPersistenceResult(batch.dateKey, result);
+        removePendingBoxOpens(batch.dateKey, batch.hours);
       }
       shouldContinueFlush = pendingBoxOpenHoursRef.current.size > 0;
     } catch (error) {
@@ -1157,7 +1244,7 @@ export default function GrowthPage() {
     const cachedOpenedBoxes = readStudyBoxOpenedCache(studyBoxCacheUid, activeStudyDayKey);
     const unsyncedOpenedBoxes = normalizeStudyBoxHours(
       cachedOpenedBoxes.filter(
-        (hour) => persistedClaimedBoxes.includes(hour) && !persistedOpenedBoxes.includes(hour)
+        (hour) => (persistedClaimedBoxes.includes(hour) || hour <= earnedBoxes) && !persistedOpenedBoxes.includes(hour)
       )
     );
     if (unsyncedOpenedBoxes.length === 0) return;
@@ -1173,8 +1260,41 @@ export default function GrowthPage() {
   }, [
     activeMembership?.id,
     activeStudyDayKey,
+    earnedBoxes,
     persistedClaimedBoxes,
     persistedOpenedBoxes,
+    studentUid,
+    studyBoxCacheUid,
+  ]);
+
+  useEffect(() => {
+    if (!activeMembership?.id || !studentUid || !previousStudyDayKey || !studyBoxCacheUid || !canOpenPreviousStudyDayBoxes) return;
+
+    const cachedOpenedBoxes = readStudyBoxOpenedCache(studyBoxCacheUid, previousStudyDayKey);
+    const unsyncedOpenedBoxes = normalizeStudyBoxHours(
+      cachedOpenedBoxes.filter(
+        (hour) =>
+          (persistedCarryoverClaimedBoxes.includes(hour) || hour <= previousStudyDayEarnedBoxes) &&
+          !persistedCarryoverOpenedBoxes.includes(hour)
+      )
+    );
+    if (unsyncedOpenedBoxes.length === 0) return;
+
+    const retryKey = `${previousStudyDayKey}:carryover:${unsyncedOpenedBoxes.join(',')}:${persistedCarryoverOpenedBoxes.join(',')}`;
+    if (retriedCachedBoxOpenKeyRef.current === retryKey) return;
+    retriedCachedBoxOpenKeyRef.current = retryKey;
+
+    const pendingHours = pendingBoxOpenHoursRef.current.get(previousStudyDayKey) ?? new Set<number>();
+    unsyncedOpenedBoxes.forEach((hour) => pendingHours.add(hour));
+    pendingBoxOpenHoursRef.current.set(previousStudyDayKey, pendingHours);
+    void flushPendingBoxOpens();
+  }, [
+    activeMembership?.id,
+    canOpenPreviousStudyDayBoxes,
+    persistedCarryoverClaimedBoxes,
+    persistedCarryoverOpenedBoxes,
+    previousStudyDayEarnedBoxes,
+    previousStudyDayKey,
     studentUid,
     studyBoxCacheUid,
   ]);
@@ -1235,6 +1355,8 @@ export default function GrowthPage() {
       dateKey: activeVaultDateKey,
       milestone: targetHour,
     });
+    markStudyBoxOpenLocally(activeVaultDateKey, targetHour, optimisticRewardEntry);
+    const persistedRewardPromise = persistSingleStudyBoxOpen(activeVaultDateKey, targetHour, optimisticRewardEntry);
 
     const shakeTimeout = setTimeout(() => {
       if (activeRevealTokenRef.current === revealToken) {
@@ -1244,43 +1366,28 @@ export default function GrowthPage() {
     timeoutsRef.current.push(shakeTimeout);
 
     const revealTimeout = setTimeout(() => {
-      const optimisticReward = optimisticRewardEntry.awardedPoints ?? targetBox.reward ?? 0;
-      queuePendingBoxOpen(activeVaultDateKey, targetHour);
+      void (async () => {
+        const optimisticReward = optimisticRewardEntry.awardedPoints ?? targetBox.reward ?? 0;
+        const persistedReward = await Promise.race([
+          persistedRewardPromise,
+          new Promise<null>((resolve) => window.setTimeout(() => resolve(null), REWARD_PERSIST_REVEAL_GRACE_MS)),
+        ]);
+        const rewardToReveal = typeof persistedReward === 'number' ? persistedReward : optimisticReward;
 
-      if (activeVaultDateKey === activeStudyDayKey) {
-        setOpenedBoxes((prev) => {
-          const nextOpenedBoxes = normalizeStudyBoxHours([...prev, targetHour]);
-          writeStudyBoxOpenedCache(studyBoxCacheUid, activeStudyDayKey, nextOpenedBoxes);
-          return nextOpenedBoxes;
-        });
-        setClaimedBoxes((prev) => {
-          const nextClaimedBoxes = normalizeStudyBoxHours([...prev, targetHour]);
-          writeStudyBoxHoursCache(claimCacheKey, nextClaimedBoxes);
-          return nextClaimedBoxes;
-        });
-        setRewardEntries((prev) => upsertStudyBoxRewardEntry(prev, optimisticRewardEntry));
-      } else {
-        setCarryoverOpenedBoxes((prev) => {
-          const nextOpenedBoxes = normalizeStudyBoxHours([...prev, targetHour]);
-          writeStudyBoxOpenedCache(studyBoxCacheUid, activeVaultDateKey, nextOpenedBoxes);
-          return nextOpenedBoxes;
-        });
-      }
+        openingBoxHoursRef.current.delete(targetHour);
+        setOpeningBoxHours(Array.from(openingBoxHoursRef.current).sort((a, b) => a - b));
 
-      openingBoxHoursRef.current.delete(targetHour);
-      setOpeningBoxHours(Array.from(openingBoxHoursRef.current).sort((a, b) => a - b));
-
-      if (activeRevealTokenRef.current === revealToken) {
-        const floatingKey = Date.now();
-        setRevealedReward(optimisticReward);
-        setBoxStage('revealed');
-        setFloatingGain({ key: floatingKey, amount: optimisticReward });
-        const clearFloating = setTimeout(() => {
-          setFloatingGain((current) => (current?.key === floatingKey ? null : current));
-        }, 1800);
-        timeoutsRef.current.push(clearFloating);
-      }
-      void flushPendingBoxOpens();
+        if (activeRevealTokenRef.current === revealToken) {
+          const floatingKey = Date.now();
+          setRevealedReward(rewardToReveal);
+          setBoxStage('revealed');
+          setFloatingGain({ key: floatingKey, amount: rewardToReveal });
+          const clearFloating = setTimeout(() => {
+            setFloatingGain((current) => (current?.key === floatingKey ? null : current));
+          }, 1800);
+          timeoutsRef.current.push(clearFloating);
+        }
+      })();
     }, REWARD_TEXT_REVEAL_DELAY_MS);
 
     timeoutsRef.current.push(revealTimeout);
