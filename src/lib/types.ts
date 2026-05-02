@@ -259,6 +259,11 @@ export interface StudentProfile {
   studyPlannerDiagnostic?: StudyPlannerDiagnosticRecord;
   routineSocialProfile?: RoutineSocialProfile;
   savedRoutineTemplates?: RoutineTemplateSave[];
+  operationsCautionMemo?: string | null;
+  operationsSharedMemo?: string | null;
+  operationsMemoUpdatedAt?: Timestamp;
+  operationsMemoUpdatedByUid?: string | null;
+  operationsMemoUpdatedByName?: string | null;
 }
 
 export interface BillingProfile {

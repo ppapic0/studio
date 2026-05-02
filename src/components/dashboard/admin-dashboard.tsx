@@ -86,11 +86,12 @@ import {
   Search,
   UserPlus,
   PlusCircle,
+  PencilLine,
 } from 'lucide-react';
 import { useFirestore, useCollection, useFunctions, useDoc, useUser } from '@/firebase';
 import { useAppContext } from '@/contexts/app-context';
 import { useMemoFirebase } from '@/hooks/use-memo-firebase';
-import { addDoc, collection, query, where, Timestamp, doc, limit, getDoc, getDocs, orderBy, serverTimestamp, documentId, writeBatch, deleteField } from 'firebase/firestore';
+import { addDoc, collection, query, where, Timestamp, doc, limit, getDoc, getDocs, orderBy, serverTimestamp, documentId, writeBatch, deleteField, updateDoc } from 'firebase/firestore';
 import { httpsCallable } from 'firebase/functions';
 import { AttendanceCurrent, AttendanceRequest, CounselingReservation, DailyStudentStat, DailyReport, CenterMembership, InviteCode, GrowthProgress, ParentActivityEvent, CounselingLog, CounselingLogStatus, LayoutRoomConfig, StudentProfile, StudentScheduleDoc, StudentScheduleTemplate, StudyLogDay, OpenClawIntegrationDoc, OpenClawSnapshotRecordCounts, PointBoostEvent, StudyPlanItem, WebsiteSeatHoldRequest } from '@/lib/types';
 import { addDays, format, startOfWeek, subDays } from 'date-fns';
@@ -1181,6 +1182,10 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
   const [isFocusParentLinkCodeEditing, setIsFocusParentLinkCodeEditing] = useState(false);
   const [focusParentLinkCodeDraft, setFocusParentLinkCodeDraft] = useState('');
   const [isFocusParentLinkCodeSaving, setIsFocusParentLinkCodeSaving] = useState(false);
+  const [isFocusStudentMemoEditing, setIsFocusStudentMemoEditing] = useState(false);
+  const [focusStudentCautionDraft, setFocusStudentCautionDraft] = useState('');
+  const [focusStudentSharedMemoDraft, setFocusStudentSharedMemoDraft] = useState('');
+  const [isFocusStudentMemoSaving, setIsFocusStudentMemoSaving] = useState(false);
   const [focusStudyTotalsRepairing, setFocusStudyTotalsRepairing] = useState(false);
   const [isManualStudySessionDialogOpen, setIsManualStudySessionDialogOpen] = useState(false);
   const [manualStudySessionStartDraft, setManualStudySessionStartDraft] = useState('');
@@ -1264,6 +1269,8 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
   const canEditFocusContact =
     activeMembership?.role === 'teacher' || canAccessAdminOnlyOperations;
   const canWriteFocusCounseling =
+    activeMembership?.role === 'teacher' || canAccessAdminOnlyOperations;
+  const canEditFocusStudentMemo =
     activeMembership?.role === 'teacher' || canAccessAdminOnlyOperations;
   const canUseSmsConsole =
     activeMembership?.role === 'teacher' || canAccessAdminOnlyOperations;
@@ -3405,6 +3412,34 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
       || null
     );
   }, [metrics, selectedFocusStudentId, studentMembersById, studentsById, todayStats, progressList, weeklyStudyMinutesByStudent, selectedFocusAttendanceSeat, attendanceSeatSignalsByStudentId]);
+
+  const selectedFocusStudentProfile = useMemo(
+    () => (selectedFocusStudentId ? studentsById.get(selectedFocusStudentId) || null : null),
+    [selectedFocusStudentId, studentsById]
+  );
+  const selectedFocusCautionMemo = selectedFocusStudentProfile?.operationsCautionMemo?.trim() || '';
+  const selectedFocusSharedMemo = selectedFocusStudentProfile?.operationsSharedMemo?.trim() || '';
+  const selectedFocusMemoUpdatedAt = toTimestampDateSafe(selectedFocusStudentProfile?.operationsMemoUpdatedAt);
+  const selectedFocusMemoUpdatedLabel = selectedFocusMemoUpdatedAt
+    ? format(selectedFocusMemoUpdatedAt, 'yyyy.MM.dd HH:mm')
+    : '아직 저장된 메모 없음';
+  const selectedFocusMemoUpdatedBy = selectedFocusStudentProfile?.operationsMemoUpdatedByName?.trim() || '운영팀';
+
+  useEffect(() => {
+    setIsFocusStudentMemoEditing(false);
+    setFocusStudentCautionDraft(selectedFocusStudentProfile?.operationsCautionMemo || '');
+    setFocusStudentSharedMemoDraft(selectedFocusStudentProfile?.operationsSharedMemo || '');
+  }, [selectedFocusStudentId]);
+
+  useEffect(() => {
+    if (isFocusStudentMemoEditing) return;
+    setFocusStudentCautionDraft(selectedFocusStudentProfile?.operationsCautionMemo || '');
+    setFocusStudentSharedMemoDraft(selectedFocusStudentProfile?.operationsSharedMemo || '');
+  }, [
+    isFocusStudentMemoEditing,
+    selectedFocusStudentProfile?.operationsCautionMemo,
+    selectedFocusStudentProfile?.operationsSharedMemo,
+  ]);
 
   const selectedFocusPlanSummary = useMemo(() => {
     if (!today || !todayKey) {
@@ -7805,6 +7840,70 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
     setFocusStudentPhoneDraft(normalizePhoneNumber(selectedFocusOperationsSummary?.studentPhone).slice(0, 11));
     setFocusParentPhoneDraft(normalizePhoneNumber(selectedFocusOperationsSummary?.parentPhone).slice(0, 11));
   };
+  const openFocusStudentMemoEditor = () => {
+    if (!canEditFocusStudentMemo) {
+      toast({
+        variant: 'destructive',
+        title: '메모 수정 권한이 없습니다.',
+        description: '센터관리자 또는 선생님 계정에서 학생별 공유 메모를 수정할 수 있습니다.',
+      });
+      return;
+    }
+    setFocusStudentCautionDraft(selectedFocusStudentProfile?.operationsCautionMemo || '');
+    setFocusStudentSharedMemoDraft(selectedFocusStudentProfile?.operationsSharedMemo || '');
+    setIsFocusStudentMemoEditing(true);
+  };
+  const closeFocusStudentMemoEditor = () => {
+    setFocusStudentCautionDraft(selectedFocusStudentProfile?.operationsCautionMemo || '');
+    setFocusStudentSharedMemoDraft(selectedFocusStudentProfile?.operationsSharedMemo || '');
+    setIsFocusStudentMemoEditing(false);
+  };
+  const handleSaveFocusStudentMemo = async () => {
+    if (!firestore || !centerId || !selectedFocusStudentId || !user) return;
+    if (!canEditFocusStudentMemo) {
+      toast({
+        variant: 'destructive',
+        title: '메모 수정 권한이 없습니다.',
+        description: '센터관리자 또는 선생님 계정에서 학생별 공유 메모를 수정할 수 있습니다.',
+      });
+      return;
+    }
+    if (!selectedFocusStudentProfile) {
+      toast({
+        variant: 'destructive',
+        title: '학생 정보를 찾지 못했습니다.',
+        description: '학생 프로필이 준비된 뒤 다시 저장해 주세요.',
+      });
+      return;
+    }
+
+    const cautionMemo = focusStudentCautionDraft.trim().slice(0, 800);
+    const sharedMemo = focusStudentSharedMemoDraft.trim().slice(0, 1200);
+
+    setIsFocusStudentMemoSaving(true);
+    try {
+      await updateDoc(doc(firestore, 'centers', centerId, 'students', selectedFocusStudentId), {
+        operationsCautionMemo: cautionMemo || null,
+        operationsSharedMemo: sharedMemo || null,
+        operationsMemoUpdatedAt: serverTimestamp(),
+        operationsMemoUpdatedByUid: user.uid,
+        operationsMemoUpdatedByName: user.displayName || activeMembership?.displayName || '운영팀',
+      });
+      toast({
+        title: '학생별 메모 저장 완료',
+        description: `${selectedFocusStudent?.name || selectedFocusStudentProfile.name || '학생'} 학생의 주의사항과 공유 메모를 저장했습니다.`,
+      });
+      setIsFocusStudentMemoEditing(false);
+    } catch (error) {
+      toast({
+        variant: 'destructive',
+        title: '학생별 메모 저장 실패',
+        description: getCallableErrorMessage(error, '잠시 후 다시 시도해 주세요.'),
+      });
+    } finally {
+      setIsFocusStudentMemoSaving(false);
+    }
+  };
   const handleSaveFocusStudentPhone = async () => {
     if (!functions || !centerId || !selectedFocusStudentId) return;
     if (!canEditFocusContact) {
@@ -11449,6 +11548,101 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
                       월~일까지 주간 등원 여부와 등하원·외출 시간을 설정할 수 있습니다. 센터관리자/선생님 직접 설정은 벌점을 부여하지 않습니다.
                     </div>
                   ) : null}
+
+                  <div className="mt-4 rounded-2xl border border-[#DCE7FF] bg-[#FBFCFF] p-3">
+                    <div className="flex flex-wrap items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-1.5 text-[#2554D7]">
+                          <MessageSquare className="h-3.5 w-3.5" />
+                          <p className="text-[11px] font-black text-[#14295F]">학생별 공유 메모</p>
+                        </div>
+                        <p className="mt-1 text-[10px] font-bold text-[#6E7EA3]">
+                          {selectedFocusMemoUpdatedLabel}
+                          {selectedFocusMemoUpdatedAt ? ` · ${selectedFocusMemoUpdatedBy}` : ''}
+                        </p>
+                      </div>
+                      {canEditFocusStudentMemo && !isFocusStudentMemoEditing ? (
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="outline"
+                          className="h-8 rounded-full border-[#DCE7FF] bg-white px-3 text-[11px] font-black text-[#14295F] hover:bg-[#EEF4FF]"
+                          onClick={openFocusStudentMemoEditor}
+                        >
+                          <PencilLine className="mr-1.5 h-3.5 w-3.5" />
+                          메모 수정
+                        </Button>
+                      ) : null}
+                    </div>
+
+                    {isFocusStudentMemoEditing ? (
+                      <div className="mt-3 grid gap-3 lg:grid-cols-2">
+                        <div className="space-y-1.5">
+                          <Label className="text-[10px] font-black uppercase tracking-[0.14em] text-rose-600">주의사항</Label>
+                          <Textarea
+                            value={focusStudentCautionDraft}
+                            onChange={(event) => setFocusStudentCautionDraft(event.target.value.slice(0, 800))}
+                            placeholder="예: 늦은 하원 시 보호자 연락 먼저 확인"
+                            disabled={isFocusStudentMemoSaving}
+                            className="min-h-[7rem] resize-none rounded-2xl border-rose-100 bg-white text-sm font-bold leading-6 text-[#14295F] placeholder:text-[#9AA8C3]"
+                          />
+                        </div>
+                        <div className="space-y-1.5">
+                          <Label className="text-[10px] font-black uppercase tracking-[0.14em] text-[#2554D7]">공유 메모</Label>
+                          <Textarea
+                            value={focusStudentSharedMemoDraft}
+                            onChange={(event) => setFocusStudentSharedMemoDraft(event.target.value.slice(0, 1200))}
+                            placeholder="예: 최근 수학 오답 루틴을 잘 따라오고 있음"
+                            disabled={isFocusStudentMemoSaving}
+                            className="min-h-[7rem] resize-none rounded-2xl border-[#DCE7FF] bg-white text-sm font-bold leading-6 text-[#14295F] placeholder:text-[#9AA8C3]"
+                          />
+                        </div>
+                        <div className="flex flex-wrap justify-end gap-2 lg:col-span-2">
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="outline"
+                            className="h-9 rounded-xl border-[#DCE7FF] px-4 text-[11px] font-black text-[#14295F]"
+                            disabled={isFocusStudentMemoSaving}
+                            onClick={closeFocusStudentMemoEditor}
+                          >
+                            취소
+                          </Button>
+                          <Button
+                            type="button"
+                            size="sm"
+                            className="h-9 rounded-xl bg-[#14295F] px-4 text-[11px] font-black text-white hover:bg-[#173D8B]"
+                            disabled={isFocusStudentMemoSaving}
+                            onClick={() => void handleSaveFocusStudentMemo()}
+                          >
+                            {isFocusStudentMemoSaving ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> : <Save className="mr-1.5 h-3.5 w-3.5" />}
+                            저장
+                          </Button>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="mt-3 grid gap-3 lg:grid-cols-2">
+                        <div className="rounded-[1.15rem] border border-rose-100 bg-rose-50 px-3 py-3">
+                          <div className="flex items-center gap-1.5 text-rose-700">
+                            <ShieldAlert className="h-3.5 w-3.5" />
+                            <p className="text-[10px] font-black uppercase tracking-[0.14em]">주의사항</p>
+                          </div>
+                          <p className={cn('mt-2 whitespace-pre-wrap break-words text-xs font-bold leading-5', selectedFocusCautionMemo ? 'text-[#14295F]' : 'text-rose-400')}>
+                            {selectedFocusCautionMemo || '저장된 주의사항이 없습니다.'}
+                          </p>
+                        </div>
+                        <div className="rounded-[1.15rem] border border-[#DCE7FF] bg-white px-3 py-3">
+                          <div className="flex items-center gap-1.5 text-[#2554D7]">
+                            <ClipboardCheck className="h-3.5 w-3.5" />
+                            <p className="text-[10px] font-black uppercase tracking-[0.14em]">공유 메모</p>
+                          </div>
+                          <p className={cn('mt-2 whitespace-pre-wrap break-words text-xs font-bold leading-5', selectedFocusSharedMemo ? 'text-[#14295F]' : 'text-[#9AA8C3]')}>
+                            {selectedFocusSharedMemo || '공유 메모가 아직 없습니다.'}
+                          </p>
+                        </div>
+                      </div>
+                    )}
+                  </div>
 
                   <div className="mt-4 rounded-2xl border border-[#DCE7FF] bg-[#F7FAFF] p-3">
                     <div className="flex flex-wrap items-center justify-between gap-2">
