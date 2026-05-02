@@ -1993,7 +1993,7 @@ export default function NotificationSettingsPage() {
   };
 
   const handleSendBulkSms = async () => {
-    if (!functions || !centerId || !canUseSmsConsole) return;
+    if (!functions || !centerId || !isAdmin) return;
     if (!bulkSmsMessageForSend) {
       toast({
         variant: 'destructive',
@@ -2077,10 +2077,10 @@ export default function NotificationSettingsPage() {
     <div className={cn('mx-auto flex w-full max-w-7xl flex-col gap-6 px-4 pb-24', isMobile ? 'pt-1' : 'pt-4')}>
       <header className="space-y-1">
         <h1 className="flex items-center gap-2 text-3xl font-black tracking-tighter text-primary">
-          <BellRing className="h-7 w-7" /> {isAdmin ? '문자 알림 설정' : '문자 콘솔'}
+          <BellRing className="h-7 w-7" /> {isAdmin ? '문자 알림 설정' : '문자 알림'}
         </h1>
         <p className="text-xs font-bold uppercase tracking-[0.25em] text-muted-foreground/60">
-          {isAdmin ? '단문/장문 발송 · 직접 발송 · 수신 제어 · 30일 히스토리' : '문자 발송 · 학생별 현황 · 수신 제어 · 히스토리'}
+          {isAdmin ? '단문/장문 발송 · 직접 발송 · 수신 제어 · 30일 히스토리' : '학생별 문자 확인 · 직접 발송 · 수신 제어 · 히스토리'}
         </p>
       </header>
 
@@ -2273,6 +2273,7 @@ export default function NotificationSettingsPage() {
       </Card>
       ) : null}
 
+      {isAdmin ? (
       <Card className="rounded-[2rem] border-none shadow-xl ring-1 ring-black/[0.04]">
         <CardHeader className="border-b bg-muted/10">
           <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
@@ -2434,6 +2435,7 @@ export default function NotificationSettingsPage() {
           </section>
         </CardContent>
       </Card>
+      ) : null}
 
       <Card className="rounded-[2rem] border-none shadow-xl ring-1 ring-black/[0.04]">
         <CardHeader className="border-b bg-muted/10">

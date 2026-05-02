@@ -94,6 +94,7 @@ const navItems: Record<string, { href: string; label: string; icon: React.Elemen
     { href: '/dashboard/teacher/students', label: '학생 관리', icon: GraduationCap },
     { href: '/dashboard/leads', label: '홍보/상담 리드DB', icon: Megaphone },
     { href: '/dashboard/attendance', label: '출결/요청 확인', icon: ClipboardCheck },
+    { href: '/dashboard/settings/notifications', label: '문자 알림', icon: Bell },
     { href: '/dashboard/appointments', label: '상담트랙', icon: MessageCircle },
     { href: '/dashboard/leaderboards', label: '랭킹트랙', icon: Trophy },
   ],
