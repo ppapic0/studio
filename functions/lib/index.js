@@ -33,8 +33,8 @@ var __importStar = (this && this.__importStar) || (function () {
     };
 })();
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.stopStudentStudySessionSecure = exports.scheduledStudyBoxCarryoverExpiry = exports.openStudyRewardBoxesSecure = exports.openStudyRewardBoxSecure = exports.claimPlannerCompletionRewardSecure = exports.submitAttendanceRequestSecure = exports.applyPenaltyEventSecure = exports.adjustStudentPenaltyBalanceSecure = exports.adjustStudentPointBalanceSecure = exports.cancelPointBoostEventSecure = exports.createPointBoostEventSecure = exports.scheduledClassroomSignalsRefresh = exports.scheduledDailyRiskAlert = exports.repairRecentStudySessionTotals = exports.deleteManualStudySessionSecure = exports.updateManualStudySessionSecure = exports.createManualStudySessionSecure = exports.scheduledKioskAttendanceQueueWorker = exports.onKioskAttendanceQueueCreated = exports.enqueueKioskAttendanceActionSecure = exports.submitKioskAttendanceActionFast = exports.lookupKioskStudentsByPin = exports.setStudentAttendanceStatusSecure = exports.onSessionWritten = exports.onSessionCreated = exports.scheduledWeeklyReport = exports.cleanupOldDocuments = exports.scheduledAttendanceCheck = exports.runLateArrivalCheck = exports.sendPaymentReminderBatch = exports.notifyDailyReportReady = exports.notifyAttendanceSms = exports.scheduledSmsQueueDispatcher = exports.sendBulkManualSms = exports.sendManualStudentSms = exports.updateSmsRecipientPreference = exports.cancelSmsQueueItem = exports.retrySmsQueueItem = exports.saveNotificationSettingsSecure = exports.confirmInvoicePayment = exports.completeSignupWithInvite = exports.redeemInviteCode = exports.createCounselingDemoBundle = exports.syncStudentEmailsForCenter = exports.registerStudent = exports.updateStudentAccount = exports.deleteTeacherAccount = exports.deleteStudentAccount = exports.repairTodayAttendanceSmsQueue = exports.onAttendanceEventCreated = void 0;
-exports.generateStudyPlan = exports.syncGiftishowCatalogSecure = exports.scheduledGiftishowCatalogSync = exports.saveGiftishowSettingsSecure = exports.resendGiftishowOrderSecure = exports.rejectGiftishowOrderSecure = exports.reconcilePendingGiftishowOrders = exports.getGiftishowBizmoneySecure = exports.createGiftishowOrderRequestSecure = exports.cancelGiftishowOrderSecure = exports.cancelGiftishowSendFailSecure = exports.approveGiftishowOrderSecure = exports.reissueDailyRankingRewardV2Secure = exports.scheduledRankingRewardSettlement = exports.ensureCurrentUserMemberships = exports.scheduledOpenClawSnapshotExport = exports.generateOpenClawSnapshot = exports.refreshClassroomSignals = void 0;
+exports.scheduledStudyBoxCarryoverExpiry = exports.openStudyRewardBoxesSecure = exports.openStudyRewardBoxSecure = exports.claimPlannerCompletionRewardSecure = exports.submitAttendanceRequestSecure = exports.applyPenaltyEventSecure = exports.adjustStudentPenaltyBalanceSecure = exports.adjustStudentPointBalanceSecure = exports.cancelPointBoostEventSecure = exports.createPointBoostEventSecure = exports.scheduledClassroomSignalsRefresh = exports.scheduledDailyRiskAlert = exports.repairRecentStudySessionTotals = exports.deleteManualStudySessionSecure = exports.updateManualStudySessionSecure = exports.createManualStudySessionSecure = exports.scheduledKioskAttendanceQueueWorker = exports.onKioskAttendanceQueueCreated = exports.enqueueKioskAttendanceActionSecure = exports.submitKioskAttendanceActionFast = exports.lookupKioskStudentsByPin = exports.setStudentAttendanceStatusSecure = exports.onSessionWritten = exports.onSessionCreated = exports.scheduledWeeklyReport = exports.cleanupOldDocuments = exports.scheduledAttendanceCheck = exports.runLateArrivalCheck = exports.sendPaymentReminderBatch = exports.notifyDailyReportReady = exports.notifyAttendanceSms = exports.scheduledSmsQueueDispatcher = exports.sendBulkManualSms = exports.sendManualStudentSms = exports.updateSmsRecipientPreference = exports.cancelSmsQueueItem = exports.retrySmsQueueItem = exports.saveNotificationSettingsSecure = exports.confirmInvoicePayment = exports.completeSignupWithInvite = exports.redeemInviteCode = exports.createCounselingDemoBundle = exports.syncStudentEmailsForCenter = exports.registerStudent = exports.updateStudentAccount = exports.deleteTeacherAccount = exports.deleteStudentAccount = exports.saveStudentWeeklyAttendanceSchedule = exports.repairTodayAttendanceSmsQueue = exports.onAttendanceEventCreated = void 0;
+exports.generateStudyPlan = exports.syncGiftishowCatalogSecure = exports.scheduledGiftishowCatalogSync = exports.saveGiftishowSettingsSecure = exports.resendGiftishowOrderSecure = exports.rejectGiftishowOrderSecure = exports.reconcilePendingGiftishowOrders = exports.getGiftishowBizmoneySecure = exports.createGiftishowOrderRequestSecure = exports.cancelGiftishowOrderSecure = exports.cancelGiftishowSendFailSecure = exports.approveGiftishowOrderSecure = exports.reissueDailyRankingRewardV2Secure = exports.scheduledRankingRewardSettlement = exports.ensureCurrentUserMemberships = exports.scheduledOpenClawSnapshotExport = exports.generateOpenClawSnapshot = exports.refreshClassroomSignals = exports.stopStudentStudySessionSecure = void 0;
 const params_1 = require("firebase-functions/params");
 const functions = __importStar(require("firebase-functions"));
 const admin = __importStar(require("firebase-admin"));
@@ -102,6 +102,7 @@ const PARENT_LINK_FAILED_ATTEMPT_WINDOW_MS = 30 * 60 * 1000;
 const PARENT_LINK_FAILED_ATTEMPT_LOCK_MS = 30 * 60 * 1000;
 const PARENT_LINK_LOOKUP_COLLECTION = "parentLinkCodeLookup";
 const TRACK_MANAGED_STUDY_CENTER_NAME = "트랙 관리형 스터디센터";
+const WEEKLY_ATTENDANCE_SCHEDULE_TIME_PATTERN = /^([01]\d|2[0-3]):[0-5]\d$/;
 const ATTENDANCE_REQUEST_PENALTY_POINTS = {
     late: 1,
     absence: 2,
@@ -4039,6 +4040,364 @@ async function assertSmsConsoleCaller(db, centerId, authUid, actionLabel) {
     }
     return membership.role;
 }
+function getWeeklyAttendanceDayLabel(weekday) {
+    if (weekday === 1)
+        return "월";
+    if (weekday === 2)
+        return "화";
+    if (weekday === 3)
+        return "수";
+    if (weekday === 4)
+        return "목";
+    if (weekday === 5)
+        return "금";
+    if (weekday === 6)
+        return "토";
+    return "일";
+}
+function isWeeklyAttendanceScheduleTime(value) {
+    return WEEKLY_ATTENDANCE_SCHEDULE_TIME_PATTERN.test(value);
+}
+function weeklyAttendanceScheduleTimeToMinutes(value) {
+    if (!isWeeklyAttendanceScheduleTime(value))
+        return null;
+    const [hours, minutes] = value.split(":").map(Number);
+    return hours * 60 + minutes;
+}
+function toWeeklyAttendanceOperationalMinutes(value, arrivalMinutes, departureMinutes) {
+    const minutes = weeklyAttendanceScheduleTimeToMinutes(value);
+    if (minutes === null)
+        return null;
+    return departureMinutes <= arrivalMinutes && minutes < arrivalMinutes ? minutes + 24 * 60 : minutes;
+}
+function normalizeWeeklyAttendanceDraftInput(raw) {
+    if (!raw || typeof raw !== "object") {
+        throw new functions.https.HttpsError("invalid-argument", "Invalid weekly schedule day.", {
+            userMessage: "저장할 주간 일정 데이터가 올바르지 않습니다.",
+        });
+    }
+    const value = raw;
+    const weekday = Math.floor(Number(value.weekday));
+    if (!Number.isFinite(weekday) || weekday < 0 || weekday > 6) {
+        throw new functions.https.HttpsError("invalid-argument", "Invalid weekly schedule weekday.", {
+            userMessage: "요일 정보가 올바르지 않습니다.",
+        });
+    }
+    const dateKey = asTrimmedString(value.dateKey);
+    if (!isValidDateKey(dateKey)) {
+        throw new functions.https.HttpsError("invalid-argument", "Invalid weekly schedule dateKey.", {
+            userMessage: "일정 날짜 정보가 올바르지 않습니다.",
+        });
+    }
+    return {
+        weekday,
+        label: asTrimmedString(value.label, getWeeklyAttendanceDayLabel(weekday)),
+        dateKey,
+        enabled: value.enabled === true,
+        isAutonomous: value.isAutonomous === true,
+        inTime: asTrimmedString(value.inTime),
+        outTime: asTrimmedString(value.outTime),
+        awayStartTime: asTrimmedString(value.awayStartTime),
+        awayEndTime: asTrimmedString(value.awayEndTime),
+        awayReason: asTrimmedString(value.awayReason).slice(0, 160),
+    };
+}
+function validateWeeklyAttendanceDraftInput(draft) {
+    if (!draft.enabled || draft.isAutonomous)
+        return null;
+    const inTime = asTrimmedString(draft.inTime);
+    const outTime = asTrimmedString(draft.outTime);
+    if (!inTime || !outTime)
+        return "등원 일정과 하원 일정을 모두 입력해 주세요.";
+    const arrivalMinutes = weeklyAttendanceScheduleTimeToMinutes(inTime);
+    const departureMinutes = weeklyAttendanceScheduleTimeToMinutes(outTime);
+    if (arrivalMinutes === null || departureMinutes === null)
+        return "시간 형식이 올바르지 않아요.";
+    const adjustedDepartureMinutes = departureMinutes <= arrivalMinutes ? departureMinutes + 24 * 60 : departureMinutes;
+    if (adjustedDepartureMinutes <= arrivalMinutes)
+        return "하원 일정은 등원 일정 이후로 입력해 주세요.";
+    const awayStartTime = asTrimmedString(draft.awayStartTime);
+    const awayEndTime = asTrimmedString(draft.awayEndTime);
+    const awayReason = asTrimmedString(draft.awayReason);
+    const hasAwayValue = Boolean(awayStartTime || awayEndTime || awayReason);
+    if (!hasAwayValue)
+        return null;
+    if (!awayStartTime || !awayEndTime)
+        return "외출 시작과 복귀 예정 시간을 모두 입력해 주세요.";
+    let awayStartMinutes = toWeeklyAttendanceOperationalMinutes(awayStartTime, arrivalMinutes, departureMinutes);
+    let awayEndMinutes = toWeeklyAttendanceOperationalMinutes(awayEndTime, arrivalMinutes, departureMinutes);
+    if (awayStartMinutes === null || awayEndMinutes === null)
+        return "외출 시간 형식이 올바르지 않아요.";
+    if (awayEndMinutes <= awayStartMinutes)
+        awayEndMinutes += 24 * 60;
+    if (awayStartMinutes < arrivalMinutes || awayEndMinutes > adjustedDepartureMinutes) {
+        return "외출 일정은 등원~하원 일정 안에서만 입력할 수 있어요.";
+    }
+    return null;
+}
+function buildWeeklyAttendanceOutings(draft) {
+    const startTime = asTrimmedString(draft.awayStartTime);
+    const endTime = asTrimmedString(draft.awayEndTime);
+    if (!startTime || !endTime || !draft.enabled || draft.isAutonomous)
+        return [];
+    return [{
+            id: "primary",
+            kind: "outing",
+            title: null,
+            startTime,
+            endTime,
+            reason: asTrimmedString(draft.awayReason),
+        }];
+}
+function normalizeStaffScheduleStatus(value) {
+    const status = asTrimmedString(value);
+    if (["scheduled", "checked_in", "checked_out", "excursion", "absent"].includes(status)) {
+        return status;
+    }
+    return "scheduled";
+}
+function isRoutineMissingPenaltyForDateKey(penaltyLog, dateKey) {
+    if (asTrimmedString(penaltyLog.source) !== "routine_missing")
+        return false;
+    if (asTrimmedString(penaltyLog.penaltyDateKey) === dateKey)
+        return true;
+    if (asTrimmedString(penaltyLog.penaltyKey) === `routine_missing:${dateKey}`)
+        return true;
+    return toDateKeyFromUnknownTimestamp(penaltyLog.createdAt) === dateKey;
+}
+exports.saveStudentWeeklyAttendanceSchedule = functions.region(region).runWith({
+    timeoutSeconds: 120,
+    memory: "512MB",
+}).https.onCall(async (data, context) => {
+    var _a, _b, _c, _d;
+    const db = admin.firestore();
+    if (!context.auth) {
+        throw new functions.https.HttpsError("unauthenticated", "로그인이 필요합니다.");
+    }
+    const callerUid = context.auth.uid;
+    const centerId = asTrimmedString(data === null || data === void 0 ? void 0 : data.centerId);
+    const studentId = asTrimmedString(data === null || data === void 0 ? void 0 : data.studentId);
+    const todayKey = asTrimmedString(data === null || data === void 0 ? void 0 : data.todayKey);
+    const rawDays = Array.isArray(data === null || data === void 0 ? void 0 : data.days) ? data.days : [];
+    if (!centerId || !studentId || !isValidDateKey(todayKey) || rawDays.length === 0 || rawDays.length > 7) {
+        throw new functions.https.HttpsError("invalid-argument", "centerId, studentId, todayKey, days are required.", {
+            userMessage: "저장할 주간 등원일정 정보가 부족합니다.",
+        });
+    }
+    const callerMembership = await resolveCenterMembershipRole(db, centerId, callerUid);
+    const callerRole = callerMembership.role || "";
+    const isTeacherOrAdminCaller = callerRole === "teacher" || isAdminRole(callerRole);
+    if (!isTeacherOrAdminCaller || !isActiveMembershipStatus(callerMembership.status)) {
+        throw new functions.https.HttpsError("permission-denied", "Only active teachers or admins can save attendance schedules.", {
+            userMessage: "센터관리자 또는 선생님 계정에서만 주간 등원일정을 저장할 수 있습니다.",
+        });
+    }
+    const studentIdentity = await resolveCenterStudentIdentity(db, centerId, studentId);
+    if (!studentIdentity || (!studentIdentity.studentProfileExists && !studentIdentity.memberExists)) {
+        throw new functions.https.HttpsError("failed-precondition", "Student profile not found.", {
+            userMessage: "학생 정보를 찾을 수 없습니다. 학생 등록 상태를 확인해 주세요.",
+        });
+    }
+    const weeklyDrafts = rawDays.map((raw) => normalizeWeeklyAttendanceDraftInput(raw));
+    for (const dayDraft of weeklyDrafts) {
+        const validationMessage = validateWeeklyAttendanceDraftInput(dayDraft);
+        if (validationMessage) {
+            throw new functions.https.HttpsError("invalid-argument", "Invalid weekly schedule time.", {
+                userMessage: `${asTrimmedString(dayDraft.label, getWeeklyAttendanceDayLabel(dayDraft.weekday))}요일 일정 확인 필요: ${validationMessage}`,
+            });
+        }
+    }
+    const enabledDrafts = weeklyDrafts.filter((draft) => draft.enabled);
+    const scheduledDrafts = enabledDrafts.filter((draft) => !draft.isAutonomous);
+    const autonomousDrafts = enabledDrafts.filter((draft) => draft.isAutonomous);
+    const offCount = weeklyDrafts.length - enabledDrafts.length;
+    const activeTemplateIds = new Set(enabledDrafts.map((draft) => `admin-weekly-${centerId}-${draft.weekday}`));
+    const targetStudentName = asTrimmedString((data === null || data === void 0 ? void 0 : data.studentName)
+        || ((_a = studentIdentity.studentProfileData) === null || _a === void 0 ? void 0 : _a.name)
+        || ((_b = studentIdentity.studentProfileData) === null || _b === void 0 ? void 0 : _b.displayName)
+        || ((_c = studentIdentity.memberData) === null || _c === void 0 ? void 0 : _c.displayName)
+        || ((_d = studentIdentity.memberData) === null || _d === void 0 ? void 0 : _d.name), "학생");
+    const editorName = asTrimmedString(data === null || data === void 0 ? void 0 : data.editorName, callerRole === "teacher" ? "선생님" : "센터관리자");
+    const todayScheduleStatus = normalizeStaffScheduleStatus(data === null || data === void 0 ? void 0 : data.todayScheduleStatus);
+    const todayAttendanceDisplayStatus = asTrimmedString(data === null || data === void 0 ? void 0 : data.todayAttendanceDisplayStatus);
+    const savedAt = admin.firestore.FieldValue.serverTimestamp();
+    const deleteField = admin.firestore.FieldValue.delete();
+    const templateSnapshot = await db
+        .collection(`users/${studentId}/scheduleTemplates`)
+        .where("centerId", "==", centerId)
+        .get();
+    const batch = db.batch();
+    let mutationCount = 0;
+    templateSnapshot.docs.forEach((templateDoc) => {
+        if (activeTemplateIds.has(templateDoc.id))
+            return;
+        batch.set(templateDoc.ref, {
+            active: false,
+            deactivatedByAdmin: true,
+            deactivatedByAdminAt: savedAt,
+            deactivatedByAdminUid: callerUid,
+            updatedAt: savedAt,
+        }, { merge: true });
+        mutationCount += 1;
+    });
+    weeklyDrafts.forEach((dayDraft) => {
+        const label = asTrimmedString(dayDraft.label, getWeeklyAttendanceDayLabel(dayDraft.weekday));
+        const templateId = `admin-weekly-${centerId}-${dayDraft.weekday}`;
+        const inTime = dayDraft.isAutonomous || !dayDraft.enabled ? "" : asTrimmedString(dayDraft.inTime);
+        const outTime = dayDraft.isAutonomous || !dayDraft.enabled ? "" : asTrimmedString(dayDraft.outTime);
+        const templateOutings = buildWeeklyAttendanceOutings(dayDraft);
+        const templatePrimaryOuting = templateOutings[0] || null;
+        const isAutonomousSchedule = dayDraft.enabled && dayDraft.isAutonomous === true;
+        if (dayDraft.enabled) {
+            batch.set(db.doc(`users/${studentId}/scheduleTemplates/${templateId}`), {
+                centerId,
+                name: isAutonomousSchedule ? `${label}요일 자율등원` : `${label}요일 등원 일정`,
+                weekdays: [dayDraft.weekday],
+                arrivalPlannedAt: inTime,
+                departurePlannedAt: outTime,
+                academyNameDefault: null,
+                academyStartAtDefault: null,
+                academyEndAtDefault: null,
+                hasExcursionDefault: templateOutings.length > 0,
+                defaultExcursionStartAt: (templatePrimaryOuting === null || templatePrimaryOuting === void 0 ? void 0 : templatePrimaryOuting.startTime) || null,
+                defaultExcursionEndAt: (templatePrimaryOuting === null || templatePrimaryOuting === void 0 ? void 0 : templatePrimaryOuting.endTime) || null,
+                defaultExcursionReason: (templatePrimaryOuting === null || templatePrimaryOuting === void 0 ? void 0 : templatePrimaryOuting.reason) || null,
+                note: null,
+                isAutonomousAttendance: isAutonomousSchedule,
+                classScheduleId: null,
+                classScheduleName: isAutonomousSchedule ? "자율등원" : null,
+                active: true,
+                timezone: "Asia/Seoul",
+                source: isAutonomousSchedule ? "admin-autonomous-attendance" : "admin-weekly-attendance",
+                adminEdited: true,
+                adminEditedAt: savedAt,
+                adminEditedByUid: callerUid,
+                adminEditedByName: editorName,
+                updatedAt: savedAt,
+            }, { merge: true });
+            mutationCount += 1;
+        }
+        if (dayDraft.dateKey < todayKey)
+            return;
+        const outings = isAutonomousSchedule || !dayDraft.enabled ? [] : templateOutings;
+        const primaryOuting = outings[0] || null;
+        const isTodaySchedule = dayDraft.dateKey === todayKey;
+        const scheduleStatus = dayDraft.enabled
+            ? isTodaySchedule ? todayScheduleStatus : "scheduled"
+            : "absent";
+        const shouldClearExcusedAbsentRecord = dayDraft.enabled && (!isTodaySchedule || todayAttendanceDisplayStatus === "excused_absent");
+        batch.set(db.doc(`users/${studentId}/schedules/${dayDraft.dateKey}`), Object.assign({ uid: studentId, studentName: targetStudentName, centerId, dateKey: dayDraft.dateKey, timezone: "Asia/Seoul", arrivalPlannedAt: inTime, departurePlannedAt: outTime, inTime,
+            outTime, isAbsent: !dayDraft.enabled, isAutonomousAttendance: isAutonomousSchedule, status: scheduleStatus, hasExcursion: outings.length > 0, excursionStartAt: (primaryOuting === null || primaryOuting === void 0 ? void 0 : primaryOuting.startTime) || null, excursionEndAt: (primaryOuting === null || primaryOuting === void 0 ? void 0 : primaryOuting.endTime) || null, excursionReason: (primaryOuting === null || primaryOuting === void 0 ? void 0 : primaryOuting.reason) || null, outings, source: dayDraft.enabled ? "regular-routine" : "manual", recurrenceSourceId: dayDraft.enabled ? templateId : null, classScheduleId: isAutonomousSchedule || !dayDraft.enabled ? null : deleteField, classScheduleName: isAutonomousSchedule ? "자율등원" : !dayDraft.enabled ? null : deleteField, adminEdited: true, adminEditedAt: savedAt, adminEditedByUid: callerUid, adminEditedByName: editorName, adminDirectEditNoPenalty: true, penaltyApplied: false, penaltyPointsDelta: 0, penaltyWaived: true, sameDayAdminEditPenaltyWaived: true, updatedAt: savedAt }, (!dayDraft.enabled
+            ? {
+                actualArrivalAt: null,
+                actualDepartureAt: null,
+                note: null,
+                recommendedStudyMinutes: null,
+                recommendedWeeklyDays: null,
+            }
+            : {})), { merge: true });
+        mutationCount += 1;
+        batch.set(db.doc(`centers/${centerId}/attendanceRecords/${dayDraft.dateKey}/students/${studentId}`), Object.assign(Object.assign({ centerId,
+            studentId, studentName: targetStudentName, dateKey: dayDraft.dateKey, scheduleEditedByAdminAt: savedAt, scheduleEditedByAdminUid: callerUid, scheduleEditPenaltyWaived: true, isAutonomousAttendance: isAutonomousSchedule, adminDirectEditNoPenalty: true, penaltyApplied: false, penaltyPointsDelta: 0, penaltyWaived: true }, (!dayDraft.enabled
+            ? {
+                status: "excused_absent",
+                statusSource: "manual",
+                statusUpdatedAt: savedAt,
+            }
+            : shouldClearExcusedAbsentRecord
+                ? {
+                    status: deleteField,
+                    statusSource: deleteField,
+                    statusUpdatedAt: deleteField,
+                }
+                : {})), { routineMissingAtCheckIn: deleteField, routineMissingPenaltyApplied: deleteField, updatedAt: savedAt }), { merge: true });
+        mutationCount += 1;
+        batch.set(db.doc(`centers/${centerId}/dailyStudentStats/${dayDraft.dateKey}/students/${studentId}`), {
+            centerId,
+            studentId,
+            dateKey: dayDraft.dateKey,
+            expectedArrivalTime: inTime,
+            plannedDepartureTime: outTime,
+            isAutonomousAttendance: isAutonomousSchedule,
+            hasExcursion: outings.length > 0,
+            excursionStartAt: (primaryOuting === null || primaryOuting === void 0 ? void 0 : primaryOuting.startTime) || null,
+            excursionEndAt: (primaryOuting === null || primaryOuting === void 0 ? void 0 : primaryOuting.endTime) || null,
+            excursionReason: (primaryOuting === null || primaryOuting === void 0 ? void 0 : primaryOuting.reason) || null,
+            scheduleEditedByAdminAt: savedAt,
+            scheduleEditedByAdminUid: callerUid,
+            scheduleEditPenaltyWaived: true,
+            adminDirectEditNoPenalty: true,
+            penaltyApplied: false,
+            penaltyPointsDelta: 0,
+            penaltyWaived: true,
+            updatedAt: savedAt,
+        }, { merge: true });
+        mutationCount += 1;
+    });
+    await batch.commit();
+    let waivedRoutinePenaltyPoints = 0;
+    let penaltyCleanupWarning = false;
+    if (isAdminRole(callerRole)) {
+        const editableWeekDateKeyList = weeklyDrafts
+            .map((draft) => draft.dateKey)
+            .filter((dateKey) => dateKey >= todayKey);
+        if (editableWeekDateKeyList.length > 0) {
+            try {
+                const routinePenaltySnapshot = await db
+                    .collection(`centers/${centerId}/penaltyLogs`)
+                    .where("studentId", "==", studentId)
+                    .where("source", "==", "routine_missing")
+                    .limit(20)
+                    .get();
+                const penaltyCleanupBatch = db.batch();
+                let penaltyCleanupMutationCount = 0;
+                routinePenaltySnapshot.docs.forEach((penaltyDoc) => {
+                    const penaltyData = penaltyDoc.data();
+                    if (!editableWeekDateKeyList.some((dateKey) => isRoutineMissingPenaltyForDateKey(penaltyData, dateKey))) {
+                        return;
+                    }
+                    const pointsDelta = Math.max(0, Math.round(Number(penaltyData.pointsDelta || 0)));
+                    waivedRoutinePenaltyPoints += pointsDelta;
+                    penaltyCleanupBatch.delete(penaltyDoc.ref);
+                    penaltyCleanupMutationCount += 1;
+                });
+                if (waivedRoutinePenaltyPoints > 0) {
+                    penaltyCleanupBatch.set(db.doc(`centers/${centerId}/growthProgress/${studentId}`), {
+                        penaltyPoints: admin.firestore.FieldValue.increment(-waivedRoutinePenaltyPoints),
+                        routineMissingPenaltyWaivedAt: savedAt,
+                        routineMissingPenaltyWaivedByUid: callerUid,
+                        routineMissingPenaltyWaivedDateKey: todayKey,
+                        routineMissingPenaltyWaivedDateKeys: editableWeekDateKeyList,
+                        updatedAt: savedAt,
+                    }, { merge: true });
+                    penaltyCleanupMutationCount += 1;
+                }
+                if (penaltyCleanupMutationCount > 0) {
+                    await penaltyCleanupBatch.commit();
+                }
+            }
+            catch (error) {
+                penaltyCleanupWarning = true;
+                console.warn("[saveStudentWeeklyAttendanceSchedule] penalty cleanup skipped", {
+                    centerId,
+                    studentId,
+                    error,
+                });
+            }
+        }
+    }
+    return {
+        ok: true,
+        centerId,
+        studentId,
+        mutationCount,
+        scheduledCount: scheduledDrafts.length,
+        autonomousCount: autonomousDrafts.length,
+        offCount,
+        waivedRoutinePenaltyPoints,
+        penaltyCleanupWarning,
+    };
+});
 function chunkArray(items, size) {
     if (size <= 0)
         return [items];

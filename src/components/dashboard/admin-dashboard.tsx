@@ -90,7 +90,7 @@ import {
 import { useFirestore, useCollection, useFunctions, useDoc, useUser } from '@/firebase';
 import { useAppContext } from '@/contexts/app-context';
 import { useMemoFirebase } from '@/hooks/use-memo-firebase';
-import { addDoc, collection, query, where, Timestamp, doc, limit, getDoc, getDocs, orderBy, serverTimestamp, documentId, writeBatch, deleteField, increment } from 'firebase/firestore';
+import { addDoc, collection, query, where, Timestamp, doc, limit, getDoc, getDocs, orderBy, serverTimestamp, documentId, writeBatch, deleteField } from 'firebase/firestore';
 import { httpsCallable } from 'firebase/functions';
 import { AttendanceCurrent, AttendanceRequest, CounselingReservation, DailyStudentStat, DailyReport, CenterMembership, InviteCode, GrowthProgress, ParentActivityEvent, CounselingLog, CounselingLogStatus, LayoutRoomConfig, StudentProfile, StudentScheduleDoc, StudentScheduleTemplate, StudyLogDay, OpenClawIntegrationDoc, OpenClawSnapshotRecordCounts, PointBoostEvent, StudyPlanItem, WebsiteSeatHoldRequest } from '@/lib/types';
 import { addDays, format, startOfWeek, subDays } from 'date-fns';
@@ -112,7 +112,6 @@ import {
 } from '@/components/dashboard/operations-inbox';
 import { motion, useReducedMotion } from 'framer-motion';
 import { buildNoShowFlag } from '@/features/schedules/lib/buildNoShowFlag';
-import { normalizeOutings, toAbsentScheduleDraft } from '@/features/schedules/lib/scheduleModel';
 import type { AttendanceScheduleDraft } from '@/components/dashboard/student-planner/planner-constants';
 import { useCenterAdminAttendanceBoard } from '@/hooks/use-center-admin-attendance-board';
 import { useCenterAdminHeatmap } from '@/hooks/use-center-admin-heatmap';
@@ -433,15 +432,6 @@ const getScheduleStatusFromFocusStatus = (
   if (currentStatus === 'away' || currentStatus === 'break') return 'excursion';
   if (currentStatus === 'absent' && firstCheckInLabel && firstCheckInLabel !== '-') return 'checked_out';
   return 'scheduled';
-};
-
-const isRoutineMissingPenaltyForDate = (penaltyLog: Record<string, unknown>, dateKey: string): boolean => {
-  if (penaltyLog.source !== 'routine_missing') return false;
-  if (penaltyLog.penaltyDateKey === dateKey) return true;
-  if (penaltyLog.penaltyKey === `routine_missing:${dateKey}`) return true;
-
-  const createdAt = toTimestampDateSafe(penaltyLog.createdAt);
-  return createdAt ? format(createdAt, 'yyyy-MM-dd') === dateKey : false;
 };
 
 const formatFocusSessionDurationLabel = (minutes: number): string => {
@@ -7997,7 +7987,7 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
     }
   };
   const handleSaveFocusSchedule = async () => {
-    if (!firestore || !centerId || !selectedFocusStudentId || !todayKey) return;
+    if (!functions || !centerId || !selectedFocusStudentId || !todayKey) return;
     if (!canEditFocusSchedule) {
       toast({
         variant: 'destructive',
@@ -8037,272 +8027,42 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
       }
     }
 
-    const savedAt = serverTimestamp();
-    const editorUid = user?.uid || null;
     const editorName = user?.displayName || activeMembership?.displayName || getStaffRoleLabel(activeMembership?.role);
 
     setFocusScheduleSavingMode('save');
     try {
-      const templateSnapshot = await getDocs(
-        query(collection(firestore, 'users', studentId, 'scheduleTemplates'), where('centerId', '==', centerId))
-      );
-      const batch = writeBatch(firestore);
-      const activeTemplateIds = new Set(
-        enabledDrafts.map((draft) => `admin-weekly-${centerId}-${draft.weekday}`)
-      );
-      templateSnapshot.docs.forEach((templateDoc) => {
-        if (activeTemplateIds.has(templateDoc.id)) return;
-        batch.set(
-          templateDoc.ref,
-          {
-            active: false,
-            deactivatedByAdmin: true,
-            deactivatedByAdminAt: savedAt,
-            deactivatedByAdminUid: editorUid,
-            updatedAt: savedAt,
-          },
-          { merge: true }
-        );
-      });
-
-      weeklyDrafts.forEach((dayDraft) => {
-        const templateId = `admin-weekly-${centerId}-${dayDraft.weekday}`;
-        const baseDraft = toFocusWeeklyAttendanceDraft(dayDraft);
-        if (dayDraft.enabled) {
-          const templateOutings = dayDraft.isAutonomous ? [] : normalizeOutings(baseDraft);
-          const templatePrimaryOuting = templateOutings[0] || null;
-          batch.set(
-            doc(firestore, 'users', studentId, 'scheduleTemplates', templateId),
-            {
-              centerId,
-              name: dayDraft.isAutonomous ? `${dayDraft.label}요일 자율등원` : `${dayDraft.label}요일 등원 일정`,
-              weekdays: [dayDraft.weekday],
-              arrivalPlannedAt: dayDraft.isAutonomous ? '' : baseDraft.inTime,
-              departurePlannedAt: dayDraft.isAutonomous ? '' : baseDraft.outTime,
-              academyNameDefault: null,
-              academyStartAtDefault: null,
-              academyEndAtDefault: null,
-              hasExcursionDefault: templateOutings.length > 0,
-              defaultExcursionStartAt: templatePrimaryOuting?.startTime || null,
-              defaultExcursionEndAt: templatePrimaryOuting?.endTime || null,
-              defaultExcursionReason: templatePrimaryOuting?.reason || null,
-              note: null,
-              isAutonomousAttendance: dayDraft.isAutonomous,
-              classScheduleId: null,
-              classScheduleName: dayDraft.isAutonomous ? '자율등원' : null,
-              active: true,
-              timezone: 'Asia/Seoul',
-              source: dayDraft.isAutonomous ? 'admin-autonomous-attendance' : 'admin-weekly-attendance',
-              adminEdited: true,
-              adminEditedAt: savedAt,
-              adminEditedByUid: editorUid,
-              adminEditedByName: editorName,
-              updatedAt: savedAt,
-            },
-            { merge: true }
-          );
+      const saveStudentWeeklyAttendanceSchedule = httpsCallable<
+        {
+          centerId: string;
+          studentId: string;
+          studentName: string;
+          editorName: string;
+          todayKey: string;
+          todayScheduleStatus: StudentScheduleDoc['status'];
+          todayAttendanceDisplayStatus?: string | null;
+          days: FocusWeeklyScheduleDraft[];
+        },
+        {
+          ok?: boolean;
+          waivedRoutinePenaltyPoints?: number;
+          penaltyCleanupWarning?: boolean;
         }
-
-        if (!dayDraft.dateKey || dayDraft.dateKey < todayKey) return;
-
-        const isAutonomousSchedule = dayDraft.enabled && dayDraft.isAutonomous;
-        const scheduleDraft = isAutonomousSchedule
-          ? {
-              ...baseDraft,
-              inTime: '',
-              outTime: '',
-              awayStartTime: '',
-              awayEndTime: '',
-              awayReason: '',
-              awaySlots: [],
-            }
-          : dayDraft.enabled
-            ? baseDraft
-            : toAbsentScheduleDraft(baseDraft);
-        const outings = isAutonomousSchedule ? [] : normalizeOutings(scheduleDraft);
-        const primaryOuting = outings[0] || null;
-        const isTodaySchedule = dayDraft.dateKey === todayKey;
-        const scheduleStatus: StudentScheduleDoc['status'] = dayDraft.enabled
-          ? isTodaySchedule
-            ? getScheduleStatusFromFocusStatus(
-                selectedFocusOperationsSummary?.currentStatus,
-                selectedFocusOperationsSummary?.firstCheckInLabel
-              )
-            : 'scheduled'
-          : 'absent';
-        const shouldClearExcusedAbsentRecord =
-          dayDraft.enabled
-          && (
-            !isTodaySchedule
-            || selectedFocusOperationsSummary?.signal?.attendanceDisplayStatus === 'excused_absent'
-          );
-
-        batch.set(
-          doc(firestore, 'users', studentId, 'schedules', dayDraft.dateKey),
-          {
-            uid: studentId,
-            studentName,
-            centerId,
-            dateKey: dayDraft.dateKey,
-            timezone: 'Asia/Seoul',
-            arrivalPlannedAt: scheduleDraft.inTime,
-            departurePlannedAt: scheduleDraft.outTime,
-            inTime: scheduleDraft.inTime,
-            outTime: scheduleDraft.outTime,
-            isAbsent: !dayDraft.enabled,
-            isAutonomousAttendance: isAutonomousSchedule,
-            status: scheduleStatus,
-            hasExcursion: outings.length > 0,
-            excursionStartAt: primaryOuting?.startTime || null,
-            excursionEndAt: primaryOuting?.endTime || null,
-            excursionReason: primaryOuting?.reason || null,
-            outings,
-            source: dayDraft.enabled ? 'regular-routine' : 'manual',
-            recurrenceSourceId: dayDraft.enabled ? templateId : null,
-            classScheduleId: isAutonomousSchedule ? null : deleteField(),
-            classScheduleName: isAutonomousSchedule ? '자율등원' : deleteField(),
-            adminEdited: true,
-            adminEditedAt: savedAt,
-            adminEditedByUid: editorUid,
-            adminEditedByName: editorName,
-            adminDirectEditNoPenalty: true,
-            penaltyApplied: false,
-            penaltyPointsDelta: 0,
-            penaltyWaived: true,
-            sameDayAdminEditPenaltyWaived: true,
-            updatedAt: savedAt,
-            ...(!dayDraft.enabled
-              ? {
-                  actualArrivalAt: null,
-                  actualDepartureAt: null,
-                  classScheduleId: null,
-                  classScheduleName: null,
-                  note: null,
-                  recommendedStudyMinutes: null,
-                  recommendedWeeklyDays: null,
-                }
-              : {}),
-          },
-          { merge: true }
-        );
-        batch.set(
-          doc(firestore, 'centers', centerId, 'attendanceRecords', dayDraft.dateKey, 'students', studentId),
-          {
-            centerId,
-            studentId,
-            studentName,
-            dateKey: dayDraft.dateKey,
-            scheduleEditedByAdminAt: savedAt,
-            scheduleEditedByAdminUid: editorUid,
-            scheduleEditPenaltyWaived: true,
-            isAutonomousAttendance: isAutonomousSchedule,
-            adminDirectEditNoPenalty: true,
-            penaltyApplied: false,
-            penaltyPointsDelta: 0,
-            penaltyWaived: true,
-            ...(!dayDraft.enabled
-              ? {
-                  status: 'excused_absent',
-                  statusSource: 'manual',
-                  statusUpdatedAt: savedAt,
-                }
-              : shouldClearExcusedAbsentRecord
-                ? {
-                    status: deleteField(),
-                    statusSource: deleteField(),
-                    statusUpdatedAt: deleteField(),
-                  }
-                : {}),
-            routineMissingAtCheckIn: deleteField(),
-            routineMissingPenaltyApplied: deleteField(),
-            updatedAt: savedAt,
-          },
-          { merge: true }
-        );
-        batch.set(
-          doc(firestore, 'centers', centerId, 'dailyStudentStats', dayDraft.dateKey, 'students', studentId),
-          {
-            centerId,
-            studentId,
-            dateKey: dayDraft.dateKey,
-            expectedArrivalTime: scheduleDraft.inTime,
-            plannedDepartureTime: scheduleDraft.outTime,
-            isAutonomousAttendance: isAutonomousSchedule,
-            hasExcursion: outings.length > 0,
-            excursionStartAt: primaryOuting?.startTime || null,
-            excursionEndAt: primaryOuting?.endTime || null,
-            excursionReason: primaryOuting?.reason || null,
-            scheduleEditedByAdminAt: savedAt,
-            scheduleEditedByAdminUid: editorUid,
-            scheduleEditPenaltyWaived: true,
-            adminDirectEditNoPenalty: true,
-            penaltyApplied: false,
-            penaltyPointsDelta: 0,
-            penaltyWaived: true,
-            updatedAt: savedAt,
-          },
-          { merge: true }
-        );
+      >(functions, 'saveStudentWeeklyAttendanceSchedule', { timeout: 600000 });
+      const result = await saveStudentWeeklyAttendanceSchedule({
+        centerId,
+        studentId,
+        studentName,
+        editorName,
+        todayKey,
+        todayScheduleStatus: getScheduleStatusFromFocusStatus(
+          selectedFocusOperationsSummary?.currentStatus,
+          selectedFocusOperationsSummary?.firstCheckInLabel
+        ),
+        todayAttendanceDisplayStatus: selectedFocusOperationsSummary?.signal?.attendanceDisplayStatus || null,
+        days: weeklyDrafts,
       });
-
-      await batch.commit();
-
-      let waivedRoutinePenaltyPoints = 0;
-      let penaltyCleanupWarning = false;
-      if (canAccessAdminOnlyOperations) {
-        const editableWeekDateKeyList = weeklyDrafts
-          .map((draft) => draft.dateKey)
-          .filter((dateKey): dateKey is string => Boolean(dateKey && dateKey >= todayKey));
-
-        if (editableWeekDateKeyList.length > 0) {
-          try {
-            const routinePenaltySnapshot = await getDocs(
-              query(
-                collection(firestore, 'centers', centerId, 'penaltyLogs'),
-                where('studentId', '==', studentId),
-                where('source', '==', 'routine_missing'),
-                limit(20)
-              )
-            );
-            const penaltyCleanupBatch = writeBatch(firestore);
-            let penaltyCleanupMutationCount = 0;
-
-            routinePenaltySnapshot.docs.forEach((penaltyDoc) => {
-              const penaltyData = penaltyDoc.data() as Record<string, unknown>;
-              if (!editableWeekDateKeyList.some((dateKey) => isRoutineMissingPenaltyForDate(penaltyData, dateKey))) {
-                return;
-              }
-              const pointsDelta = Math.max(0, Math.round(Number(penaltyData.pointsDelta || 0)));
-              waivedRoutinePenaltyPoints += pointsDelta;
-              penaltyCleanupBatch.delete(penaltyDoc.ref);
-              penaltyCleanupMutationCount += 1;
-            });
-
-            if (waivedRoutinePenaltyPoints > 0) {
-              penaltyCleanupBatch.set(
-                doc(firestore, 'centers', centerId, 'growthProgress', studentId),
-                {
-                  penaltyPoints: increment(-waivedRoutinePenaltyPoints),
-                  routineMissingPenaltyWaivedAt: savedAt,
-                  routineMissingPenaltyWaivedByUid: editorUid,
-                  routineMissingPenaltyWaivedDateKey: todayKey,
-                  routineMissingPenaltyWaivedDateKeys: editableWeekDateKeyList,
-                  updatedAt: savedAt,
-                },
-                { merge: true }
-              );
-              penaltyCleanupMutationCount += 1;
-            }
-
-            if (penaltyCleanupMutationCount > 0) {
-              await penaltyCleanupBatch.commit();
-            }
-          } catch (cleanupError) {
-            penaltyCleanupWarning = true;
-            logHandledClientIssue('[admin-dashboard] focus weekly schedule penalty cleanup failed', cleanupError);
-          }
-        }
-      }
+      const waivedRoutinePenaltyPoints = Math.max(0, Math.round(Number(result.data?.waivedRoutinePenaltyPoints || 0)));
+      const penaltyCleanupWarning = result.data?.penaltyCleanupWarning === true;
 
       setLiveTickMs(Date.now());
       resetFocusScheduleDialog();
