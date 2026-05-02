@@ -3642,6 +3642,33 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
     setSelectedBoxHour(targetHour);
     setRevealedHomeReward(null);
     setHomeBoxStage('shake');
+    queuePendingHomeBoxOpen(targetDateKey, targetHour);
+
+    if (targetDateKey === activeStudyDayKey) {
+      setHomeOpenedBoxes((prev) => {
+        const nextOpenedBoxes = normalizeStudyBoxHours([...prev, targetHour]);
+        writeStudyBoxOpenedCache(studyBoxCacheUid, activeStudyDayKey, nextOpenedBoxes);
+        return nextOpenedBoxes;
+      });
+      setHomeClaimedBoxes((prev) => {
+        const nextClaimedBoxes = normalizeStudyBoxHours([...prev, targetHour]);
+        writeStudyBoxHoursCache(studyBoxClaimCacheKey, nextClaimedBoxes);
+        return nextClaimedBoxes;
+      });
+      setHomeRewardEntries((prev) => upsertStudyBoxRewardEntry(prev, optimisticRewardEntry));
+    } else {
+      const nextOpenedBoxes = normalizeStudyBoxHours([...resolvedCarryoverOpenedBoxes, targetHour]);
+      setCarryoverOpenedSnapshot({
+        dateKey: targetDateKey,
+        hours: nextOpenedBoxes,
+      });
+      writeCarryoverOpenedCache(targetDateKey, nextOpenedBoxes);
+      setCarryoverOpenedCacheState({
+        dateKey: targetDateKey,
+        hours: nextOpenedBoxes,
+      });
+    }
+    void flushPendingHomeBoxOpens();
 
     const burstId = setTimeout(() => setHomeBoxStage('burst'), HOME_REWARD_BOX_BURST_DELAY_MS);
     homeBoxTimeoutsRef.current.push(burstId);
@@ -3651,33 +3678,6 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
       setRevealedHomeReward(optimisticReward);
       setHomeBoxStage('revealed');
       activeHomeBoxRevealKeyRef.current = null;
-      queuePendingHomeBoxOpen(targetDateKey, targetHour);
-
-      if (targetDateKey === activeStudyDayKey) {
-        setHomeOpenedBoxes((prev) => {
-          const nextOpenedBoxes = normalizeStudyBoxHours([...prev, targetHour]);
-          writeStudyBoxOpenedCache(studyBoxCacheUid, activeStudyDayKey, nextOpenedBoxes);
-          return nextOpenedBoxes;
-        });
-        setHomeClaimedBoxes((prev) => {
-          const nextClaimedBoxes = normalizeStudyBoxHours([...prev, targetHour]);
-          writeStudyBoxHoursCache(studyBoxClaimCacheKey, nextClaimedBoxes);
-          return nextClaimedBoxes;
-        });
-        setHomeRewardEntries((prev) => upsertStudyBoxRewardEntry(prev, optimisticRewardEntry));
-      } else {
-        const nextOpenedBoxes = normalizeStudyBoxHours([...resolvedCarryoverOpenedBoxes, targetHour]);
-        setCarryoverOpenedSnapshot({
-          dateKey: targetDateKey,
-          hours: nextOpenedBoxes,
-        });
-        writeCarryoverOpenedCache(targetDateKey, nextOpenedBoxes);
-        setCarryoverOpenedCacheState({
-          dateKey: targetDateKey,
-          hours: nextOpenedBoxes,
-        });
-      }
-      void flushPendingHomeBoxOpens();
     }, HOME_REWARD_TEXT_REVEAL_DELAY_MS);
 
     homeBoxTimeoutsRef.current.push(revealId);
