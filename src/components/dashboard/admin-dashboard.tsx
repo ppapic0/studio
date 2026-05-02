@@ -343,6 +343,38 @@ const buildFocusWeeklyScheduleDrafts = (baseDate?: Date | null): FocusWeeklySche
   });
 };
 
+const redateFocusWeeklyScheduleDrafts = (
+  drafts: FocusWeeklyScheduleDraft[],
+  baseDate?: Date | null
+): FocusWeeklyScheduleDraft[] => {
+  const draftByWeekday = new Map(drafts.map((draft) => [draft.weekday, draft]));
+  return buildFocusWeeklyScheduleDrafts(baseDate).map((datedDraft) => {
+    const previousDraft = draftByWeekday.get(datedDraft.weekday);
+    if (!previousDraft) return datedDraft;
+    return {
+      ...datedDraft,
+      enabled: previousDraft.enabled,
+      isAutonomous: previousDraft.isAutonomous,
+      inTime: previousDraft.inTime,
+      outTime: previousDraft.outTime,
+      awayStartTime: previousDraft.awayStartTime,
+      awayEndTime: previousDraft.awayEndTime,
+      awayReason: previousDraft.awayReason,
+    };
+  });
+};
+
+const formatFocusScheduleWeekRange = (drafts: FocusWeeklyScheduleDraft[]): string => {
+  const startKey = drafts[0]?.dateKey || '';
+  const endKey = drafts[drafts.length - 1]?.dateKey || '';
+  if (!startKey || !endKey) return '주차 선택';
+  const formatKey = (dateKey: string) => {
+    const date = new Date(`${dateKey}T00:00:00`);
+    return Number.isNaN(date.getTime()) ? dateKey : format(date, 'M/d');
+  };
+  return `${formatKey(startKey)}~${formatKey(endKey)}`;
+};
+
 const toFocusWeeklyAttendanceDraft = (draft: FocusWeeklyScheduleDraft): AttendanceScheduleDraft => ({
   inTime: draft.inTime.trim(),
   outTime: draft.outTime.trim(),
@@ -1128,6 +1160,7 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
   const [focusWeeklyScheduleDrafts, setFocusWeeklyScheduleDrafts] = useState<FocusWeeklyScheduleDraft[]>(() =>
     buildFocusWeeklyScheduleDrafts(null)
   );
+  const [focusScheduleWeekOffset, setFocusScheduleWeekOffset] = useState<0 | 1>(0);
   const [focusScheduleSavingMode, setFocusScheduleSavingMode] = useState<'save' | null>(null);
   const isFocusScheduleSaving = focusScheduleSavingMode !== null;
   const [isFocusCounselingDialogOpen, setIsFocusCounselingDialogOpen] = useState(false);
@@ -4995,6 +5028,7 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
     const studentName = selectedFocusStudent?.name || selectedFocusOperationsSummary?.student?.name || '학생';
     const scheduledCount = focusWeeklyScheduleDrafts.filter((draft) => draft.enabled && !draft.isAutonomous).length;
     const autonomousCount = focusWeeklyScheduleDrafts.filter((draft) => draft.enabled && draft.isAutonomous).length;
+    const weekRangeLabel = formatFocusScheduleWeekRange(focusWeeklyScheduleDrafts);
 
     return (
       <Dialog
@@ -5027,12 +5061,54 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
                 <div>
                   <p className="text-xs font-black text-emerald-800">주간 반복 설정</p>
                   <p className="mt-1 text-[11px] font-bold leading-5 text-emerald-800">
-                    오늘 이전 기록은 유지하고, 반복 주간 템플릿과 이번 주 오늘 이후 일정만 반영합니다.
+                    {focusScheduleWeekOffset === 0
+                      ? '오늘 이전 기록은 유지하고, 이번 주 오늘 이후 일정과 다음 주 일정을 함께 반영합니다.'
+                      : '다음 주 일정을 미리 저장합니다. 이번 주 실제 일정은 변경하지 않습니다.'}
                   </p>
                 </div>
                 <Badge className="h-7 rounded-full border-none bg-white px-3 text-[10px] font-black text-emerald-700">
                   정규 {scheduledCount}일 · 자율 {autonomousCount}일
                 </Badge>
+              </div>
+              <div className="mt-3 flex flex-wrap items-center gap-2">
+                <div className="grid grid-cols-2 gap-1.5 rounded-xl border border-emerald-200 bg-white p-1">
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant={focusScheduleWeekOffset === 0 ? 'default' : 'ghost'}
+                    className={cn(
+                      'h-8 rounded-lg px-3 text-[10px] font-black',
+                      focusScheduleWeekOffset === 0
+                        ? 'bg-emerald-700 text-white hover:bg-emerald-800'
+                        : 'text-emerald-800 hover:bg-emerald-50'
+                    )}
+                    onClick={() => updateFocusScheduleWeekOffset(0)}
+                  >
+                    이번 주
+                  </Button>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant={focusScheduleWeekOffset === 1 ? 'default' : 'ghost'}
+                    className={cn(
+                      'h-8 rounded-lg px-3 text-[10px] font-black',
+                      focusScheduleWeekOffset === 1
+                        ? 'bg-emerald-700 text-white hover:bg-emerald-800'
+                        : 'text-emerald-800 hover:bg-emerald-50'
+                    )}
+                    onClick={() => updateFocusScheduleWeekOffset(1)}
+                  >
+                    다음 주
+                  </Button>
+                </div>
+                <Badge className="h-8 rounded-full border border-emerald-200 bg-white px-3 text-[10px] font-black text-emerald-800">
+                  {weekRangeLabel}
+                </Badge>
+                {focusScheduleWeekOffset === 0 ? (
+                  <Badge className="h-8 rounded-full border-none bg-emerald-700 px-3 text-[10px] font-black text-white">
+                    다음 주 자동 반영
+                  </Badge>
+                ) : null}
               </div>
             </div>
 
@@ -7546,8 +7622,15 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
   };
   const resetFocusScheduleDialog = () => {
     setIsFocusScheduleDialogOpen(false);
+    setFocusScheduleWeekOffset(0);
     setFocusWeeklyScheduleDrafts(buildFocusWeeklyScheduleDrafts(today));
     setFocusScheduleSavingMode(null);
+  };
+  const updateFocusScheduleWeekOffset = (weekOffset: 0 | 1) => {
+    setFocusScheduleWeekOffset(weekOffset);
+    setFocusWeeklyScheduleDrafts((previousDrafts) =>
+      redateFocusWeeklyScheduleDrafts(previousDrafts, today ? addDays(today, weekOffset * 7) : null)
+    );
   };
   const updateFocusWeeklyScheduleDraft = (
     weekday: number,
@@ -7899,6 +7982,7 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
 
     const signal = selectedFocusOperationsSummary.signal || attendanceSeatSignalsByStudentId.get(selectedFocusStudentId) || null;
     const todayWeekday = today?.getDay();
+    setFocusScheduleWeekOffset(0);
     const seedDrafts = buildFocusWeeklyScheduleDrafts(today).map((draft) => {
       if (draft.weekday !== todayWeekday || draft.isAutonomous) return draft;
       return {
@@ -8041,9 +8125,11 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
           todayScheduleStatus: StudentScheduleDoc['status'];
           todayAttendanceDisplayStatus?: string | null;
           days: FocusWeeklyScheduleDraft[];
+          applyFollowingWeek?: boolean;
         },
         {
           ok?: boolean;
+          appliedScheduleWeeks?: number;
           waivedRoutinePenaltyPoints?: number;
           penaltyCleanupWarning?: boolean;
         }
@@ -8060,7 +8146,9 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
         ),
         todayAttendanceDisplayStatus: selectedFocusOperationsSummary?.signal?.attendanceDisplayStatus || null,
         days: weeklyDrafts,
+        applyFollowingWeek: focusScheduleWeekOffset === 0,
       });
+      const appliedScheduleWeeks = Math.max(1, Math.round(Number(result.data?.appliedScheduleWeeks || 1)));
       const waivedRoutinePenaltyPoints = Math.max(0, Math.round(Number(result.data?.waivedRoutinePenaltyPoints || 0)));
       const penaltyCleanupWarning = result.data?.penaltyCleanupWarning === true;
 
@@ -8073,7 +8161,9 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
         ? `${studentName} 학생 주간 일정은 저장했습니다. 기존 루틴 미작성 벌점 정리는 권한 확인 후 다시 시도해 주세요.`
         : waivedRoutinePenaltyPoints > 0
           ? `${studentName} 학생 주간 일정과 루틴 미작성 벌점 ${waivedRoutinePenaltyPoints}점을 함께 정리했습니다.`
-          : `${studentName} 학생 정규 ${scheduledDrafts.length}일(${scheduledLabels}) · 자율 ${autonomousDrafts.length}일(${autonomousLabels}) · 미등원 ${offCount}일로 반영했습니다.`;
+          : focusScheduleWeekOffset === 0
+            ? `${studentName} 학생 정규 ${scheduledDrafts.length}일(${scheduledLabels}) · 자율 ${autonomousDrafts.length}일(${autonomousLabels}) · 미등원 ${offCount}일을 이번 주와 다음 주(${appliedScheduleWeeks}주)에 반영했습니다.`
+            : `${studentName} 학생 다음 주 정규 ${scheduledDrafts.length}일(${scheduledLabels}) · 자율 ${autonomousDrafts.length}일(${autonomousLabels}) · 미등원 ${offCount}일로 미리 저장했습니다.`;
       toast({
         title: '주간 등원일정을 저장했습니다.',
         description: saveDescription,

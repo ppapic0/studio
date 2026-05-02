@@ -5533,6 +5533,27 @@ function buildWeeklyAttendanceOutings(draft: StaffWeeklyAttendanceScheduleDraftI
   }];
 }
 
+function addDaysToWeeklyAttendanceDateKey(dateKey: string, dayDelta: number): string {
+  const [year, month, day] = dateKey.split("-").map((part) => Number(part));
+  const date = new Date(Date.UTC(year, month - 1, day));
+  date.setUTCDate(date.getUTCDate() + dayDelta);
+  return [
+    String(date.getUTCFullYear()).padStart(4, "0"),
+    String(date.getUTCMonth() + 1).padStart(2, "0"),
+    String(date.getUTCDate()).padStart(2, "0"),
+  ].join("-");
+}
+
+function shiftWeeklyAttendanceDraftDateKeys(
+  drafts: StaffWeeklyAttendanceScheduleDraftInput[],
+  dayDelta: number
+): StaffWeeklyAttendanceScheduleDraftInput[] {
+  return drafts.map((draft) => ({
+    ...draft,
+    dateKey: addDaysToWeeklyAttendanceDateKey(draft.dateKey, dayDelta),
+  }));
+}
+
 function normalizeStaffScheduleStatus(value: unknown): string {
   const status = asTrimmedString(value);
   if (["scheduled", "checked_in", "checked_out", "excursion", "absent"].includes(status)) {
@@ -5601,6 +5622,10 @@ export const saveStudentWeeklyAttendanceSchedule = functions.region(region).runW
   const scheduledDrafts = enabledDrafts.filter((draft) => !draft.isAutonomous);
   const autonomousDrafts = enabledDrafts.filter((draft) => draft.isAutonomous);
   const offCount = weeklyDrafts.length - enabledDrafts.length;
+  const applyFollowingWeek = data?.applyFollowingWeek !== false;
+  const followingWeekDrafts = applyFollowingWeek ? shiftWeeklyAttendanceDraftDateKeys(weeklyDrafts, 7) : [];
+  const scheduleDraftsToPersist = [...weeklyDrafts, ...followingWeekDrafts];
+  const appliedScheduleWeeks = applyFollowingWeek ? 2 : 1;
   const activeTemplateIds = new Set(
     enabledDrafts.map((draft) => `admin-weekly-${centerId}-${draft.weekday}`)
   );
@@ -5678,6 +5703,14 @@ export const saveStudentWeeklyAttendanceSchedule = functions.region(region).runW
       }, { merge: true });
       mutationCount += 1;
     }
+  });
+
+  scheduleDraftsToPersist.forEach((dayDraft) => {
+    const templateId = `admin-weekly-${centerId}-${dayDraft.weekday}`;
+    const inTime = dayDraft.isAutonomous || !dayDraft.enabled ? "" : asTrimmedString(dayDraft.inTime);
+    const outTime = dayDraft.isAutonomous || !dayDraft.enabled ? "" : asTrimmedString(dayDraft.outTime);
+    const templateOutings = buildWeeklyAttendanceOutings(dayDraft);
+    const isAutonomousSchedule = dayDraft.enabled && dayDraft.isAutonomous === true;
 
     if (dayDraft.dateKey < todayKey) return;
 
@@ -5853,6 +5886,7 @@ export const saveStudentWeeklyAttendanceSchedule = functions.region(region).runW
     scheduledCount: scheduledDrafts.length,
     autonomousCount: autonomousDrafts.length,
     offCount,
+    appliedScheduleWeeks,
     waivedRoutinePenaltyPoints,
     penaltyCleanupWarning,
   };

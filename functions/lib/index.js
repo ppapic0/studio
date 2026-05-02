@@ -4149,6 +4149,19 @@ function buildWeeklyAttendanceOutings(draft) {
             reason: asTrimmedString(draft.awayReason),
         }];
 }
+function addDaysToWeeklyAttendanceDateKey(dateKey, dayDelta) {
+    const [year, month, day] = dateKey.split("-").map((part) => Number(part));
+    const date = new Date(Date.UTC(year, month - 1, day));
+    date.setUTCDate(date.getUTCDate() + dayDelta);
+    return [
+        String(date.getUTCFullYear()).padStart(4, "0"),
+        String(date.getUTCMonth() + 1).padStart(2, "0"),
+        String(date.getUTCDate()).padStart(2, "0"),
+    ].join("-");
+}
+function shiftWeeklyAttendanceDraftDateKeys(drafts, dayDelta) {
+    return drafts.map((draft) => (Object.assign(Object.assign({}, draft), { dateKey: addDaysToWeeklyAttendanceDateKey(draft.dateKey, dayDelta) })));
+}
 function normalizeStaffScheduleStatus(value) {
     const status = asTrimmedString(value);
     if (["scheduled", "checked_in", "checked_out", "excursion", "absent"].includes(status)) {
@@ -4211,6 +4224,10 @@ exports.saveStudentWeeklyAttendanceSchedule = functions.region(region).runWith({
     const scheduledDrafts = enabledDrafts.filter((draft) => !draft.isAutonomous);
     const autonomousDrafts = enabledDrafts.filter((draft) => draft.isAutonomous);
     const offCount = weeklyDrafts.length - enabledDrafts.length;
+    const applyFollowingWeek = (data === null || data === void 0 ? void 0 : data.applyFollowingWeek) !== false;
+    const followingWeekDrafts = applyFollowingWeek ? shiftWeeklyAttendanceDraftDateKeys(weeklyDrafts, 7) : [];
+    const scheduleDraftsToPersist = [...weeklyDrafts, ...followingWeekDrafts];
+    const appliedScheduleWeeks = applyFollowingWeek ? 2 : 1;
     const activeTemplateIds = new Set(enabledDrafts.map((draft) => `admin-weekly-${centerId}-${draft.weekday}`));
     const targetStudentName = asTrimmedString((data === null || data === void 0 ? void 0 : data.studentName)
         || ((_a = studentIdentity.studentProfileData) === null || _a === void 0 ? void 0 : _a.name)
@@ -4277,6 +4294,13 @@ exports.saveStudentWeeklyAttendanceSchedule = functions.region(region).runWith({
             }, { merge: true });
             mutationCount += 1;
         }
+    });
+    scheduleDraftsToPersist.forEach((dayDraft) => {
+        const templateId = `admin-weekly-${centerId}-${dayDraft.weekday}`;
+        const inTime = dayDraft.isAutonomous || !dayDraft.enabled ? "" : asTrimmedString(dayDraft.inTime);
+        const outTime = dayDraft.isAutonomous || !dayDraft.enabled ? "" : asTrimmedString(dayDraft.outTime);
+        const templateOutings = buildWeeklyAttendanceOutings(dayDraft);
+        const isAutonomousSchedule = dayDraft.enabled && dayDraft.isAutonomous === true;
         if (dayDraft.dateKey < todayKey)
             return;
         const outings = isAutonomousSchedule || !dayDraft.enabled ? [] : templateOutings;
@@ -4394,6 +4418,7 @@ exports.saveStudentWeeklyAttendanceSchedule = functions.region(region).runWith({
         scheduledCount: scheduledDrafts.length,
         autonomousCount: autonomousDrafts.length,
         offCount,
+        appliedScheduleWeeks,
         waivedRoutinePenaltyPoints,
         penaltyCleanupWarning,
     };
