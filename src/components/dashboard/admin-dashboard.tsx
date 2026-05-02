@@ -1237,7 +1237,7 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
   const operationsRoomTitle = isTeacherOperationsRoom ? '선생님 운영실' : '센터관리자 운영실';
   const canAdjustStudentPoints = canAccessAdminOnlyOperations;
   const canEditFocusSchedule =
-    canAccessAdminOnlyOperations;
+    activeMembership?.role === 'teacher' || canAccessAdminOnlyOperations;
   const canWriteFocusCounseling =
     activeMembership?.role === 'teacher' || canAccessAdminOnlyOperations;
   const todayKey = today ? format(today, 'yyyy-MM-dd') : '';
@@ -5018,7 +5018,7 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
               </div>
               <DialogTitle className="text-2xl font-black tracking-tight">월~일 주간 등원일정 설정</DialogTitle>
               <DialogDescription className="text-sm font-medium text-white/76">
-                요일별 등원 여부와 등하원·외출 시간을 저장합니다. 센터관리자 직접 설정은 벌점 흐름을 타지 않습니다.
+                요일별 등원 여부와 등하원·외출 시간을 저장합니다. 센터관리자/선생님 직접 설정은 벌점 흐름을 타지 않습니다.
               </DialogDescription>
             </DialogHeader>
           </div>
@@ -7891,7 +7891,7 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
       toast({
         variant: 'destructive',
         title: '주간 등원일정 설정 권한이 없습니다.',
-        description: '센터관리자 계정에서만 학생 주간 등원일정을 설정할 수 있습니다.',
+        description: '센터관리자 또는 선생님 계정에서 학생 주간 등원일정을 설정할 수 있습니다.',
       });
       return;
     }
@@ -7991,7 +7991,7 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
       toast({
         variant: 'destructive',
         title: '주간 등원일정 설정 권한이 없습니다.',
-        description: '센터관리자 계정에서만 학생 주간 등원일정을 설정할 수 있습니다.',
+        description: '센터관리자 또는 선생님 계정에서 학생 주간 등원일정을 설정할 수 있습니다.',
       });
       return;
     }
@@ -8028,21 +8028,13 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
 
     const savedAt = serverTimestamp();
     const editorUid = user?.uid || null;
-    const editorName = user?.displayName || activeMembership?.displayName || '센터관리자';
+    const editorName = user?.displayName || activeMembership?.displayName || getStaffRoleLabel(activeMembership?.role);
 
     setFocusScheduleSavingMode('save');
     try {
-      const [routinePenaltySnapshot, templateSnapshot] = await Promise.all([
-        getDocs(
-          query(
-            collection(firestore, 'centers', centerId, 'penaltyLogs'),
-            where('studentId', '==', studentId),
-            where('source', '==', 'routine_missing'),
-            limit(20)
-          )
-        ),
-        getDocs(query(collection(firestore, 'users', studentId, 'scheduleTemplates'), where('centerId', '==', centerId))),
-      ]);
+      const templateSnapshot = await getDocs(
+        query(collection(firestore, 'users', studentId, 'scheduleTemplates'), where('centerId', '==', centerId))
+      );
       const batch = writeBatch(firestore);
       const activeTemplateIds = new Set(
         enabledDrafts.map((draft) => `admin-weekly-${centerId}-${draft.weekday}`)
@@ -8242,47 +8234,78 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
         );
       });
 
+      await batch.commit();
+
       let waivedRoutinePenaltyPoints = 0;
-      const editableWeekDateKeys = new Set(
-        weeklyDrafts
+      let penaltyCleanupWarning = false;
+      if (canAccessAdminOnlyOperations) {
+        const editableWeekDateKeyList = weeklyDrafts
           .map((draft) => draft.dateKey)
-          .filter((dateKey): dateKey is string => Boolean(dateKey && dateKey >= todayKey))
-      );
-      routinePenaltySnapshot.docs.forEach((penaltyDoc) => {
-        const penaltyData = penaltyDoc.data() as Record<string, unknown>;
-        if (!Array.from(editableWeekDateKeys).some((dateKey) => isRoutineMissingPenaltyForDate(penaltyData, dateKey))) {
-          return;
+          .filter((dateKey): dateKey is string => Boolean(dateKey && dateKey >= todayKey));
+
+        if (editableWeekDateKeyList.length > 0) {
+          try {
+            const routinePenaltySnapshot = await getDocs(
+              query(
+                collection(firestore, 'centers', centerId, 'penaltyLogs'),
+                where('studentId', '==', studentId),
+                where('source', '==', 'routine_missing'),
+                limit(20)
+              )
+            );
+            const penaltyCleanupBatch = writeBatch(firestore);
+            let penaltyCleanupMutationCount = 0;
+
+            routinePenaltySnapshot.docs.forEach((penaltyDoc) => {
+              const penaltyData = penaltyDoc.data() as Record<string, unknown>;
+              if (!editableWeekDateKeyList.some((dateKey) => isRoutineMissingPenaltyForDate(penaltyData, dateKey))) {
+                return;
+              }
+              const pointsDelta = Math.max(0, Math.round(Number(penaltyData.pointsDelta || 0)));
+              waivedRoutinePenaltyPoints += pointsDelta;
+              penaltyCleanupBatch.delete(penaltyDoc.ref);
+              penaltyCleanupMutationCount += 1;
+            });
+
+            if (waivedRoutinePenaltyPoints > 0) {
+              penaltyCleanupBatch.set(
+                doc(firestore, 'centers', centerId, 'growthProgress', studentId),
+                {
+                  penaltyPoints: increment(-waivedRoutinePenaltyPoints),
+                  routineMissingPenaltyWaivedAt: savedAt,
+                  routineMissingPenaltyWaivedByUid: editorUid,
+                  routineMissingPenaltyWaivedDateKey: todayKey,
+                  routineMissingPenaltyWaivedDateKeys: editableWeekDateKeyList,
+                  updatedAt: savedAt,
+                },
+                { merge: true }
+              );
+              penaltyCleanupMutationCount += 1;
+            }
+
+            if (penaltyCleanupMutationCount > 0) {
+              await penaltyCleanupBatch.commit();
+            }
+          } catch (cleanupError) {
+            penaltyCleanupWarning = true;
+            logHandledClientIssue('[admin-dashboard] focus weekly schedule penalty cleanup failed', cleanupError);
+          }
         }
-        const pointsDelta = Math.max(0, Math.round(Number(penaltyData.pointsDelta || 0)));
-        waivedRoutinePenaltyPoints += pointsDelta;
-        batch.delete(penaltyDoc.ref);
-      });
-      if (waivedRoutinePenaltyPoints > 0) {
-        batch.set(
-          doc(firestore, 'centers', centerId, 'growthProgress', studentId),
-          {
-            penaltyPoints: increment(-waivedRoutinePenaltyPoints),
-            routineMissingPenaltyWaivedAt: savedAt,
-            routineMissingPenaltyWaivedByUid: editorUid,
-            routineMissingPenaltyWaivedDateKey: todayKey,
-            routineMissingPenaltyWaivedDateKeys: Array.from(editableWeekDateKeys),
-            updatedAt: savedAt,
-          },
-          { merge: true }
-        );
       }
 
-      await batch.commit();
       setLiveTickMs(Date.now());
       resetFocusScheduleDialog();
       const scheduledLabels = scheduledDrafts.map((draft) => draft.label).join(', ') || '없음';
       const autonomousLabels = autonomousDrafts.map((draft) => draft.label).join(', ') || '없음';
       const offCount = weeklyDrafts.length - enabledDrafts.length;
+      const saveDescription = penaltyCleanupWarning
+        ? `${studentName} 학생 주간 일정은 저장했습니다. 기존 루틴 미작성 벌점 정리는 권한 확인 후 다시 시도해 주세요.`
+        : waivedRoutinePenaltyPoints > 0
+          ? `${studentName} 학생 주간 일정과 루틴 미작성 벌점 ${waivedRoutinePenaltyPoints}점을 함께 정리했습니다.`
+          : `${studentName} 학생 정규 ${scheduledDrafts.length}일(${scheduledLabels}) · 자율 ${autonomousDrafts.length}일(${autonomousLabels}) · 미등원 ${offCount}일로 반영했습니다.`;
       toast({
         title: '주간 등원일정을 저장했습니다.',
-        description: waivedRoutinePenaltyPoints > 0
-          ? `${studentName} 학생 주간 일정과 루틴 미작성 벌점 ${waivedRoutinePenaltyPoints}점을 함께 정리했습니다.`
-          : `${studentName} 학생 정규 ${scheduledDrafts.length}일(${scheduledLabels}) · 자율 ${autonomousDrafts.length}일(${autonomousLabels}) · 미등원 ${offCount}일로 반영했습니다.`,
+        description: saveDescription,
       });
     } catch (error) {
       logHandledClientIssue('[admin-dashboard] focus weekly schedule save failed', error);
@@ -11562,7 +11585,7 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
                   </div>
                   {canEditFocusSchedule ? (
                     <div className="mt-3 rounded-[1.15rem] border border-[#CDEFD9] bg-emerald-50 px-3 py-2 text-[11px] font-black leading-5 text-emerald-800">
-                      월~일까지 주간 등원 여부와 등하원·외출 시간을 설정할 수 있습니다. 센터관리자 직접 설정은 벌점을 부여하지 않습니다.
+                      월~일까지 주간 등원 여부와 등하원·외출 시간을 설정할 수 있습니다. 센터관리자/선생님 직접 설정은 벌점을 부여하지 않습니다.
                     </div>
                   ) : null}
 
