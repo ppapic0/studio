@@ -3559,6 +3559,36 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
     studyBoxCacheUid,
   ]);
 
+  useEffect(() => {
+    if (!activeMembership?.id || !studentUid || !previousStudyDayKey || !studyBoxCacheUid || isCarryoverExpired) return;
+
+    const cachedOpenedBoxes = readStudyBoxOpenedCache(studyBoxCacheUid, previousStudyDayKey);
+    const unsyncedOpenedBoxes = normalizeStudyBoxHours(
+      cachedOpenedBoxes.filter(
+        (hour) => persistedCarryoverClaimedBoxes.includes(hour) && !persistedCarryoverOpenedBoxes.includes(hour)
+      )
+    );
+    if (unsyncedOpenedBoxes.length === 0) return;
+
+    const retryKey = `${previousStudyDayKey}:carryover:${unsyncedOpenedBoxes.join(',')}:${persistedCarryoverOpenedBoxes.join(',')}`;
+    if (retriedCachedHomeBoxOpenKeyRef.current === retryKey) return;
+    retriedCachedHomeBoxOpenKeyRef.current = retryKey;
+
+    const pendingHours = pendingHomeBoxOpenHoursRef.current.get(previousStudyDayKey) ?? new Set<number>();
+    unsyncedOpenedBoxes.forEach((hour) => pendingHours.add(hour));
+    pendingHomeBoxOpenHoursRef.current.set(previousStudyDayKey, pendingHours);
+    void flushPendingHomeBoxOpens();
+  }, [
+    activeMembership?.id,
+    flushPendingHomeBoxOpens,
+    isCarryoverExpired,
+    persistedCarryoverClaimedBoxes,
+    persistedCarryoverOpenedBoxes,
+    previousStudyDayKey,
+    studentUid,
+    studyBoxCacheUid,
+  ]);
+
   const openVault = useCallback((hour?: number) => {
     const targetBoxes = carryoverReadyBoxes.length > 0 ? carryoverReadyBoxes : readyBoxes;
     if (targetBoxes.length === 0) return;
