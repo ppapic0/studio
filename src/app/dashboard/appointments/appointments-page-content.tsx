@@ -1203,6 +1203,55 @@ export function AppointmentsPageContent({
     return <Badge variant="secondary" className="font-black text-[10px]">접수됨</Badge>;
   };
 
+  const renderCommunicationStatusActions = (
+    item: ParentCommunicationRecord,
+    tone: 'light' | 'dark' = 'light'
+  ) => {
+    if (!isStaff) return null;
+
+    const status = item.status || 'requested';
+    const canSetInProgress = status !== 'in_progress';
+    const canSetDone = status !== 'done';
+    if (!canSetInProgress && !canSetDone) return null;
+
+    const inProgressClass = tone === 'dark'
+      ? 'border-white/18 bg-white/10 text-white hover:bg-white/16'
+      : 'border-[#dbe5ff] bg-white text-[#14295F] hover:bg-[#f5f8ff]';
+    const doneClass = tone === 'dark'
+      ? 'bg-white text-[#14295F] hover:bg-white/90'
+      : 'bg-[var(--accent-orange)] text-white hover:bg-[var(--accent-orange-strong)]';
+
+    return (
+      <div className="flex flex-wrap items-center justify-end gap-2">
+        {canSetInProgress && (
+          <Button
+            type="button"
+            size="sm"
+            variant="outline"
+            disabled={isSubmitting}
+            onClick={() => handleParentCommunicationStatus(item.id, 'in_progress')}
+            className={cn('h-9 rounded-xl px-3 font-black gap-1.5', inProgressClass)}
+          >
+            <Clock className="h-3.5 w-3.5" />
+            처리 중
+          </Button>
+        )}
+        {canSetDone && (
+          <Button
+            type="button"
+            size="sm"
+            disabled={isSubmitting}
+            onClick={() => handleParentCommunicationStatus(item.id, 'done')}
+            className={cn('h-9 rounded-xl px-3 font-black gap-1.5', doneClass)}
+          >
+            <CheckCircle2 className="h-3.5 w-3.5" />
+            완료 처리
+          </Button>
+        )}
+      </div>
+    );
+  };
+
   const getStatusBadge = (status: string) => {
     if (isStudentTrackTheme) {
       switch (status) {
@@ -2445,9 +2494,12 @@ export function AppointmentsPageContent({
                       const threadMessages = getSupportThreadMessages(item.id);
                       return (
                         <div key={item.id} className={cn(isStudentTrackTheme ? "surface-card surface-card--ghost on-dark rounded-[1.35rem] border-white/10 shadow-none" : isStaff ? "space-y-3 rounded-[1.5rem] border border-[#d9ecff] bg-[linear-gradient(135deg,#ffffff_0%,#f4faff_54%,#eef5ff_100%)] mx-4 my-4 shadow-[0_20px_42px_-34px_rgba(37,84,215,0.18)]" : "space-y-3 hover:bg-muted/5 transition-colors", isMobile ? "p-5" : "p-6 sm:p-8")}>
-                          <div className="flex items-center gap-2 flex-wrap">
-                            {getCommunicationTypeBadge(item)}
-                            {getParentStatusBadge(item.status)}
+                          <div className="flex items-start justify-between gap-3 flex-wrap">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              {getCommunicationTypeBadge(item)}
+                              {getParentStatusBadge(item.status)}
+                            </div>
+                            {renderCommunicationStatusActions(item)}
                           </div>
                           <h3 className={cn("font-black break-keep", isMobile ? "text-sm" : "text-base", studentTitleTextClass)}>{item.title || '질문/건의'}</h3>
                           <p className={cn("text-[10px] font-bold", studentMetaTextClass)}>{createdAtLabel}</p>
@@ -2584,16 +2636,7 @@ export function AppointmentsPageContent({
                                   1:1 톡 열기
                                 </Button>
                               )}
-                              {item.status !== 'in_progress' && item.status !== 'done' && (
-                                <Button size="sm" variant="outline" disabled={isSubmitting} onClick={() => handleParentCommunicationStatus(item.id, item.type === 'consultation' ? 'in_progress' : 'in_review')} className="rounded-xl border-[#dbe5ff] bg-white font-black text-[#14295F] h-9 hover:bg-[#f5f8ff]">
-                                  {item.type === 'consultation' ? '처리 시작' : '검토 시작'}
-                                </Button>
-                              )}
-                              {item.status !== 'done' && (
-                  <Button size="sm" disabled={isSubmitting} onClick={() => handleParentCommunicationStatus(item.id, 'done')} className="rounded-xl font-black h-9 bg-[var(--accent-orange)] text-white hover:bg-[var(--accent-orange-strong)]">
-                                  완료 처리
-                                </Button>
-                              )}
+                              {renderCommunicationStatusActions(item)}
                             </div>
                           </div>
                           <div className="rounded-2xl border border-[#dbe5ff] bg-[linear-gradient(135deg,#ffffff_0%,#f4f8ff_100%)] p-4">
@@ -2723,6 +2766,11 @@ export function AppointmentsPageContent({
                     1:1 톡 진행 중
                   </Badge>
                 </div>
+                {isStaff && (
+                  <div className="mt-3">
+                    {renderCommunicationStatusActions(liveSelectedSupportThread, 'dark')}
+                  </div>
+                )}
                 {liveSelectedSupportThread.supportKind === 'wifi_unblock' && liveSelectedSupportThread.requestedUrl && (
                   <div className="mt-4 rounded-[1.35rem] border border-white/12 bg-white/[0.08] p-4">
                     <p className="text-[10px] font-black uppercase tracking-[0.22em] text-white/70">요청 URL</p>
