@@ -941,6 +941,7 @@ export function useCenterAdminAttendanceBoard({
           hasAttendanceEvidence,
           isReturned,
           isShortAwayOverdue,
+          isAutonomousAttendance: Boolean(routineInfo?.isAutonomousAttendance),
         });
 
         const flags = buildAttendanceBoardFlags({
@@ -948,6 +949,7 @@ export function useCenterAdminAttendanceBoard({
           attendanceRiskLevel,
           isLongAway,
           isShortAwayOverdue,
+          isAutonomousAttendance: Boolean(routineInfo?.isAutonomousAttendance),
         });
         const operationalException = resolveAttendanceOperationalException({
           boardStatus,
@@ -976,6 +978,7 @@ export function useCenterAdminAttendanceBoard({
           todayStudyLabel: formatAttendanceBoardMinutes(totalStudyMinutes),
           liveSessionMinutes,
           isNoAttendanceDay: Boolean(routineInfo?.isNoAttendanceDay),
+          isAutonomousAttendance: Boolean(routineInfo?.isAutonomousAttendance),
           routineExpectedArrivalTime: routineInfo?.expectedArrivalTime || null,
           plannedDepartureTime: routineInfo?.plannedDepartureTime || todaySchedule?.departurePlannedAt || null,
           classScheduleName: todaySchedule?.classScheduleName || routineInfo?.classScheduleName || null,
@@ -1019,6 +1022,7 @@ export function useCenterAdminAttendanceBoard({
             firstCheckInLabel: formatAttendanceBoardClockLabel(firstCheckInAt),
             lastCheckOutLabel: formatAttendanceBoardClockLabel(lastCheckOutAt),
             wasLateToday: derived.status === 'confirmed_late',
+            isAutonomousAttendance: Boolean(routineInfo?.isAutonomousAttendance),
           }),
         };
       });

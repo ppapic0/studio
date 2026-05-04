@@ -1872,9 +1872,11 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
       student,
       studentMember,
       seatLabel,
-      plannedArrival: signal.routineExpectedArrivalTime || student?.expectedArrivalTime || '-',
+      plannedArrival: signal.isAutonomousAttendance
+        ? '자율등원'
+        : signal.routineExpectedArrivalTime || student?.expectedArrivalTime || '-',
       firstCheckInLabel: signal.firstCheckInLabel || '-',
-      plannedDeparture: signal.plannedDepartureTime || '-',
+      plannedDeparture: signal.isAutonomousAttendance ? '-' : signal.plannedDepartureTime || '-',
       outingLabel,
       scheduleLabel: scheduleLabel || classScheduleLabel || '등록된 일정 없음',
       parentName:
@@ -3699,9 +3701,11 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
       currentStatus: seat?.status || signal?.seatStatus || 'absent',
       currentStatusLabel: getAdminAttendanceStatusLabel(seat?.status || signal?.seatStatus || 'absent'),
       seatId: seat?.id || signal?.seatId || '',
-      plannedArrival: signal?.routineExpectedArrivalTime || student?.expectedArrivalTime || '-',
+      plannedArrival: signal?.isAutonomousAttendance
+        ? '자율등원'
+        : signal?.routineExpectedArrivalTime || student?.expectedArrivalTime || '-',
       firstCheckInLabel: signal?.firstCheckInLabel || '-',
-      plannedDeparture: signal?.plannedDepartureTime || '-',
+      plannedDeparture: signal?.isAutonomousAttendance ? '-' : signal?.plannedDepartureTime || '-',
       latestAwayStartLabel: signal?.latestAwayStartLabel || '-',
       latestAwayEndLabel: signal?.latestAwayEndLabel || (signal?.latestAwayStartLabel ? '복귀 전' : '-'),
       outingLabel,
@@ -4565,6 +4569,7 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
       away: 5,
       returned: 6,
       present: 7,
+      autonomous: 8,
       planned: 8,
       excused_absent: 9,
     };
@@ -5331,7 +5336,7 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
                           size="sm"
                           variant={mode === 'autonomous' ? 'default' : 'ghost'}
                           className={cn(
-                            'h-8 rounded-lg px-2 text-[10px] font-black',
+                            'h-8 rounded-lg px-1.5 text-[10px] font-black',
                             mode === 'autonomous'
                               ? 'bg-sky-600 text-white hover:bg-sky-700'
                               : 'text-[#5C6E97] hover:bg-sky-50'
@@ -5346,8 +5351,8 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
                             })
                           }
                         >
-                          <Clock className="mr-1 h-3.5 w-3.5" />
-                          자율
+                          <Clock className="mr-0.5 h-3.5 w-3.5" />
+                          자율등원
                         </Button>
                         <Button
                           type="button"
@@ -8381,8 +8386,8 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
         : waivedRoutinePenaltyPoints > 0
           ? `${studentName} 학생 주간 일정과 루틴 미작성 벌점 ${waivedRoutinePenaltyPoints}점을 함께 정리했습니다.`
           : focusScheduleWeekOffset === 0
-            ? `${studentName} 학생 정규 ${scheduledDrafts.length}일(${scheduledLabels}) · 자율 ${autonomousDrafts.length}일(${autonomousLabels}) · 미등원 ${offCount}일을 이번 주와 다음 주(${appliedScheduleWeeks}주)에 반영했습니다.`
-            : `${studentName} 학생 다음 주 정규 ${scheduledDrafts.length}일(${scheduledLabels}) · 자율 ${autonomousDrafts.length}일(${autonomousLabels}) · 미등원 ${offCount}일로 미리 저장했습니다.`;
+            ? `${studentName} 학생 정규 ${scheduledDrafts.length}일(${scheduledLabels}) · 자율등원 ${autonomousDrafts.length}일(${autonomousLabels}) · 미등원 ${offCount}일을 이번 주와 다음 주(${appliedScheduleWeeks}주)에 반영했습니다.`
+            : `${studentName} 학생 다음 주 정규 ${scheduledDrafts.length}일(${scheduledLabels}) · 자율등원 ${autonomousDrafts.length}일(${autonomousLabels}) · 미등원 ${offCount}일로 미리 저장했습니다.`;
       toast({
         title: '주간 등원일정을 저장했습니다.',
         description: saveDescription,

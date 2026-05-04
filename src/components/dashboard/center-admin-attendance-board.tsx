@@ -166,6 +166,7 @@ export function CenterAdminAttendanceBoard({
     }),
     [operationalSignals]
   );
+  const waitingSeatCount = summary.excusedAbsentCount + summary.autonomousCount + summary.plannedCount;
 
   const summaryItems: SummaryItem[] = [
     {
@@ -201,8 +202,8 @@ export function CenterAdminAttendanceBoard({
       label: '퇴실',
       value: summary.exitFamilyCount,
       note:
-        summary.excusedAbsentCount + summary.plannedCount > 0
-          ? `예정/대기 ${summary.excusedAbsentCount + summary.plannedCount}`
+        waitingSeatCount > 0
+          ? `예정/자율 ${waitingSeatCount}`
           : '현재 좌석 기준',
       toneClass: 'border-[#DFE7F2] bg-[#F8FAFD]',
       valueClass: 'text-slate-700',
@@ -239,6 +240,7 @@ export function CenterAdminAttendanceBoard({
       } else if (
         signal.boardStatus === 'checked_out' ||
         signal.boardStatus === 'excused_absent' ||
+        signal.boardStatus === 'autonomous' ||
         signal.boardStatus === 'planned'
       ) {
         exitCount += 1;
@@ -297,6 +299,7 @@ export function CenterAdminAttendanceBoard({
                   const displayName = manualOccupantName || signal?.studentName || student?.name || member?.displayName || '학생';
                   const scheduleMovementLabel = signal?.scheduleMovementSummary || null;
                   const isNoAttendanceDay = Boolean(signal?.isNoAttendanceDay || signal?.boardStatus === 'excused_absent');
+                  const isAutonomousAttendance = signal?.boardStatus === 'autonomous';
                   const isCheckedOutLate = Boolean(signal?.boardStatus === 'checked_out' && signal.wasLateToday);
                   const firstCheckInTimeLabel = signal?.firstCheckInLabel || signal?.checkedAtLabel || null;
                   const latestAwayStartLabel = signal?.latestAwayStartLabel || null;
@@ -358,6 +361,8 @@ export function CenterAdminAttendanceBoard({
                   const attendanceTimeLabel = signal
                     ? isNoAttendanceDay
                       ? '미등원'
+                    : isAutonomousAttendance
+                      ? '자율등원'
                     : signal.boardStatus === 'checked_out'
                       ? actualCheckOutLabel
                         ? `퇴실 ${actualCheckOutLabel}`
@@ -378,6 +383,7 @@ export function CenterAdminAttendanceBoard({
                     Boolean(manualOccupantName) ||
                     (!isNameOnly && !hasSeatTimeChips) ||
                     isNoAttendanceDay ||
+                    isAutonomousAttendance ||
                     Boolean(scheduleMovementLabel) ||
                     checkoutMetaChips.length > 0;
 
@@ -496,6 +502,7 @@ export function CenterAdminAttendanceBoard({
                             className={cn(
                               'inline-flex max-w-full items-center rounded-full border border-white/85 bg-white/88 px-2.5 py-1 font-black tracking-tight text-[#14295F] shadow-[0_10px_18px_-16px_rgba(20,41,95,0.35)]',
                               isNoAttendanceDay && 'bg-rose-50 text-rose-700',
+                              isAutonomousAttendance && 'border-sky-200 bg-white text-sky-700',
                               signal?.boardStatus === 'checked_out' &&
                                 !isCheckedOutLate &&
                                 'border-slate-600 bg-slate-800 text-white',

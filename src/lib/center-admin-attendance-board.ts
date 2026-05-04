@@ -16,6 +16,7 @@ export type CenterAdminAttendanceBoardStatus =
   | 'checked_out'
   | 'absent'
   | 'excused_absent'
+  | 'autonomous'
   | 'planned';
 
 export interface CenterAdminAttendanceSeatSignal {
@@ -33,6 +34,7 @@ export interface CenterAdminAttendanceSeatSignal {
   todayStudyLabel: string;
   liveSessionMinutes: number;
   isNoAttendanceDay: boolean;
+  isAutonomousAttendance: boolean;
   routineExpectedArrivalTime: string | null;
   plannedDepartureTime: string | null;
   classScheduleName: string | null;
@@ -80,6 +82,7 @@ export interface CenterAdminAttendanceBoardSummary {
   checkedOutCount: number;
   longAwayCount: number;
   excusedAbsentCount: number;
+  autonomousCount: number;
   plannedCount: number;
   studyingFamilyCount: number;
   attentionFamilyCount: number;
@@ -166,6 +169,13 @@ const PRESENTATION_BY_STATUS: Record<CenterAdminAttendanceBoardStatus, Attendanc
     flagClass: 'bg-white/95 text-slate-700',
     isDark: false,
   },
+  autonomous: {
+    surfaceClass: 'border-sky-200 bg-sky-50 text-[#14295F]',
+    chipClass: 'bg-sky-600 text-white',
+    chipLabel: '자율등원',
+    flagClass: 'bg-white/95 text-sky-700',
+    isDark: false,
+  },
   planned: {
     surfaceClass: 'border-[#C8D2E3] bg-[#F2F5F9] text-[#14295F]',
     chipClass: 'bg-slate-100 text-slate-700',
@@ -194,6 +204,7 @@ const BOARD_STATUS_LABELS: Record<CenterAdminAttendanceBoardStatus, string> = {
   checked_out: '퇴실',
   absent: '미입실',
   excused_absent: '미등원',
+  autonomous: '자율등원',
   planned: '입실 예정',
 };
 
@@ -253,8 +264,16 @@ export function resolveAttendanceBoardStatus(params: {
   hasAttendanceEvidence: boolean;
   isReturned: boolean;
   isShortAwayOverdue?: boolean;
+  isAutonomousAttendance?: boolean;
 }) {
-  const { seatStatus, displayStatus, hasAttendanceEvidence, isReturned, isShortAwayOverdue = false } = params;
+  const {
+    seatStatus,
+    displayStatus,
+    hasAttendanceEvidence,
+    isReturned,
+    isShortAwayOverdue = false,
+    isAutonomousAttendance = false,
+  } = params;
 
   if ((seatStatus === 'away' || seatStatus === 'break') && isShortAwayOverdue) return 'not_returned';
   if (seatStatus === 'away' || seatStatus === 'break') return 'away';
@@ -267,6 +286,7 @@ export function resolveAttendanceBoardStatus(params: {
   if (displayStatus === 'missing_routine') return 'routine_missing';
   if (displayStatus === 'confirmed_present') return 'present';
   if (displayStatus === 'confirmed_absent') return 'absent';
+  if (isAutonomousAttendance && !hasAttendanceEvidence) return 'autonomous';
   return 'planned';
 }
 
@@ -279,8 +299,15 @@ export function buildAttendanceBoardFlags(params: {
   attendanceRiskLevel: CenterAdminAttendanceRiskLevel;
   isLongAway: boolean;
   isShortAwayOverdue?: boolean;
+  isAutonomousAttendance?: boolean;
 }) {
-  const { displayStatus, attendanceRiskLevel, isLongAway, isShortAwayOverdue = false } = params;
+  const {
+    displayStatus,
+    attendanceRiskLevel,
+    isLongAway,
+    isShortAwayOverdue = false,
+    isAutonomousAttendance = false,
+  } = params;
   return [
     attendanceRiskLevel === 'risk' ? '출석위험' : attendanceRiskLevel === 'warning' ? '출석주의' : null,
     displayStatus === 'confirmed_late' ? '오늘 지각O' : null,
@@ -288,6 +315,7 @@ export function buildAttendanceBoardFlags(params: {
     isShortAwayOverdue ? '미복귀' : null,
     isLongAway ? '장기외출' : null,
     displayStatus === 'excused_absent' ? '미등원' : null,
+    isAutonomousAttendance ? '자율등원' : null,
   ].filter(Boolean) as string[];
 }
 
@@ -300,6 +328,7 @@ export function buildAttendanceBoardNote(params: {
   firstCheckInLabel?: string | null;
   lastCheckOutLabel?: string | null;
   wasLateToday?: boolean;
+  isAutonomousAttendance?: boolean;
 }) {
   const {
     boardStatus,
@@ -310,10 +339,14 @@ export function buildAttendanceBoardNote(params: {
     firstCheckInLabel,
     lastCheckOutLabel,
     wasLateToday = false,
+    isAutonomousAttendance = false,
   } = params;
 
   switch (boardStatus) {
     case 'present':
+      if (isAutonomousAttendance) {
+        return '자율등원으로 입실해 현재 공부중입니다.';
+      }
       if (displayStatus === 'confirmed_late') {
         return expectedArrivalTime
           ? `현재 공부중이며 오늘은 예정 등원 ${expectedArrivalTime}보다 늦게 입실했습니다.`
@@ -352,6 +385,8 @@ export function buildAttendanceBoardNote(params: {
         : '오늘 입실 증거가 없어 미입실로 보고 있습니다.';
     case 'excused_absent':
       return '오늘은 미등원으로 등록되어 있습니다.';
+    case 'autonomous':
+      return '오늘은 자율등원으로 등록되어 있어 등원 시간을 강제하지 않습니다.';
     case 'planned':
       return '아직 루틴 예정 시각 전이거나 입실 대기 상태입니다.';
     default:
@@ -479,6 +514,7 @@ export function buildAttendanceBoardSummary(signals: CenterAdminAttendanceSeatSi
       if (signal.boardStatus === 'returned') acc.returnedCount += 1;
       if (signal.boardStatus === 'checked_out') acc.checkedOutCount += 1;
       if (signal.boardStatus === 'excused_absent') acc.excusedAbsentCount += 1;
+      if (signal.boardStatus === 'autonomous') acc.autonomousCount += 1;
       if (signal.boardStatus === 'planned') acc.plannedCount += 1;
       if (signal.isLongAway) acc.longAwayCount += 1;
       return acc;
@@ -493,6 +529,7 @@ export function buildAttendanceBoardSummary(signals: CenterAdminAttendanceSeatSi
       checkedOutCount: 0,
       longAwayCount: 0,
       excusedAbsentCount: 0,
+      autonomousCount: 0,
       plannedCount: 0,
       studyingFamilyCount: 0,
       attentionFamilyCount: 0,
@@ -504,7 +541,8 @@ export function buildAttendanceBoardSummary(signals: CenterAdminAttendanceSeatSi
   summary.studyingFamilyCount = summary.normalPresentCount + summary.returnedCount;
   summary.attentionFamilyCount = summary.lateOrAbsentCount + summary.routineMissingCount;
   summary.restFamilyCount = summary.awayCount + summary.notReturnedCount;
-  summary.exitFamilyCount = summary.checkedOutCount + summary.excusedAbsentCount + summary.plannedCount;
+  summary.exitFamilyCount =
+    summary.checkedOutCount + summary.excusedAbsentCount + summary.autonomousCount + summary.plannedCount;
 
   return summary;
 }
