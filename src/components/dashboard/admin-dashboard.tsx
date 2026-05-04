@@ -93,7 +93,7 @@ import { useAppContext } from '@/contexts/app-context';
 import { useMemoFirebase } from '@/hooks/use-memo-firebase';
 import { addDoc, collection, query, where, Timestamp, doc, limit, getDoc, getDocs, orderBy, serverTimestamp, documentId, writeBatch, deleteField, updateDoc } from 'firebase/firestore';
 import { httpsCallable } from 'firebase/functions';
-import { AttendanceCurrent, AttendanceRequest, CounselingReservation, DailyStudentStat, DailyReport, CenterMembership, InviteCode, GrowthProgress, ParentActivityEvent, CounselingLog, CounselingLogStatus, LayoutRoomConfig, StudentProfile, StudentScheduleDoc, StudentScheduleTemplate, StudyLogDay, OpenClawIntegrationDoc, OpenClawSnapshotRecordCounts, PointBoostEvent, StudyPlanItem, WebsiteSeatHoldRequest } from '@/lib/types';
+import { AttendanceCurrent, AttendanceRequest, CounselingReservation, DailyStudentStat, DailyReport, CenterMembership, GiftishowOrder, InviteCode, GrowthProgress, ParentActivityEvent, CounselingLog, CounselingLogStatus, LayoutRoomConfig, StudentProfile, StudentScheduleDoc, StudentScheduleTemplate, StudyLogDay, OpenClawIntegrationDoc, OpenClawSnapshotRecordCounts, PointBoostEvent, StudyPlanItem, WebsiteSeatHoldRequest } from '@/lib/types';
 import { addDays, format, startOfWeek, subDays } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { logHandledClientIssue } from '@/lib/handled-client-log';
@@ -1654,6 +1654,18 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
     );
   }, [firestore, centerId]);
   const { data: attendanceRequests } = useCollection<AttendanceRequest>(attendanceRequestsQuery, { enabled: isActive });
+
+  const pendingGiftishowOrdersQuery = useMemoFirebase(() => {
+    if (!firestore || !centerId || !canAccessAdminOnlyOperations) return null;
+    return query(
+      collection(firestore, 'centers', centerId, 'giftishowOrders'),
+      where('status', '==', 'requested'),
+      limit(200)
+    );
+  }, [firestore, centerId, canAccessAdminOnlyOperations]);
+  const { data: pendingGiftishowOrders } = useCollection<GiftishowOrder>(pendingGiftishowOrdersQuery, {
+    enabled: isActive && canAccessAdminOnlyOperations,
+  });
 
   // 4. 실시간 학습 로그 집계
   const todayStatsQuery = useMemoFirebase(() => {
@@ -7647,6 +7659,9 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
   const openAttendanceRequestsPage = () => {
     router.push('/dashboard/attendance?tab=requests');
   };
+  const openGiftishowSettingsPage = () => {
+    router.push('/dashboard/settings/giftishow');
+  };
   const openPointHistoryDialog = (window: PointHistoryWindow = 'today') => {
     setSelectedPointHistoryWindow(window);
     setExpandedPointHistoryDateKey(null);
@@ -8557,6 +8572,8 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
 
     return detailParts.join(' · ');
   }
+  const pendingGiftishowOrderCount = pendingGiftishowOrders?.length ?? 0;
+  const firstPendingGiftishowOrder = pendingGiftishowOrders?.[0] || null;
   const adminOperationsInboxTotalOpenCount =
     adminNoShowSignals.length
     + adminLateSignals.length
@@ -8565,7 +8582,8 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
     + counselingTrackOverview.consultationCount
     + counselingTrackOverview.wifiCount
     + counselingTrackOverview.parentRequestCount
-    + counselingTrackOverview.studentRequestCount;
+    + counselingTrackOverview.studentRequestCount
+    + (canAccessAdminOnlyOperations ? pendingGiftishowOrderCount : 0);
   const adminOperationsInboxStatusTone =
     adminNoShowSignals.length > 0 || adminLateSignals.length > 0
       ? 'urgent'
@@ -8643,6 +8661,20 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
             ? () => openCounselTrackDialog('parent')
             : undefined,
       },
+      ...(canAccessAdminOnlyOperations
+        ? [
+            {
+              key: 'giftishow-request',
+              label: '기프티쇼 요청',
+              value: `${pendingGiftishowOrderCount}건`,
+              caption: firstPendingGiftishowOrder
+                ? `${firstPendingGiftishowOrder.studentName || '학생'} · 승인 대기`
+                : '처리 대기 없음',
+              tone: pendingGiftishowOrderCount > 0 ? 'emerald' as const : 'blue' as const,
+              onClick: pendingGiftishowOrderCount > 0 ? openGiftishowSettingsPage : undefined,
+            },
+          ]
+        : []),
       {
         key: 'today-points',
         label: '오늘 포인트',
@@ -8658,6 +8690,9 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
       counselingTrackOverview.consultationCount,
       counselingTrackOverview.parentRequestCount,
       counselingTrackOverview.wifiCount,
+      canAccessAdminOnlyOperations,
+      firstPendingGiftishowOrder,
+      pendingGiftishowOrderCount,
       pendingOtherAttendanceRequests,
       pendingScheduleChangeRequests,
       todayPointsSummary.earners,
@@ -8757,8 +8792,19 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
               onClick: () => openCounselTrackDialog('parent'),
             }
           : null,
+        canAccessAdminOnlyOperations && pendingGiftishowOrderCount > 0
+          ? {
+              key: 'queue-giftishow-request',
+              label: '기프티쇼 요청',
+              title: `기프티쇼 요청 ${pendingGiftishowOrderCount}건`,
+              detail: `${firstPendingGiftishowOrder?.studentName || '학생'} 요청부터 승인/반려를 처리하세요.`,
+              meta: firstPendingGiftishowOrder?.goodsName || '승인 대기',
+              tone: 'emerald' as const,
+              onClick: openGiftishowSettingsPage,
+            }
+          : null,
       ].filter((item): item is NonNullable<typeof item> => Boolean(item)),
-    [adminLateSignals, adminNoShowSignals, attendanceSeatSignalsByStudentId, counselingTrackOverview, pendingOtherAttendanceRequests, pendingScheduleChangeRequests]
+    [adminLateSignals, adminNoShowSignals, attendanceSeatSignalsByStudentId, canAccessAdminOnlyOperations, counselingTrackOverview, firstPendingGiftishowOrder, pendingGiftishowOrderCount, pendingOtherAttendanceRequests, pendingScheduleChangeRequests]
   );
   const adminOperationsInboxPanels = useMemo<OperationsInboxPanel[]>(
     () => [
