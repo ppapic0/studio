@@ -251,6 +251,11 @@ type AttendanceEventRow = {
   activeStudyDayKey?: string;
   flowDateKey?: string;
   eventType?: string;
+  awayKind?: 'short' | 'long' | string;
+  suppressParentSms?: boolean;
+  parentSmsSuppressed?: boolean;
+  parentSmsSuppressedReason?: string;
+  smsSuppressedReason?: string;
   occurredAt?: { toDate?: () => Date };
   createdAt?: { toDate?: () => Date };
 };
@@ -492,6 +497,12 @@ function pickDateByMode(values: Array<Date | null | undefined>, mode: 'earliest'
     .sort((a, b) => mode === 'earliest' ? a.getTime() - b.getTime() : b.getTime() - a.getTime())[0] || null;
 }
 
+function isShortAwayAttendanceEvent(row: AttendanceEventRow) {
+  if (row.eventType !== 'away_start' && row.eventType !== 'away_end') return false;
+  const suppressedReason = row.parentSmsSuppressedReason || row.smsSuppressedReason || '';
+  return row.awayKind === 'short' || suppressedReason === 'short_away';
+}
+
 function pickAttendanceEventTime(
   rows: AttendanceEventRow[],
   eventType: string,
@@ -502,6 +513,7 @@ function pickAttendanceEventTime(
     rows
       .filter((row) => {
         if (row.eventType !== eventType) return false;
+        if (isShortAwayAttendanceEvent(row)) return false;
         const rowDateKey = row.activeStudyDayKey || row.flowDateKey || row.dateKey;
         if (dateKey && rowDateKey && rowDateKey !== dateKey) return false;
         const eventDate = toDateSafe(row.occurredAt) || toDateSafe(row.createdAt);
