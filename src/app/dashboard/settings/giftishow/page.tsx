@@ -4,6 +4,8 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { collection, doc, limit, query, serverTimestamp, setDoc, writeBatch } from 'firebase/firestore';
 import {
   Gift,
+  ChevronLeft,
+  ChevronRight,
   Loader2,
   PlugZap,
   RefreshCcw,
@@ -90,6 +92,7 @@ const DEFAULT_FORM: GiftishowFormState = {
 const GIFTISHOW_ADMIN_PRODUCT_FETCH_LIMIT = 2500;
 const GIFTISHOW_REVIEW_CANDIDATE_PREVIEW_LIMIT = 30;
 const GIFTISHOW_REVIEW_APPROVAL_BATCH_LIMIT = 400;
+const GIFTISHOW_ORDER_PAGE_SIZE = 3;
 
 function getGiftishowSyncTone(status?: GiftishowSyncStatus | null) {
   if (status === 'success') return 'bg-emerald-100 text-emerald-700';
@@ -280,6 +283,11 @@ export default function GiftishowSettingsPage() {
   const [actionKey, setActionKey] = useState<string | null>(null);
   const [reviewActionKey, setReviewActionKey] = useState<string | null>(null);
   const [isApplyingReviewBaseline, setIsApplyingReviewBaseline] = useState(false);
+  const [orderSectionPages, setOrderSectionPages] = useState<Record<string, number>>({
+    requested: 1,
+    delivery: 1,
+    failed: 1,
+  });
   const reviewBaselineRef = useRef<string | null>(null);
 
   const settingsRef = useMemoFirebase(() => {
@@ -484,6 +492,33 @@ export default function GiftishowSettingsPage() {
     ],
     [deliveryOrders, failedOrders, requestedOrders]
   );
+
+  useEffect(() => {
+    setOrderSectionPages((current) => {
+      let didChange = false;
+      const next = { ...current };
+
+      orderSections.forEach((section) => {
+        const totalPages = Math.max(1, Math.ceil(section.orders.length / GIFTISHOW_ORDER_PAGE_SIZE));
+        const currentPage = next[section.key] || 1;
+        const clampedPage = Math.min(Math.max(currentPage, 1), totalPages);
+
+        if (currentPage !== clampedPage) {
+          next[section.key] = clampedPage;
+          didChange = true;
+        }
+      });
+
+      return didChange ? next : current;
+    });
+  }, [orderSections]);
+
+  const setOrderSectionPage = (sectionKey: string, page: number) => {
+    setOrderSectionPages((current) => ({
+      ...current,
+      [sectionKey]: page,
+    }));
+  };
 
   const updateField = <K extends keyof GiftishowFormState>(key: K, value: GiftishowFormState[K]) => {
     setForm((current) => ({ ...current, [key]: value }));
@@ -1083,34 +1118,79 @@ export default function GiftishowSettingsPage() {
       </div>
 
       <div className="grid gap-5 xl:grid-cols-3">
-        {orderSections.map((section) => (
-          <Card key={section.key} className="rounded-[2rem] border-none shadow-xl ring-1 ring-black/[0.04]">
-            <CardHeader className="border-b bg-muted/10">
-              <CardTitle className="text-xl font-black tracking-tight">{section.title}</CardTitle>
-              <CardDescription className="font-bold text-sm">{section.description}</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-3 p-6">
-              {section.orders.length === 0 ? (
-                <div className="rounded-[1.5rem] border border-dashed py-10 text-center text-sm font-bold text-muted-foreground">
-                  {section.emptyLabel}
+        {orderSections.map((section) => {
+          const totalPages = Math.max(1, Math.ceil(section.orders.length / GIFTISHOW_ORDER_PAGE_SIZE));
+          const currentPage = Math.min(Math.max(orderSectionPages[section.key] || 1, 1), totalPages);
+          const pageStartIndex = (currentPage - 1) * GIFTISHOW_ORDER_PAGE_SIZE;
+          const visibleOrders = section.orders.slice(pageStartIndex, pageStartIndex + GIFTISHOW_ORDER_PAGE_SIZE);
+
+          return (
+            <Card key={section.key} className="rounded-[2rem] border-none shadow-xl ring-1 ring-black/[0.04]">
+              <CardHeader className="border-b bg-muted/10">
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div>
+                    <CardTitle className="text-xl font-black tracking-tight">{section.title}</CardTitle>
+                    <CardDescription className="mt-2 font-bold text-sm">{section.description}</CardDescription>
+                  </div>
+                  <Badge className="border-none bg-slate-100 text-slate-700 font-black">
+                    총 {section.orders.length.toLocaleString()}건
+                  </Badge>
                 </div>
-              ) : (
-                section.orders.slice(0, 12).map((order) => (
-                  <GiftishowOrderCard
-                    key={order.id || `${section.key}-${order.trId || order.goodsCode}-${order.studentId}`}
-                    order={order}
-                    actionKey={actionKey}
-                    onApprove={handleApprove}
-                    onReject={handleReject}
-                    onCancel={handleCancel}
-                    onCancelSendFail={handleCancelSendFail}
-                    onResend={handleResend}
-                  />
-                ))
-              )}
-            </CardContent>
-          </Card>
-        ))}
+              </CardHeader>
+              <CardContent className="space-y-3 p-6">
+                {section.orders.length === 0 ? (
+                  <div className="rounded-[1.5rem] border border-dashed py-10 text-center text-sm font-bold text-muted-foreground">
+                    {section.emptyLabel}
+                  </div>
+                ) : (
+                  <>
+                    {visibleOrders.map((order) => (
+                      <GiftishowOrderCard
+                        key={order.id || `${section.key}-${order.trId || order.goodsCode}-${order.studentId}`}
+                        order={order}
+                        actionKey={actionKey}
+                        onApprove={handleApprove}
+                        onReject={handleReject}
+                        onCancel={handleCancel}
+                        onCancelSendFail={handleCancelSendFail}
+                        onResend={handleResend}
+                      />
+                    ))}
+                    {totalPages > 1 ? (
+                      <div className="flex items-center justify-between gap-2 rounded-[1.25rem] border border-slate-200 bg-slate-50/70 px-3 py-2">
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="outline"
+                          className="h-9 rounded-full px-3 font-black"
+                          disabled={currentPage <= 1}
+                          onClick={() => setOrderSectionPage(section.key, currentPage - 1)}
+                        >
+                          <ChevronLeft className="mr-1 h-3.5 w-3.5" />
+                          이전
+                        </Button>
+                        <span className="shrink-0 text-xs font-black text-slate-600">
+                          {currentPage} / {totalPages}
+                        </span>
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="outline"
+                          className="h-9 rounded-full px-3 font-black"
+                          disabled={currentPage >= totalPages}
+                          onClick={() => setOrderSectionPage(section.key, currentPage + 1)}
+                        >
+                          다음
+                          <ChevronRight className="ml-1 h-3.5 w-3.5" />
+                        </Button>
+                      </div>
+                    ) : null}
+                  </>
+                )}
+              </CardContent>
+            </Card>
+          );
+        })}
       </div>
     </div>
   );
