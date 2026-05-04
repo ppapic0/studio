@@ -19,7 +19,7 @@ export const NSU_STUDY_ROOM_SCHEDULE_TEMPLATE_ID = 'default-nsu-study-room-sched
 export const SHARED_STUDY_ROOM_MANDATORY_ARRIVAL_TIME = '18:00';
 export const SHARED_STUDY_ROOM_MANDATORY_DEPARTURE_TIME = '23:30';
 export const SATURDAY_STUDY_ROOM_MANDATORY_ARRIVAL_TIME = '08:30';
-export const SATURDAY_STUDY_ROOM_MANDATORY_DEPARTURE_TIME = '16:40';
+export const SATURDAY_STUDY_ROOM_MANDATORY_DEPARTURE_TIME = '16:37';
 export const NSU_STUDY_ROOM_MANDATORY_ARRIVAL_TIME = '17:00';
 export const NSU_STUDY_ROOM_MANDATORY_DEPARTURE_TIME = '01:00';
 
@@ -159,14 +159,14 @@ export const SATURDAY_STUDY_ROOM_PERIOD_BLOCKS: StudyRoomPeriodBlock[] = [
     id: 'saturday-track-4',
     label: '4트랙',
     startTime: '14:50',
-    endTime: '16:40',
+    endTime: '16:37',
     description: '집중 학습',
   },
   {
     id: 'saturday-wrap-up',
     label: '종료',
-    startTime: '16:40',
-    endTime: '16:40',
+    startTime: '16:37',
+    endTime: '16:37',
     description: '기록 마감',
   },
 ];
@@ -244,7 +244,7 @@ export function buildSaturdayStudyRoomClassSchedule(
     weekdays: [...SATURDAY_STUDY_ROOM_CLASS_SCHEDULE_WEEKDAYS],
     arrivalTime: SATURDAY_STUDY_ROOM_MANDATORY_ARRIVAL_TIME,
     departureTime: SATURDAY_STUDY_ROOM_MANDATORY_DEPARTURE_TIME,
-    note: '토요일은 의무 트랙제로 운영합니다. 08:30 입실 후 16:40 기록 마감까지 토요일 전용 트랙을 따릅니다.',
+    note: '토요일은 의무 트랙제로 운영합니다. 08:30 입실 후 16:37 기록 마감까지 토요일 전용 트랙을 따릅니다.',
     blocks: SATURDAY_STUDY_ROOM_PERIOD_BLOCKS.map((block) => ({ ...block })),
     active: true,
     createdByUid: null,

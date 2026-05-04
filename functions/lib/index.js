@@ -4914,7 +4914,7 @@ const nsuStudyRoomScheduleWeekdays = [1, 2, 3, 4, 5, 6, 0];
 const sharedStudyRoomArrivalTime = "18:00";
 const sharedStudyRoomDepartureTime = "23:30";
 const saturdayStudyRoomArrivalTime = "08:30";
-const saturdayStudyRoomDepartureTime = "16:40";
+const saturdayStudyRoomDepartureTime = "16:37";
 const nsuStudyRoomArrivalTime = "17:00";
 const nsuStudyRoomDepartureTime = "01:00";
 const defaultStudyRoomScheduleTemplateId = "default-shared-study-room-schedule";
@@ -4966,7 +4966,7 @@ function buildDefaultStudyRoomScheduleTemplateData(params) {
                 weekdays: saturdayStudyRoomScheduleWeekdays,
                 arrivalPlannedAt: saturdayStudyRoomArrivalTime,
                 departurePlannedAt: saturdayStudyRoomDepartureTime,
-                note: "토요일은 의무 트랙제로 운영합니다. 08:30 입실 후 16:40 기록 마감까지 토요일 전용 트랙을 따릅니다.",
+                note: "토요일은 의무 트랙제로 운영합니다. 08:30 입실 후 16:37 기록 마감까지 토요일 전용 트랙을 따릅니다.",
             },
         ];
     return templateConfigs.map((config) => ({
