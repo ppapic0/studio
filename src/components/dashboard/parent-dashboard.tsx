@@ -92,11 +92,6 @@ import {
   type StudentProfile,
 } from '@/lib/types';
 import {
-  COUNSELING_LOG_STATUS_BADGE_CLASS,
-  getCounselingLogStatusItems,
-  getCounselingLogStatusLabel,
-} from '@/lib/counseling-log';
-import {
   buildAwayTimeInsight,
   buildRhythmInsight,
   buildStartEndInsight,
@@ -4531,7 +4526,7 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
                   icon={<FileText className="h-3.5 w-3.5" />}
                   eyebrow="Counseling Log"
                   title="상담일지"
-                  description="선생님이 작성한 상담요약, 합의액션, 자유메모와 다음 일정을 자세히 확인합니다."
+                  description="선생님이 공유한 상담요약과 합의액션을 바로 확인합니다."
                   badges={
                     <Badge variant="outline" className="h-6 rounded-full border border-[#ffe0bf] bg-white px-2.5 text-[10px] font-black text-[#9b6938]">
                       {parentCounselingLogs.length}건
@@ -4555,11 +4550,6 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
                       const typeLabel = log.type === 'academic' ? '학업' : log.type === 'life' ? '생활' : '진로';
                       const summary = log.summary?.trim() || log.content?.trim() || '';
                       const agreedAction = log.agreedAction?.trim() || log.improvement?.trim() || '';
-                      const freeMemo = log.freeMemo?.trim() || '';
-                      const nextCounselingDate = log.nextCounselingDate?.trim() || '';
-                      const followUp = log.followUp?.trim() || '';
-                      const studentQuestion = log.studentQuestion?.trim() || '';
-                      const statusItems = getCounselingLogStatusItems(log);
 
                       return (
                         <article
@@ -4580,27 +4570,7 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
                             )}
                           </div>
 
-                          {statusItems.length > 0 && (
-                            <div className="mt-3 flex flex-wrap gap-1.5">
-                              {statusItems.map((item) => (
-                                <Badge
-                                  key={`${log.id}-${item.label}`}
-                                  variant="outline"
-                                  className={cn('rounded-full px-2.5 py-1 text-[10px] font-black', COUNSELING_LOG_STATUS_BADGE_CLASS[item.value])}
-                                >
-                                  {item.label} {getCounselingLogStatusLabel(item.value)}
-                                </Badge>
-                              ))}
-                            </div>
-                          )}
-
                           <div className="mt-4 grid gap-3">
-                            {studentQuestion && (
-                              <div className="rounded-[1.25rem] border border-sky-100 bg-sky-50/60 p-4">
-                                <p className="mb-1 text-[10px] font-black uppercase tracking-[0.16em] text-sky-700">학생 질문</p>
-                                <p className="whitespace-pre-wrap break-keep text-[13px] font-bold leading-relaxed text-sky-950">{studentQuestion}</p>
-                              </div>
-                            )}
                             <div className="rounded-[1.25rem] border border-[#ffe4c9] bg-white/90 p-4">
                               <p className="mb-1 text-[10px] font-black uppercase tracking-[0.16em] text-[#a06632]">상담요약</p>
                               <p className="whitespace-pre-wrap break-keep text-[13px] font-bold leading-relaxed text-[#14295F] sm:text-sm">{summary}</p>
@@ -4609,23 +4579,6 @@ export function ParentDashboard({ isActive }: { isActive: boolean }) {
                               <div className="rounded-[1.25rem] border border-emerald-100 bg-emerald-50/70 p-4">
                                 <p className="mb-1 text-[10px] font-black uppercase tracking-[0.16em] text-emerald-700">합의액션</p>
                                 <p className="whitespace-pre-wrap break-keep text-[13px] font-bold leading-relaxed text-emerald-950 sm:text-sm">{agreedAction}</p>
-                              </div>
-                            )}
-                            {freeMemo && (
-                              <div className="rounded-[1.25rem] border border-[#e8ddff] bg-violet-50/60 p-4">
-                                <p className="mb-1 text-[10px] font-black uppercase tracking-[0.16em] text-violet-700">자유메모</p>
-                                <p className="whitespace-pre-wrap break-keep text-[13px] font-bold leading-relaxed text-[#14295F] sm:text-sm">{freeMemo}</p>
-                              </div>
-                            )}
-                            {(nextCounselingDate || followUp) && (
-                              <div className="rounded-[1.25rem] border border-orange-100 bg-orange-50/70 p-4">
-                                <p className="mb-1 text-[10px] font-black uppercase tracking-[0.16em] text-orange-700">다음 일정</p>
-                                {nextCounselingDate && (
-                                  <p className="text-[13px] font-black leading-relaxed text-orange-950 sm:text-sm">다음상담예정일: {nextCounselingDate}</p>
-                                )}
-                                {followUp && (
-                                  <p className="mt-1 whitespace-pre-wrap break-keep text-[13px] font-bold leading-relaxed text-orange-950/80 sm:text-sm">{followUp}</p>
-                                )}
                               </div>
                             )}
                           </div>

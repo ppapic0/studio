@@ -4503,6 +4503,7 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
                     const freeMemo = log.freeMemo?.trim() || '';
                     const nextCounselingDate = log.nextCounselingDate?.trim() || '';
                     const followUp = log.followUp?.trim() || '';
+                    const canViewCounselingLogDetails = !isStudentSelfView;
                     const statusBadges = [
                       { label: '학습', value: log.studyStatus },
                       { label: '생활', value: log.lifeStatus },
@@ -4531,7 +4532,7 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
                         <span className="text-xs font-bold text-[#5c6e97]">{log.createdAt ? format(log.createdAt.toDate(), 'yyyy.MM.dd HH:mm', { locale: ko }) : '작성 시각 없음'}</span>
                         <span className="text-xs font-bold text-[#5c6e97]">· {log.teacherName || '담당 선생님'}</span>
                       </div>
-                      {statusBadges.length > 0 && (
+                      {canViewCounselingLogDetails && statusBadges.length > 0 && (
                         <div className="mb-2 flex flex-wrap gap-1.5">
                           {statusBadges.map((item) => (
                             <Badge
@@ -4547,7 +4548,7 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
                           ))}
                         </div>
                       )}
-                      {studentQuestion && (
+                      {canViewCounselingLogDetails && studentQuestion && (
                         <div className="mb-2 rounded-lg border border-sky-200 bg-sky-50 px-2.5 py-2">
                           <p className="mb-1 text-[10px] font-black uppercase tracking-widest text-sky-700">학생 질문</p>
                           <p className="text-sm font-bold leading-relaxed text-sky-900 whitespace-pre-wrap">{studentQuestion}</p>
@@ -4555,8 +4556,8 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
                       )}
                       <p className="text-sm font-bold leading-relaxed text-[#14295F] whitespace-pre-wrap">{summary}</p>
                       {agreedAction && <div className="mt-2 rounded-lg bg-emerald-50 px-2.5 py-2 text-xs font-semibold text-emerald-700 whitespace-pre-wrap">합의액션: {agreedAction}</div>}
-                      {freeMemo && <div className="mt-2 rounded-lg bg-[#F7FAFF] px-2.5 py-2 text-xs font-semibold text-[#5c6e97] whitespace-pre-wrap">자유메모: {freeMemo}</div>}
-                      {(nextCounselingDate || followUp) && (
+                      {canViewCounselingLogDetails && freeMemo && <div className="mt-2 rounded-lg bg-[#F7FAFF] px-2.5 py-2 text-xs font-semibold text-[#5c6e97] whitespace-pre-wrap">자유메모: {freeMemo}</div>}
+                      {canViewCounselingLogDetails && (nextCounselingDate || followUp) && (
                         <div className="mt-2 rounded-lg border border-[#DCE7FF] bg-white px-2.5 py-2 text-xs font-semibold text-[#14295F]">
                           {nextCounselingDate ? <p>다음상담예정일: {nextCounselingDate}</p> : null}
                           {followUp ? <p className="mt-1">팔로업: {followUp}</p> : null}

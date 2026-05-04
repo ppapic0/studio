@@ -18,9 +18,11 @@ import {
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { 
   Dialog,
+  DialogClose,
   DialogContent,
   DialogHeader,
   DialogTitle,
@@ -61,13 +63,14 @@ import {
   Send,
   Link2,
   ShieldCheck,
-  Wifi
+  Wifi,
+  Save
 } from 'lucide-react';
 import { useCollection, useFirestore, useUser, useMemoFirebase } from '@/firebase';
 import { useAppContext } from '@/contexts/app-context';
-import { collection, query, where, addDoc, serverTimestamp, Timestamp, updateDoc, doc, orderBy, limit, FieldValue } from 'firebase/firestore';
+import { collection, query, where, addDoc, serverTimestamp, Timestamp, updateDoc, doc, orderBy, limit, FieldValue, writeBatch } from 'firebase/firestore';
 import { format } from 'date-fns';
-import { CounselingReservation, CounselingLog, CenterMembership, StudentProfile, SupportThreadMessage, SupportThreadKind } from '@/lib/types';
+import { CounselingReservation, CounselingLog, CounselingLogStatus, CenterMembership, StudentProfile, SupportThreadMessage, SupportThreadKind } from '@/lib/types';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 import Link from 'next/link';
@@ -75,6 +78,8 @@ import { isAdminRole, isTeacherOrAdminRole } from '@/lib/dashboard-access';
 import { getSafeErrorMessage } from '@/lib/exposed-error';
 import {
   COUNSELING_LOG_STATUS_BADGE_CLASS,
+  COUNSELING_LOG_STATUS_OPTIONS,
+  buildCounselingLogNotificationMessage,
   getCounselingLogStatusItems,
   getCounselingLogStatusLabel,
 } from '@/lib/counseling-log';
@@ -231,8 +236,14 @@ export function AppointmentsPageContent({
   const [selectedTeacherId, setSelectedTeacherId] = useState<string>('');
   
   const [logType, setLogType] = useState<'academic' | 'life' | 'career'>('academic');
+  const [logStudyStatus, setLogStudyStatus] = useState<CounselingLogStatus>('normal');
+  const [logLifeStatus, setLogLifeStatus] = useState<CounselingLogStatus>('normal');
+  const [logEmotionStatus, setLogEmotionStatus] = useState<CounselingLogStatus>('normal');
   const [logContent, setLogContent] = useState('');
   const [logImprovement, setLogImprovement] = useState('');
+  const [logFreeMemo, setLogFreeMemo] = useState('');
+  const [logNextCounselingDate, setLogNextCounselingDate] = useState('');
+  const [logFollowUp, setLogFollowUp] = useState('');
   
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [selectedSeason, setSelectedSeason] = useState<string>('all');
@@ -321,6 +332,13 @@ export function AppointmentsPageContent({
       if (profile.id) {
         map.set(profile.id, profile.name || profile.id);
       }
+    });
+    return map;
+  }, [studentProfiles]);
+  const studentProfileById = useMemo(() => {
+    const map = new Map<string, StudentProfile>();
+    (studentProfiles || []).forEach((profile) => {
+      if (profile.id) map.set(profile.id, profile);
     });
     return map;
   }, [studentProfiles]);
@@ -691,36 +709,117 @@ export function AppointmentsPageContent({
     setSelectedResForLog(res);
     setLogContent('');
     setLogImprovement('');
+    setLogFreeMemo('');
+    setLogNextCounselingDate('');
+    setLogFollowUp('');
     setLogType('academic');
+    setLogStudyStatus('normal');
+    setLogLifeStatus('normal');
+    setLogEmotionStatus('normal');
     setIsLogModalOpen(true);
   };
 
   const handleSaveCounselLog = async () => {
     if (!firestore || !centerId || !user || !selectedResForLog || !logContent.trim()) return;
+    const summary = logContent.trim();
+    const agreedAction = logImprovement.trim();
+    const freeMemo = logFreeMemo.trim();
+    const nextCounselingDate = logNextCounselingDate.trim();
+    const followUp = logFollowUp.trim();
+    const studentProfile = studentProfileById.get(selectedResForLog.studentId);
+    const studentName = selectedResForLog.studentName || studentProfile?.name || '학생';
+    const teacherName = user.displayName || activeMembership?.displayName || '선생님';
+    const notificationBody = buildCounselingLogNotificationMessage({
+      summary,
+      agreedAction,
+      freeMemo,
+      nextCounselingDate,
+      followUp,
+    });
+
     setIsSubmitting(true);
     try {
-      const logData = {
-        studentId: selectedResForLog.studentId,
-        studentName: selectedResForLog.studentName || '학생',
-        teacherId: user.uid,
-        teacherName: user.displayName || '선생님',
-        type: logType,
-        content: logContent.trim(),
-        improvement: logImprovement.trim(),
-        studentQuestion: selectedResForLog.studentNote?.trim() || '',
-        createdAt: serverTimestamp(),
-        readAt: null,
-        reservationId: selectedResForLog.id
-      };
+      const createdAt = serverTimestamp();
+      const logRef = doc(collection(firestore, 'centers', centerId, 'counselingLogs'));
+      const batch = writeBatch(firestore);
 
-      await addDoc(collection(firestore, 'centers', centerId, 'counselingLogs'), logData);
-      await updateDoc(doc(firestore, 'centers', centerId, 'counselingReservations', selectedResForLog.id), {
-        status: 'done',
-        updatedAt: serverTimestamp()
+      batch.set(logRef, {
+        studentId: selectedResForLog.studentId,
+        studentName,
+        teacherId: user.uid,
+        teacherName,
+        type: logType,
+        content: summary,
+        improvement: agreedAction,
+        studyStatus: logStudyStatus,
+        lifeStatus: logLifeStatus,
+        emotionStatus: logEmotionStatus,
+        summary,
+        agreedAction,
+        freeMemo,
+        nextCounselingDate: nextCounselingDate || null,
+        followUp,
+        studentQuestion: selectedResForLog.studentNote?.trim() || '',
+        readAt: null,
+        createdAt,
+        updatedAt: createdAt,
+        reservationId: selectedResForLog.id
       });
 
-      toast({ title: "상담 일지 저장 및 완료 처리됨" });
+      batch.update(doc(firestore, 'centers', centerId, 'counselingReservations', selectedResForLog.id), {
+        status: 'done',
+        updatedAt: createdAt
+      });
+
+      batch.set(doc(collection(firestore, 'centers', centerId, 'studentNotifications')), {
+        centerId,
+        studentId: selectedResForLog.studentId,
+        teacherId: user.uid,
+        teacherName,
+        type: 'one_line_feedback',
+        title: '상담일지 도착',
+        message: notificationBody,
+        source: 'counseling_log',
+        counselingLogId: logRef.id,
+        createdAt,
+        updatedAt: createdAt,
+      });
+
+      Array.from(new Set(studentProfile?.parentUids || [])).forEach((parentUid) => {
+        if (!parentUid) return;
+        batch.set(doc(collection(firestore, 'centers', centerId, 'parentNotifications')), {
+          centerId,
+          studentId: selectedResForLog.studentId,
+          studentName,
+          parentUid,
+          teacherId: user.uid,
+          teacherName,
+          type: 'counseling_done',
+          title: `${studentName} 상담일지 도착`,
+          body: notificationBody,
+          category: 'life',
+          priority: 'normal',
+          isRead: false,
+          isImportant: true,
+          source: 'counseling_log',
+          counselingLogId: logRef.id,
+          createdAt,
+          updatedAt: createdAt,
+        });
+      });
+
+      await batch.commit();
+
+      toast({ title: "상담 일지 저장 및 완료 처리됨", description: "학생과 학부모 알림으로 함께 전달했습니다." });
       setIsLogModalOpen(false);
+      setLogStudyStatus('normal');
+      setLogLifeStatus('normal');
+      setLogEmotionStatus('normal');
+      setLogContent('');
+      setLogImprovement('');
+      setLogFreeMemo('');
+      setLogNextCounselingDate('');
+      setLogFollowUp('');
     } catch (e: any) {
       toast({ variant: "destructive", title: "저장 실패" });
     } finally {
@@ -2217,6 +2316,7 @@ export function AppointmentsPageContent({
                     const freeMemo = log.freeMemo?.trim() || '';
                     const nextCounselingDate = log.nextCounselingDate?.trim() || '';
                     const followUp = log.followUp?.trim() || '';
+                    const canViewCounselingLogDetails = isStaff;
                     const statusItems = getCounselingLogStatusItems(log);
                     const statusBadgeClass = (status: typeof statusItems[number]['value']) =>
                       isStudentTrackTheme
@@ -2273,7 +2373,7 @@ export function AppointmentsPageContent({
                           {!isMobile && <span className={cn("text-[8px] font-black tracking-[0.3em]", isStudentTrackTheme ? "text-[var(--text-on-dark-muted)]/70" : isStaff ? "text-[#9badd3]" : "text-primary/30")}>상담 로그</span>}
                         </div>
 
-                        {statusItems.length > 0 && (
+                        {canViewCounselingLogDetails && statusItems.length > 0 && (
                           <div className="flex flex-wrap gap-1.5">
                             {statusItems.map((item) => (
                               <Badge
@@ -2288,7 +2388,7 @@ export function AppointmentsPageContent({
                         )}
                         
                         <div className="space-y-3">
-                          {studentQuestion && (
+                          {canViewCounselingLogDetails && studentQuestion && (
                             <div className={cn(isStudentTrackTheme ? "surface-card surface-card--ghost on-dark border-[#66b9ff]/20" : isStaff ? "rounded-[1.25rem] border border-[#d8e7ff] bg-[linear-gradient(135deg,#ffffff_0%,#eff6ff_100%)]" : "rounded-[1.25rem] border border-sky-200 bg-sky-50/60", isMobile ? "p-4" : "p-5")}>
                               <p className={cn("mb-1 text-[10px] font-black uppercase tracking-widest", isStudentTrackTheme ? "text-[#9fd6ff]" : isStaff ? "text-[#5c6e97]" : "text-sky-700")}>학생 질문</p>
                               <p className={cn("font-bold leading-relaxed whitespace-pre-wrap break-keep", isMobile ? "text-sm" : "text-base", isStudentTrackTheme ? "text-[var(--text-on-dark)]" : isStaff ? "text-[#14295F]" : "text-sky-900")}>
@@ -2309,13 +2409,13 @@ export function AppointmentsPageContent({
                               </div>
                             </div>
                           )}
-                          {freeMemo && (
+                          {canViewCounselingLogDetails && freeMemo && (
                             <div className={cn(isStudentTrackTheme ? "surface-card surface-card--ghost on-dark border-white/10" : isStaff ? "rounded-[1.25rem] border border-[#eadfff] bg-white/90" : "rounded-[1.25rem] border border-[#eadfff] bg-violet-50/60", isMobile ? "p-4" : "p-5")}>
                               <p className={cn("mb-1 text-[10px] font-black uppercase tracking-widest", isStudentTrackTheme ? "text-[var(--text-on-dark-muted)]" : isStaff ? "text-[#5c6e97]" : "text-violet-700")}>자유메모</p>
                               <p className={cn("font-bold leading-relaxed whitespace-pre-wrap break-keep", isMobile ? "text-xs" : "text-sm", studentBodyTextClass)}>{freeMemo}</p>
                             </div>
                           )}
-                          {(nextCounselingDate || followUp) && (
+                          {canViewCounselingLogDetails && (nextCounselingDate || followUp) && (
                             <div className={cn(isStudentTrackTheme ? "surface-card surface-card--ghost on-dark border-orange-300/20 flex items-start gap-3" : isStaff ? "rounded-[1.25rem] border border-[#ffe2c2] bg-[linear-gradient(135deg,#fff8ef_0%,#ffffff_100%)] flex items-start gap-3" : "rounded-[1.25rem] border border-orange-100 bg-orange-50/70 flex items-start gap-3", isMobile ? "p-4" : "p-5")}>
                               <div className={cn("p-1.5 rounded-lg shrink-0", isStudentTrackTheme ? "bg-orange-300/12" : isStaff ? "bg-white" : "bg-white shadow-sm")}>
                                 <Calendar className={cn("h-3.5 w-3.5", isStudentTrackTheme ? "text-orange-200" : isStaff ? "text-[#14295F]" : "text-orange-600")} />
@@ -2693,46 +2793,131 @@ export function AppointmentsPageContent({
       </Tabs>
 
       <Dialog open={isLogModalOpen} onOpenChange={setIsLogModalOpen}>
-        <DialogContent className={cn("rounded-[3rem] p-0 overflow-hidden border-none shadow-2xl", isMobile ? "w-[min(94vw,28rem)] max-h-[86svh] rounded-[2rem]" : "sm:max-w-md")}>
-          <div className={cn("relative bg-[#14295F] text-white", isMobile ? "p-6" : "p-8")}>
-            <DialogHeader>
-              <DialogTitle className="text-2xl font-black tracking-tighter">상담 일지 작성</DialogTitle>
-              <DialogDescription className="text-white/70 font-bold">상담 후 피드백을 기록하고 예약을 완료 처리합니다.</DialogDescription>
-            </DialogHeader>
-            {selectedResForLog && (
-              <div className="mt-4 rounded-[1.2rem] border border-white/10 bg-white/[0.08] px-4 py-3">
-                <p className="text-[10px] font-black uppercase tracking-[0.22em] text-white/60">대상 상담</p>
-                <p className="mt-2 text-base font-black text-white">{selectedResForLog.studentName || '학생'} · {selectedResForLog.teacherName || '선생님'}</p>
-                <p className="mt-1 text-[11px] font-semibold text-white/70">
-                  {selectedResForLog.scheduledAt ? format(selectedResForLog.scheduledAt.toDate(), 'yyyy.MM.dd HH:mm') : '일정 정보 없음'}
-                </p>
+        <DialogContent className={cn("flex max-h-[90vh] flex-col overflow-hidden rounded-[2rem] border-none p-0 shadow-2xl", isMobile ? "w-[min(96vw,29rem)]" : "sm:max-w-3xl")}>
+          <div className="bg-[linear-gradient(135deg,#14295F_0%,#173D8B_58%,#2554D4_100%)] px-6 py-5 text-white">
+            <DialogHeader className="text-left">
+              <div className="mb-3 flex flex-wrap items-center gap-2">
+                <Badge className="border border-white/14 bg-white/8 px-3 py-1 text-[10px] font-black text-white">
+                  상담일지
+                </Badge>
+                <Badge className="border border-white/14 bg-white px-3 py-1 text-[10px] font-black text-[#14295F]">
+                  {selectedResForLog?.studentName || '학생'}
+                </Badge>
               </div>
-            )}
+              <DialogTitle className="text-2xl font-black tracking-tight">상담일지 작성하기</DialogTitle>
+              <DialogDescription className="text-sm font-semibold text-white/80">
+                오늘 상태, 상담 내용, 다음 일정을 저장하면 학생과 학부모 알림으로 함께 전달됩니다.
+              </DialogDescription>
+            </DialogHeader>
           </div>
-          <div className={cn("space-y-5 bg-white", isMobile ? "max-h-[calc(86svh-9rem)] overflow-y-auto p-5" : "p-8")}>
-            <div className="space-y-1.5">
-              <label className="text-[10px] font-black uppercase text-[#5c6e97] ml-1">상담 유형</label>
-              <Select value={logType} onValueChange={(val: any) => setLogType(val)}>
-                <SelectTrigger className={cn("rounded-xl h-12", staffInputClass)}><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="academic">학업/성적</SelectItem>
-                  <SelectItem value="life">생활 습관</SelectItem>
-                  <SelectItem value="career">진로/진학</SelectItem>
-                </SelectContent>
-              </Select>
+          <div className={cn("flex-1 space-y-4 overflow-y-auto bg-[linear-gradient(180deg,#F7FAFF_0%,#EEF4FF_100%)] px-6 py-5", isMobile && "px-5 py-5")}>
+            <div className={cn("grid gap-3", isMobile ? "grid-cols-1" : "sm:grid-cols-4")}>
+              <div className="space-y-1.5">
+                <Label className="text-[10px] font-black uppercase text-[#5c6e97]">상담 유형</Label>
+                <Select value={logType} onValueChange={(value) => setLogType(value as typeof logType)}>
+                  <SelectTrigger className="h-11 rounded-xl border-[#DCE7FF] bg-white font-bold text-[#14295F]">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="academic">학습 상담</SelectItem>
+                    <SelectItem value="life">생활 상담</SelectItem>
+                    <SelectItem value="career">진로 상담</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              {([
+                ['학습', logStudyStatus, setLogStudyStatus],
+                ['생활', logLifeStatus, setLogLifeStatus],
+                ['정서', logEmotionStatus, setLogEmotionStatus],
+              ] as const).map(([label, value, setter]) => (
+                <div key={label} className="space-y-1.5">
+                  <Label className="text-[10px] font-black uppercase text-[#5c6e97]">{label}</Label>
+                  <Select value={value} onValueChange={(nextValue) => setter(nextValue as CounselingLogStatus)}>
+                    <SelectTrigger className="h-11 rounded-xl border-[#DCE7FF] bg-white font-bold text-[#14295F]">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {COUNSELING_LOG_STATUS_OPTIONS.map((option) => (
+                        <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              ))}
+            </div>
+            <div className={cn("grid gap-3", isMobile ? "grid-cols-1" : "sm:grid-cols-2")}>
+              <div className="space-y-1.5">
+                <Label className="text-[10px] font-black uppercase text-[#5c6e97]">상담요약</Label>
+                <Textarea
+                  value={logContent}
+                  onChange={(event) => setLogContent(event.target.value)}
+                  placeholder="오늘 상담의 핵심 내용을 적어주세요."
+                  className="min-h-[132px] rounded-xl border-[#DCE7FF] bg-white font-bold text-[#14295F] placeholder:text-[#7F91B3]"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-[10px] font-black uppercase text-[#5c6e97]">합의액션</Label>
+                <Textarea
+                  value={logImprovement}
+                  onChange={(event) => setLogImprovement(event.target.value)}
+                  placeholder="학생/가정/센터가 함께 실행할 다음 행동을 적어주세요."
+                  className="min-h-[132px] rounded-xl border-[#DCE7FF] bg-white font-bold text-[#14295F] placeholder:text-[#7F91B3]"
+                />
+              </div>
             </div>
             <div className="space-y-1.5">
-              <label className="text-[10px] font-black uppercase text-[#5c6e97] ml-1">상담 내용</label>
-              <Textarea placeholder="핵심 내용을 상세히 기록하세요." value={logContent} onChange={(e) => setLogContent(e.target.value)} className={cn("min-h-[120px] text-sm", staffInputClass)} />
+              <Label className="text-[10px] font-black uppercase text-[#5c6e97]">자유메모</Label>
+              <Textarea
+                value={logFreeMemo}
+                onChange={(event) => setLogFreeMemo(event.target.value)}
+                placeholder="추가로 공유할 내용을 적어주세요."
+                className="min-h-[96px] rounded-xl border-[#DCE7FF] bg-white font-bold text-[#14295F] placeholder:text-[#7F91B3]"
+              />
             </div>
-            <div className="space-y-1.5">
-              <label className="text-[10px] font-black uppercase text-[#5c6e97] ml-1">개선 권고 사항</label>
-              <Input placeholder="학생이 수행할 과제나 개선점" value={logImprovement} onChange={(e) => setLogImprovement(e.target.value)} className={cn("h-12", staffInputClass)} />
+            <div className={cn("grid gap-3", isMobile ? "grid-cols-1" : "sm:grid-cols-[220px_1fr]")}>
+              <div className="space-y-1.5">
+                <Label className="text-[10px] font-black uppercase text-[#5c6e97]">다음상담예정일</Label>
+                <Input
+                  type="date"
+                  value={logNextCounselingDate}
+                  onChange={(event) => setLogNextCounselingDate(event.target.value)}
+                  className="h-11 rounded-xl border-[#DCE7FF] bg-white font-bold text-[#14295F]"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-[10px] font-black uppercase text-[#5c6e97]">팔로업</Label>
+                <Input
+                  value={logFollowUp}
+                  onChange={(event) => setLogFollowUp(event.target.value)}
+                  placeholder="예: 다음 주 영어 독해 루틴 확인"
+                  className="h-11 rounded-xl border-[#DCE7FF] bg-white font-bold text-[#14295F] placeholder:text-[#7F91B3]"
+                />
+              </div>
             </div>
           </div>
-          <DialogFooter className={cn("border-t border-[#dbe5ff] bg-[#f8fbff]", isMobile ? "p-5" : "p-8")}>
-              <Button onClick={handleSaveCounselLog} disabled={isSubmitting || !logContent.trim()} className="w-full h-14 rounded-2xl font-black bg-[var(--accent-orange)] text-white shadow-xl hover:bg-[var(--accent-orange-strong)]">
-              {isSubmitting ? <Loader2 className="animate-spin h-5 w-5" /> : '상담 완료 및 일지 저장'}
+          <DialogFooter className="gap-2 border-t border-[#DCE7FF] bg-white px-5 py-4 sm:space-x-0">
+            <DialogClose asChild>
+              <Button
+                type="button"
+                variant="outline"
+                disabled={isSubmitting}
+                className="rounded-xl border-[#DCE7FF] font-black text-[#14295F] hover:bg-[#f4f7ff]"
+              >
+                취소
+              </Button>
+            </DialogClose>
+            <Button
+              type="button"
+              onClick={handleSaveCounselLog}
+              disabled={isSubmitting || !logContent.trim()}
+              className="rounded-xl bg-[#14295F] font-black text-white hover:bg-[#10224C]"
+            >
+              {isSubmitting ? (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              ) : (
+                <Save className="mr-2 h-4 w-4" />
+              )}
+              상담일지 저장
             </Button>
           </DialogFooter>
         </DialogContent>
