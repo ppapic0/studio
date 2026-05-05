@@ -242,9 +242,11 @@ export function deriveAttendanceDisplayState(params: {
     isStudyLogLoading = false,
   } = params;
 
-  const effectiveRoutine = isAutonomousAttendanceDate(selectedDate)
-    ? buildAutonomousAttendanceRoutineInfo()
-    : routine;
+  const effectiveRoutine = routine || (
+    isAutonomousAttendanceDate(selectedDate)
+      ? buildAutonomousAttendanceRoutineInfo()
+      : undefined
+  );
   const isTodaySelected = dateKey === todayDateKey;
   const hasStudyEvidence = hasStudyLog || studyMinutes > 0;
   const studyEvidenceCheckedAt = studyCheckedAt || null;
@@ -348,10 +350,6 @@ async function fetchAttendanceRoutineInfo(
   weekKey: string,
   targetDate: Date
 ): Promise<AttendanceRoutineInfo> {
-  if (isAutonomousAttendanceDate(targetDate)) {
-    return buildAutonomousAttendanceRoutineInfo();
-  }
-
   const directScheduleRef = doc(firestore, 'users', studentId, 'schedules', dateKey);
   const directScheduleSnap = await getDoc(directScheduleRef);
   if (directScheduleSnap.exists()) {
@@ -359,6 +357,10 @@ async function fetchAttendanceRoutineInfo(
     if (!schedule.centerId || schedule.centerId === centerId) {
       return buildAttendanceRoutineInfoFromScheduleDoc(schedule);
     }
+  }
+
+  if (isAutonomousAttendanceDate(targetDate)) {
+    return buildAutonomousAttendanceRoutineInfo();
   }
 
   try {

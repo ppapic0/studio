@@ -555,19 +555,26 @@ export function useCenterAdminAttendanceBoard({
     const loadRoutineInfo = async () => {
       setRoutineLoading(true);
       try {
+        const scheduleByStudentId = new Map<string, StudentScheduleDoc>();
+        (todaySchedules || []).forEach((schedule) => {
+          if (!schedule.uid) return;
+          scheduleByStudentId.set(schedule.uid, schedule);
+        });
+
         if (isAutonomousAttendanceDay) {
-          const entries = activeMembers.map((member) => [member.id, autonomousRoutineInfo] as const);
+          const entries = activeMembers.map((member) => {
+            const directSchedule = scheduleByStudentId.get(member.id);
+            return [
+              member.id,
+              directSchedule ? buildRoutineInfoFromSchedule(directSchedule) : autonomousRoutineInfo,
+            ] as const;
+          });
           if (!cancelled) {
             setRoutineInfoByStudentId(Object.fromEntries(entries));
           }
           return;
         }
 
-        const scheduleByStudentId = new Map<string, StudentScheduleDoc>();
-        (todaySchedules || []).forEach((schedule) => {
-          if (!schedule.uid) return;
-          scheduleByStudentId.set(schedule.uid, schedule);
-        });
         const entries = await Promise.all(
           activeMembers.map(async (member) => {
             const directSchedule = scheduleByStudentId.get(member.id);
@@ -794,9 +801,10 @@ export function useCenterAdminAttendanceBoard({
         const todayStat = todayStatsByStudentId.get(studentId);
         const rawRoutineInfo = routineInfoByStudentId[studentId];
         const todaySchedule = todayScheduleByStudentId.get(studentId);
-        const routineInfo = isAutonomousAttendanceDay
-          ? autonomousRoutineInfo
-          : rawRoutineInfo || (todaySchedule ? buildRoutineInfoFromSchedule(todaySchedule) : undefined);
+        const routineInfo =
+          (todaySchedule ? buildRoutineInfoFromSchedule(todaySchedule) : undefined) ||
+          rawRoutineInfo ||
+          (isAutonomousAttendanceDay ? autonomousRoutineInfo : undefined);
         const scheduleMovementInfo = routineInfo?.isNoAttendanceDay ? EMPTY_SCHEDULE_MOVEMENT_INFO : routineInfo || EMPTY_SCHEDULE_MOVEMENT_INFO;
         const todayRecord = todayRecordByStudentId.get(studentId);
         const todayEventsForStudent = todayEventsByStudentId.get(studentId) || [];

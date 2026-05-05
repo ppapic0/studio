@@ -1048,15 +1048,15 @@ export function useAttendanceKpi({
         const defaultClassSchedule = buildStudyRoomClassSchedulesForClassName(centerId, student.className)
           .filter((schedule) => schedule.active !== false)
           .find((schedule) => Array.isArray(schedule.weekdays) && schedule.weekdays.includes(date.getDay()));
-        const routineInfo: AttendanceRoutineInfo = isAutonomousAttendanceDateKey(dateKey)
-          ? buildAutonomousAttendanceRoutineInfo()
-          : directSchedule
+        const routineInfo: AttendanceRoutineInfo = directSchedule
             ? buildAttendanceRoutineInfoFromScheduleDoc(directSchedule)
-            : matchingTemplate
-              ? buildAttendanceRoutineInfoFromScheduleTemplate(matchingTemplate)
-              : defaultClassSchedule
-                ? buildAttendanceRoutineInfoFromClassSchedule(defaultClassSchedule)
-                : buildAttendanceRoutineInfo(scheduleTitleMap.get(key) || []);
+            : isAutonomousAttendanceDateKey(dateKey)
+              ? buildAutonomousAttendanceRoutineInfo()
+              : matchingTemplate
+                ? buildAttendanceRoutineInfoFromScheduleTemplate(matchingTemplate)
+                : defaultClassSchedule
+                  ? buildAttendanceRoutineInfoFromClassSchedule(defaultClassSchedule)
+                  : buildAttendanceRoutineInfo(scheduleTitleMap.get(key) || []);
         const attendanceRecord = attendanceMap.get(key);
         const dayStat = dailyStatsMap.get(key);
         const dayKpi = attendanceDailyStatsMap.get(key);
