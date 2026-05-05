@@ -505,6 +505,8 @@ export default function GrowthPage() {
   const isFlushingBoxOpensRef = useRef(false);
   const pendingBoxOpenErrorToastAtRef = useRef(0);
   const retriedCachedBoxOpenKeyRef = useRef<string | null>(null);
+  const repairedTodayBoxCreditKeyRef = useRef<string | null>(null);
+  const repairedCarryoverBoxCreditKeyRef = useRef<string | null>(null);
   const [hydratedClaimCacheKey, setHydratedClaimCacheKey] = useState<string | null>(null);
 
   const progressRef = useMemoFirebase(() => {
@@ -1405,6 +1407,81 @@ export default function GrowthPage() {
       document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
   }, [activeMembership?.id, activeStudyDayKey, previousStudyDayKey, studentUid, studyBoxOpenQueueUid]);
+
+  useEffect(() => {
+    if (!activeMembership?.id || !studentUid || !activeStudyDayKey || persistedOpenedBoxes.length === 0) return;
+
+    const rewardSignature = persistedRewardEntries
+      .map((entry) => `${entry.milestone}:${entry.awardedPoints}`)
+      .join(',');
+    const pointEventSignature = Array.isArray(todayStatus.pointEvents)
+      ? todayStatus.pointEvents
+          .map((event: any) => `${event?.id || ''}:${event?.points || 0}`)
+          .join(',')
+      : '';
+    const repairKey = [
+      'today',
+      activeStudyDayKey,
+      persistedOpenedBoxes.join(','),
+      rewardSignature,
+      Number(todayStatus.dailyPointAmount || 0),
+      pointEventSignature,
+    ].join('|');
+    if (repairedTodayBoxCreditKeyRef.current === repairKey) return;
+    repairedTodayBoxCreditKeyRef.current = repairKey;
+
+    persistedOpenedBoxes.forEach((hour) => queuePendingBoxOpen(activeStudyDayKey, hour));
+    void flushPendingBoxOpens();
+  }, [
+    activeMembership?.id,
+    activeStudyDayKey,
+    persistedOpenedBoxes,
+    persistedRewardEntries,
+    studentUid,
+    todayStatus,
+  ]);
+
+  useEffect(() => {
+    if (
+      !activeMembership?.id ||
+      !studentUid ||
+      !previousStudyDayKey ||
+      !canOpenPreviousStudyDayBoxes ||
+      persistedCarryoverOpenedBoxes.length === 0
+    ) {
+      return;
+    }
+
+    const rewardSignature = persistedCarryoverRewardEntries
+      .map((entry) => `${entry.milestone}:${entry.awardedPoints}`)
+      .join(',');
+    const pointEventSignature = Array.isArray(previousStudyDayStatus.pointEvents)
+      ? previousStudyDayStatus.pointEvents
+          .map((event: any) => `${event?.id || ''}:${event?.points || 0}`)
+          .join(',')
+      : '';
+    const repairKey = [
+      'carryover',
+      previousStudyDayKey,
+      persistedCarryoverOpenedBoxes.join(','),
+      rewardSignature,
+      Number(previousStudyDayStatus.dailyPointAmount || 0),
+      pointEventSignature,
+    ].join('|');
+    if (repairedCarryoverBoxCreditKeyRef.current === repairKey) return;
+    repairedCarryoverBoxCreditKeyRef.current = repairKey;
+
+    persistedCarryoverOpenedBoxes.forEach((hour) => queuePendingBoxOpen(previousStudyDayKey, hour));
+    void flushPendingBoxOpens();
+  }, [
+    activeMembership?.id,
+    canOpenPreviousStudyDayBoxes,
+    persistedCarryoverOpenedBoxes,
+    persistedCarryoverRewardEntries,
+    previousStudyDayKey,
+    previousStudyDayStatus,
+    studentUid,
+  ]);
 
   useEffect(() => {
     if (!activeMembership?.id || !studentUid || !activeStudyDayKey || !studyBoxCacheUid) return;

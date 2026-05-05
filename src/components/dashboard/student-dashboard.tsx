@@ -1359,6 +1359,8 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
   const homeBoxOpenErrorToastAtRef = useRef(0);
   const activeHomeBoxRevealKeyRef = useRef<string | null>(null);
   const retriedCachedHomeBoxOpenKeyRef = useRef<string | null>(null);
+  const repairedHomeTodayBoxCreditKeyRef = useRef<string | null>(null);
+  const repairedHomeCarryoverBoxCreditKeyRef = useRef<string | null>(null);
   const homeLiveClaimKeyRef = useRef<string | null>(null);
   const autoRequestDateRef = useRef('');
   const [homeClaimedBoxes, setHomeClaimedBoxes] = useState<number[]>([]);
@@ -3604,6 +3606,85 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
       document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
   }, [activeMembership?.id, flushPendingHomeBoxOpens, studentUid, studyBoxOpenQueueUid]);
+
+  useEffect(() => {
+    if (!activeMembership?.id || !studentUid || !activeStudyDayKey || persistedOpenedBoxes.length === 0) return;
+
+    const rewardSignature = persistedRewardEntries
+      .map((entry) => `${entry.milestone}:${entry.awardedPoints}`)
+      .join(',');
+    const pointEventSignature = Array.isArray(todayPointStatus.pointEvents)
+      ? todayPointStatus.pointEvents
+          .map((event: any) => `${event?.id || ''}:${event?.points || 0}`)
+          .join(',')
+      : '';
+    const repairKey = [
+      'today',
+      activeStudyDayKey,
+      persistedOpenedBoxes.join(','),
+      rewardSignature,
+      Number(todayPointStatus.dailyPointAmount || 0),
+      pointEventSignature,
+    ].join('|');
+    if (repairedHomeTodayBoxCreditKeyRef.current === repairKey) return;
+    repairedHomeTodayBoxCreditKeyRef.current = repairKey;
+
+    persistedOpenedBoxes.forEach((hour) => queuePendingHomeBoxOpen(activeStudyDayKey, hour));
+    void flushPendingHomeBoxOpens();
+  }, [
+    activeMembership?.id,
+    activeStudyDayKey,
+    flushPendingHomeBoxOpens,
+    persistedOpenedBoxes,
+    persistedRewardEntries,
+    queuePendingHomeBoxOpen,
+    studentUid,
+    todayPointStatus,
+  ]);
+
+  useEffect(() => {
+    if (
+      !activeMembership?.id ||
+      !studentUid ||
+      !previousStudyDayKey ||
+      isCarryoverExpired ||
+      persistedCarryoverOpenedBoxes.length === 0
+    ) {
+      return;
+    }
+
+    const rewardSignature = persistedCarryoverRewardEntries
+      .map((entry) => `${entry.milestone}:${entry.awardedPoints}`)
+      .join(',');
+    const pointEventSignature = Array.isArray(yesterdayPointStatus.pointEvents)
+      ? yesterdayPointStatus.pointEvents
+          .map((event: any) => `${event?.id || ''}:${event?.points || 0}`)
+          .join(',')
+      : '';
+    const repairKey = [
+      'carryover',
+      previousStudyDayKey,
+      persistedCarryoverOpenedBoxes.join(','),
+      rewardSignature,
+      Number(yesterdayPointStatus.dailyPointAmount || 0),
+      pointEventSignature,
+    ].join('|');
+    if (repairedHomeCarryoverBoxCreditKeyRef.current === repairKey) return;
+    repairedHomeCarryoverBoxCreditKeyRef.current = repairKey;
+
+    persistedCarryoverOpenedBoxes.forEach((hour) => queuePendingHomeBoxOpen(previousStudyDayKey, hour));
+    void flushPendingHomeBoxOpens();
+  }, [
+    activeMembership?.id,
+    flushPendingHomeBoxOpens,
+    isCarryoverExpired,
+    persistedCarryoverOpenedBoxes,
+    persistedCarryoverRewardEntries,
+    previousStudyDayKey,
+    queuePendingHomeBoxOpen,
+    studentUid,
+    yesterdayPointStatus,
+  ]);
 
   useEffect(() => {
     if (!activeMembership?.id || !studentUid || !activeStudyDayKey || !studyBoxCacheUid) return;
