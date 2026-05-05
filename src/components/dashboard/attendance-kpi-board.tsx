@@ -35,7 +35,11 @@ import {
   type AttendanceKpiPeriod,
   type AttendanceStudentKpiRow,
 } from '@/lib/attendance-kpi';
-import { buildAttendanceStudentSubtitle, useAttendanceKpi } from '@/hooks/use-attendance-kpi';
+import {
+  buildAttendanceStudentSubtitle,
+  useAttendanceKpi,
+  type AttendanceKpiSourceDiagnostic,
+} from '@/hooks/use-attendance-kpi';
 import { AttendanceCurrent, AttendanceRequest, CenterMembership } from '@/lib/types';
 
 type RiskFilter = 'all' | 'critical' | 'risk' | 'watch' | 'stable';
@@ -117,6 +121,88 @@ function OpsSummaryCard({
         </div>
       </div>
       <p className="mt-2 text-[11px] font-bold leading-relaxed text-slate-500">{hint}</p>
+    </div>
+  );
+}
+
+function SourceDiagnosticsStrip({
+  diagnostics,
+}: {
+  diagnostics: AttendanceKpiSourceDiagnostic[];
+}) {
+  const fallbackCount = diagnostics.filter((item) => item.usedFallback).length;
+  const errorCount = diagnostics.filter((item) => item.errorMessage && !item.usedFallback).length;
+  const totalCount = diagnostics.reduce((sum, item) => sum + item.count, 0);
+  const headline = errorCount > 0
+    ? `일부 소스 ${errorCount}개 점검 필요`
+    : fallbackCount > 0
+      ? `보정 조회 ${fallbackCount}개 적용`
+      : '전체 소스 정상 조회';
+
+  return (
+    <div className="rounded-[1.6rem] border border-[#14295F]/10 bg-white px-4 py-4 shadow-[0_18px_36px_-34px_rgba(20,41,95,0.3)]">
+      <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+        <div className="flex min-w-0 items-start gap-3">
+          <div className={cn(
+            'flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl border',
+            errorCount > 0
+              ? 'border-rose-200 bg-rose-50 text-rose-600'
+              : fallbackCount > 0
+                ? 'border-orange-200 bg-orange-50 text-[#FF7A16]'
+                : 'border-emerald-200 bg-emerald-50 text-emerald-600'
+          )}>
+            {errorCount > 0 ? <AlertCircle className="h-4 w-4" /> : <CheckCircle2 className="h-4 w-4" />}
+          </div>
+          <div className="min-w-0">
+            <p className="text-sm font-black tracking-tight text-[#14295F]">{headline}</p>
+            <p className="mt-1 text-xs font-bold leading-relaxed text-slate-500">
+              학습일, 세션, 일정 소스가 인덱스 상황과 관계없이 실제 경로 기준으로 보정됩니다.
+            </p>
+          </div>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          <Badge variant="outline" className="rounded-full border-[#14295F]/10 bg-[#F8FAFF] px-3 py-1 text-[11px] font-black text-[#14295F]">
+            수집 {totalCount.toLocaleString('ko-KR')}건
+          </Badge>
+          {fallbackCount > 0 ? (
+            <Badge className="rounded-full border border-orange-200 bg-orange-50 px-3 py-1 text-[11px] font-black text-[#C95A08]">
+              보정 조회됨
+            </Badge>
+          ) : null}
+        </div>
+      </div>
+
+      <div className="mt-3 grid gap-2 sm:grid-cols-2 xl:grid-cols-5">
+        {diagnostics.map((source) => (
+          <div
+            key={source.key}
+            className={cn(
+              'min-h-[58px] rounded-[1.1rem] border px-3 py-2.5',
+              source.usedFallback
+                ? 'border-orange-200 bg-orange-50'
+                : source.errorMessage
+                  ? 'border-rose-200 bg-rose-50'
+                  : 'border-slate-200 bg-[#F8FAFF]'
+            )}
+            title={source.errorMessage || undefined}
+          >
+            <div className="flex items-center justify-between gap-2">
+              <p className="truncate text-[10px] font-black uppercase tracking-[0.12em] text-slate-500">{source.label}</p>
+              <span className={cn(
+                'shrink-0 rounded-full px-2 py-0.5 text-[9px] font-black',
+                source.usedFallback
+                  ? 'bg-orange-100 text-orange-700'
+                  : source.errorMessage
+                    ? 'bg-rose-100 text-rose-700'
+                    : 'bg-emerald-100 text-emerald-700'
+              )}>
+                {source.usedFallback ? '보정' : source.errorMessage ? '확인' : '정상'}
+              </span>
+            </div>
+            <p className="mt-2 text-sm font-black text-[#14295F]">{source.count.toLocaleString('ko-KR')}건</p>
+          </div>
+        ))}
+      </div>
     </div>
   );
 }
@@ -204,10 +290,20 @@ function StudentPriorityCard({
           </div>
         </div>
 
-        <div className="mt-4 grid gap-2 sm:grid-cols-3">
+        <div className="mt-4 grid gap-2 sm:grid-cols-2 xl:grid-cols-5">
           <StudentMetricPill label="출석률" value={`${row.attendanceRate}%`} />
-          <StudentMetricPill label="지각/결석" value={`${row.lateCount}회 / ${row.absenceCount}회`} tone={row.absenceCount > 0 ? 'text-rose-700' : 'text-amber-700'} />
-          <StudentMetricPill label="최근 하원" value={row.latestCheckOutLabel} tone="text-slate-700" />
+          <StudentMetricPill label="지각" value={`${row.lateCount}회`} tone={row.lateCount > 0 ? 'text-amber-700' : 'text-emerald-700'} />
+          <StudentMetricPill label="무단결석" value={`${row.absenceCount}회`} tone={row.absenceCount > 0 ? 'text-rose-700' : 'text-emerald-700'} />
+          <StudentMetricPill
+            label="하원 누락"
+            value={row.checkoutCompletionRate < 100 ? `${100 - row.checkoutCompletionRate}%` : '없음'}
+            tone={row.checkoutCompletionRate < 100 ? 'text-rose-700' : 'text-emerald-700'}
+          />
+          <StudentMetricPill
+            label="루틴/신청"
+            value={`${row.routineMissingCount}일 / ${row.recentRequestCount}건`}
+            tone={row.routineMissingCount > 0 || row.recentRequestCount > 0 ? 'text-[#14295F]' : 'text-emerald-700'}
+          />
         </div>
 
         <div className="mt-4 flex items-center justify-between gap-3">
@@ -684,7 +780,7 @@ export function AttendanceKpiBoard({
   const isDesktop = !isMobile;
   const reduceMotion = useReducedMotion();
 
-  const { isLoading, error, rows, summary, requestOperations, availableRooms, periodOptions } = useAttendanceKpi({
+  const { isLoading, error, rows, summary, requestOperations, availableRooms, periodOptions, sourceDiagnostics } = useAttendanceKpi({
     firestore,
     centerId,
     students,
@@ -904,6 +1000,8 @@ export function AttendanceKpiBoard({
             </div>
           </div>
         </div>
+
+        <SourceDiagnosticsStrip diagnostics={sourceDiagnostics} />
 
         <div className="grid gap-3 xl:grid-cols-3">
           {primaryMetrics.map((metric) => (

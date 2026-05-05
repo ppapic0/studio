@@ -3,6 +3,8 @@ import { addDays, differenceInMinutes, eachDayOfInterval, endOfDay, format, star
 import {
   collection,
   collectionGroup,
+  doc,
+  getDoc,
   getDocs,
   orderBy,
   query,
@@ -14,7 +16,10 @@ import {
 
 import {
   AttendanceRoutineInfo,
+  buildAttendanceRoutineInfoFromScheduleDoc,
+  buildAttendanceRoutineInfoFromScheduleTemplate,
   buildAttendanceRoutineInfo,
+  buildAutonomousAttendanceRoutineInfo,
   combineDateWithTime,
   deriveAttendanceDisplayState,
   toDateSafe,
@@ -38,7 +43,16 @@ import {
 import { getRoomLabel } from '@/lib/seat-layout';
 import { getStudyDayKey } from '@/lib/study-day';
 import { getLiveStudySessionDurationMinutes, getStudySessionDurationMinutes } from '@/lib/study-session-time';
-import { AttendanceCurrent, AttendanceRequest, CenterMembership } from '@/lib/types';
+import { buildStudyRoomClassSchedulesForClassName } from '@/lib/study-room-class-schedule';
+import { isAutonomousAttendanceDateKey } from '@/lib/korean-public-holidays';
+import {
+  AttendanceCurrent,
+  AttendanceRequest,
+  CenterMembership,
+  StudentScheduleDoc,
+  StudentScheduleTemplate,
+  StudyRoomClassScheduleTemplate,
+} from '@/lib/types';
 
 type AttendanceRecordDoc = {
   id: string;
@@ -114,6 +128,15 @@ type ScheduleItemDoc = {
   title?: string;
 };
 
+type DirectScheduleDoc = StudentScheduleDoc & {
+  id: string;
+};
+
+type ScheduleTemplateDoc = StudentScheduleTemplate & {
+  id: string;
+  studentId: string;
+};
+
 type StudySessionDoc = {
   id: string;
   studentId: string;
@@ -121,6 +144,31 @@ type StudySessionDoc = {
   startTime: Date | null;
   endTime: Date | null;
   durationMinutes?: number;
+};
+
+export type AttendanceKpiSourceKey =
+  | 'scheduleItems'
+  | 'directSchedules'
+  | 'scheduleTemplates'
+  | 'attendanceRecords'
+  | 'dailyStudentStats'
+  | 'attendanceDailyStats'
+  | 'studyLogDays'
+  | 'studySessions'
+  | 'parentNotifications'
+  | 'attendanceEvents';
+
+export type AttendanceKpiSourceDiagnostic = {
+  key: AttendanceKpiSourceKey;
+  label: string;
+  count: number;
+  usedFallback: boolean;
+  errorMessage: string | null;
+};
+
+type LoadResult<T> = {
+  data: T[];
+  diagnostic: AttendanceKpiSourceDiagnostic;
 };
 
 interface UseAttendanceKpiOptions {
@@ -141,6 +189,7 @@ interface UseAttendanceKpiResult {
   requestOperations: AttendanceRequestOperationsSummary;
   availableRooms: Array<{ value: string; label: string }>;
   periodOptions: typeof ATTENDANCE_KPI_PERIOD_OPTIONS;
+  sourceDiagnostics: AttendanceKpiSourceDiagnostic[];
 }
 
 const REQUEST_DEFAULT_SUMMARY = {
@@ -167,8 +216,49 @@ const EMPTY_CENTER_SUMMARY: AttendanceCenterSummary = {
   criticalCount: 0,
 };
 
+const SOURCE_LABELS: Record<AttendanceKpiSourceKey, string> = {
+  scheduleItems: '기존 일정',
+  directSchedules: '직접 등록 일정',
+  scheduleTemplates: '학생 템플릿',
+  attendanceRecords: '출결 기록',
+  dailyStudentStats: '일별 학습 통계',
+  attendanceDailyStats: '출결 KPI 통계',
+  studyLogDays: '학습일 기록',
+  studySessions: '학습 세션',
+  parentNotifications: '보호자 알림',
+  attendanceEvents: '출결 이벤트',
+};
+
+const EMPTY_SOURCE_DIAGNOSTICS = (Object.keys(SOURCE_LABELS) as AttendanceKpiSourceKey[]).map((key) =>
+  makeSourceDiagnostic(key, 0)
+);
+
 function makeCompositeKey(studentId: string, dateKey: string) {
   return `${studentId}::${dateKey}`;
+}
+
+function getErrorMessage(error: unknown) {
+  if (!error) return null;
+  if (error instanceof Error && error.message) return error.message;
+  if (typeof error === 'object' && 'message' in error) return String((error as { message?: unknown }).message || '');
+  return String(error);
+}
+
+function makeSourceDiagnostic(
+  key: AttendanceKpiSourceKey,
+  count: number,
+  options?: {
+    usedFallback?: boolean;
+    error?: unknown;
+  }
+): AttendanceKpiSourceDiagnostic {
+  return {
+    key,
+    label: SOURCE_LABELS[key],
+    count,
+    usedFallback: Boolean(options?.usedFallback),
+    errorMessage: getErrorMessage(options?.error),
+  };
 }
 
 function asNumber(value: unknown) {
@@ -179,6 +269,28 @@ function asNumber(value: unknown) {
 function compareDateKeys(startKey: string, endKey: string, currentKey?: string | null) {
   if (!currentKey) return false;
   return currentKey >= startKey && currentKey <= endKey;
+}
+
+function getScheduleTimestampMs(value?: unknown) {
+  const date = toDateSafe(value);
+  if (date) return date.getTime();
+  return 0;
+}
+
+function getScheduleTemplateTimestampMs(template: ScheduleTemplateDoc) {
+  return Math.max(getScheduleTimestampMs(template.updatedAt), getScheduleTimestampMs(template.createdAt));
+}
+
+function buildAttendanceRoutineInfoFromClassSchedule(
+  schedule: Pick<StudyRoomClassScheduleTemplate, 'arrivalTime' | 'departureTime' | 'className'>
+): AttendanceRoutineInfo {
+  return {
+    hasRoutine: true,
+    isNoAttendanceDay: false,
+    expectedArrivalTime: schedule.arrivalTime || null,
+    plannedDepartureTime: schedule.departureTime || null,
+    classScheduleName: schedule.className || null,
+  };
 }
 
 function mapSnapshotData<T extends { id: string }>(docs: QueryDocumentSnapshot[]) {
@@ -342,7 +454,7 @@ async function loadScheduleItemsRange(
   endKey: string,
   studentIds: string[],
   dates: Date[]
-) {
+): Promise<LoadResult<ScheduleItemDoc>> {
   try {
     const groupedQuery = query(
       collectionGroup(firestore, 'items'),
@@ -353,7 +465,11 @@ async function loadScheduleItemsRange(
       orderBy('dateKey', 'asc')
     );
     const snap = await getDocs(groupedQuery);
-    return mapSnapshotData<ScheduleItemDoc>(snap.docs);
+    const data = mapSnapshotData<ScheduleItemDoc>(snap.docs);
+    return {
+      data,
+      diagnostic: makeSourceDiagnostic('scheduleItems', data.length),
+    };
   } catch (error) {
     const weekKeys = Array.from(new Set(dates.map((date) => format(date, "yyyy-'W'II"))));
     const fallback = await Promise.all(
@@ -364,14 +480,112 @@ async function loadScheduleItemsRange(
             where('category', '==', 'schedule')
           );
           const snap = await getDocs(weekQuery);
-          return mapSnapshotData<ScheduleItemDoc>(snap.docs).filter((item) =>
-            compareDateKeys(startKey, endKey, item.dateKey)
-          );
+          return mapSnapshotData<ScheduleItemDoc>(snap.docs)
+            .map((item) => ({ ...item, studentId: item.studentId || studentId }))
+            .filter((item) => compareDateKeys(startKey, endKey, item.dateKey));
         })
       )
     );
-    return fallback.flat();
+    const data = fallback.flat();
+    return {
+      data,
+      diagnostic: makeSourceDiagnostic('scheduleItems', data.length, { usedFallback: true, error }),
+    };
   }
+}
+
+async function loadDirectSchedulesRange(
+  firestore: Firestore,
+  centerId: string,
+  startKey: string,
+  endKey: string,
+  studentIds: string[],
+  dateKeys: string[]
+): Promise<LoadResult<DirectScheduleDoc>> {
+  try {
+    const groupedQuery = query(
+      collectionGroup(firestore, 'schedules'),
+      where('centerId', '==', centerId),
+      where('dateKey', '>=', startKey),
+      where('dateKey', '<=', endKey),
+      orderBy('dateKey', 'asc')
+    );
+    const snap = await getDocs(groupedQuery);
+    const data = snap.docs
+      .map((snapshot) => {
+        const parts = snapshot.ref.path.split('/');
+        const uidFromPath = parts[0] === 'users' ? parts[1] : '';
+        return {
+          id: snapshot.id,
+          ...(snapshot.data() as Omit<DirectScheduleDoc, 'id'>),
+          uid: String((snapshot.data() as { uid?: unknown }).uid || uidFromPath || ''),
+        } as DirectScheduleDoc;
+      })
+      .filter((item) => Boolean(item.uid && item.dateKey));
+    return {
+      data,
+      diagnostic: makeSourceDiagnostic('directSchedules', data.length),
+    };
+  } catch (error) {
+    const snapshots = await Promise.all(
+      studentIds.flatMap((studentId) =>
+        dateKeys.map(async (dateKey) => getDoc(doc(firestore, 'users', studentId, 'schedules', dateKey)))
+      )
+    );
+    const data = snapshots
+      .filter((snapshot) => snapshot.exists())
+      .map((snapshot) => {
+        const parts = snapshot.ref.path.split('/');
+        const uidFromPath = parts[1] || '';
+        return {
+          id: snapshot.id,
+          ...(snapshot.data() as Omit<DirectScheduleDoc, 'id'>),
+          uid: String((snapshot.data() as { uid?: unknown }).uid || uidFromPath || ''),
+          dateKey: String((snapshot.data() as { dateKey?: unknown }).dateKey || snapshot.id),
+        } as DirectScheduleDoc;
+      })
+      .filter((item) => !item.centerId || item.centerId === centerId);
+    return {
+      data,
+      diagnostic: makeSourceDiagnostic('directSchedules', data.length, { usedFallback: true, error }),
+    };
+  }
+}
+
+async function loadScheduleTemplatesRange(
+  firestore: Firestore,
+  centerId: string,
+  studentIds: string[]
+): Promise<LoadResult<ScheduleTemplateDoc>> {
+  const settled = await Promise.all(
+    studentIds.map(async (studentId) => {
+      try {
+        const templateQuery = query(
+          collection(firestore, 'users', studentId, 'scheduleTemplates'),
+          where('centerId', '==', centerId)
+        );
+        const snap = await getDocs(templateQuery);
+        return {
+          data: mapSnapshotData<StudentScheduleTemplate & { id: string }>(snap.docs).map((item) => ({
+            ...item,
+            studentId,
+          })),
+          error: null,
+        };
+      } catch (error) {
+        return {
+          data: [] as ScheduleTemplateDoc[],
+          error,
+        };
+      }
+    })
+  );
+  const data = settled.flatMap((item) => item.data);
+  const errors = settled.map((item) => item.error).filter(Boolean);
+  return {
+    data,
+    diagnostic: makeSourceDiagnostic('scheduleTemplates', data.length, { error: errors[0] || null }),
+  };
 }
 
 async function loadAttendanceRecordsRange(
@@ -420,8 +634,10 @@ async function loadStudyLogDaysRange(
   firestore: Firestore,
   centerId: string,
   startKey: string,
-  endKey: string
-) {
+  endKey: string,
+  studentIds: string[],
+  dateKeys: string[]
+): Promise<LoadResult<StudyLogDayDoc>> {
   try {
     const groupedQuery = query(
       collectionGroup(firestore, 'days'),
@@ -431,7 +647,7 @@ async function loadStudyLogDaysRange(
       orderBy('dateKey', 'asc')
     );
     const snap = await getDocs(groupedQuery);
-    return snap.docs
+    const data = snap.docs
       .map((snapshot) => {
         const parts = snapshot.ref.path.split('/');
         if (parts.length < 6 || parts[1] !== centerId || parts[2] !== 'studyLogs') return null;
@@ -441,8 +657,35 @@ async function loadStudyLogDaysRange(
         } as StudyLogDayDoc;
       })
       .filter((item): item is StudyLogDayDoc => Boolean(item));
+    return {
+      data,
+      diagnostic: makeSourceDiagnostic('studyLogDays', data.length),
+    };
   } catch (error) {
-    return [] as StudyLogDayDoc[];
+    const snapshots = await Promise.all(
+      studentIds.flatMap((studentId) =>
+        dateKeys.map(async (dateKey) =>
+          getDoc(doc(firestore, 'centers', centerId, 'studyLogs', studentId, 'days', dateKey))
+        )
+      )
+    );
+    const data = snapshots
+      .filter((snapshot) => snapshot.exists())
+      .map((snapshot) => {
+        const parts = snapshot.ref.path.split('/');
+        const studentId = parts[3] || '';
+        return {
+          id: snapshot.id,
+          ...(snapshot.data() as Omit<StudyLogDayDoc, 'id'>),
+          studentId: String((snapshot.data() as { studentId?: unknown }).studentId || studentId),
+          dateKey: String((snapshot.data() as { dateKey?: unknown }).dateKey || snapshot.id),
+        } as StudyLogDayDoc;
+      })
+      .filter((item) => compareDateKeys(startKey, endKey, item.dateKey));
+    return {
+      data,
+      diagnostic: makeSourceDiagnostic('studyLogDays', data.length, { usedFallback: true, error }),
+    };
   }
 }
 
@@ -450,8 +693,11 @@ async function loadStudySessionsRange(
   firestore: Firestore,
   centerId: string,
   start: Date,
-  end: Date
-) {
+  end: Date,
+  studentIds: string[],
+  dateKeys: string[],
+  fallbackDays?: StudyLogDayDoc[]
+): Promise<LoadResult<StudySessionDoc>> {
   try {
     const groupedQuery = query(
       collectionGroup(firestore, 'sessions'),
@@ -460,7 +706,7 @@ async function loadStudySessionsRange(
       orderBy('startTime', 'asc')
     );
     const snap = await getDocs(groupedQuery);
-    return snap.docs
+    const data = snap.docs
       .map((snapshot) => {
         const parts = snapshot.ref.path.split('/');
         if (parts.length < 8 || parts[1] !== centerId || parts[2] !== 'studyLogs') return null;
@@ -475,8 +721,46 @@ async function loadStudySessionsRange(
         } as StudySessionDoc;
       })
       .filter((item): item is StudySessionDoc => Boolean(item?.studentId && item?.dateKey));
+    return {
+      data,
+      diagnostic: makeSourceDiagnostic('studySessions', data.length),
+    };
   } catch (error) {
-    return [] as StudySessionDoc[];
+    const fallbackTargets = fallbackDays?.length
+      ? fallbackDays
+          .filter((day) => day.studentId && day.dateKey)
+          .map((day) => ({ studentId: day.studentId as string, dateKey: day.dateKey as string }))
+      : studentIds.flatMap((studentId) => dateKeys.map((dateKey) => ({ studentId, dateKey })));
+    const seenTargets = new Set<string>();
+    const uniqueFallbackTargets = fallbackTargets.filter((target) => {
+      const key = makeCompositeKey(target.studentId, target.dateKey);
+      if (seenTargets.has(key)) return false;
+      seenTargets.add(key);
+      return true;
+    });
+    const snapshots = await Promise.all(
+      uniqueFallbackTargets.map(async ({ studentId, dateKey }) => {
+        const snap = await getDocs(
+          collection(firestore, 'centers', centerId, 'studyLogs', studentId, 'days', dateKey, 'sessions')
+        );
+        return snap.docs.map((snapshot) => {
+          const data = snapshot.data() as Record<string, unknown>;
+          return {
+            id: snapshot.id,
+            studentId,
+            dateKey,
+            startTime: toDateSafe(data.startTime),
+            endTime: toDateSafe(data.endTime),
+            durationMinutes: asNumber(data.durationMinutes),
+          } as StudySessionDoc;
+        });
+      })
+    );
+    const data = snapshots.flat();
+    return {
+      data,
+      diagnostic: makeSourceDiagnostic('studySessions', data.length, { usedFallback: true, error }),
+    };
   }
 }
 
@@ -484,7 +768,7 @@ async function loadParentNotificationsRange(
   firestore: Firestore,
   centerId: string,
   start: Date
-) {
+): Promise<LoadResult<ParentNotificationDoc>> {
   try {
     const notificationsQuery = query(
       collection(firestore, 'centers', centerId, 'parentNotifications'),
@@ -492,11 +776,18 @@ async function loadParentNotificationsRange(
       orderBy('createdAt', 'desc')
     );
     const snap = await getDocs(notificationsQuery);
-    return mapSnapshotData<ParentNotificationDoc>(snap.docs).filter((item) =>
+    const data = mapSnapshotData<ParentNotificationDoc>(snap.docs).filter((item) =>
       item.type === 'check_out' || item.type === 'away_long' || item.type === 'unauthorized_exit'
     );
+    return {
+      data,
+      diagnostic: makeSourceDiagnostic('parentNotifications', data.length),
+    };
   } catch (error) {
-    return [] as ParentNotificationDoc[];
+    return {
+      data: [],
+      diagnostic: makeSourceDiagnostic('parentNotifications', 0, { error }),
+    };
   }
 }
 
@@ -505,7 +796,7 @@ async function loadAttendanceEventsRange(
   centerId: string,
   startKey: string,
   endKey: string
-) {
+): Promise<LoadResult<AttendanceEventDoc>> {
   try {
     const eventsQuery = query(
       collection(firestore, 'centers', centerId, 'attendanceEvents'),
@@ -514,9 +805,16 @@ async function loadAttendanceEventsRange(
       orderBy('dateKey', 'asc')
     );
     const snap = await getDocs(eventsQuery);
-    return mapSnapshotData<AttendanceEventDoc>(snap.docs);
+    const data = mapSnapshotData<AttendanceEventDoc>(snap.docs);
+    return {
+      data,
+      diagnostic: makeSourceDiagnostic('attendanceEvents', data.length),
+    };
   } catch (error) {
-    return [] as AttendanceEventDoc[];
+    return {
+      data: [],
+      diagnostic: makeSourceDiagnostic('attendanceEvents', 0, { error }),
+    };
   }
 }
 
@@ -538,6 +836,8 @@ export function useAttendanceKpi({
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [scheduleItems, setScheduleItems] = useState<ScheduleItemDoc[]>([]);
+  const [directSchedules, setDirectSchedules] = useState<DirectScheduleDoc[]>([]);
+  const [scheduleTemplates, setScheduleTemplates] = useState<ScheduleTemplateDoc[]>([]);
   const [attendanceRecords, setAttendanceRecords] = useState<AttendanceRecordDoc[]>([]);
   const [dailyStudentStats, setDailyStudentStats] = useState<DailyStudentStatDoc[]>([]);
   const [attendanceDailyStats, setAttendanceDailyStats] = useState<AttendanceDailyStatDoc[]>([]);
@@ -545,12 +845,15 @@ export function useAttendanceKpi({
   const [studySessions, setStudySessions] = useState<StudySessionDoc[]>([]);
   const [parentNotifications, setParentNotifications] = useState<ParentNotificationDoc[]>([]);
   const [attendanceEvents, setAttendanceEvents] = useState<AttendanceEventDoc[]>([]);
+  const [sourceDiagnostics, setSourceDiagnostics] = useState<AttendanceKpiSourceDiagnostic[]>(EMPTY_SOURCE_DIAGNOSTICS);
 
   const dateRange = useMemo(() => getDateRange(periodDays), [periodDays]);
 
   useEffect(() => {
     if (!firestore || !centerId || !students?.length || !enabled) {
       setScheduleItems([]);
+      setDirectSchedules([]);
+      setScheduleTemplates([]);
       setAttendanceRecords([]);
       setDailyStudentStats([]);
       setAttendanceDailyStats([]);
@@ -558,6 +861,7 @@ export function useAttendanceKpi({
       setStudySessions([]);
       setParentNotifications([]);
       setAttendanceEvents([]);
+      setSourceDiagnostics(EMPTY_SOURCE_DIAGNOSTICS);
       setIsLoading(false);
       setError(null);
       return;
@@ -571,39 +875,65 @@ export function useAttendanceKpi({
       setError(null);
       try {
         const [
-          nextScheduleItems,
+          scheduleItemsResult,
+          directSchedulesResult,
+          scheduleTemplatesResult,
           nextAttendanceRecords,
           nextDailyStudentStats,
           nextAttendanceDailyStats,
-          nextStudyLogDays,
-          nextStudySessions,
-          nextParentNotifications,
-          nextAttendanceEvents,
+          studyLogDaysResult,
+          parentNotificationsResult,
+          attendanceEventsResult,
         ] = await Promise.all([
           loadScheduleItemsRange(firestore, centerId, dateRange.startKey, dateRange.endKey, studentIds, dateRange.dates),
+          loadDirectSchedulesRange(firestore, centerId, dateRange.startKey, dateRange.endKey, studentIds, dateRange.dateKeys),
+          loadScheduleTemplatesRange(firestore, centerId, studentIds),
           loadAttendanceRecordsRange(firestore, centerId, dateRange.dateKeys),
           loadDailyStudentStatsRange(firestore, centerId, dateRange.dateKeys),
           loadAttendanceDailyStatsRange(firestore, centerId, dateRange.dateKeys),
-          loadStudyLogDaysRange(firestore, centerId, dateRange.startKey, dateRange.endKey),
-          loadStudySessionsRange(firestore, centerId, dateRange.start, dateRange.end),
+          loadStudyLogDaysRange(firestore, centerId, dateRange.startKey, dateRange.endKey, studentIds, dateRange.dateKeys),
           loadParentNotificationsRange(firestore, centerId, dateRange.start),
           loadAttendanceEventsRange(firestore, centerId, dateRange.startKey, dateRange.endKey),
         ]);
+        const studySessionsResult = await loadStudySessionsRange(
+          firestore,
+          centerId,
+          dateRange.start,
+          dateRange.end,
+          studentIds,
+          dateRange.dateKeys,
+          studyLogDaysResult.data
+        );
 
         if (cancelled) return;
 
-        setScheduleItems(nextScheduleItems);
+        setScheduleItems(scheduleItemsResult.data);
+        setDirectSchedules(directSchedulesResult.data);
+        setScheduleTemplates(scheduleTemplatesResult.data);
         setAttendanceRecords(nextAttendanceRecords);
         setDailyStudentStats(nextDailyStudentStats);
         setAttendanceDailyStats(nextAttendanceDailyStats);
-        setStudyLogDays(nextStudyLogDays);
-        setStudySessions(nextStudySessions);
-        setParentNotifications(nextParentNotifications);
-        setAttendanceEvents(nextAttendanceEvents);
+        setStudyLogDays(studyLogDaysResult.data);
+        setStudySessions(studySessionsResult.data);
+        setParentNotifications(parentNotificationsResult.data);
+        setAttendanceEvents(attendanceEventsResult.data);
+        setSourceDiagnostics([
+          scheduleItemsResult.diagnostic,
+          directSchedulesResult.diagnostic,
+          scheduleTemplatesResult.diagnostic,
+          makeSourceDiagnostic('attendanceRecords', nextAttendanceRecords.length),
+          makeSourceDiagnostic('dailyStudentStats', nextDailyStudentStats.length),
+          makeSourceDiagnostic('attendanceDailyStats', nextAttendanceDailyStats.length),
+          studyLogDaysResult.diagnostic,
+          studySessionsResult.diagnostic,
+          parentNotificationsResult.diagnostic,
+          attendanceEventsResult.diagnostic,
+        ]);
       } catch (loadError) {
         console.error('[attendance-kpi] load failed', loadError);
         if (!cancelled) {
           setError('출결 KPI 데이터를 불러오지 못했습니다.');
+          setSourceDiagnostics(EMPTY_SOURCE_DIAGNOSTICS);
         }
       } finally {
         if (!cancelled) {
@@ -656,6 +986,20 @@ export function useAttendanceKpi({
       current.push(item.title);
       scheduleTitleMap.set(key, current);
     });
+    const directScheduleMap = new Map<string, DirectScheduleDoc>();
+    directSchedules.forEach((item) => {
+      if (!item.uid || !item.dateKey) return;
+      directScheduleMap.set(makeCompositeKey(item.uid, item.dateKey), item);
+    });
+    const templatesByStudent = new Map<string, ScheduleTemplateDoc[]>();
+    scheduleTemplates.forEach((template) => {
+      const bucket = templatesByStudent.get(template.studentId) || [];
+      bucket.push(template);
+      templatesByStudent.set(template.studentId, bucket);
+    });
+    templatesByStudent.forEach((bucket) => {
+      bucket.sort((left, right) => getScheduleTemplateTimestampMs(right) - getScheduleTemplateTimestampMs(left));
+    });
 
     const attendanceMap = groupByStudentAndDate(attendanceRecords);
     const dailyStatsMap = groupByStudentAndDate(dailyStudentStats);
@@ -696,7 +1040,23 @@ export function useAttendanceKpi({
       const timeline: AttendanceKpiDay[] = dateRange.dates.map((date) => {
         const dateKey = format(date, 'yyyy-MM-dd');
         const key = makeCompositeKey(student.id, dateKey);
-        const routineInfo: AttendanceRoutineInfo = buildAttendanceRoutineInfo(scheduleTitleMap.get(key) || []);
+        const directSchedule = directScheduleMap.get(key);
+        const matchingTemplate = (templatesByStudent.get(student.id) || [])
+          .filter((template) => template.active !== false)
+          .filter((template) => !template.centerId || template.centerId === centerId)
+          .find((template) => Array.isArray(template.weekdays) && template.weekdays.includes(date.getDay()));
+        const defaultClassSchedule = buildStudyRoomClassSchedulesForClassName(centerId, student.className)
+          .filter((schedule) => schedule.active !== false)
+          .find((schedule) => Array.isArray(schedule.weekdays) && schedule.weekdays.includes(date.getDay()));
+        const routineInfo: AttendanceRoutineInfo = isAutonomousAttendanceDateKey(dateKey)
+          ? buildAutonomousAttendanceRoutineInfo()
+          : directSchedule
+            ? buildAttendanceRoutineInfoFromScheduleDoc(directSchedule)
+            : matchingTemplate
+              ? buildAttendanceRoutineInfoFromScheduleTemplate(matchingTemplate)
+              : defaultClassSchedule
+                ? buildAttendanceRoutineInfoFromClassSchedule(defaultClassSchedule)
+                : buildAttendanceRoutineInfo(scheduleTitleMap.get(key) || []);
         const attendanceRecord = attendanceMap.get(key);
         const dayStat = dailyStatsMap.get(key);
         const dayKpi = attendanceDailyStatsMap.get(key);
@@ -961,11 +1321,14 @@ export function useAttendanceKpi({
     attendanceDailyStats,
     attendanceEvents,
     attendanceRecords,
+    centerId,
     dailyStudentStats,
     dateRange,
+    directSchedules,
     parentNotifications,
     requests,
     scheduleItems,
+    scheduleTemplates,
     studyLogDays,
     studySessions,
     students,
@@ -1065,6 +1428,7 @@ export function useAttendanceKpi({
     requestOperations,
     availableRooms,
     periodOptions: ATTENDANCE_KPI_PERIOD_OPTIONS,
+    sourceDiagnostics,
   };
 }
 
