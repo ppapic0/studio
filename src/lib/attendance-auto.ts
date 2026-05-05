@@ -127,6 +127,17 @@ export const buildAttendanceRoutineInfo = (scheduleTitles: string[]): Attendance
   };
 };
 
+export function buildAutonomousAttendanceRoutineInfo(): AttendanceRoutineInfo {
+  return {
+    hasRoutine: true,
+    isNoAttendanceDay: false,
+    isAutonomousAttendance: true,
+    expectedArrivalTime: null,
+    plannedDepartureTime: null,
+    classScheduleName: '자율등원',
+  };
+}
+
 function getScheduleTemplateTimestampMs(template: StudentScheduleTemplate) {
   const raw = template.updatedAt || template.createdAt;
   if (!raw) return 0;
@@ -231,6 +242,9 @@ export function deriveAttendanceDisplayState(params: {
     isStudyLogLoading = false,
   } = params;
 
+  const effectiveRoutine = isAutonomousAttendanceDate(selectedDate)
+    ? buildAutonomousAttendanceRoutineInfo()
+    : routine;
   const isTodaySelected = dateKey === todayDateKey;
   const hasStudyEvidence = hasStudyLog || studyMinutes > 0;
   const studyEvidenceCheckedAt = studyCheckedAt || null;
@@ -250,22 +264,22 @@ export function deriveAttendanceDisplayState(params: {
     return { status: recordStatus || 'requested', checkedAt };
   }
 
-  if (!isRoutineLoading && routine && !routine.hasRoutine) {
+  if (!isRoutineLoading && effectiveRoutine && !effectiveRoutine.hasRoutine) {
     return {
       status: hasStudyEvidence ? 'confirmed_present_missing_routine' : 'missing_routine',
       checkedAt: hasStudyEvidence ? (studyEvidenceCheckedAt || fallbackCheckedAt) : (accessCheckedAt || liveCheckedAt || recordCheckedAt || null),
     };
   }
 
-  if (routine?.isNoAttendanceDay) {
+  if (effectiveRoutine?.isNoAttendanceDay) {
     return {
       status: 'excused_absent',
       checkedAt: accessCheckedAt || liveCheckedAt || recordCheckedAt || null,
     };
   }
 
-  if (routine?.expectedArrivalTime) {
-    const expectedArrivalAt = combineDateWithTime(selectedDate, routine.expectedArrivalTime);
+  if (effectiveRoutine?.expectedArrivalTime) {
+    const expectedArrivalAt = combineDateWithTime(selectedDate, effectiveRoutine.expectedArrivalTime);
     if (hasStudyEvidence) {
       const attendanceEvidenceAt = studyEvidenceCheckedAt || liveCheckedAt || recordCheckedAt || accessCheckedAt || null;
       const status =
@@ -334,6 +348,10 @@ async function fetchAttendanceRoutineInfo(
   weekKey: string,
   targetDate: Date
 ): Promise<AttendanceRoutineInfo> {
+  if (isAutonomousAttendanceDate(targetDate)) {
+    return buildAutonomousAttendanceRoutineInfo();
+  }
+
   const directScheduleRef = doc(firestore, 'users', studentId, 'schedules', dateKey);
   const directScheduleSnap = await getDoc(directScheduleRef);
   if (directScheduleSnap.exists()) {
@@ -407,10 +425,7 @@ export async function syncAutoAttendanceRecord(params: {
     return { status: existing.status || 'requested', wrote: false, reason: 'manual_override' };
   }
 
-  const fetchedRoutine = await fetchAttendanceRoutineInfo(firestore, centerId, studentId, dateKey, weekKey, studyDayDate);
-  const routine = isAutonomousAttendanceDate(studyDayDate) && !fetchedRoutine.hasRoutine
-    ? undefined
-    : fetchedRoutine;
+  const routine = await fetchAttendanceRoutineInfo(firestore, centerId, studentId, dateKey, weekKey, studyDayDate);
   const studyLogInfo = await fetchStudyLogInfo(firestore, centerId, studentId, dateKey);
   const existingCheckedAt = toDateSafe(existing?.checkInAt || existing?.updatedAt);
   const firstCheckedAt = pickEarliestDate(existingCheckedAt, checkInAt) || checkInAt || existingCheckedAt;

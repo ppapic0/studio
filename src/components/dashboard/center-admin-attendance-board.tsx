@@ -299,7 +299,7 @@ export function CenterAdminAttendanceBoard({
                   const displayName = manualOccupantName || signal?.studentName || student?.name || member?.displayName || '학생';
                   const scheduleMovementLabel = signal?.scheduleMovementSummary || null;
                   const isNoAttendanceDay = Boolean(signal?.isNoAttendanceDay || signal?.boardStatus === 'excused_absent');
-                  const isAutonomousAttendance = signal?.boardStatus === 'autonomous';
+                  const isAutonomousAttendance = Boolean(signal?.isAutonomousAttendance || signal?.boardStatus === 'autonomous');
                   const isCheckedOutLate = Boolean(signal?.boardStatus === 'checked_out' && signal.wasLateToday);
                   const firstCheckInTimeLabel = signal?.firstCheckInLabel || signal?.checkedAtLabel || null;
                   const latestAwayStartLabel = signal?.latestAwayStartLabel || null;

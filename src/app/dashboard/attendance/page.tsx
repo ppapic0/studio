@@ -52,6 +52,7 @@ import {
   AttendanceRoutineInfo,
   DisplayAttendanceStatus,
   buildAttendanceRoutineInfo,
+  buildAutonomousAttendanceRoutineInfo,
   combineDateWithTime,
   deriveAttendanceDisplayState,
   syncAutoAttendanceRecord,
@@ -212,6 +213,22 @@ function buildTodayScheduleInfoFromClassSchedule(schedule: StudyRoomClassSchedul
   };
 }
 
+function buildAutonomousTodayScheduleInfo(): TodayScheduleInfo {
+  return {
+    ...buildAutonomousAttendanceRoutineInfo(),
+    expectedArrivalTime: null,
+    plannedDepartureTime: null,
+    hasExcursion: false,
+    excursionStartAt: null,
+    excursionEndAt: null,
+    scheduleMovementSummary: null,
+    classScheduleName: '자율등원',
+    scheduleUpdatedAt: null,
+    scheduleStatus: null,
+    actualArrivalAt: null,
+  };
+}
+
 function createPeriodBlock(overrides?: Partial<StudyRoomPeriodBlock>): StudyRoomPeriodBlock {
   return {
     id: `block-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
@@ -281,6 +298,7 @@ export default function AttendancePage() {
   const weekKey = selectedDate ? format(selectedDate, "yyyy-'W'II") : '';
   const selectedWeekdayValue = selectedDate ? selectedDate.getDay() : null;
   const isAutonomousAttendanceDay = isAutonomousAttendanceDate(selectedDate);
+  const autonomousTodayScheduleInfo = useMemo(() => buildAutonomousTodayScheduleInfo(), []);
   const centerId = classroomMembership?.id;
   const isTeacherOrAdmin = Boolean(classroomMembership);
   const canOpenSettings = canManageSettings(activeMembership?.role);
@@ -347,6 +365,14 @@ export default function AttendancePage() {
     const loadRoutineMap = async () => {
       setRoutineLoading(true);
       try {
+        if (isAutonomousAttendanceDay) {
+          const entries = students.map((student) => [student.id, autonomousTodayScheduleInfo] as const);
+          if (!cancelled) {
+            setAttendanceRoutineMap(Object.fromEntries(entries));
+          }
+          return;
+        }
+
         const scheduledIds = new Set(todaySchedules?.map((schedule) => schedule.uid).filter(Boolean));
         const entries = await Promise.all(
           students
@@ -369,27 +395,6 @@ export default function AttendancePage() {
                 }
               } catch (templateError) {
                 logHandledClientIssue('[attendance] schedule template fallback failed', templateError);
-              }
-
-              if (isAutonomousAttendanceDay) {
-                return [
-                  student.id,
-                  {
-                    hasRoutine: true,
-                    isNoAttendanceDay: false,
-                    isAutonomousAttendance: true,
-                    expectedArrivalTime: null,
-                    plannedDepartureTime: null,
-                    hasExcursion: false,
-                    excursionStartAt: null,
-                    excursionEndAt: null,
-                    scheduleMovementSummary: null,
-                    classScheduleName: '자율등원',
-                    scheduleUpdatedAt: null,
-                    scheduleStatus: null,
-                    actualArrivalAt: null,
-                  },
-                ] as const;
               }
 
               const defaultTrackSchedule = buildStudyRoomClassSchedulesForClassName(centerId, student.className)
@@ -444,7 +449,18 @@ export default function AttendancePage() {
     return () => {
       cancelled = true;
     };
-  }, [firestore, centerId, isTeacherOrAdmin, dateKey, weekKey, selectedWeekdayValue, students, todaySchedules, isAutonomousAttendanceDay]);
+  }, [
+    autonomousTodayScheduleInfo,
+    firestore,
+    centerId,
+    isTeacherOrAdmin,
+    dateKey,
+    weekKey,
+    selectedWeekdayValue,
+    students,
+    todaySchedules,
+    isAutonomousAttendanceDay,
+  ]);
 
   useEffect(() => {
     if (!firestore || !centerId || !isTeacherOrAdmin || !dateKey || !students) {
@@ -520,6 +536,7 @@ export default function AttendancePage() {
   const formatScheduleTimeRange = (routine?: TodayScheduleInfo | null) => {
     if (!routine || !routine.hasRoutine) return '일정 미등록';
     if (routine.isNoAttendanceDay) return '미등원 등록';
+    if (routine.isAutonomousAttendance) return '자율등원';
     if (!routine.expectedArrivalTime || !routine.plannedDepartureTime) return '시간 미정';
     return `${routine.expectedArrivalTime} ~ ${routine.plannedDepartureTime}`;
   };
@@ -775,6 +792,10 @@ export default function AttendancePage() {
     const mapped = new Map<string, TodayScheduleInfo>();
     (todaySchedules || []).forEach((schedule) => {
       if (!schedule.uid) return;
+      if (isAutonomousAttendanceDay) {
+        mapped.set(schedule.uid, autonomousTodayScheduleInfo);
+        return;
+      }
       const scheduleMovementSummary =
         formatScheduleMovementSummary(schedule.outings)
         || (
@@ -799,7 +820,7 @@ export default function AttendancePage() {
       });
     });
     return mapped;
-  }, [todaySchedules]);
+  }, [autonomousTodayScheduleInfo, isAutonomousAttendanceDay, todaySchedules]);
 
   const attendanceDisplayMap = useMemo(() => {
     const mapped = new Map<string, { status: DisplayAttendanceStatus; checkedAt: Date | null }>();
@@ -811,7 +832,9 @@ export default function AttendancePage() {
 
     (students || []).forEach((student) => {
       const record = attendanceMap.get(student.id);
-      const routine = todayScheduleMap.get(student.id) || attendanceRoutineMap[student.id];
+      const routine = isAutonomousAttendanceDay
+        ? autonomousTodayScheduleInfo
+        : todayScheduleMap.get(student.id) || attendanceRoutineMap[student.id];
       const liveAttendance = attendanceCurrentMap.get(student.id);
       const studyLog = studyLogMap[student.id];
       const liveCheckInAt = isTodaySelected ? toDateSafe(liveAttendance?.lastCheckInAt) : null;
@@ -854,6 +877,8 @@ export default function AttendancePage() {
     attendanceRoutineMap,
     todayScheduleMap,
     dateKey,
+    isAutonomousAttendanceDay,
+    autonomousTodayScheduleInfo,
     routineLoading,
     studyLogLoading,
     studyLogMap,
@@ -864,6 +889,10 @@ export default function AttendancePage() {
   const mergedScheduleMap = useMemo(() => {
     const mapped = new Map<string, TodayScheduleInfo>();
     (students || []).forEach((student) => {
+      if (isAutonomousAttendanceDay) {
+        mapped.set(student.id, autonomousTodayScheduleInfo);
+        return;
+      }
       const directSchedule = todayScheduleMap.get(student.id);
       if (directSchedule) {
         mapped.set(student.id, directSchedule);
@@ -875,7 +904,7 @@ export default function AttendancePage() {
       }
     });
     return mapped;
-  }, [attendanceRoutineMap, students, todayScheduleMap]);
+  }, [attendanceRoutineMap, autonomousTodayScheduleInfo, isAutonomousAttendanceDay, students, todayScheduleMap]);
 
   const todayDateKey = useMemo(() => getStudyDayKey(new Date()), []);
 

@@ -43,6 +43,7 @@ const crypto_1 = require("crypto");
 const geminiClient_1 = require("./geminiClient");
 const openclawSnapshot_1 = require("./openclawSnapshot");
 const plannerSchema_1 = require("./plannerSchema");
+const koreanPublicHolidays_1 = require("./koreanPublicHolidays");
 if (admin.apps.length === 0) {
     admin.initializeApp();
 }
@@ -3590,6 +3591,8 @@ async function runLateArrivalCheckForCenter(db, centerId, nowKst, attendanceSnap
         : 20;
     const nowMinutes = nowKst.getHours() * 60 + nowKst.getMinutes();
     const dateKey = toStudyDayKey(nowKst);
+    if ((0, koreanPublicHolidays_1.isAutonomousAttendanceDateKey)(dateKey))
+        return 0;
     const membersSnap = await db
         .collection(`centers/${centerId}/members`)
         .where("role", "==", "student")
@@ -4560,6 +4563,7 @@ async function buildClassroomSignalsForCenter(db, centerId, nowKst, dateKey) {
         ? Math.max(0, Number(settings.lateAlertGraceMinutes))
         : 20;
     const nowMinutes = nowKst.getHours() * 60 + nowKst.getMinutes();
+    const isAutonomousAttendanceDay = (0, koreanPublicHolidays_1.isAutonomousAttendanceDateKey)(dateKey);
     const weekAgoKey = toStudyDayKey(new Date(nowKst.getTime() - 6 * 24 * 60 * 60 * 1000));
     const penaltyCutoff = admin.firestore.Timestamp.fromMillis(nowKst.getTime() - 30 * 24 * 60 * 60 * 1000);
     const startOfTodayKst = new Date(nowKst);
@@ -4718,7 +4722,8 @@ async function buildClassroomSignalsForCenter(db, centerId, nowKst, dateKey) {
         const expectedArrivalTime = asTrimmedString(student === null || student === void 0 ? void 0 : student.expectedArrivalTime);
         const expectedArrivalMinutes = parseExpectedArrivalMinutes(expectedArrivalTime);
         const hasCurrentAttendance = seatStatus === "studying" || seatStatus === "away" || seatStatus === "break";
-        const lateOrAbsent = Boolean(expectedArrivalMinutes !== null &&
+        const lateOrAbsent = Boolean(!isAutonomousAttendanceDay &&
+            expectedArrivalMinutes !== null &&
             !hasCurrentAttendance &&
             nowMinutes >= expectedArrivalMinutes + graceMinutes);
         const riskCacheAtRisk = riskCacheStudentIds.has(studentId);

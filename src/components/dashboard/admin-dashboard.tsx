@@ -357,6 +357,7 @@ const redateFocusWeeklyScheduleDrafts = (
   return buildFocusWeeklyScheduleDrafts(baseDate).map((datedDraft) => {
     const previousDraft = draftByWeekday.get(datedDraft.weekday);
     if (!previousDraft) return datedDraft;
+    if (datedDraft.isAutonomous) return datedDraft;
     return {
       ...datedDraft,
       enabled: previousDraft.enabled,
@@ -8258,6 +8259,7 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
 
       setFocusWeeklyScheduleDrafts((currentDrafts) =>
         currentDrafts.map((draft) => {
+          if (draft.isAutonomous) return draft;
           const template = templateByWeekday.get(draft.weekday);
           if (!template) return draft;
           if (template.isAutonomousAttendance || template.source === 'admin-autonomous-attendance') {

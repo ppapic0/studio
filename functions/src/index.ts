@@ -10,6 +10,7 @@ import {
   OpenClawExportInProgressError,
 } from "./openclawSnapshot";
 import { generateStudyPlanInputSchema, validateStudyPlanOutput } from "./plannerSchema";
+import { isAutonomousAttendanceDateKey } from "./koreanPublicHolidays";
 
 if (admin.apps.length === 0) {
   admin.initializeApp();
@@ -4945,6 +4946,7 @@ async function runLateArrivalCheckForCenter(
     : 20;
   const nowMinutes = nowKst.getHours() * 60 + nowKst.getMinutes();
   const dateKey = toStudyDayKey(nowKst);
+  if (isAutonomousAttendanceDateKey(dateKey)) return 0;
 
   const membersSnap = await db
     .collection(`centers/${centerId}/members`)
@@ -6103,6 +6105,7 @@ async function buildClassroomSignalsForCenter(
     ? Math.max(0, Number(settings.lateAlertGraceMinutes))
     : 20;
   const nowMinutes = nowKst.getHours() * 60 + nowKst.getMinutes();
+  const isAutonomousAttendanceDay = isAutonomousAttendanceDateKey(dateKey);
   const weekAgoKey = toStudyDayKey(new Date(nowKst.getTime() - 6 * 24 * 60 * 60 * 1000));
   const penaltyCutoff = admin.firestore.Timestamp.fromMillis(nowKst.getTime() - 30 * 24 * 60 * 60 * 1000);
   const startOfTodayKst = new Date(nowKst);
@@ -6279,7 +6282,8 @@ async function buildClassroomSignalsForCenter(
       const expectedArrivalMinutes = parseExpectedArrivalMinutes(expectedArrivalTime);
       const hasCurrentAttendance = seatStatus === "studying" || seatStatus === "away" || seatStatus === "break";
       const lateOrAbsent = Boolean(
-        expectedArrivalMinutes !== null &&
+        !isAutonomousAttendanceDay &&
+          expectedArrivalMinutes !== null &&
           !hasCurrentAttendance &&
           nowMinutes >= expectedArrivalMinutes + graceMinutes
       );
