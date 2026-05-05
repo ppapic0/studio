@@ -42,6 +42,7 @@ import { useCollection, useDoc, useFirestore, useUser } from '@/firebase';
 import { useMemoFirebase } from '@/hooks/use-memo-firebase';
 import { useToast } from '@/hooks/use-toast';
 import { getSafeErrorMessage } from '@/lib/exposed-error';
+import { logHandledClientIssue } from '@/lib/handled-client-log';
 import { createGiftishowOrderRequestSecure } from '@/lib/giftishow-actions';
 import {
   formatGiftishowTimestamp,
@@ -1134,7 +1135,7 @@ export default function GrowthPage() {
         }
       })
       .catch((error: any) => {
-        console.warn('[point-track] live study box claim failed', error?.message || error);
+        logHandledClientIssue('[point-track] live study box claim failed', error);
         liveClaimKeyRef.current = null;
         setClaimedBoxes(persistedClaimedBoxes);
         setRewardEntries(persistedRewardEntries);
@@ -1297,7 +1298,7 @@ export default function GrowthPage() {
       removePendingBoxOpens(dateKey, [hour]);
       return typeof result.reward?.awardedPoints === 'number' ? result.reward.awardedPoints : null;
     } catch (error) {
-      console.warn('[point-track] reward box immediate open failed', error);
+      logHandledClientIssue('[point-track] reward box immediate open failed', error);
       void flushPendingBoxOpens();
       return null;
     }
@@ -1325,7 +1326,7 @@ export default function GrowthPage() {
           removePendingBoxOpens(batch.dateKey, batch.hours);
         } catch (error) {
           failedBatchCount += 1;
-          console.error('[point-track] reward box batch open failed', error);
+          logHandledClientIssue('[point-track] reward box batch open failed', error);
           for (const hour of batch.hours) {
             try {
               const result = await openStudyRewardBoxSecure({
@@ -1343,7 +1344,7 @@ export default function GrowthPage() {
               applyStudyBoxOpenPersistenceResult(batch.dateKey, result);
               removePendingBoxOpens(batch.dateKey, [hour]);
             } catch (singleError) {
-              console.error('[point-track] reward box single retry failed', singleError);
+              logHandledClientIssue('[point-track] reward box single retry failed', singleError);
             }
           }
           const remainingBatch = getPendingBoxOpenBatches().find((entry) => entry.dateKey === batch.dateKey);
