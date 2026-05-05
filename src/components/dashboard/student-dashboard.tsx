@@ -127,7 +127,7 @@ import {
 } from '@/lib/student-ranking-policy';
 import { submitAttendanceRequestSecure } from '@/lib/penalty-actions';
 import { getAttendanceRequestTypeLabel } from '@/lib/attendance-request';
-import { openStudyRewardBoxesSecure } from '@/lib/study-box-actions';
+import { openStudyRewardBoxSecure, openStudyRewardBoxesSecure } from '@/lib/study-box-actions';
 import { setStudentAttendanceStatusSecure, stopStudentStudySessionSecure } from '@/lib/study-session-actions';
 import { sumStudySessionDurationMinutes } from '@/lib/study-session-time';
 import {
@@ -3485,6 +3485,61 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
       .filter((batch) => batch.dateKey && batch.hours.length > 0);
   }, [studyBoxOpenQueueUid]);
 
+  const applyHomeBoxOpenPersistenceResult = useCallback((
+    dateKey: string,
+    result: {
+      openedStudyBoxes?: unknown;
+      claimedStudyBoxes?: unknown;
+      rewards?: StudyBoxReward[];
+      reward?: StudyBoxReward | null;
+    }
+  ) => {
+    const nextOpenedBoxes = Array.isArray(result.openedStudyBoxes)
+      ? normalizeStudyBoxHours(result.openedStudyBoxes)
+      : null;
+    const nextClaimedBoxes = Array.isArray(result.claimedStudyBoxes)
+      ? normalizeStudyBoxHours(result.claimedStudyBoxes)
+      : null;
+    const rewardEntries = [
+      ...(Array.isArray(result.rewards) ? result.rewards : []),
+      ...(result.reward ? [result.reward] : []),
+    ];
+
+    if (dateKey === activeStudyDayKey) {
+      if (nextOpenedBoxes) {
+        setHomeOpenedBoxes(nextOpenedBoxes);
+        writeStudyBoxOpenedCache(studyBoxCacheUid, dateKey, nextOpenedBoxes);
+      }
+      if (nextClaimedBoxes) {
+        setHomeClaimedBoxes(nextClaimedBoxes);
+        writeStudyBoxHoursCache(studyBoxClaimCacheKey, nextClaimedBoxes);
+      }
+      if (rewardEntries.length > 0) {
+        setHomeRewardEntries((prev) =>
+          rewardEntries.reduce((entries, reward) => upsertStudyBoxRewardEntry(entries, reward), prev)
+        );
+      }
+      return;
+    }
+
+    if (nextOpenedBoxes) {
+      setCarryoverOpenedSnapshot({
+        dateKey,
+        hours: nextOpenedBoxes,
+      });
+      writeCarryoverOpenedCache(dateKey, nextOpenedBoxes);
+      setCarryoverOpenedCacheState({
+        dateKey,
+        hours: nextOpenedBoxes,
+      });
+    }
+  }, [
+    activeStudyDayKey,
+    studyBoxCacheUid,
+    studyBoxClaimCacheKey,
+    writeCarryoverOpenedCache,
+  ]);
+
   const flushPendingHomeBoxOpens = useCallback(async () => {
     if (isFlushingHomeBoxOpensRef.current || !activeMembership?.id || !studentUid || !studyBoxOpenQueueUid) return;
     const batches = getPendingHomeBoxOpenBatches();
@@ -3493,67 +3548,64 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
 
     isFlushingHomeBoxOpensRef.current = true;
     let shouldContinueFlush = false;
+    let failedBatchCount = 0;
     try {
       for (const batch of batches) {
-        const result = await openStudyRewardBoxesSecure({
-          centerId: activeMembership.id,
-          studentId: studentUid,
-          dateKey: batch.dateKey,
-          hours: batch.hours,
-        });
+        try {
+          const result = await openStudyRewardBoxesSecure({
+            centerId: activeMembership.id,
+            studentId: studentUid,
+            dateKey: batch.dateKey,
+            hours: batch.hours,
+          });
+          applyHomeBoxOpenPersistenceResult(batch.dateKey, result);
+          removePendingHomeBoxOpens(batch.dateKey, batch.hours);
+        } catch (error) {
+          failedBatchCount += 1;
+          logHandledClientIssue('[student-track] home reward box batch flush failed', error);
 
-        const nextOpenedBoxes = Array.isArray(result.openedStudyBoxes)
-          ? normalizeStudyBoxHours(result.openedStudyBoxes)
-          : null;
-        const nextClaimedBoxes = Array.isArray(result.claimedStudyBoxes)
-          ? normalizeStudyBoxHours(result.claimedStudyBoxes)
-          : null;
-        const rewardEntries = Array.isArray(result.rewards) ? result.rewards : [];
+          for (const hour of batch.hours) {
+            try {
+              const result = await openStudyRewardBoxSecure({
+                centerId: activeMembership.id,
+                studentId: studentUid,
+                dateKey: batch.dateKey,
+                hour,
+                reward: buildDeterministicStudyBoxReward({
+                  centerId: activeMembership.id,
+                  studentId: studentUid,
+                  dateKey: batch.dateKey,
+                  milestone: hour,
+                }),
+              });
+              applyHomeBoxOpenPersistenceResult(batch.dateKey, result);
+              removePendingHomeBoxOpens(batch.dateKey, [hour]);
+            } catch (singleError) {
+              logHandledClientIssue('[student-track] home reward box single retry failed', singleError);
+            }
+          }
 
-        if (batch.dateKey === activeStudyDayKey) {
-          if (nextOpenedBoxes) {
-            setHomeOpenedBoxes(nextOpenedBoxes);
-            writeStudyBoxOpenedCache(studyBoxCacheUid, batch.dateKey, nextOpenedBoxes);
-          }
-          if (nextClaimedBoxes) {
-            setHomeClaimedBoxes(nextClaimedBoxes);
-            writeStudyBoxHoursCache(studyBoxClaimCacheKey, nextClaimedBoxes);
-          }
-          if (rewardEntries.length > 0) {
-            setHomeRewardEntries((prev) =>
-              rewardEntries.reduce((entries, reward) => upsertStudyBoxRewardEntry(entries, reward), prev)
-            );
-          }
-        } else {
-          if (nextOpenedBoxes) {
-            setCarryoverOpenedSnapshot({
-              dateKey: batch.dateKey,
-              hours: nextOpenedBoxes,
-            });
-            writeCarryoverOpenedCache(batch.dateKey, nextOpenedBoxes);
-            setCarryoverOpenedCacheState({
-              dateKey: batch.dateKey,
-              hours: nextOpenedBoxes,
-            });
+          const remainingBatch = getPendingHomeBoxOpenBatches().find((entry) => entry.dateKey === batch.dateKey);
+          const stillPendingHours = remainingBatch?.hours.filter((hour) => batch.hours.includes(hour)) || [];
+          if (stillPendingHours.length === 0) {
+            failedBatchCount -= 1;
           }
         }
-
-        removePendingHomeBoxOpens(batch.dateKey, batch.hours);
       }
       shouldContinueFlush = getPendingHomeBoxOpenBatches().length > 0;
-    } catch (error) {
-      shouldContinueFlush = getPendingHomeBoxOpenBatches().length > 0;
-      logHandledClientIssue('[student-track] home reward box flush failed', error);
-      const now = Date.now();
-      if (now - homeBoxOpenErrorToastAtRef.current > 10000) {
-        homeBoxOpenErrorToastAtRef.current = now;
-        toast({
-          variant: 'destructive',
-          title: '상자 보상 저장 대기 중',
-          description: '서버 저장을 계속 재시도하고 있어요. 네트워크가 돌아오면 자동으로 반영됩니다.',
-        });
-      }
     } finally {
+      shouldContinueFlush = getPendingHomeBoxOpenBatches().length > 0;
+      if (failedBatchCount > 0) {
+        const now = Date.now();
+        if (now - homeBoxOpenErrorToastAtRef.current > 10000) {
+          homeBoxOpenErrorToastAtRef.current = now;
+          toast({
+            variant: 'destructive',
+            title: '상자 보상 저장 대기 중',
+            description: '서버 저장을 계속 재시도하고 있어요. 네트워크가 돌아오면 자동으로 반영됩니다.',
+          });
+        }
+      }
       isFlushingHomeBoxOpensRef.current = false;
       if (shouldContinueFlush) {
         window.setTimeout(() => {
@@ -3563,15 +3615,12 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
     }
   }, [
     activeMembership?.id,
-    activeStudyDayKey,
+    applyHomeBoxOpenPersistenceResult,
     getPendingHomeBoxOpenBatches,
     removePendingHomeBoxOpens,
     studentUid,
-    studyBoxCacheUid,
-    studyBoxClaimCacheKey,
     studyBoxOpenQueueUid,
     toast,
-    writeCarryoverOpenedCache,
   ]);
 
   useEffect(() => {
