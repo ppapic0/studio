@@ -452,6 +452,22 @@ function getCreditedStudyBoxPointTotal(dayStatus) {
     const nonStudyBoxPointTotal = getRankRewardAwardTotal(dayStatus) + getPlanCompletionAwardTotal(dayStatus);
     return Math.max(0, getPointEventAwardTotal(dayStatus, "study_box"), dailyPointAmount - nonStudyBoxPointTotal);
 }
+function getStudyBoxPointEventCreditSummary(dayStatus) {
+    const creditedByHour = new Map();
+    normalizeDailyPointEvents(dayStatus.pointEvents).forEach((event) => {
+        var _a, _b;
+        if (event.source !== "study_box")
+            return;
+        const points = Math.max(0, Math.floor((_a = parseFiniteNumber(event.points)) !== null && _a !== void 0 ? _a : 0));
+        if (points <= 0)
+            return;
+        const eventHour = getStudyBoxHourFromDailyPointEvent(event);
+        if (eventHour === null)
+            return;
+        creditedByHour.set(eventHour, ((_b = creditedByHour.get(eventHour)) !== null && _b !== void 0 ? _b : 0) + points);
+    });
+    return { creditedByHour };
+}
 function getStudyBoxRewardPointsForHour(rewardEntries, hour, fallbackReward) {
     var _a, _b, _c, _d, _e;
     const storedReward = (_a = rewardEntries.find((entry) => entry.milestone === hour)) !== null && _a !== void 0 ? _a : null;
@@ -459,13 +475,33 @@ function getStudyBoxRewardPointsForHour(rewardEntries, hour, fallbackReward) {
     return awardedPoints;
 }
 function getMissingStudyBoxCreditDelta(params) {
+    var _a;
     const hour = Math.max(1, Math.min(8, Math.round(params.hour)));
-    if (!params.openedStudyBoxes.includes(hour))
+    const openedStudyBoxes = normalizeStudyBoxHoursFromUnknown(params.openedStudyBoxes);
+    if (!openedStudyBoxes.includes(hour))
         return 0;
+    const rewardPoints = getStudyBoxRewardPointsForHour(params.rewardEntries, hour, params.fallbackReward);
+    if (rewardPoints <= 0)
+        return 0;
+    const { creditedByHour } = getStudyBoxPointEventCreditSummary(params.dayStatus);
     const creditedStudyBoxPoints = getCreditedStudyBoxPointTotal(params.dayStatus);
-    if (creditedStudyBoxPoints > 0)
-        return 0;
-    return getStudyBoxRewardPointsForHour(params.rewardEntries, hour, params.fallbackReward);
+    const hourSpecificCreditTotal = Array.from(creditedByHour.values()).reduce((total, points) => total + points, 0);
+    let remainingGenericCredits = Math.max(0, creditedStudyBoxPoints - hourSpecificCreditTotal);
+    for (const openedHour of openedStudyBoxes) {
+        const openedRewardPoints = openedHour === hour
+            ? rewardPoints
+            : getStudyBoxRewardPointsForHour(params.rewardEntries, openedHour, null);
+        if (openedRewardPoints <= 0)
+            continue;
+        const specificCredits = Math.min(openedRewardPoints, Math.max(0, (_a = creditedByHour.get(openedHour)) !== null && _a !== void 0 ? _a : 0));
+        const uncoveredPoints = Math.max(0, openedRewardPoints - specificCredits);
+        const genericCredits = Math.min(uncoveredPoints, remainingGenericCredits);
+        remainingGenericCredits -= genericCredits;
+        if (openedHour === hour) {
+            return Math.max(0, uncoveredPoints - genericCredits);
+        }
+    }
+    return 0;
 }
 function getPlanCompletionAwardTotal(dayStatus) {
     var _a;
@@ -483,6 +519,19 @@ function upsertDailyPointEvent(existing, event) {
     });
     next.set(event.id, event);
     return Array.from(next.values()).slice(-80);
+}
+function buildStudyBoxPointEvent(existing, params) {
+    var _a, _b;
+    const id = `study_box:${params.dateKey}:${params.hour}`;
+    const existingPoints = Math.max(0, Math.floor((_b = parseFiniteNumber((_a = normalizeDailyPointEvents(existing).find((entry) => entry.id === id)) === null || _a === void 0 ? void 0 : _a.points)) !== null && _b !== void 0 ? _b : 0));
+    return {
+        id,
+        source: "study_box",
+        label: `${params.hour}시간 상자`,
+        points: existingPoints + Math.max(0, Math.floor(params.awardedDelta)),
+        createdAt: new Date(params.nowMs).toISOString(),
+        hour: params.hour,
+    };
 }
 function getOpenedStudyBoxAwardTotal(dayStatus) {
     const openedHourSet = new Set(resolveOpenedStudyBoxHoursFromDayStatus(dayStatus));
@@ -12190,14 +12239,12 @@ exports.openStudyRewardBoxSecure = functions.region(region).https.onCall(async (
         const nextClaimedStudyBoxes = normalizeStudyBoxHoursFromUnknown([...claimedStudyBoxes, hour]);
         const nextRewardEntries = upsertStudyBoxRewardEntries(storedRewardEntries, creditedReward);
         const nextPointEvents = awardedDelta > 0
-            ? upsertDailyPointEvent(currentDayStatus.pointEvents, {
-                id: `study_box:${dateKey}:${hour}`,
-                source: "study_box",
-                label: `${hour}시간 상자`,
-                points: awardedDelta,
-                createdAt: new Date(nowMs).toISOString(),
+            ? upsertDailyPointEvent(currentDayStatus.pointEvents, buildStudyBoxPointEvent(currentDayStatus.pointEvents, {
+                dateKey,
                 hour,
-            })
+                awardedDelta,
+                nowMs,
+            }))
             : normalizeDailyPointEvents(currentDayStatus.pointEvents);
         const currentPointsBalance = Math.max(0, Math.floor((_b = parseFiniteNumber(progressData.pointsBalance)) !== null && _b !== void 0 ? _b : 0));
         const currentTotalPointsEarned = Math.max(0, Math.floor((_c = parseFiniteNumber(progressData.totalPointsEarned)) !== null && _c !== void 0 ? _c : 0));
@@ -12362,7 +12409,7 @@ exports.openStudyRewardBoxesSecure = functions.region(region).https.onCall(async
             reward });
     });
     const result = await db.runTransaction(async (transaction) => {
-        var _a, _b, _c;
+        var _a, _b, _c, _d;
         const latestProgressSnap = await transaction.get(progressRef);
         const progressData = latestProgressSnap.exists ? latestProgressSnap.data() : {};
         const dailyPointStatus = isPlainObject(progressData.dailyPointStatus)
@@ -12385,9 +12432,12 @@ exports.openStudyRewardBoxesSecure = functions.region(region).https.onCall(async
             const resolvedReward = alreadyOpened
                 ? (storedReward !== null && storedReward !== void 0 ? storedReward : plan.reward)
                 : Object.assign(Object.assign({}, rewardBase), { awardedPoints: Math.max(0, Math.round(Math.max(0, Math.floor(rewardBase.basePoints)) * plan.boostMultiplier)), multiplier: plan.boostMultiplier, earnedAt: plan.earnedAtMs ? new Date(plan.earnedAtMs).toISOString() : null, boostEventId: plan.boostEventId });
+            const creditRepairDayStatus = alreadyOpened
+                ? Object.assign(Object.assign({}, currentDayStatus), { claimedStudyBoxes: nextClaimedStudyBoxes, openedStudyBoxes: nextOpenedStudyBoxes, studyBoxRewards: nextRewardEntries, pointEvents: nextPointEvents, dailyPointAmount: Math.max(0, Math.floor((_b = parseFiniteNumber(currentDayStatus.dailyPointAmount)) !== null && _b !== void 0 ? _b : 0)) +
+                        awardedTotalDelta }) : currentDayStatus;
             const missingStudyBoxCreditDelta = alreadyOpened
                 ? getMissingStudyBoxCreditDelta({
-                    dayStatus: currentDayStatus,
+                    dayStatus: creditRepairDayStatus,
                     openedStudyBoxes: nextOpenedStudyBoxes,
                     rewardEntries: nextRewardEntries,
                     hour: plan.hour,
@@ -12407,20 +12457,18 @@ exports.openStudyRewardBoxesSecure = functions.region(region).https.onCall(async
             nextClaimedStudyBoxes = normalizeStudyBoxHoursFromUnknown([...nextClaimedStudyBoxes, plan.hour]);
             nextRewardEntries = upsertStudyBoxRewardEntries(nextRewardEntries, creditedReward);
             if (awardedDelta > 0) {
-                nextPointEvents = upsertDailyPointEvent(nextPointEvents, {
-                    id: `study_box:${dateKey}:${plan.hour}`,
-                    source: "study_box",
-                    label: `${plan.hour}시간 상자`,
-                    points: awardedDelta,
-                    createdAt: new Date(nowMs).toISOString(),
+                nextPointEvents = upsertDailyPointEvent(nextPointEvents, buildStudyBoxPointEvent(nextPointEvents, {
+                    dateKey,
                     hour: plan.hour,
-                });
+                    awardedDelta,
+                    nowMs,
+                }));
             }
             awardedTotalDelta += awardedDelta;
             creditedRewards.push(creditedReward);
         }
-        const currentPointsBalance = Math.max(0, Math.floor((_b = parseFiniteNumber(progressData.pointsBalance)) !== null && _b !== void 0 ? _b : 0));
-        const currentTotalPointsEarned = Math.max(0, Math.floor((_c = parseFiniteNumber(progressData.totalPointsEarned)) !== null && _c !== void 0 ? _c : 0));
+        const currentPointsBalance = Math.max(0, Math.floor((_c = parseFiniteNumber(progressData.pointsBalance)) !== null && _c !== void 0 ? _c : 0));
+        const currentTotalPointsEarned = Math.max(0, Math.floor((_d = parseFiniteNumber(progressData.totalPointsEarned)) !== null && _d !== void 0 ? _d : 0));
         transaction.set(progressRef, {
             pointsBalance: admin.firestore.FieldValue.increment(awardedTotalDelta),
             totalPointsEarned: admin.firestore.FieldValue.increment(awardedTotalDelta),

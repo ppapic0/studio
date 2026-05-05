@@ -108,6 +108,11 @@ import {
 } from '@/lib/student-rewards';
 import { readStudyBoxOpenedCache, writeStudyBoxOpenedCache } from '@/lib/study-box-opened-cache';
 import {
+  mergeStudyBoxPendingOpenQueue,
+  readStudyBoxPendingOpenQueue,
+  removeStudyBoxPendingOpenQueue,
+} from '@/lib/study-box-open-queue';
+import {
   EMPTY_STUDENT_RANKING_SNAPSHOT,
   fetchStudentRankingSnapshot,
   type StudentRankingSnapshot,
@@ -1299,6 +1304,8 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
   const studentDocId = activeStudentId || authUid || null;
   const studentUid = studentDocId || authUid || null;
   const studyBoxCacheUid = studentDocId || authUid || null;
+  const studyBoxOpenQueueUid =
+    activeMembership?.id && studyBoxCacheUid ? `${activeMembership.id}:${studyBoxCacheUid}` : studyBoxCacheUid;
   
   const [today, setToday] = useState<Date | null>(null);
   const [localSeconds, setLocalSeconds] = useState(0);
@@ -1349,6 +1356,7 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
   const homeBoxTimeoutsRef = useRef<Array<ReturnType<typeof setTimeout>>>([]);
   const pendingHomeBoxOpenHoursRef = useRef<Map<string, Set<number>>>(new Map());
   const isFlushingHomeBoxOpensRef = useRef(false);
+  const homeBoxOpenErrorToastAtRef = useRef(0);
   const activeHomeBoxRevealKeyRef = useRef<string | null>(null);
   const retriedCachedHomeBoxOpenKeyRef = useRef<string | null>(null);
   const homeLiveClaimKeyRef = useRef<string | null>(null);
@@ -3436,16 +3444,48 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
     const pendingHours = pendingHomeBoxOpenHoursRef.current.get(dateKey) ?? new Set<number>();
     pendingHours.add(normalizedHour);
     pendingHomeBoxOpenHoursRef.current.set(dateKey, pendingHours);
-  }, []);
+    mergeStudyBoxPendingOpenQueue(studyBoxOpenQueueUid, dateKey, [normalizedHour]);
+  }, [studyBoxOpenQueueUid]);
 
-  const flushPendingHomeBoxOpens = useCallback(async () => {
-    if (isFlushingHomeBoxOpensRef.current || !activeMembership?.id || !studentUid) return;
-    const batches = Array.from(pendingHomeBoxOpenHoursRef.current.entries())
+  const removePendingHomeBoxOpens = useCallback((dateKey: string, hours: number[]) => {
+    const currentPendingHours = pendingHomeBoxOpenHoursRef.current.get(dateKey);
+
+    if (currentPendingHours) {
+      hours.forEach((hour) => currentPendingHours.delete(hour));
+      if (currentPendingHours.size === 0) {
+        pendingHomeBoxOpenHoursRef.current.delete(dateKey);
+      }
+    }
+    removeStudyBoxPendingOpenQueue(studyBoxOpenQueueUid, dateKey, hours);
+  }, [studyBoxOpenQueueUid]);
+
+  const getPendingHomeBoxOpenBatches = useCallback(() => {
+    const pendingByDateKey = new Map<string, Set<number>>();
+
+    pendingHomeBoxOpenHoursRef.current.forEach((hours, dateKey) => {
+      if (!dateKey) return;
+      const nextHours = pendingByDateKey.get(dateKey) ?? new Set<number>();
+      hours.forEach((hour) => nextHours.add(hour));
+      pendingByDateKey.set(dateKey, nextHours);
+    });
+
+    readStudyBoxPendingOpenQueue(studyBoxOpenQueueUid).forEach(({ dateKey, hours }) => {
+      const nextHours = pendingByDateKey.get(dateKey) ?? new Set<number>();
+      hours.forEach((hour) => nextHours.add(hour));
+      pendingByDateKey.set(dateKey, nextHours);
+    });
+
+    return Array.from(pendingByDateKey.entries())
       .map(([dateKey, hourSet]) => ({
         dateKey,
         hours: normalizeStudyBoxHours(Array.from(hourSet)),
       }))
       .filter((batch) => batch.dateKey && batch.hours.length > 0);
+  }, [studyBoxOpenQueueUid]);
+
+  const flushPendingHomeBoxOpens = useCallback(async () => {
+    if (isFlushingHomeBoxOpensRef.current || !activeMembership?.id || !studentUid || !studyBoxOpenQueueUid) return;
+    const batches = getPendingHomeBoxOpenBatches();
 
     if (batches.length === 0) return;
 
@@ -3496,39 +3536,74 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
           }
         }
 
-        const currentPendingHours = pendingHomeBoxOpenHoursRef.current.get(batch.dateKey);
-        if (currentPendingHours) {
-          batch.hours.forEach((hour) => currentPendingHours.delete(hour));
-          if (currentPendingHours.size === 0) {
-            pendingHomeBoxOpenHoursRef.current.delete(batch.dateKey);
-          }
-        }
+        removePendingHomeBoxOpens(batch.dateKey, batch.hours);
       }
-      shouldContinueFlush = pendingHomeBoxOpenHoursRef.current.size > 0;
+      shouldContinueFlush = getPendingHomeBoxOpenBatches().length > 0;
     } catch (error) {
+      shouldContinueFlush = getPendingHomeBoxOpenBatches().length > 0;
       logHandledClientIssue('[student-track] home reward box flush failed', error);
-      toast({
-        variant: 'destructive',
-        title: '상자 보상 저장 실패',
-        description: '화면에서는 열렸지만 서버 저장이 실패했어요. 잠시 후 보관함을 다시 열어 확인해 주세요.',
-      });
+      const now = Date.now();
+      if (now - homeBoxOpenErrorToastAtRef.current > 10000) {
+        homeBoxOpenErrorToastAtRef.current = now;
+        toast({
+          variant: 'destructive',
+          title: '상자 보상 저장 대기 중',
+          description: '서버 저장을 계속 재시도하고 있어요. 네트워크가 돌아오면 자동으로 반영됩니다.',
+        });
+      }
     } finally {
       isFlushingHomeBoxOpensRef.current = false;
       if (shouldContinueFlush) {
         window.setTimeout(() => {
           void flushPendingHomeBoxOpens();
-        }, 250);
+        }, 1500);
       }
     }
   }, [
     activeMembership?.id,
     activeStudyDayKey,
+    getPendingHomeBoxOpenBatches,
+    removePendingHomeBoxOpens,
     studentUid,
     studyBoxCacheUid,
     studyBoxClaimCacheKey,
+    studyBoxOpenQueueUid,
     toast,
     writeCarryoverOpenedCache,
   ]);
+
+  useEffect(() => {
+    if (!activeMembership?.id || !studentUid || !studyBoxOpenQueueUid) return;
+
+    const flushNow = () => {
+      void flushPendingHomeBoxOpens();
+    };
+    const flushSoon = () => {
+      window.setTimeout(() => {
+        flushNow();
+      }, 0);
+    };
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'hidden') {
+        flushNow();
+        return;
+      }
+      flushSoon();
+    };
+
+    flushSoon();
+    window.addEventListener('focus', flushSoon);
+    window.addEventListener('online', flushSoon);
+    window.addEventListener('pagehide', flushNow);
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
+    return () => {
+      window.removeEventListener('focus', flushSoon);
+      window.removeEventListener('online', flushSoon);
+      window.removeEventListener('pagehide', flushNow);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  }, [activeMembership?.id, flushPendingHomeBoxOpens, studentUid, studyBoxOpenQueueUid]);
 
   useEffect(() => {
     if (!activeMembership?.id || !studentUid || !activeStudyDayKey || !studyBoxCacheUid) return;
@@ -3545,9 +3620,7 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
     if (retriedCachedHomeBoxOpenKeyRef.current === retryKey) return;
     retriedCachedHomeBoxOpenKeyRef.current = retryKey;
 
-    const pendingHours = pendingHomeBoxOpenHoursRef.current.get(activeStudyDayKey) ?? new Set<number>();
-    unsyncedOpenedBoxes.forEach((hour) => pendingHours.add(hour));
-    pendingHomeBoxOpenHoursRef.current.set(activeStudyDayKey, pendingHours);
+    unsyncedOpenedBoxes.forEach((hour) => queuePendingHomeBoxOpen(activeStudyDayKey, hour));
     void flushPendingHomeBoxOpens();
   }, [
     activeMembership?.id,
@@ -3555,6 +3628,7 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
     flushPendingHomeBoxOpens,
     persistedClaimedBoxes,
     persistedOpenedBoxes,
+    queuePendingHomeBoxOpen,
     studentUid,
     studyBoxCacheUid,
   ]);
@@ -3574,9 +3648,7 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
     if (retriedCachedHomeBoxOpenKeyRef.current === retryKey) return;
     retriedCachedHomeBoxOpenKeyRef.current = retryKey;
 
-    const pendingHours = pendingHomeBoxOpenHoursRef.current.get(previousStudyDayKey) ?? new Set<number>();
-    unsyncedOpenedBoxes.forEach((hour) => pendingHours.add(hour));
-    pendingHomeBoxOpenHoursRef.current.set(previousStudyDayKey, pendingHours);
+    unsyncedOpenedBoxes.forEach((hour) => queuePendingHomeBoxOpen(previousStudyDayKey, hour));
     void flushPendingHomeBoxOpens();
   }, [
     activeMembership?.id,
@@ -3585,6 +3657,7 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
     persistedCarryoverClaimedBoxes,
     persistedCarryoverOpenedBoxes,
     previousStudyDayKey,
+    queuePendingHomeBoxOpen,
     studentUid,
     studyBoxCacheUid,
   ]);
