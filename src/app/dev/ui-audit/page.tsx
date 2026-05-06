@@ -12,6 +12,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '@/components/ui/sheet';
+import { buildStudyBoxRewardReveal } from '@/lib/student-rewards';
 
 const mockTrend = [
   { date: '03/25', minutes: 180 },
@@ -156,7 +157,7 @@ export default function UiAuditPage() {
           selectedBox={mockBoxes[1]}
           boxStage="revealed"
           onRevealBox={() => undefined}
-          revealedReward={28}
+          revealedReward={buildStudyBoxRewardReveal({ basePoints: 14, awardedPoints: 28, multiplier: 2 })}
           onNextBox={() => undefined}
           nextCountdownLabel="14:10"
         />

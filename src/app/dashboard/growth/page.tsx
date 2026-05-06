@@ -56,6 +56,7 @@ import {
   sortGiftishowProducts,
 } from '@/lib/giftishow';
 import {
+  buildStudyBoxRewardReveal,
   buildDeterministicStudyBoxReward,
   getAvailableStudyBoxMilestones,
   getClaimedStudyBoxes,
@@ -70,6 +71,7 @@ import {
   normalizeStoredStudyBoxRewardEntries,
   normalizeStudyBoxHourValues,
   upsertStudyBoxRewardEntry,
+  type StudyBoxRewardReveal,
   type StudyBoxReward,
 } from '@/lib/student-rewards';
 import { getCurrentStudyDayLiveSeconds, getStudyDayContext, isStudyBoxCarryoverOpenable } from '@/lib/study-day';
@@ -481,7 +483,7 @@ export default function GrowthPage() {
   const [selectedVaultMode, setSelectedVaultMode] = useState<'today' | 'carryover'>('today');
   const [selectedBoxHour, setSelectedBoxHour] = useState<number | null>(null);
   const [boxStage, setBoxStage] = useState<BoxStage>('idle');
-  const [revealedReward, setRevealedReward] = useState<number | null>(null);
+  const [revealedReward, setRevealedReward] = useState<StudyBoxRewardReveal | null>(null);
   const [openingBoxHours, setOpeningBoxHours] = useState<number[]>([]);
   const [floatingGain, setFloatingGain] = useState<FloatingGain | null>(null);
   const [arrivalEvent, setArrivalEvent] = useState<{ key: number; count: number } | null>(null);
@@ -1296,7 +1298,7 @@ export default function GrowthPage() {
       });
       applyStudyBoxOpenPersistenceResult(dateKey, result);
       removePendingBoxOpens(dateKey, [hour]);
-      return typeof result.reward?.awardedPoints === 'number' ? result.reward.awardedPoints : null;
+      return result.reward ?? null;
     } catch (error) {
       logHandledClientIssue('[point-track] reward box immediate open failed', error);
       void flushPendingBoxOpens();
@@ -1613,12 +1615,14 @@ export default function GrowthPage() {
 
     const revealTimeout = setTimeout(() => {
       void (async () => {
-        const optimisticReward = optimisticRewardEntry.awardedPoints ?? targetBox.reward ?? 0;
+        const optimisticReward = buildStudyBoxRewardReveal(optimisticRewardEntry, targetBox.reward ?? 0);
         const persistedReward = await Promise.race([
           persistedRewardPromise,
           new Promise<null>((resolve) => window.setTimeout(() => resolve(null), REWARD_PERSIST_REVEAL_GRACE_MS)),
         ]);
-        const rewardToReveal = typeof persistedReward === 'number' ? persistedReward : optimisticReward;
+        const rewardToReveal = persistedReward
+          ? buildStudyBoxRewardReveal(persistedReward, optimisticReward.awardedPoints)
+          : optimisticReward;
 
         openingBoxHoursRef.current.delete(targetHour);
         setOpeningBoxHours(Array.from(openingBoxHoursRef.current).sort((a, b) => a - b));
@@ -1627,7 +1631,7 @@ export default function GrowthPage() {
           const floatingKey = Date.now();
           setRevealedReward(rewardToReveal);
           setBoxStage('revealed');
-          setFloatingGain({ key: floatingKey, amount: rewardToReveal });
+          setFloatingGain({ key: floatingKey, amount: rewardToReveal.awardedPoints });
           const clearFloating = setTimeout(() => {
             setFloatingGain((current) => (current?.key === floatingKey ? null : current));
           }, 1800);
@@ -2151,10 +2155,19 @@ export default function GrowthPage() {
                   </p>
                   {boxStage === 'revealed' && revealedReward !== null ? (
                     <div className="point-track-reward-burst">
-                      <p className="text-[2.35rem] font-black tracking-tight text-orange-100">
-                        +{revealedReward.toLocaleString()}P
+                      {revealedReward.hasBoost ? (
+                        <div className="point-track-boost-calculation point-track-boost-calculation--dark">
+                          <span className="point-track-boost-base">+{revealedReward.basePoints.toLocaleString()}P</span>
+                          <span className="point-track-boost-multiplier">{revealedReward.multiplierLabel}</span>
+                          <span className="point-track-boost-equals">=</span>
+                        </div>
+                      ) : null}
+                      <p className="point-track-boost-final text-[2.35rem] font-black tracking-tight text-orange-100">
+                        +{revealedReward.awardedPoints.toLocaleString()}P
                       </p>
-                      <p className="mt-1 text-xs font-black text-[var(--text-on-dark-soft)]">이번 상자 보상이에요.</p>
+                      <p className="mt-1 text-xs font-black text-[var(--text-on-dark-soft)]">
+                        {revealedReward.hasBoost ? '포인트 부스트가 적용된 상자 보상이에요.' : '이번 상자 보상이에요.'}
+                      </p>
                     </div>
                   ) : (
                     <p className="mt-2 text-sm font-black text-[var(--text-on-dark)]">

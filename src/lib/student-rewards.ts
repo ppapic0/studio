@@ -49,6 +49,14 @@ export type StudyBoxReward = {
   boostEventId?: string | null;
 };
 
+export type StudyBoxRewardReveal = {
+  basePoints: number;
+  awardedPoints: number;
+  multiplier: number;
+  multiplierLabel: string;
+  hasBoost: boolean;
+};
+
 export type DailyPointBreakdownItemTone = 'box' | 'rank' | 'plan' | 'legacy' | 'adjustment';
 
 export type DailyPointBreakdownItem = {
@@ -104,6 +112,45 @@ function getNormalizedRewardAmount(value: unknown): number {
   const points = Number(value ?? 0);
   if (!Number.isFinite(points)) return 0;
   return Math.max(0, Math.floor(points));
+}
+
+export function formatStudyBoxRewardMultiplierLabel(value: number): string {
+  if (!Number.isFinite(value) || value <= 0) return 'x1';
+  const rounded = Math.round(value);
+  if (Math.abs(value - rounded) < 0.01) return `x${rounded}`;
+  return `x${value.toFixed(1).replace(/\.0$/, '')}`;
+}
+
+export function buildStudyBoxRewardReveal(
+  reward?: Pick<StudyBoxReward, 'basePoints' | 'awardedPoints' | 'multiplier'> | null,
+  fallbackAwardedPoints = 0
+): StudyBoxRewardReveal {
+  const fallbackPoints = getNormalizedRewardAmount(fallbackAwardedPoints);
+  const rawBasePoints = Number(reward?.basePoints);
+  const rawAwardedPoints = Number(reward?.awardedPoints);
+  const awardedPoints = Number.isFinite(rawAwardedPoints)
+    ? getNormalizedRewardAmount(rawAwardedPoints)
+    : fallbackPoints;
+  const basePoints = Number.isFinite(rawBasePoints)
+    ? getNormalizedRewardAmount(rawBasePoints)
+    : awardedPoints;
+  const rawMultiplier = Number(reward?.multiplier);
+  const inferredMultiplier = basePoints > 0 && awardedPoints > basePoints ? awardedPoints / basePoints : 1;
+  const rewardMultiplier = Number.isFinite(rawMultiplier) && rawMultiplier > 0 ? rawMultiplier : inferredMultiplier;
+  const expectedAwardedPoints = basePoints > 0 ? Math.round(basePoints * rewardMultiplier) : awardedPoints;
+  const multiplier =
+    basePoints > 0 && awardedPoints > basePoints && expectedAwardedPoints !== awardedPoints
+      ? awardedPoints / basePoints
+      : rewardMultiplier;
+  const hasBoost = multiplier > 1.001 && awardedPoints > basePoints;
+
+  return {
+    basePoints,
+    awardedPoints,
+    multiplier,
+    multiplierLabel: formatStudyBoxRewardMultiplierLabel(multiplier),
+    hasBoost,
+  };
 }
 
 function getDailyRankRewardPoints(dayStatus?: Record<string, any>): number {

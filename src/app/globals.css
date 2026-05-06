@@ -6372,6 +6372,64 @@ select {
   animation: point-track-reward-pop 0.34s ease-out both;
 }
 
+.point-track-boost-calculation {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 0.38rem;
+  color: var(--text-on-accent);
+}
+
+.point-track-boost-base,
+.point-track-boost-multiplier,
+.point-track-boost-equals {
+  display: inline-flex;
+  min-height: 1.72rem;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.42);
+  background: rgba(255, 255, 255, 0.64);
+  padding: 0.26rem 0.58rem;
+  font-size: 0.78rem;
+  font-weight: 900;
+  line-height: 1;
+  box-shadow: 0 12px 22px -18px rgba(20, 41, 95, 0.55);
+  animation: point-track-boost-step-pop 0.42s cubic-bezier(0.2, 0.88, 0.24, 1.18) both;
+}
+
+.point-track-boost-multiplier {
+  background: linear-gradient(180deg, #ffb24d 0%, #ff8a20 100%);
+  color: white;
+  animation-delay: 0.12s;
+}
+
+.point-track-boost-equals {
+  min-width: 1.72rem;
+  padding-inline: 0.42rem;
+  animation-delay: 0.2s;
+}
+
+.point-track-boost-calculation--dark .point-track-boost-base,
+.point-track-boost-calculation--dark .point-track-boost-equals {
+  border-color: rgba(255, 255, 255, 0.16);
+  background: rgba(255, 255, 255, 0.1);
+  color: rgba(255, 255, 255, 0.9);
+}
+
+.point-track-boost-calculation--dark .point-track-boost-multiplier {
+  box-shadow: 0 14px 26px -18px rgba(255, 138, 32, 0.72);
+}
+
+.point-track-boost-final {
+  animation: point-track-boost-final-pop 0.44s cubic-bezier(0.2, 0.88, 0.24, 1.18) both;
+}
+
+.point-track-boost-calculation + .point-track-boost-final {
+  animation-delay: 0.26s;
+}
+
 @keyframes point-track-box-float {
   0%, 100% { transform: translateY(0) rotate(0deg); }
   50% { transform: translateY(-6px) rotate(-1.5deg); }
@@ -6470,6 +6528,18 @@ select {
   100% { opacity: 1; transform: translateY(0) scale(1); }
 }
 
+@keyframes point-track-boost-step-pop {
+  0% { opacity: 0; transform: translateY(8px) scale(0.86); }
+  58% { opacity: 1; transform: translateY(-2px) scale(1.08); }
+  100% { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+@keyframes point-track-boost-final-pop {
+  0% { opacity: 0; transform: translateY(12px) scale(0.72); }
+  62% { opacity: 1; transform: translateY(-3px) scale(1.1); }
+  100% { opacity: 1; transform: translateY(0) scale(1); }
+}
+
 @keyframes point-track-particle-burst {
   0% { opacity: 0; filter: blur(0); }
   20% { opacity: 1; }
@@ -6506,6 +6576,10 @@ select {
   .point-track-progress-fill::after,
   .point-track-slot--ready .point-track-slot__box,
   .point-track-reward-burst,
+  .point-track-boost-base,
+  .point-track-boost-multiplier,
+  .point-track-boost-equals,
+  .point-track-boost-final,
   .point-track-modal-particle--visible,
   .point-track-arrival-banner,
   .point-track-slot--fresh,

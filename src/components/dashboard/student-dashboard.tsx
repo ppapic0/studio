@@ -92,6 +92,7 @@ import {
 import { resolveSeatIdentity } from '@/lib/seat-layout';
 import {
   NAVY_REWARD_THEME,
+  buildStudyBoxRewardReveal,
   buildDeterministicStudyBoxReward,
   formatStudyMinutes,
   formatStudyMinutesShort,
@@ -104,6 +105,7 @@ import {
   normalizeStoredStudyBoxRewardEntries,
   normalizeStudyBoxHourValues,
   upsertStudyBoxRewardEntry,
+  type StudyBoxRewardReveal,
   type StudyBoxReward,
 } from '@/lib/student-rewards';
 import { readStudyBoxOpenedCache, writeStudyBoxOpenedCache } from '@/lib/study-box-opened-cache';
@@ -158,6 +160,7 @@ const EMPTY_STUDY_BOX_CACHE_KEY = '__empty-claim-cache__';
 const POINT_BOOST_POPUP_SESSION_PREFIX = 'student-point-boost-popup';
 const HOME_REWARD_BOX_BURST_DELAY_MS = 420;
 const HOME_REWARD_TEXT_REVEAL_DELAY_MS = 620;
+const HOME_REWARD_PERSIST_REVEAL_GRACE_MS = 1200;
 
 type StudentWifiRequestRecord = {
   id: string;
@@ -1372,7 +1375,7 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
   const [selectedBoxHour, setSelectedBoxHour] = useState<number | null>(null);
   const [vaultSourceDateKey, setVaultSourceDateKey] = useState<string | null>(null);
   const [homeBoxStage, setHomeBoxStage] = useState<'idle' | 'shake' | 'burst' | 'revealed'>('idle');
-  const [revealedHomeReward, setRevealedHomeReward] = useState<number | null>(null);
+  const [revealedHomeReward, setRevealedHomeReward] = useState<StudyBoxRewardReveal | null>(null);
   const [carryoverOpenedSnapshot, setCarryoverOpenedSnapshot] = useState<{
     dateKey: string;
     hours: number[];
@@ -3623,6 +3626,33 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
     toast,
   ]);
 
+  const persistSingleHomeBoxOpen = useCallback(async (dateKey: string, hour: number, rewardEntry: StudyBoxReward) => {
+    if (!activeMembership?.id || !studentUid) return null;
+
+    try {
+      const result = await openStudyRewardBoxSecure({
+        centerId: activeMembership.id,
+        studentId: studentUid,
+        dateKey,
+        hour,
+        reward: rewardEntry,
+      });
+      applyHomeBoxOpenPersistenceResult(dateKey, result);
+      removePendingHomeBoxOpens(dateKey, [hour]);
+      return result.reward ?? null;
+    } catch (error) {
+      logHandledClientIssue('[student-track] home reward box immediate open failed', error);
+      void flushPendingHomeBoxOpens();
+      return null;
+    }
+  }, [
+    activeMembership?.id,
+    applyHomeBoxOpenPersistenceResult,
+    flushPendingHomeBoxOpens,
+    removePendingHomeBoxOpens,
+    studentUid,
+  ]);
+
   useEffect(() => {
     if (!activeMembership?.id || !studentUid || !studyBoxOpenQueueUid) return;
 
@@ -3871,16 +3901,27 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
         hours: nextOpenedBoxes,
       });
     }
-    void flushPendingHomeBoxOpens();
+    const persistedRewardPromise = persistSingleHomeBoxOpen(targetDateKey, targetHour, optimisticRewardEntry);
 
     const burstId = setTimeout(() => setHomeBoxStage('burst'), HOME_REWARD_BOX_BURST_DELAY_MS);
     homeBoxTimeoutsRef.current.push(burstId);
 
     const revealId = setTimeout(() => {
-      const optimisticReward = optimisticRewardEntry.awardedPoints ?? targetBox.reward ?? 0;
-      setRevealedHomeReward(optimisticReward);
-      setHomeBoxStage('revealed');
-      activeHomeBoxRevealKeyRef.current = null;
+      void (async () => {
+        const optimisticReward = buildStudyBoxRewardReveal(optimisticRewardEntry, targetBox.reward ?? 0);
+        const persistedReward = await Promise.race([
+          persistedRewardPromise,
+          new Promise<null>((resolve) => window.setTimeout(() => resolve(null), HOME_REWARD_PERSIST_REVEAL_GRACE_MS)),
+        ]);
+        const rewardToReveal = persistedReward
+          ? buildStudyBoxRewardReveal(persistedReward, optimisticReward.awardedPoints)
+          : optimisticReward;
+
+        if (activeHomeBoxRevealKeyRef.current !== revealKey) return;
+        setRevealedHomeReward(rewardToReveal);
+        setHomeBoxStage('revealed');
+        activeHomeBoxRevealKeyRef.current = null;
+      })();
     }, HOME_REWARD_TEXT_REVEAL_DELAY_MS);
 
     homeBoxTimeoutsRef.current.push(revealId);
@@ -3891,7 +3932,7 @@ export function StudentDashboard({ isActive }: { isActive: boolean }) {
     activeVaultDateKey,
     homeBoxStage,
     queuePendingHomeBoxOpen,
-    flushPendingHomeBoxOpens,
+    persistSingleHomeBoxOpen,
     resolvedCarryoverOpenedBoxes,
     selectedHomeBox,
     studentUid,

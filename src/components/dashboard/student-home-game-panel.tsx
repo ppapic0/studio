@@ -25,6 +25,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import type { StudyBoxRewardReveal } from "@/lib/student-rewards";
 import type { GrowthProgress } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
@@ -240,7 +241,7 @@ function RewardModal({
   boxContextLabel?: string | null;
   boxStage: BoxStage;
   onReveal: () => void;
-  revealedReward: number | null;
+  revealedReward: StudyBoxRewardReveal | null;
   onNextBox: () => void;
   todayOpenedBoxCount: number;
   nextCountdownLabel: string;
@@ -311,11 +312,18 @@ function RewardModal({
             ) : (
               <div className="point-track-reward-burst surface-card surface-card--highlight mt-5 rounded-[1.35rem] px-4 py-5">
                 <div className="text-[11px] font-black uppercase tracking-[0.2em] text-[var(--text-on-accent)]">reward</div>
-                <div className="mt-2 text-[2rem] font-black tracking-tight text-[var(--text-on-accent)]">
-                  +{revealedReward.toLocaleString()}P
+                {revealedReward.hasBoost ? (
+                  <div className="point-track-boost-calculation mt-3">
+                    <span className="point-track-boost-base">+{revealedReward.basePoints.toLocaleString()}P</span>
+                    <span className="point-track-boost-multiplier">{revealedReward.multiplierLabel}</span>
+                    <span className="point-track-boost-equals">=</span>
+                  </div>
+                ) : null}
+                <div className="point-track-boost-final mt-2 text-[2rem] font-black tracking-tight text-[var(--text-on-accent)]">
+                  +{revealedReward.awardedPoints.toLocaleString()}P
                 </div>
                 <div className="mt-2 text-sm font-semibold text-[color-mix(in_srgb,var(--text-on-light)_72%,white)]">
-                  이번 상자 보상이에요.
+                  {revealedReward.hasBoost ? "포인트 부스트가 적용된 상자 보상이에요." : "이번 상자 보상이에요."}
                 </div>
                 <div className="mt-3 rounded-full border border-[color:var(--border-subtle)] bg-[rgba(255,255,255,0.56)] px-3 py-2 text-[11px] font-black text-[color-mix(in_srgb,var(--text-on-light)_70%,white)]">
                   오늘 연 상자 {todayOpenedBoxCount}개
@@ -576,7 +584,7 @@ export function StudentHomeGamePanel({
   boxContextLabel?: string | null;
   boxStage: BoxStage;
   onRevealBox: () => void;
-  revealedReward: number | null;
+  revealedReward: StudyBoxRewardReveal | null;
   onNextBox: () => void;
   nextCountdownLabel: string;
   }) {
