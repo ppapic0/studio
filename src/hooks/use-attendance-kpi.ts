@@ -297,6 +297,10 @@ function mapSnapshotData<T extends { id: string }>(docs: QueryDocumentSnapshot[]
   return docs.map((snapshot) => ({ id: snapshot.id, ...(snapshot.data() as Omit<T, 'id'>) })) as T[];
 }
 
+function getPathPart(parts: string[], index: number) {
+  return typeof parts[index] === 'string' ? parts[index] : '';
+}
+
 function getDateRange(periodDays: AttendanceKpiPeriod) {
   const today = startOfDay(new Date());
   const start = startOfDay(subDays(today, periodDays - 1));
@@ -465,7 +469,19 @@ async function loadScheduleItemsRange(
       orderBy('dateKey', 'asc')
     );
     const snap = await getDocs(groupedQuery);
-    const data = mapSnapshotData<ScheduleItemDoc>(snap.docs);
+    const data = snap.docs.map((snapshot) => {
+      const raw = snapshot.data() as Omit<ScheduleItemDoc, 'id'>;
+      const parts = snapshot.ref.path.split('/');
+      const studentIdFromPath =
+        getPathPart(parts, 0) === 'centers' && getPathPart(parts, 2) === 'plans'
+          ? getPathPart(parts, 3)
+          : '';
+      return {
+        id: snapshot.id,
+        ...raw,
+        studentId: raw.studentId || studentIdFromPath,
+      } as ScheduleItemDoc;
+    });
     return {
       data,
       diagnostic: makeSourceDiagnostic('scheduleItems', data.length),
@@ -592,42 +608,99 @@ async function loadAttendanceRecordsRange(
   firestore: Firestore,
   centerId: string,
   dateKeys: string[]
-) {
+): Promise<LoadResult<AttendanceRecordDoc>> {
   const results = await Promise.all(
     dateKeys.map(async (dateKey) => {
-      const snap = await getDocs(collection(firestore, 'centers', centerId, 'attendanceRecords', dateKey, 'students'));
-      return mapSnapshotData<AttendanceRecordDoc>(snap.docs).map((item) => ({ ...item, dateKey: item.dateKey || dateKey }));
+      try {
+        const snap = await getDocs(collection(firestore, 'centers', centerId, 'attendanceRecords', dateKey, 'students'));
+        return {
+          data: mapSnapshotData<AttendanceRecordDoc>(snap.docs).map((item) => ({
+            ...item,
+            studentId: item.studentId || item.id,
+            dateKey: item.dateKey || dateKey,
+          })),
+          error: null,
+        };
+      } catch (error) {
+        return {
+          data: [] as AttendanceRecordDoc[],
+          error,
+        };
+      }
     })
   );
-  return results.flat();
+  const data = results.flatMap((result) => result.data);
+  const errors = results.map((result) => result.error).filter(Boolean);
+  return {
+    data,
+    diagnostic: makeSourceDiagnostic('attendanceRecords', data.length, { error: errors[0] || null }),
+  };
 }
 
 async function loadDailyStudentStatsRange(
   firestore: Firestore,
   centerId: string,
   dateKeys: string[]
-) {
+): Promise<LoadResult<DailyStudentStatDoc>> {
   const results = await Promise.all(
     dateKeys.map(async (dateKey) => {
-      const snap = await getDocs(collection(firestore, 'centers', centerId, 'dailyStudentStats', dateKey, 'students'));
-      return mapSnapshotData<DailyStudentStatDoc>(snap.docs).map((item) => ({ ...item, dateKey: item.dateKey || dateKey }));
+      try {
+        const snap = await getDocs(collection(firestore, 'centers', centerId, 'dailyStudentStats', dateKey, 'students'));
+        return {
+          data: mapSnapshotData<DailyStudentStatDoc>(snap.docs).map((item) => ({
+            ...item,
+            studentId: item.studentId || item.id,
+            dateKey: item.dateKey || dateKey,
+          })),
+          error: null,
+        };
+      } catch (error) {
+        return {
+          data: [] as DailyStudentStatDoc[],
+          error,
+        };
+      }
     })
   );
-  return results.flat();
+  const data = results.flatMap((result) => result.data);
+  const errors = results.map((result) => result.error).filter(Boolean);
+  return {
+    data,
+    diagnostic: makeSourceDiagnostic('dailyStudentStats', data.length, { error: errors[0] || null }),
+  };
 }
 
 async function loadAttendanceDailyStatsRange(
   firestore: Firestore,
   centerId: string,
   dateKeys: string[]
-) {
+): Promise<LoadResult<AttendanceDailyStatDoc>> {
   const results = await Promise.all(
     dateKeys.map(async (dateKey) => {
-      const snap = await getDocs(collection(firestore, 'centers', centerId, 'attendanceDailyStats', dateKey, 'students'));
-      return mapSnapshotData<AttendanceDailyStatDoc>(snap.docs).map((item) => ({ ...item, dateKey: item.dateKey || dateKey }));
+      try {
+        const snap = await getDocs(collection(firestore, 'centers', centerId, 'attendanceDailyStats', dateKey, 'students'));
+        return {
+          data: mapSnapshotData<AttendanceDailyStatDoc>(snap.docs).map((item) => ({
+            ...item,
+            studentId: item.studentId || item.id,
+            dateKey: item.dateKey || dateKey,
+          })),
+          error: null,
+        };
+      } catch (error) {
+        return {
+          data: [] as AttendanceDailyStatDoc[],
+          error,
+        };
+      }
     })
   );
-  return results.flat();
+  const data = results.flatMap((result) => result.data);
+  const errors = results.map((result) => result.error).filter(Boolean);
+  return {
+    data,
+    diagnostic: makeSourceDiagnostic('attendanceDailyStats', data.length, { error: errors[0] || null }),
+  };
 }
 
 async function loadStudyLogDaysRange(
@@ -651,9 +724,12 @@ async function loadStudyLogDaysRange(
       .map((snapshot) => {
         const parts = snapshot.ref.path.split('/');
         if (parts.length < 6 || parts[1] !== centerId || parts[2] !== 'studyLogs') return null;
+        const raw = snapshot.data() as Omit<StudyLogDayDoc, 'id'>;
         return {
           id: snapshot.id,
-          ...(snapshot.data() as Omit<StudyLogDayDoc, 'id'>),
+          ...raw,
+          studentId: raw.studentId || getPathPart(parts, 3),
+          dateKey: raw.dateKey || getPathPart(parts, 5),
         } as StudyLogDayDoc;
       })
       .filter((item): item is StudyLogDayDoc => Boolean(item));
@@ -910,9 +986,9 @@ export function useAttendanceKpi({
         setScheduleItems(scheduleItemsResult.data);
         setDirectSchedules(directSchedulesResult.data);
         setScheduleTemplates(scheduleTemplatesResult.data);
-        setAttendanceRecords(nextAttendanceRecords);
-        setDailyStudentStats(nextDailyStudentStats);
-        setAttendanceDailyStats(nextAttendanceDailyStats);
+        setAttendanceRecords(nextAttendanceRecords.data);
+        setDailyStudentStats(nextDailyStudentStats.data);
+        setAttendanceDailyStats(nextAttendanceDailyStats.data);
         setStudyLogDays(studyLogDaysResult.data);
         setStudySessions(studySessionsResult.data);
         setParentNotifications(parentNotificationsResult.data);
@@ -921,9 +997,9 @@ export function useAttendanceKpi({
           scheduleItemsResult.diagnostic,
           directSchedulesResult.diagnostic,
           scheduleTemplatesResult.diagnostic,
-          makeSourceDiagnostic('attendanceRecords', nextAttendanceRecords.length),
-          makeSourceDiagnostic('dailyStudentStats', nextDailyStudentStats.length),
-          makeSourceDiagnostic('attendanceDailyStats', nextAttendanceDailyStats.length),
+          nextAttendanceRecords.diagnostic,
+          nextDailyStudentStats.diagnostic,
+          nextAttendanceDailyStats.diagnostic,
           studyLogDaysResult.diagnostic,
           studySessionsResult.diagnostic,
           parentNotificationsResult.diagnostic,
