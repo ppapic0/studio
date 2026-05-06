@@ -1,7 +1,7 @@
 
 'use client';
 
-import { useState, useEffect, useMemo, useRef, type KeyboardEvent } from 'react';
+import { useState, useEffect, useMemo, useRef, useCallback, type KeyboardEvent } from 'react';
 import {
   Card,
   CardContent,
@@ -832,6 +832,7 @@ type PointHistoryGrantRow = {
   key: string;
   dateKey: string;
   studentId: string;
+  progressStudentId?: string;
   studentName: string;
   className: string;
   totalPoints: number;
@@ -921,6 +922,8 @@ type AdjustStudentPenaltyBalanceResult = {
   penaltyPoints: number;
 };
 
+type GrowthProgressRecord = GrowthProgress & { id: string };
+
 const POINT_HISTORY_WINDOW_ORDER: PointHistoryWindow[] = ['today', '7d', '30d'];
 
 const EMPTY_POINT_HISTORY_SUMMARY: PointHistorySummary = {
@@ -932,6 +935,59 @@ const EMPTY_POINT_HISTORY_SUMMARY: PointHistorySummary = {
   adjustmentPoints: 0,
   legacyPoints: 0,
   earners: 0,
+};
+
+const toPointNumber = (value: unknown) => {
+  const numeric = Number(value);
+  return Number.isFinite(numeric) ? numeric : 0;
+};
+
+const hasGrowthProgressPointData = (progress?: GrowthProgress | null) => {
+  if (!progress) return false;
+  if (toPointNumber(progress.pointsBalance) > 0) return true;
+  if (toPointNumber(progress.totalPointsEarned) > 0) return true;
+  return Object.keys(progress.dailyPointStatus || {}).length > 0;
+};
+
+const mergeGrowthProgressRecords = (
+  primary?: GrowthProgressRecord | null,
+  fallback?: GrowthProgressRecord | null
+): GrowthProgressRecord | null => {
+  if (!primary) return fallback ?? null;
+  if (!fallback) return primary;
+
+  const primaryHasPointData = hasGrowthProgressPointData(primary);
+  const fallbackHasPointData = hasGrowthProgressPointData(fallback);
+  if (!primaryHasPointData && !fallbackHasPointData) return primary;
+  if (!fallbackHasPointData) return primary;
+
+  const primaryPointsBalance = toPointNumber(primary.pointsBalance);
+  const fallbackPointsBalance = toPointNumber(fallback.pointsBalance);
+  const primaryTotalEarned = toPointNumber(primary.totalPointsEarned);
+  const fallbackTotalEarned = toPointNumber(fallback.totalPointsEarned);
+  const pointSource =
+    !primaryHasPointData ||
+    fallbackPointsBalance > primaryPointsBalance ||
+    (fallbackPointsBalance === primaryPointsBalance && fallbackTotalEarned > primaryTotalEarned)
+      ? fallback
+      : primary;
+
+  return {
+    ...fallback,
+    ...primary,
+    id: pointSource.id,
+    dailyPointStatus: {
+      ...(fallback.dailyPointStatus || {}),
+      ...(primary.dailyPointStatus || {}),
+    },
+    pointsBalance: Math.max(primaryPointsBalance, fallbackPointsBalance),
+    totalPointsEarned: Math.max(primaryTotalEarned, fallbackTotalEarned),
+    penaltyPoints: Math.max(
+      0,
+      Math.floor(Math.max(toPointNumber(primary.penaltyPoints), toPointNumber(fallback.penaltyPoints)))
+    ),
+    stats: primary.stats || fallback.stats,
+  };
 };
 
 const buildRecentDateKeys = (referenceDate: Date | null, dayCount: number): string[] => {
@@ -1158,6 +1214,7 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
   const [today, setToday] = useState<Date | null>(null);
   const [selectedClass, setSelectedClass] = useState<string>('all');
   const [now, setNow] = useState<number>(0);
+  const [studentProfileDocIdByStoredId, setStudentProfileDocIdByStoredId] = useState<Record<string, string>>({});
   const [teacherSearch, setTeacherSearch] = useState('');
   const [selectedTeacherId, setSelectedTeacherId] = useState<string | null>(null);
   const [deletingTeacherId, setDeletingTeacherId] = useState<string | null>(null);
@@ -1708,6 +1765,40 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
   }, [firestore, centerId]);
   const { data: students } = useCollection<StudentProfile>(studentsQuery, { enabled: isActive });
 
+  useEffect(() => {
+    if (!studentsQuery || !isActive) {
+      setStudentProfileDocIdByStoredId({});
+      return;
+    }
+
+    let cancelled = false;
+    const loadStudentProfileStoredIds = async () => {
+      try {
+        const snapshot = await getDocs(studentsQuery);
+        const next: Record<string, string> = {};
+        snapshot.docs.forEach((docSnap) => {
+          const storedId = typeof docSnap.data().id === 'string' ? docSnap.data().id.trim() : '';
+          if (storedId && storedId !== docSnap.id) {
+            next[storedId] = docSnap.id;
+          }
+        });
+        if (!cancelled) {
+          setStudentProfileDocIdByStoredId(next);
+        }
+      } catch (error) {
+        logHandledClientIssue('[admin-dashboard] student profile id map load failed', error);
+        if (!cancelled) {
+          setStudentProfileDocIdByStoredId({});
+        }
+      }
+    };
+
+    void loadStudentProfileStoredIds();
+    return () => {
+      cancelled = true;
+    };
+  }, [isActive, studentsQuery]);
+
   const websiteSeatHoldRequestsQuery = useMemoFirebase(() => {
     if (!firestore || !centerId) return null;
     return query(collection(firestore, 'centers', centerId, 'websiteSeatHoldRequests'), limit(300));
@@ -1743,6 +1834,50 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
     () => new Map((activeMembers || []).map((member) => [member.id, member])),
     [activeMembers]
   );
+
+  const studentProfileDocIdsByMemberId = useMemo(() => {
+    const mapped = new Map<string, string>();
+    (activeMembers || []).forEach((member) => {
+      const directProfileDocId = studentProfileDocIdByStoredId[member.id];
+      if (directProfileDocId) {
+        mapped.set(member.id, directProfileDocId);
+        return;
+      }
+
+      const memberName = (member.displayName || '').trim();
+      if (!memberName) return;
+      const memberClassName = (member.className || '').trim();
+      const memberPhone = normalizePhoneNumber(member.phoneNumber);
+      const candidates = (students || []).filter((student) => {
+        if (student.id === member.id) return false;
+        if ((student.name || '').trim() !== memberName) return false;
+        const studentClassName = (student.className || '').trim();
+        if (memberClassName && studentClassName && memberClassName !== studentClassName) return false;
+        const studentPhone = normalizePhoneNumber(student.phoneNumber);
+        if (memberPhone && studentPhone && memberPhone !== studentPhone) return false;
+        return true;
+      });
+      if (candidates.length === 1) {
+        mapped.set(member.id, candidates[0].id);
+      }
+    });
+    return mapped;
+  }, [activeMembers, studentProfileDocIdByStoredId, students]);
+
+  const studentStoredIdByProfileDocId = useMemo(() => {
+    const mapped = new Map<string, string>();
+    Object.entries(studentProfileDocIdByStoredId).forEach(([storedId, profileDocId]) => {
+      if (storedId && profileDocId) {
+        mapped.set(profileDocId, storedId);
+      }
+    });
+    studentProfileDocIdsByMemberId.forEach((profileDocId, memberId) => {
+      if (profileDocId && memberId) {
+        mapped.set(profileDocId, memberId);
+      }
+    });
+    return mapped;
+  }, [studentProfileDocIdByStoredId, studentProfileDocIdsByMemberId]);
 
   const assignedStudentIdsFromSeats = useMemo(() => {
     return new Set(
@@ -1918,8 +2053,32 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
   ]);
 
   const progressById = useMemo(
-    () => new Map((progressList || []).map((progress) => [progress.id, progress])),
+    () => new Map((progressList || []).map((progress) => [progress.id, progress as GrowthProgressRecord])),
     [progressList]
+  );
+
+  const getStudentProgressLookupIds = useCallback(
+    (studentId?: string | null) => {
+      const normalizedStudentId = typeof studentId === 'string' ? studentId.trim() : '';
+      if (!normalizedStudentId) return [] as string[];
+
+      const ids = new Set<string>([normalizedStudentId]);
+      const profileDocId = studentProfileDocIdsByMemberId.get(normalizedStudentId) || studentProfileDocIdByStoredId[normalizedStudentId];
+      const storedStudentId = studentStoredIdByProfileDocId.get(normalizedStudentId);
+      if (profileDocId) ids.add(profileDocId);
+      if (storedStudentId) ids.add(storedStudentId);
+      return Array.from(ids);
+    },
+    [studentProfileDocIdByStoredId, studentProfileDocIdsByMemberId, studentStoredIdByProfileDocId]
+  );
+
+  const getGrowthProgressForStudentId = useCallback(
+    (studentId?: string | null): GrowthProgressRecord | null =>
+      getStudentProgressLookupIds(studentId).reduce<GrowthProgressRecord | null>(
+        (merged, progressId) => mergeGrowthProgressRecords(merged, progressById.get(progressId) || null),
+        null
+      ),
+    [getStudentProgressLookupIds, progressById]
   );
 
   const seatById = useMemo(
@@ -2387,7 +2546,7 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
 
   const pointHistoryByWindow = useMemo(() => {
     const getMemberDailyPointBreakdown = (memberId: string, dateKey: string) => {
-      const progress = progressById.get(memberId);
+      const progress = getGrowthProgressForStudentId(memberId);
       const dailyPointStatus = (progress?.dailyPointStatus || {}) as Record<string, any>;
       return getDailyPointBreakdown((dailyPointStatus[dateKey] || {}) as Record<string, any>);
     };
@@ -2447,6 +2606,7 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
         .map((dateKey) => {
           const grants = filteredStudentMembers
             .map((member): PointHistoryGrantRow | null => {
+              const progress = getGrowthProgressForStudentId(member.id);
               const breakdown = getMemberDailyPointBreakdown(member.id, dateKey);
               if (breakdown.totalPoints <= 0) return null;
               const breakdownItems = getPointBreakdownItems(breakdown);
@@ -2455,6 +2615,7 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
                 key: `${dateKey}-${member.id}`,
                 dateKey,
                 studentId: member.id,
+                progressStudentId: progress?.id,
                 studentName: toSafeStudentName(member.displayName, member.id),
                 className: member.className || '-',
                 totalPoints: breakdown.totalPoints,
@@ -2525,7 +2686,7 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
         dailyRows: buildDailyRows(pointHistoryDateKeys['30d']),
       },
     };
-  }, [filteredStudentMembers, pointHistoryDateKeys, progressById]);
+  }, [filteredStudentMembers, getGrowthProgressForStudentId, pointHistoryDateKeys]);
 
   const todayPointRows = pointHistoryByWindow.today.rows;
   const todayPointsSummary = pointHistoryByWindow.today.summary;
@@ -3166,7 +3327,7 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
 
     filteredStudentMembers.forEach(member => {
       const studentStat = todayStats?.find(s => s.studentId === member.id);
-      const studentProgress = progressList.find(p => p.id === member.id);
+      const studentProgress = getGrowthProgressForStudentId(member.id);
       const seat = attendanceList.find(a => a.studentId === member.id);
       const liveSession = getLiveRoundedMinutes(seat);
       const signalMinutes = Math.max(0, Math.round(Number(attendanceSeatSignalsByStudentId.get(member.id)?.todayStudyMinutes || 0)));
@@ -3199,12 +3360,12 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
     const filteredYesterdayStats = yesterdayStats?.filter((s) => targetMemberIds.has(s.studentId)) || [];
     const todayFocusScores = filteredStudentMembers.map((member) => {
       const studentStat = filteredTodayStats.find((s) => s.studentId === member.id);
-      const studentProgress = progressList.find((p) => p.id === member.id);
+      const studentProgress = getGrowthProgressForStudentId(member.id);
       return calculateStudentFocusScore(studentStat, studentProgress);
     });
     const yesterdayFocusScores = filteredStudentMembers.map((member) => {
       const studentStat = filteredYesterdayStats.find((s) => s.studentId === member.id);
-      const studentProgress = progressList.find((p) => p.id === member.id);
+      const studentProgress = getGrowthProgressForStudentId(member.id);
       return calculateStudentFocusScore(studentStat, studentProgress);
     });
 
@@ -3235,7 +3396,7 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
       ? Math.round(awayDurations.reduce((sum, value) => sum + value, 0) / awayDurations.length)
       : 0;
     const highPenaltyCount = filteredStudentMembers.filter((member) => {
-      const progress = progressList.find((p) => p.id === member.id);
+      const progress = getGrowthProgressForStudentId(member.id);
       return (progress?.penaltyPoints || 0) >= 10;
     }).length;
     const lowCompletionCount = filteredTodayStats.filter((item) => (item.todayPlanCompletionRate || 0) < 60).length;
@@ -3307,7 +3468,7 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
     const reportReadCount30d = recentParentEvents.filter((event) => event.eventType === 'report_read').length;
     const focusRows = filteredStudentMembers.map((member) => {
       const studentStat = filteredTodayStats.find((s) => s.studentId === member.id);
-      const studentProgress = progressList.find((p) => p.id === member.id);
+      const studentProgress = getGrowthProgressForStudentId(member.id);
       const seat = attendanceList.find((a) => a.studentId === member.id);
       const liveSession = getLiveRoundedMinutes(seat);
       const signalMinutes = Math.max(0, Math.round(Number(attendanceSeatSignalsByStudentId.get(member.id)?.todayStudyMinutes || 0)));
@@ -3372,7 +3533,7 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
       focusTop10,
       focusBottom10,
     };
-  }, [activeMembers, attendanceList, todayStats, yesterdayStats, dailyReports, progressList, parentActivityEvents, normalizedParentCommunications, consultingLeads, websiteConsultRequests, targetMemberIds, filteredStudentMembers, now, isMounted, weeklyStudyMinutesByStudent, liveTickMs, attendanceSeatSignalsByStudentId]);
+  }, [activeMembers, attendanceList, todayStats, yesterdayStats, dailyReports, progressList, parentActivityEvents, normalizedParentCommunications, consultingLeads, websiteConsultRequests, targetMemberIds, filteredStudentMembers, now, isMounted, weeklyStudyMinutesByStudent, liveTickMs, attendanceSeatSignalsByStudentId, getGrowthProgressForStudentId]);
 
   const counselingTrackOverview = useMemo(
     () =>
@@ -3480,7 +3641,7 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
         const member = studentMembersById.get(selectedFocusStudentId);
         const studentProfile = studentsById.get(selectedFocusStudentId);
         const focusStat = (todayStats || []).find((row) => row.studentId === selectedFocusStudentId) || null;
-        const focusProgress = (progressList || []).find((row) => row.id === selectedFocusStudentId) || null;
+        const focusProgress = getGrowthProgressForStudentId(selectedFocusStudentId);
         const seat = selectedFocusAttendanceSeat;
         const liveSession = getLiveRoundedMinutes(seat);
         const signalMinutes = Math.max(0, Math.round(Number(attendanceSeatSignalsByStudentId.get(selectedFocusStudentId)?.todayStudyMinutes || 0)));
@@ -3500,7 +3661,7 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
       })()
       || null
     );
-  }, [metrics, selectedFocusStudentId, studentMembersById, studentsById, todayStats, progressList, weeklyStudyMinutesByStudent, selectedFocusAttendanceSeat, attendanceSeatSignalsByStudentId]);
+  }, [metrics, selectedFocusStudentId, studentMembersById, studentsById, todayStats, getGrowthProgressForStudentId, weeklyStudyMinutesByStudent, selectedFocusAttendanceSeat, attendanceSeatSignalsByStudentId]);
 
   const selectedFocusStudentProfile = useMemo(
     () => (selectedFocusStudentId ? studentsById.get(selectedFocusStudentId) || null : null),
@@ -3781,8 +3942,8 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
   ]);
 
   const selectedFocusProgress = useMemo(
-    () => (selectedFocusStudentId ? (progressList || []).find((row) => row.id === selectedFocusStudentId) || null : null),
-    [progressList, selectedFocusStudentId]
+    () => getGrowthProgressForStudentId(selectedFocusStudentId),
+    [getGrowthProgressForStudentId, selectedFocusStudentId]
   );
 
   const selectedFocusAdjustmentSnapshot = useMemo(() => {
@@ -3840,7 +4001,7 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
   }, [selectedFocusStudent, selectedFocusStat, selectedFocusProgress, selectedFocusEffectiveTodayStudyMinutes]);
 
   const focusStudentTrend = useMemo(() => {
-    const progress = progressList?.find((p) => p.id === selectedFocusStudentId);
+    const progress = getGrowthProgressForStudentId(selectedFocusStudentId);
     const minutesByDateKey = new Map(
       (focusStudyLogDaysRaw || []).map((row) => [row.dateKey, Math.round(row.totalMinutes || 0)])
     );
@@ -3876,7 +4037,7 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
         minutes,
       };
     });
-  }, [focusStudentTrendRaw, focusStudyLogDaysRaw, progressList, selectedFocusStudentId, selectedFocusStudent?.todayMinutes, selectedFocusEffectiveTodayStudyMinutes, today, todayKey]);
+  }, [focusStudentTrendRaw, focusStudyLogDaysRaw, getGrowthProgressForStudentId, selectedFocusStudentId, selectedFocusStudent?.todayMinutes, selectedFocusEffectiveTodayStudyMinutes, today, todayKey]);
 
   // ── 선택 학생 세션 데이터 로드 (시작시간 분포·외출시간 산출용) ──
   useEffect(() => {
@@ -7720,9 +7881,10 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
       return;
     }
 
-    const progress = progressById.get(grant.studentId);
+    const progress = getGrowthProgressForStudentId(grant.studentId);
     setPointAdjustmentTarget({
       ...grant,
+      progressStudentId: progress?.id || grant.progressStudentId,
       currentBalance: Math.max(0, Math.floor(Number(progress?.pointsBalance || 0))),
       currentTotalEarned: Math.max(0, Math.floor(Number(progress?.totalPointsEarned || 0))),
     });
@@ -7786,7 +7948,7 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
       );
       const result = await adjustStudentPoints({
         centerId,
-        studentId: pointAdjustmentTarget.studentId,
+        studentId: pointAdjustmentTarget.progressStudentId || pointAdjustmentTarget.studentId,
         dateKey: pointAdjustmentTarget.dateKey,
         deltaPoints,
         reason,
@@ -8517,7 +8679,7 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
         );
         const result = await adjustStudentPoints({
           centerId,
-          studentId: selectedFocusStudentId,
+          studentId: selectedFocusProgress?.id || selectedFocusStudentId,
           dateKey: todayKey,
           deltaPoints,
           reason,
