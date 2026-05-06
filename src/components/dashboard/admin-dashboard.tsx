@@ -184,11 +184,27 @@ type FocusWeeklyScheduleDraft = {
   dateKey: string;
   enabled: boolean;
   isAutonomous: boolean;
+  scheduleSource?: 'calendar' | 'manual' | 'template' | null;
   inTime: string;
   outTime: string;
   awayStartTime: string;
   awayEndTime: string;
   awayReason: string;
+};
+
+const isCalendarAutonomousFocusDraft = (
+  draft: Pick<FocusWeeklyScheduleDraft, 'enabled' | 'isAutonomous' | 'scheduleSource'>
+): boolean => draft.enabled && draft.isAutonomous && draft.scheduleSource === 'calendar';
+
+const hasFocusWeeklyDraftContent = (draft: FocusWeeklyScheduleDraft): boolean => {
+  return Boolean(
+    draft.enabled
+    || draft.inTime
+    || draft.outTime
+    || draft.awayStartTime
+    || draft.awayEndTime
+    || draft.awayReason.trim()
+  );
 };
 
 type AdminSmsRecipientPreference = {
@@ -340,6 +356,7 @@ const buildFocusWeeklyScheduleDrafts = (baseDate?: Date | null): FocusWeeklySche
       dateKey: date ? format(date, 'yyyy-MM-dd') : '',
       enabled: isAutonomous,
       isAutonomous,
+      scheduleSource: isAutonomous ? 'calendar' : null,
       inTime: '',
       outTime: '',
       awayStartTime: '',
@@ -357,11 +374,15 @@ const redateFocusWeeklyScheduleDrafts = (
   return buildFocusWeeklyScheduleDrafts(baseDate).map((datedDraft) => {
     const previousDraft = draftByWeekday.get(datedDraft.weekday);
     if (!previousDraft) return datedDraft;
-    if (datedDraft.isAutonomous) return datedDraft;
+    if (isCalendarAutonomousFocusDraft(previousDraft)) return datedDraft;
+    if (datedDraft.scheduleSource === 'calendar' && !previousDraft.scheduleSource && !hasFocusWeeklyDraftContent(previousDraft)) {
+      return datedDraft;
+    }
     return {
       ...datedDraft,
       enabled: previousDraft.enabled,
       isAutonomous: previousDraft.isAutonomous,
+      scheduleSource: previousDraft.scheduleSource ?? null,
       inTime: previousDraft.inTime,
       outTime: previousDraft.outTime,
       awayStartTime: previousDraft.awayStartTime,
@@ -5324,6 +5345,7 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
                             updateFocusWeeklyScheduleDraft(dayDraft.weekday, {
                               enabled: true,
                               isAutonomous: false,
+                              scheduleSource: 'manual',
                               inTime: dayDraft.inTime || FOCUS_SCHEDULE_DEFAULT_ARRIVAL_TIME,
                               outTime: dayDraft.outTime || FOCUS_SCHEDULE_DEFAULT_DEPARTURE_TIME,
                             })
@@ -5346,6 +5368,7 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
                             updateFocusWeeklyScheduleDraft(dayDraft.weekday, {
                               enabled: true,
                               isAutonomous: true,
+                              scheduleSource: 'manual',
                               awayStartTime: '',
                               awayEndTime: '',
                               awayReason: '',
@@ -5365,7 +5388,13 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
                               ? 'bg-[#D54E2B] text-white hover:bg-[#BF4426]'
                               : 'text-[#5C6E97] hover:bg-[#FFF5F2]'
                           )}
-                          onClick={() => updateFocusWeeklyScheduleDraft(dayDraft.weekday, { enabled: false, isAutonomous: false })}
+                          onClick={() =>
+                            updateFocusWeeklyScheduleDraft(dayDraft.weekday, {
+                              enabled: false,
+                              isAutonomous: false,
+                              scheduleSource: 'manual',
+                            })
+                          }
                         >
                           <UserX className="mr-1 h-3.5 w-3.5" />
                           미등원
@@ -5444,7 +5473,9 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
                       </>
                     ) : mode === 'autonomous' ? (
                       <div className="mt-3 rounded-xl border border-sky-200 bg-white px-3 py-2 text-[11px] font-bold leading-5 text-sky-700">
-                        자율등원으로 저장합니다. 등원 예정 시간을 강제하지 않고, 입실하면 출석으로만 반영됩니다.
+                        {dayDraft.scheduleSource === 'calendar'
+                          ? '공휴일/일요일 기본 자율등원입니다. 정규를 누르면 의무등원 시간을 직접 설정할 수 있습니다.'
+                          : '자율등원으로 저장합니다. 등원 예정 시간을 강제하지 않고, 입실하면 출석으로만 반영됩니다.'}
                       </div>
                     ) : (
                       <div className="mt-3 rounded-xl border border-[#FFE0D5] bg-[#FFF8F5] px-3 py-2 text-[11px] font-bold leading-5 text-[#B44D2D]">
@@ -8214,6 +8245,7 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
         ...draft,
         enabled: true,
         isAutonomous: false,
+        scheduleSource: null,
         inTime: toScheduleTimeDraft(
           signal?.routineExpectedArrivalTime || selectedFocusOperationsSummary.plannedArrival,
           FOCUS_SCHEDULE_DEFAULT_ARRIVAL_TIME
@@ -8259,7 +8291,6 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
 
       setFocusWeeklyScheduleDrafts((currentDrafts) =>
         currentDrafts.map((draft) => {
-          if (draft.isAutonomous) return draft;
           const template = templateByWeekday.get(draft.weekday);
           if (!template) return draft;
           if (template.isAutonomousAttendance || template.source === 'admin-autonomous-attendance') {
@@ -8267,6 +8298,7 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
               ...draft,
               enabled: true,
               isAutonomous: true,
+              scheduleSource: 'template',
               inTime: '',
               outTime: '',
               awayStartTime: '',
@@ -8280,6 +8312,7 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
             ...draft,
             enabled: true,
             isAutonomous: false,
+            scheduleSource: 'template',
             inTime: toScheduleTimeDraft(template.arrivalPlannedAt, FOCUS_SCHEDULE_DEFAULT_ARRIVAL_TIME),
             outTime: toScheduleTimeDraft(template.departurePlannedAt, FOCUS_SCHEDULE_DEFAULT_DEPARTURE_TIME),
             awayStartTime: hasExcursion ? toScheduleTimeDraft(template.defaultExcursionStartAt || '', '') : '',
@@ -8324,7 +8357,8 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
     }));
     const enabledDrafts = weeklyDrafts.filter((draft) => draft.enabled);
     const scheduledDrafts = enabledDrafts.filter((draft) => !draft.isAutonomous);
-    const autonomousDrafts = enabledDrafts.filter((draft) => draft.isAutonomous);
+    const autonomousDrafts = enabledDrafts.filter((draft) => draft.isAutonomous && !isCalendarAutonomousFocusDraft(draft));
+    const calendarAutonomousDrafts = enabledDrafts.filter(isCalendarAutonomousFocusDraft);
     for (const dayDraft of scheduledDrafts) {
       const validationMessage = validateFocusScheduleDraft(toFocusWeeklyAttendanceDraft(dayDraft));
       if (validationMessage) {
@@ -8382,14 +8416,18 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
       resetFocusScheduleDialog();
       const scheduledLabels = scheduledDrafts.map((draft) => draft.label).join(', ') || '없음';
       const autonomousLabels = autonomousDrafts.map((draft) => draft.label).join(', ') || '없음';
+      const calendarAutonomousLabels = calendarAutonomousDrafts.map((draft) => draft.label).join(', ');
+      const calendarAutonomousNote = calendarAutonomousLabels
+        ? ` 공휴일 기본 자율등원 ${calendarAutonomousLabels}은 해당 주 날짜에만 적용됩니다.`
+        : '';
       const offCount = weeklyDrafts.length - enabledDrafts.length;
       const saveDescription = penaltyCleanupWarning
         ? `${studentName} 학생 주간 일정은 저장했습니다. 기존 루틴 미작성 벌점 정리는 권한 확인 후 다시 시도해 주세요.`
         : waivedRoutinePenaltyPoints > 0
           ? `${studentName} 학생 주간 일정과 루틴 미작성 벌점 ${waivedRoutinePenaltyPoints}점을 함께 정리했습니다.`
           : focusScheduleWeekOffset === 0
-            ? `${studentName} 학생 정규 ${scheduledDrafts.length}일(${scheduledLabels}) · 자율등원 ${autonomousDrafts.length}일(${autonomousLabels}) · 미등원 ${offCount}일을 이번 주와 다음 주(${appliedScheduleWeeks}주)에 반영했습니다.`
-            : `${studentName} 학생 다음 주 정규 ${scheduledDrafts.length}일(${scheduledLabels}) · 자율등원 ${autonomousDrafts.length}일(${autonomousLabels}) · 미등원 ${offCount}일로 미리 저장했습니다.`;
+            ? `${studentName} 학생 정규 ${scheduledDrafts.length}일(${scheduledLabels}) · 직접 자율등원 ${autonomousDrafts.length}일(${autonomousLabels}) · 미등원 ${offCount}일을 이번 주와 다음 주(${appliedScheduleWeeks}주)에 반영했습니다.${calendarAutonomousNote}`
+            : `${studentName} 학생 다음 주 정규 ${scheduledDrafts.length}일(${scheduledLabels}) · 직접 자율등원 ${autonomousDrafts.length}일(${autonomousLabels}) · 미등원 ${offCount}일로 미리 저장했습니다.${calendarAutonomousNote}`;
       toast({
         title: '주간 등원일정을 저장했습니다.',
         description: saveDescription,

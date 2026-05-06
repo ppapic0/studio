@@ -254,12 +254,15 @@ const SECURE_PENALTY_SOURCE_POINTS: Record<"manual" | "routine_missing", number>
   routine_missing: 1,
 };
 
+type StaffWeeklyAttendanceScheduleSource = "calendar" | "manual" | "template";
+
 type StaffWeeklyAttendanceScheduleDraftInput = {
   weekday: number;
   label?: string;
   dateKey: string;
   enabled: boolean;
   isAutonomous?: boolean;
+  scheduleSource?: StaffWeeklyAttendanceScheduleSource | null;
   inTime?: string;
   outTime?: string;
   awayStartTime?: string;
@@ -5586,6 +5589,10 @@ function normalizeWeeklyAttendanceDraftInput(
       userMessage: "일정 날짜 정보가 올바르지 않습니다.",
     });
   }
+  const rawScheduleSource = asTrimmedString(value.scheduleSource || value.autonomousSource);
+  const scheduleSource = ["calendar", "manual", "template"].includes(rawScheduleSource)
+    ? rawScheduleSource as StaffWeeklyAttendanceScheduleSource
+    : null;
 
   return {
     weekday,
@@ -5593,12 +5600,17 @@ function normalizeWeeklyAttendanceDraftInput(
     dateKey,
     enabled: value.enabled === true,
     isAutonomous: value.isAutonomous === true,
+    scheduleSource,
     inTime: asTrimmedString(value.inTime),
     outTime: asTrimmedString(value.outTime),
     awayStartTime: asTrimmedString(value.awayStartTime),
     awayEndTime: asTrimmedString(value.awayEndTime),
     awayReason: asTrimmedString(value.awayReason).slice(0, 160),
   };
+}
+
+function isCalendarAutonomousWeeklyDraft(draft: StaffWeeklyAttendanceScheduleDraftInput): boolean {
+  return draft.enabled === true && draft.isAutonomous === true && draft.scheduleSource === "calendar";
 }
 
 function validateWeeklyAttendanceDraftInput(draft: StaffWeeklyAttendanceScheduleDraftInput): string | null {
@@ -5732,15 +5744,16 @@ export const saveStudentWeeklyAttendanceSchedule = functions.region(region).runW
   }
 
   const enabledDrafts = weeklyDrafts.filter((draft) => draft.enabled);
-  const scheduledDrafts = enabledDrafts.filter((draft) => !draft.isAutonomous);
-  const autonomousDrafts = enabledDrafts.filter((draft) => draft.isAutonomous);
+  const templateEligibleDrafts = enabledDrafts.filter((draft) => !isCalendarAutonomousWeeklyDraft(draft));
+  const scheduledDrafts = templateEligibleDrafts.filter((draft) => !draft.isAutonomous);
+  const autonomousDrafts = templateEligibleDrafts.filter((draft) => draft.isAutonomous);
   const offCount = weeklyDrafts.length - enabledDrafts.length;
   const applyFollowingWeek = data?.applyFollowingWeek !== false;
   const followingWeekDrafts = applyFollowingWeek ? shiftWeeklyAttendanceDraftDateKeys(weeklyDrafts, 7) : [];
   const scheduleDraftsToPersist = [...weeklyDrafts, ...followingWeekDrafts];
   const appliedScheduleWeeks = applyFollowingWeek ? 2 : 1;
   const activeTemplateIds = new Set(
-    enabledDrafts.map((draft) => `admin-weekly-${centerId}-${draft.weekday}`)
+    templateEligibleDrafts.map((draft) => `admin-weekly-${centerId}-${draft.weekday}`)
   );
   const targetStudentName = asTrimmedString(
     data?.studentName
@@ -5779,6 +5792,7 @@ export const saveStudentWeeklyAttendanceSchedule = functions.region(region).runW
   });
 
   weeklyDrafts.forEach((dayDraft) => {
+    if (isCalendarAutonomousWeeklyDraft(dayDraft)) return;
     const label = asTrimmedString(dayDraft.label, getWeeklyAttendanceDayLabel(dayDraft.weekday));
     const templateId = `admin-weekly-${centerId}-${dayDraft.weekday}`;
     const inTime = dayDraft.isAutonomous || !dayDraft.enabled ? "" : asTrimmedString(dayDraft.inTime);
@@ -5819,6 +5833,7 @@ export const saveStudentWeeklyAttendanceSchedule = functions.region(region).runW
   });
 
   scheduleDraftsToPersist.forEach((dayDraft) => {
+    if (isCalendarAutonomousWeeklyDraft(dayDraft)) return;
     const templateId = `admin-weekly-${centerId}-${dayDraft.weekday}`;
     const inTime = dayDraft.isAutonomous || !dayDraft.enabled ? "" : asTrimmedString(dayDraft.inTime);
     const outTime = dayDraft.isAutonomous || !dayDraft.enabled ? "" : asTrimmedString(dayDraft.outTime);
@@ -5941,6 +5956,7 @@ export const saveStudentWeeklyAttendanceSchedule = functions.region(region).runW
   let penaltyCleanupWarning = false;
   if (isAdminRole(callerRole)) {
     const editableWeekDateKeyList = weeklyDrafts
+      .filter((draft) => !isCalendarAutonomousWeeklyDraft(draft))
       .map((draft) => draft.dateKey)
       .filter((dateKey) => dateKey >= todayKey);
     if (editableWeekDateKeyList.length > 0) {
