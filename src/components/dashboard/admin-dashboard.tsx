@@ -177,6 +177,7 @@ const FOCUS_WEEKLY_SCHEDULE_DAYS = [
   { weekday: 6, label: '토' },
   { weekday: 0, label: '일' },
 ] as const;
+const FOCUS_SCHEDULE_DEFAULT_BULK_WEEKDAYS = [1, 2, 3, 4, 5, 6];
 
 type FocusWeeklyScheduleDraft = {
   weekday: number;
@@ -185,6 +186,15 @@ type FocusWeeklyScheduleDraft = {
   enabled: boolean;
   isAutonomous: boolean;
   scheduleSource?: 'calendar' | 'manual' | 'template' | null;
+  inTime: string;
+  outTime: string;
+  awayStartTime: string;
+  awayEndTime: string;
+  awayReason: string;
+};
+
+type FocusScheduleBulkDraft = {
+  weekdays: number[];
   inTime: string;
   outTime: string;
   awayStartTime: string;
@@ -345,6 +355,15 @@ const toScheduleTimeDraft = (value: string | null | undefined, fallback = ''): s
   return isScheduleTimeLabel(normalized) ? normalized : fallback;
 };
 
+const createDefaultFocusScheduleBulkDraft = (): FocusScheduleBulkDraft => ({
+  weekdays: [...FOCUS_SCHEDULE_DEFAULT_BULK_WEEKDAYS],
+  inTime: FOCUS_SCHEDULE_DEFAULT_ARRIVAL_TIME,
+  outTime: FOCUS_SCHEDULE_DEFAULT_DEPARTURE_TIME,
+  awayStartTime: '',
+  awayEndTime: '',
+  awayReason: '',
+});
+
 const buildFocusWeeklyScheduleDrafts = (baseDate?: Date | null): FocusWeeklyScheduleDraft[] => {
   const weekStart = baseDate ? startOfWeek(baseDate, { weekStartsOn: 1 }) : null;
   return FOCUS_WEEKLY_SCHEDULE_DAYS.map((day, index) => {
@@ -364,6 +383,47 @@ const buildFocusWeeklyScheduleDrafts = (baseDate?: Date | null): FocusWeeklySche
       awayReason: '',
     };
   });
+};
+
+const buildFocusScheduleDraftSignature = (
+  draft: Pick<FocusWeeklyScheduleDraft, 'inTime' | 'outTime' | 'awayStartTime' | 'awayEndTime' | 'awayReason'>
+) => [
+  draft.inTime.trim(),
+  draft.outTime.trim(),
+  draft.awayStartTime.trim(),
+  draft.awayEndTime.trim(),
+  draft.awayReason.trim(),
+].join('|');
+
+const buildFocusScheduleBulkDraftFromDrafts = (drafts: FocusWeeklyScheduleDraft[]): FocusScheduleBulkDraft => {
+  const scheduledDrafts = drafts.filter((draft) => draft.enabled && !draft.isAutonomous);
+  if (scheduledDrafts.length === 0) return createDefaultFocusScheduleBulkDraft();
+
+  const signatureEntries = new Map<string, { draft: FocusWeeklyScheduleDraft; count: number; firstIndex: number }>();
+  scheduledDrafts.forEach((draft, index) => {
+    const signature = buildFocusScheduleDraftSignature(draft);
+    const previous = signatureEntries.get(signature);
+    signatureEntries.set(signature, {
+      draft: previous?.draft ?? draft,
+      count: (previous?.count ?? 0) + 1,
+      firstIndex: previous?.firstIndex ?? index,
+    });
+  });
+  const commonEntry = Array.from(signatureEntries.values()).sort((left, right) => (
+    right.count - left.count || left.firstIndex - right.firstIndex
+  ))[0];
+  const sourceDraft = commonEntry?.draft ?? scheduledDrafts[0];
+  const sourceWeekdays =
+    scheduledDrafts.length > 1 ? scheduledDrafts.map((draft) => draft.weekday) : FOCUS_SCHEDULE_DEFAULT_BULK_WEEKDAYS;
+
+  return {
+    weekdays: Array.from(new Set(sourceWeekdays)),
+    inTime: sourceDraft.inTime || FOCUS_SCHEDULE_DEFAULT_ARRIVAL_TIME,
+    outTime: sourceDraft.outTime || FOCUS_SCHEDULE_DEFAULT_DEPARTURE_TIME,
+    awayStartTime: sourceDraft.awayStartTime,
+    awayEndTime: sourceDraft.awayEndTime,
+    awayReason: sourceDraft.awayReason,
+  };
 };
 
 const redateFocusWeeklyScheduleDrafts = (
@@ -462,6 +522,32 @@ const formatKoreanElapsedTime = (date: Date | null, currentMs: number): string =
 const getFocusWeeklyScheduleMode = (draft: FocusWeeklyScheduleDraft): 'scheduled' | 'autonomous' | 'absent' => {
   if (!draft.enabled) return 'absent';
   return draft.isAutonomous ? 'autonomous' : 'scheduled';
+};
+
+const formatFocusWeeklyScheduleSummary = (draft: FocusWeeklyScheduleDraft): string => {
+  const mode = getFocusWeeklyScheduleMode(draft);
+  if (mode === 'absent') return '미등원';
+  if (mode === 'autonomous') return '자율등원';
+
+  const timeLabel = draft.inTime && draft.outTime ? `${draft.inTime} ~ ${draft.outTime}` : '등하원 시간 미정';
+  const awayLabel = draft.awayStartTime && draft.awayEndTime
+    ? `학원/외출 ${draft.awayStartTime} ~ ${draft.awayEndTime}${draft.awayReason.trim() ? ` · ${draft.awayReason.trim()}` : ''}`
+    : '';
+  return [timeLabel, awayLabel].filter(Boolean).join(' · ');
+};
+
+const isFocusWeeklyDraftSameAsBulk = (
+  draft: FocusWeeklyScheduleDraft,
+  bulkDraft: FocusScheduleBulkDraft
+): boolean => {
+  if (!draft.enabled || draft.isAutonomous || !bulkDraft.weekdays.includes(draft.weekday)) return false;
+  return buildFocusScheduleDraftSignature(draft) === buildFocusScheduleDraftSignature({
+    inTime: bulkDraft.inTime,
+    outTime: bulkDraft.outTime,
+    awayStartTime: bulkDraft.awayStartTime,
+    awayEndTime: bulkDraft.awayEndTime,
+    awayReason: bulkDraft.awayReason,
+  });
 };
 
 const scheduleTimeToMinutes = (value: string): number | null => {
@@ -1278,6 +1364,9 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
   const [focusWeeklyScheduleDrafts, setFocusWeeklyScheduleDrafts] = useState<FocusWeeklyScheduleDraft[]>(() =>
     buildFocusWeeklyScheduleDrafts(null)
   );
+  const [focusScheduleBulkDraft, setFocusScheduleBulkDraft] = useState<FocusScheduleBulkDraft>(() =>
+    createDefaultFocusScheduleBulkDraft()
+  );
   const [focusScheduleWeekOffset, setFocusScheduleWeekOffset] = useState<0 | 1>(0);
   const [focusScheduleSavingMode, setFocusScheduleSavingMode] = useState<'save' | null>(null);
   const isFocusScheduleSaving = focusScheduleSavingMode !== null;
@@ -1481,6 +1570,7 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
     setDeletingStudySessionId(null);
     setIsFocusScheduleDialogOpen(false);
     setFocusWeeklyScheduleDrafts(buildFocusWeeklyScheduleDrafts(today));
+    setFocusScheduleBulkDraft(createDefaultFocusScheduleBulkDraft());
     setFocusScheduleSavingMode(null);
     setIsFocusCounselingDialogOpen(false);
     setFocusCounselingType('academic');
@@ -5369,6 +5459,23 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
     const scheduledCount = focusWeeklyScheduleDrafts.filter((draft) => draft.enabled && !draft.isAutonomous).length;
     const autonomousCount = focusWeeklyScheduleDrafts.filter((draft) => draft.enabled && draft.isAutonomous).length;
     const weekRangeLabel = formatFocusScheduleWeekRange(focusWeeklyScheduleDrafts);
+    const focusScheduleBulkWeekdayLabels = FOCUS_WEEKLY_SCHEDULE_DAYS
+      .filter((day) => focusScheduleBulkDraft.weekdays.includes(day.weekday))
+      .map((day) => day.label)
+      .join(', ') || '미선택';
+    const focusScheduleBulkSummary = formatFocusWeeklyScheduleSummary({
+      weekday: -1,
+      label: '기본',
+      dateKey: '',
+      enabled: true,
+      isAutonomous: false,
+      scheduleSource: 'manual',
+      inTime: focusScheduleBulkDraft.inTime,
+      outTime: focusScheduleBulkDraft.outTime,
+      awayStartTime: focusScheduleBulkDraft.awayStartTime,
+      awayEndTime: focusScheduleBulkDraft.awayEndTime,
+      awayReason: focusScheduleBulkDraft.awayReason,
+    });
 
     return (
       <Dialog
@@ -5390,7 +5497,7 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
               </div>
               <DialogTitle className="text-2xl font-black tracking-tight">월~일 주간 등원일정 설정</DialogTitle>
               <DialogDescription className="text-sm font-medium text-white/76">
-                요일별 등원 여부와 등하원·외출 시간을 저장합니다. 센터관리자/선생님 직접 설정은 벌점 흐름을 타지 않습니다.
+                기본 반복값으로 등하원·학원/외출을 먼저 적용하고, 특이사항 있는 날짜만 요일별로 조정합니다.
               </DialogDescription>
             </DialogHeader>
           </div>
@@ -5452,12 +5559,125 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
               </div>
             </div>
 
+            <div className="mt-4 rounded-[1.25rem] border border-[#FFD9B5] bg-white px-4 py-4 shadow-[0_18px_40px_-34px_rgba(255,122,22,0.32)]">
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <p className="text-xs font-black text-[#B95508]">기본 반복값</p>
+                  <p className="mt-1 text-sm font-black text-[#14295F]">{focusScheduleBulkSummary}</p>
+                </div>
+                <Badge className="h-7 rounded-full border-none bg-[#FFF3E8] px-3 text-[10px] font-black text-[#B95508]">
+                  {focusScheduleBulkWeekdayLabels}
+                </Badge>
+              </div>
+
+              <div className="mt-3 grid gap-3 md:grid-cols-5">
+                <div className="flex flex-col gap-2">
+                  <Label className="text-[10px] font-black uppercase tracking-[0.14em] text-[#5c6e97]">등원</Label>
+                  <Input
+                    type="time"
+                    value={focusScheduleBulkDraft.inTime}
+                    onChange={(event) => updateFocusScheduleBulkDraft({ inTime: event.target.value })}
+                    className="h-10 rounded-xl border-[#DCE7FF] font-bold text-[#14295F]"
+                  />
+                </div>
+                <div className="flex flex-col gap-2">
+                  <Label className="text-[10px] font-black uppercase tracking-[0.14em] text-[#5c6e97]">하원</Label>
+                  <Input
+                    type="time"
+                    value={focusScheduleBulkDraft.outTime}
+                    onChange={(event) => updateFocusScheduleBulkDraft({ outTime: event.target.value })}
+                    className="h-10 rounded-xl border-[#DCE7FF] font-bold text-[#14295F]"
+                  />
+                </div>
+                <div className="flex flex-col gap-2">
+                  <Label className="text-[10px] font-black uppercase tracking-[0.14em] text-[#C95A08]">외출 시작</Label>
+                  <Input
+                    type="time"
+                    value={focusScheduleBulkDraft.awayStartTime}
+                    onChange={(event) => updateFocusScheduleBulkDraft({ awayStartTime: event.target.value })}
+                    className="h-10 rounded-xl border-[#FFD7BA] bg-[#FFFDFC] font-bold text-[#14295F]"
+                  />
+                </div>
+                <div className="flex flex-col gap-2">
+                  <Label className="text-[10px] font-black uppercase tracking-[0.14em] text-[#C95A08]">복귀 예정</Label>
+                  <Input
+                    type="time"
+                    value={focusScheduleBulkDraft.awayEndTime}
+                    onChange={(event) => updateFocusScheduleBulkDraft({ awayEndTime: event.target.value })}
+                    className="h-10 rounded-xl border-[#FFD7BA] bg-[#FFFDFC] font-bold text-[#14295F]"
+                  />
+                </div>
+                <div className="flex flex-col gap-2">
+                  <Label className="text-[10px] font-black uppercase tracking-[0.14em] text-[#C95A08]">외출 사유</Label>
+                  <Input
+                    value={focusScheduleBulkDraft.awayReason}
+                    onChange={(event) => updateFocusScheduleBulkDraft({ awayReason: event.target.value })}
+                    placeholder="예: 학원"
+                    className="h-10 rounded-xl border-[#FFD7BA] bg-[#FFFDFC] font-bold text-[#14295F] placeholder:text-[#7F91B3]"
+                  />
+                </div>
+              </div>
+
+              <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
+                <div className="flex flex-wrap gap-1.5">
+                  {FOCUS_WEEKLY_SCHEDULE_DAYS.map((day) => {
+                    const selected = focusScheduleBulkDraft.weekdays.includes(day.weekday);
+                    return (
+                      <Button
+                        key={`bulk-weekday-${day.weekday}`}
+                        type="button"
+                        size="sm"
+                        variant={selected ? 'default' : 'outline'}
+                        className={cn(
+                          'h-8 rounded-full px-3 text-[10px] font-black',
+                          selected
+                            ? 'bg-[#14295F] text-white hover:bg-[#10224C]'
+                            : 'border-[#DCE7FF] bg-white text-[#5C6E97] hover:bg-[#EEF4FF]'
+                        )}
+                        onClick={() => toggleFocusScheduleBulkWeekday(day.weekday)}
+                      >
+                        {day.label}
+                      </Button>
+                    );
+                  })}
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    className="h-9 rounded-xl border-[#FFD7BA] bg-white px-3 text-[10px] font-black text-[#C95A08]"
+                    onClick={() =>
+                      setFocusScheduleBulkDraft((previousDraft) => ({
+                        ...previousDraft,
+                        awayStartTime: '',
+                        awayEndTime: '',
+                        awayReason: '',
+                      }))
+                    }
+                  >
+                    외출 비우기
+                  </Button>
+                  <Button
+                    type="button"
+                    size="sm"
+                    className="h-9 rounded-xl bg-[#FF7A16] px-3 text-[10px] font-black text-white hover:bg-[#E66B10]"
+                    onClick={() => applyFocusScheduleBulkDraft()}
+                  >
+                    선택 요일에 적용
+                  </Button>
+                </div>
+              </div>
+            </div>
+
             <div className="mt-4 grid gap-3">
               {focusWeeklyScheduleDrafts.map((dayDraft) => {
                 const mode = getFocusWeeklyScheduleMode(dayDraft);
                 const outingEnabled = Boolean(
                   dayDraft.awayStartTime || dayDraft.awayEndTime || dayDraft.awayReason.trim()
                 );
+                const daySummary = formatFocusWeeklyScheduleSummary(dayDraft);
+                const isDefaultApplied = isFocusWeeklyDraftSameAsBulk(dayDraft, focusScheduleBulkDraft);
                 return (
                   <div
                     key={dayDraft.weekday}
@@ -5485,13 +5705,37 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
                           {dayDraft.label}
                         </span>
                         <div className="min-w-0">
-                          <p className="text-sm font-black text-[#14295F]">{dayDraft.label}요일</p>
-                          <p className="mt-0.5 text-[11px] font-bold text-[#6E7EA3]">
-                            {dayDraft.dateKey || '이번 주 날짜 없음'}
+                          <div className="flex flex-wrap items-center gap-2">
+                            <p className="text-sm font-black text-[#14295F]">{dayDraft.label}요일</p>
+                            <Badge className={cn(
+                              'h-6 rounded-full border-none px-2 text-[9px] font-black',
+                              isDefaultApplied
+                                ? 'bg-[#FFF3E8] text-[#C95A08]'
+                                : mode === 'scheduled'
+                                  ? 'bg-[#EEF4FF] text-[#14295F]'
+                                  : mode === 'autonomous'
+                                    ? 'bg-sky-100 text-sky-700'
+                                    : 'bg-[#FFF0EA] text-[#B44D2D]'
+                            )}>
+                              {isDefaultApplied ? '기본값' : mode === 'scheduled' ? '특이사항' : mode === 'autonomous' ? '자율' : '미등원'}
+                            </Badge>
+                          </div>
+                          <p className="mt-0.5 break-keep text-[11px] font-bold leading-5 text-[#6E7EA3]">
+                            {dayDraft.dateKey || '이번 주 날짜 없음'} · {daySummary}
                           </p>
                         </div>
                       </div>
-                      <div className="grid grid-cols-3 gap-1.5 rounded-xl border border-[#DCE7FF] bg-white p-1">
+                      <div className="flex flex-wrap items-center justify-end gap-2">
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="outline"
+                          className="h-8 rounded-lg border-[#FFD7BA] bg-white px-2.5 text-[10px] font-black text-[#C95A08]"
+                          onClick={() => applyFocusScheduleBulkDraft([dayDraft.weekday])}
+                        >
+                          기본 반영
+                        </Button>
+                        <div className="grid grid-cols-3 gap-1.5 rounded-xl border border-[#DCE7FF] bg-white p-1">
                         <Button
                           type="button"
                           size="sm"
@@ -5560,6 +5804,7 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
                           <UserX className="mr-1 h-3.5 w-3.5" />
                           미등원
                         </Button>
+                        </div>
                       </div>
                     </div>
 
@@ -7978,6 +8223,7 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
     setIsFocusScheduleDialogOpen(false);
     setFocusScheduleWeekOffset(0);
     setFocusWeeklyScheduleDrafts(buildFocusWeeklyScheduleDrafts(today));
+    setFocusScheduleBulkDraft(createDefaultFocusScheduleBulkDraft());
     setFocusScheduleSavingMode(null);
   };
   const updateFocusScheduleWeekOffset = (weekOffset: 0 | 1) => {
@@ -7992,6 +8238,78 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
   ) => {
     setFocusWeeklyScheduleDrafts((previousDrafts) =>
       previousDrafts.map((draft) => (draft.weekday === weekday ? { ...draft, ...patch } : draft))
+    );
+  };
+  const updateFocusScheduleBulkDraft = (
+    patch: Partial<Omit<FocusScheduleBulkDraft, 'weekdays'>>
+  ) => {
+    setFocusScheduleBulkDraft((previousDraft) => ({ ...previousDraft, ...patch }));
+  };
+  const toggleFocusScheduleBulkWeekday = (weekday: number) => {
+    setFocusScheduleBulkDraft((previousDraft) => {
+      const currentWeekdays = new Set(previousDraft.weekdays);
+      if (currentWeekdays.has(weekday)) {
+        currentWeekdays.delete(weekday);
+      } else {
+        currentWeekdays.add(weekday);
+      }
+      return {
+        ...previousDraft,
+        weekdays: FOCUS_WEEKLY_SCHEDULE_DAYS
+          .map((day) => day.weekday)
+          .filter((dayWeekday) => currentWeekdays.has(dayWeekday)),
+      };
+    });
+  };
+  const applyFocusScheduleBulkDraft = (weekdays = focusScheduleBulkDraft.weekdays) => {
+    const selectedWeekdays = Array.from(new Set(weekdays));
+    if (selectedWeekdays.length === 0) {
+      toast({
+        variant: 'destructive',
+        title: '적용 요일을 선택해 주세요',
+        description: '기본 반복값을 적용할 요일을 하나 이상 선택해야 합니다.',
+      });
+      return;
+    }
+
+    const normalizedBulkDraft = {
+      inTime: focusScheduleBulkDraft.inTime.trim(),
+      outTime: focusScheduleBulkDraft.outTime.trim(),
+      awayStartTime: focusScheduleBulkDraft.awayStartTime.trim(),
+      awayEndTime: focusScheduleBulkDraft.awayEndTime.trim(),
+      awayReason: focusScheduleBulkDraft.awayReason.trim(),
+    };
+    const validationMessage = validateFocusScheduleDraft(toFocusWeeklyAttendanceDraft({
+      weekday: -1,
+      label: '기본',
+      dateKey: '',
+      enabled: true,
+      isAutonomous: false,
+      scheduleSource: 'manual',
+      ...normalizedBulkDraft,
+    }));
+    if (validationMessage) {
+      toast({
+        variant: 'destructive',
+        title: '기본 반복값 확인 필요',
+        description: validationMessage,
+      });
+      return;
+    }
+
+    const selectedWeekdaySet = new Set(selectedWeekdays);
+    setFocusWeeklyScheduleDrafts((previousDrafts) =>
+      previousDrafts.map((draft) => (
+        selectedWeekdaySet.has(draft.weekday)
+          ? {
+              ...draft,
+              enabled: true,
+              isAutonomous: false,
+              scheduleSource: 'manual',
+              ...normalizedBulkDraft,
+            }
+          : draft
+      ))
     );
   };
   const resetFocusCounselingDialog = () => {
@@ -8423,6 +8741,7 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
     });
 
     setFocusWeeklyScheduleDrafts(seedDrafts);
+    setFocusScheduleBulkDraft(buildFocusScheduleBulkDraftFromDrafts(seedDrafts));
     setIsFocusScheduleDialogOpen(true);
 
     if (!firestore || !centerId) return;
@@ -8451,38 +8770,38 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
           });
         });
 
-      setFocusWeeklyScheduleDrafts((currentDrafts) =>
-        currentDrafts.map((draft) => {
-          const template = templateByWeekday.get(draft.weekday);
-          if (!template) return draft;
-          if (template.isAutonomousAttendance || template.source === 'admin-autonomous-attendance') {
-            return {
-              ...draft,
-              enabled: true,
-              isAutonomous: true,
-              scheduleSource: 'template',
-              inTime: '',
-              outTime: '',
-              awayStartTime: '',
-              awayEndTime: '',
-              awayReason: '',
-            };
-          }
-          const hasExcursion = template.hasExcursionDefault !== false
-            && Boolean(template.defaultExcursionStartAt || template.defaultExcursionEndAt || template.defaultExcursionReason);
+      const templateDrafts = seedDrafts.map((draft) => {
+        const template = templateByWeekday.get(draft.weekday);
+        if (!template) return draft;
+        if (template.isAutonomousAttendance || template.source === 'admin-autonomous-attendance') {
           return {
             ...draft,
             enabled: true,
-            isAutonomous: false,
-            scheduleSource: 'template',
-            inTime: toScheduleTimeDraft(template.arrivalPlannedAt, FOCUS_SCHEDULE_DEFAULT_ARRIVAL_TIME),
-            outTime: toScheduleTimeDraft(template.departurePlannedAt, FOCUS_SCHEDULE_DEFAULT_DEPARTURE_TIME),
-            awayStartTime: hasExcursion ? toScheduleTimeDraft(template.defaultExcursionStartAt || '', '') : '',
-            awayEndTime: hasExcursion ? toScheduleTimeDraft(template.defaultExcursionEndAt || '', '') : '',
-            awayReason: hasExcursion ? template.defaultExcursionReason || '' : '',
+            isAutonomous: true,
+            scheduleSource: 'template' as const,
+            inTime: '',
+            outTime: '',
+            awayStartTime: '',
+            awayEndTime: '',
+            awayReason: '',
           };
-        })
-      );
+        }
+        const hasExcursion = template.hasExcursionDefault !== false
+          && Boolean(template.defaultExcursionStartAt || template.defaultExcursionEndAt || template.defaultExcursionReason);
+        return {
+          ...draft,
+          enabled: true,
+          isAutonomous: false,
+          scheduleSource: 'template' as const,
+          inTime: toScheduleTimeDraft(template.arrivalPlannedAt, FOCUS_SCHEDULE_DEFAULT_ARRIVAL_TIME),
+          outTime: toScheduleTimeDraft(template.departurePlannedAt, FOCUS_SCHEDULE_DEFAULT_DEPARTURE_TIME),
+          awayStartTime: hasExcursion ? toScheduleTimeDraft(template.defaultExcursionStartAt || '', '') : '',
+          awayEndTime: hasExcursion ? toScheduleTimeDraft(template.defaultExcursionEndAt || '', '') : '',
+          awayReason: hasExcursion ? template.defaultExcursionReason || '' : '',
+        };
+      });
+      setFocusWeeklyScheduleDrafts(templateDrafts);
+      setFocusScheduleBulkDraft(buildFocusScheduleBulkDraftFromDrafts(templateDrafts));
     } catch (error) {
       logHandledClientIssue('[admin-dashboard] focus weekly schedule templates load failed', error);
       toast({
@@ -8588,8 +8907,8 @@ export function AdminDashboard({ isActive }: { isActive: boolean }) {
         : waivedRoutinePenaltyPoints > 0
           ? `${studentName} 학생 주간 일정과 루틴 미작성 벌점 ${waivedRoutinePenaltyPoints}점을 함께 정리했습니다.`
           : focusScheduleWeekOffset === 0
-            ? `${studentName} 학생 정규 ${scheduledDrafts.length}일(${scheduledLabels}) · 직접 자율등원 ${autonomousDrafts.length}일(${autonomousLabels}) · 미등원 ${offCount}일을 이번 주와 다음 주(${appliedScheduleWeeks}주)에 반영했습니다.${calendarAutonomousNote}`
-            : `${studentName} 학생 다음 주 정규 ${scheduledDrafts.length}일(${scheduledLabels}) · 직접 자율등원 ${autonomousDrafts.length}일(${autonomousLabels}) · 미등원 ${offCount}일로 미리 저장했습니다.${calendarAutonomousNote}`;
+            ? `${studentName} 학생 기본 반복값 기준으로 정규 ${scheduledDrafts.length}일(${scheduledLabels}) · 직접 자율등원 ${autonomousDrafts.length}일(${autonomousLabels}) · 미등원 ${offCount}일을 이번 주와 다음 주(${appliedScheduleWeeks}주)에 반영했습니다.${calendarAutonomousNote}`
+            : `${studentName} 학생 다음 주 기본 반복값 기준으로 정규 ${scheduledDrafts.length}일(${scheduledLabels}) · 직접 자율등원 ${autonomousDrafts.length}일(${autonomousLabels}) · 미등원 ${offCount}일로 미리 저장했습니다.${calendarAutonomousNote}`;
       toast({
         title: '주간 등원일정을 저장했습니다.',
         description: saveDescription,
