@@ -51,6 +51,7 @@ interface AttendanceKpiBoardProps {
   students: CenterMembership[] | undefined;
   requests: AttendanceRequest[] | undefined;
   attendanceCurrentDocs: AttendanceCurrent[] | undefined;
+  anchorDate?: Date | null;
 }
 
 const REQUEST_STATUS_LABELS: Record<RequestFilter, string> = {
@@ -762,6 +763,7 @@ export function AttendanceKpiBoard({
   students,
   requests,
   attendanceCurrentDocs,
+  anchorDate,
 }: AttendanceKpiBoardProps) {
   const [periodDays, setPeriodDays] = useState<AttendanceKpiPeriod>(30);
   const [search, setSearch] = useState('');
@@ -780,13 +782,14 @@ export function AttendanceKpiBoard({
   const isDesktop = !isMobile;
   const reduceMotion = useReducedMotion();
 
-  const { isLoading, error, rows, summary, requestOperations, availableRooms, periodOptions, sourceDiagnostics } = useAttendanceKpi({
+  const { isLoading, error, rows, summary, requestOperations, availableRooms, periodOptions, sourceDiagnostics, rangeEndKey } = useAttendanceKpi({
     firestore,
     centerId,
     students,
     requests,
     attendanceCurrentDocs,
     periodDays,
+    anchorDate,
     enabled: Boolean(centerId),
   });
 
@@ -969,6 +972,9 @@ export function AttendanceKpiBoard({
                   기간 {periodLabel}
                 </Badge>
                 <Badge variant="outline" className="rounded-full border-[#14295F]/10 bg-white px-3 py-1 text-[10px] font-black text-slate-600">
+                  기준 {rangeEndKey}
+                </Badge>
+                <Badge variant="outline" className="rounded-full border-[#14295F]/10 bg-white px-3 py-1 text-[10px] font-black text-slate-600">
                   결과 {filteredRows.length}명
                 </Badge>
                 <Badge className="rounded-full border border-[#FFB980]/30 bg-[#FF7A16] px-3 py-1 text-[10px] font-black text-white">
@@ -1133,6 +1139,9 @@ export function AttendanceKpiBoard({
             <div className="flex flex-wrap items-center gap-2">
               <Badge variant="outline" className="rounded-full border-[#14295F]/10 bg-white px-3 py-1 text-[11px] font-black text-[#14295F]">
                 기간 {periodLabel}
+              </Badge>
+              <Badge variant="outline" className="rounded-full border-[#14295F]/10 bg-white px-3 py-1 text-[11px] font-black text-slate-600">
+                기준 {rangeEndKey}
               </Badge>
               <Badge variant="outline" className="rounded-full border-[#14295F]/10 bg-white px-3 py-1 text-[11px] font-black text-slate-600">
                 활성 필터 {activeFilterCount}개

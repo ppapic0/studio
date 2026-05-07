@@ -1875,6 +1875,7 @@ export default function AttendancePage() {
             students={students || undefined}
             requests={requests || undefined}
             attendanceCurrentDocs={attendanceCurrentDocs || undefined}
+            anchorDate={selectedDate}
           />
         </TabsContent>
 

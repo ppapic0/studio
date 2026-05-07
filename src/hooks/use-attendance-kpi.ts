@@ -93,6 +93,7 @@ type AttendanceDailyStatDoc = {
   studentId?: string;
   dateKey?: string;
   attendanceStatus?: string;
+  source?: string;
   checkInAt?: unknown;
   checkOutAt?: unknown;
   lateMinutes?: number;
@@ -179,6 +180,7 @@ interface UseAttendanceKpiOptions {
   attendanceCurrentDocs: AttendanceCurrent[] | undefined;
   enabled?: boolean;
   periodDays: AttendanceKpiPeriod;
+  anchorDate?: Date | null;
 }
 
 interface UseAttendanceKpiResult {
@@ -190,6 +192,7 @@ interface UseAttendanceKpiResult {
   availableRooms: Array<{ value: string; label: string }>;
   periodOptions: typeof ATTENDANCE_KPI_PERIOD_OPTIONS;
   sourceDiagnostics: AttendanceKpiSourceDiagnostic[];
+  rangeEndKey: string;
 }
 
 const REQUEST_DEFAULT_SUMMARY = {
@@ -301,14 +304,17 @@ function getPathPart(parts: string[], index: number) {
   return typeof parts[index] === 'string' ? parts[index] : '';
 }
 
-function getDateRange(periodDays: AttendanceKpiPeriod) {
+function getDateRange(periodDays: AttendanceKpiPeriod, anchorDate?: Date | null) {
   const today = startOfDay(new Date());
-  const start = startOfDay(subDays(today, periodDays - 1));
-  const end = endOfDay(today);
-  const dates = eachDayOfInterval({ start, end: today });
+  const requestedAnchor = anchorDate ? startOfDay(anchorDate) : today;
+  const rangeEnd = requestedAnchor.getTime() > today.getTime() ? today : requestedAnchor;
+  const start = startOfDay(subDays(rangeEnd, periodDays - 1));
+  const end = endOfDay(rangeEnd);
+  const dates = eachDayOfInterval({ start, end: rangeEnd });
   const dateKeys = dates.map((date) => format(date, 'yyyy-MM-dd'));
   return {
     today,
+    rangeEnd,
     start,
     end,
     dates,
@@ -908,6 +914,7 @@ export function useAttendanceKpi({
   attendanceCurrentDocs,
   enabled = true,
   periodDays,
+  anchorDate = null,
 }: UseAttendanceKpiOptions): UseAttendanceKpiResult {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -923,7 +930,7 @@ export function useAttendanceKpi({
   const [attendanceEvents, setAttendanceEvents] = useState<AttendanceEventDoc[]>([]);
   const [sourceDiagnostics, setSourceDiagnostics] = useState<AttendanceKpiSourceDiagnostic[]>(EMPTY_SOURCE_DIAGNOSTICS);
 
-  const dateRange = useMemo(() => getDateRange(periodDays), [periodDays]);
+  const dateRange = useMemo(() => getDateRange(periodDays, anchorDate), [anchorDate, periodDays]);
 
   useEffect(() => {
     if (!firestore || !centerId || !students?.length || !enabled) {
@@ -1179,6 +1186,7 @@ export function useAttendanceKpi({
           studyLogDay?.updatedAt || studyLogDay?.createdAt || dayStat?.updatedAt || dayStat?.createdAt
         );
         const studyCheckedAt = firstCheckInAt || studyLogCheckedAt;
+        const hasAttendanceEvidence = studyMinutes > 0 || Boolean(firstCheckInAt);
 
         const derived = deriveAttendanceDisplayState({
           selectedDate: date,
@@ -1193,7 +1201,7 @@ export function useAttendanceKpi({
           accessCheckedAt: firstCheckInAt || liveCheckedAt,
           studyCheckedAt,
           studyMinutes,
-          hasStudyLog: studyMinutes > 0,
+          hasStudyLog: hasAttendanceEvidence,
           nowMs: Date.now(),
           isRoutineLoading: false,
           isStudyLogLoading: false,
@@ -1505,6 +1513,7 @@ export function useAttendanceKpi({
     availableRooms,
     periodOptions: ATTENDANCE_KPI_PERIOD_OPTIONS,
     sourceDiagnostics,
+    rangeEndKey: dateRange.endKey,
   };
 }
 
