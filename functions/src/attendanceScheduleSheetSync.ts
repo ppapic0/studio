@@ -395,7 +395,7 @@ function buildHeaderColumnMap(headerRows: string[][]): HeaderColumnMap {
   });
 
   return {
-    studentId: findColumnIndex(combinedHeaders, ["학생ID", "학생Id", "studentId", "uid"]),
+    studentId: findColumnIndex(combinedHeaders, ["학생ID", "학생Id", "학생ID/이름", "studentId", "uid"]),
     name: findColumnIndex(combinedHeaders, ["이름", "학생명", "학생이름", "name"]),
     school: findColumnIndex(combinedHeaders, ["학교", "학교명", "school"]),
     grade: findColumnIndex(combinedHeaders, ["학년", "grade"]),
@@ -433,10 +433,9 @@ function detectHeader(rows: string[][]): { columnMap: HeaderColumnMap; dataStart
   const columnMap = best?.columnMap || buildHeaderColumnMap([]);
   const errors: SheetSyncIssue[] = [];
 
-  if (columnMap.studentId === null) errors.push({ message: "필수 컬럼 `학생ID`를 찾지 못했습니다." });
-  if (columnMap.name === null) errors.push({ message: "필수 컬럼 `이름`을 찾지 못했습니다." });
-  if (columnMap.school === null) errors.push({ message: "필수 컬럼 `학교`를 찾지 못했습니다." });
-  if (columnMap.grade === null) errors.push({ message: "필수 컬럼 `학년`을 찾지 못했습니다." });
+  if (columnMap.studentId === null && columnMap.name === null) {
+    errors.push({ message: "필수 컬럼 `학생ID/이름` 또는 `이름`을 찾지 못했습니다." });
+  }
 
   DAY_DEFINITIONS.forEach((day) => {
     const dayColumns = columnMap.days[day.label] || {};
@@ -475,6 +474,22 @@ function makeFallbackKey(params: { name: string; school: string; grade: string }
   return [params.name, params.school, params.grade].map(normalizeLookupText).join("|");
 }
 
+function addFallbackStudentKey(
+  fallbackStudentIdsByKey: Map<string, string[]>,
+  params: { studentId: string; name: string; school?: string; grade?: string }
+): void {
+  if (!normalizeLookupText(params.name)) return;
+  const fallbackKey = makeFallbackKey({
+    name: params.name,
+    school: params.school || "",
+    grade: params.grade || "",
+  });
+  if (!fallbackKey.replace(/\|/g, "")) return;
+  const existingStudentIds = fallbackStudentIdsByKey.get(fallbackKey) || [];
+  if (existingStudentIds.includes(params.studentId)) return;
+  fallbackStudentIdsByKey.set(fallbackKey, [...existingStudentIds, params.studentId]);
+}
+
 async function loadStudentsForCenter(db: admin.firestore.Firestore, centerId: string): Promise<{
   studentsById: Map<string, SheetStudentRecord>;
   fallbackStudentIdsByKey: Map<string, string[]>;
@@ -499,10 +514,10 @@ async function loadStudentsForCenter(db: admin.firestore.Firestore, centerId: st
     const grade = asTrimmedString(profileData.grade || memberData.grade);
     const record = { id: studentId, studentName, schoolName, grade };
     studentsById.set(studentId, record);
-    const fallbackKey = makeFallbackKey({ name: studentName, school: schoolName, grade });
-    if (fallbackKey.replace(/\|/g, "")) {
-      fallbackStudentIdsByKey.set(fallbackKey, [...(fallbackStudentIdsByKey.get(fallbackKey) || []), studentId]);
-    }
+    addFallbackStudentKey(fallbackStudentIdsByKey, { studentId, name: studentName });
+    if (schoolName) addFallbackStudentKey(fallbackStudentIdsByKey, { studentId, name: studentName, school: schoolName });
+    if (grade) addFallbackStudentKey(fallbackStudentIdsByKey, { studentId, name: studentName, grade });
+    addFallbackStudentKey(fallbackStudentIdsByKey, { studentId, name: studentName, school: schoolName, grade });
   });
 
   return { studentsById, fallbackStudentIdsByKey };
@@ -518,6 +533,28 @@ function rowHasAnyScheduleValue(row: string[], columnMap: HeaderColumnMap): bool
     const dayColumns = columnMap.days[day.label] || {};
     return DAY_FIELD_DEFINITIONS.some((field) => readCell(row, dayColumns[field.key]));
   });
+}
+
+function matchStudentFromSheetRow(params: {
+  studentsById: Map<string, SheetStudentRecord>;
+  fallbackStudentIdsByKey: Map<string, string[]>;
+  identifier: string;
+  name: string;
+  school: string;
+  grade: string;
+}): { matchedStudent: SheetStudentRecord | null; duplicate: boolean } {
+  if (params.identifier) {
+    const directMatch = params.studentsById.get(params.identifier);
+    if (directMatch) return { matchedStudent: directMatch, duplicate: false };
+  }
+
+  const lookupName = params.name || params.identifier;
+  const fallbackKey = makeFallbackKey({ name: lookupName, school: params.school, grade: params.grade });
+  const fallbackIds = params.fallbackStudentIdsByKey.get(fallbackKey) || [];
+  if (fallbackIds.length === 1) {
+    return { matchedStudent: params.studentsById.get(fallbackIds[0]) || null, duplicate: false };
+  }
+  return { matchedStudent: null, duplicate: fallbackIds.length > 1 };
 }
 
 function validateScheduledDay(day: ParsedSheetDay): string | null {
@@ -578,28 +615,25 @@ function parseSheetRows(params: {
     }
     totalSheetRows += 1;
 
-    let matchedStudent: SheetStudentRecord | null = null;
-    if (sheetStudentId) {
-      matchedStudent = params.studentsById.get(sheetStudentId) || null;
-      if (!matchedStudent) {
-        errors.push({ rowNumber, studentName: sheetStudentName || null, message: `학생ID ${sheetStudentId} 학생을 센터에서 찾지 못했습니다.` });
-        return;
-      }
-    } else {
-      const fallbackKey = makeFallbackKey({ name: sheetStudentName, school: sheetSchool, grade: sheetGrade });
-      const fallbackIds = params.fallbackStudentIdsByKey.get(fallbackKey) || [];
-      if (fallbackIds.length === 1) {
-        matchedStudent = params.studentsById.get(fallbackIds[0]) || null;
-      } else if (fallbackIds.length > 1) {
-        errors.push({ rowNumber, studentName: sheetStudentName || null, message: "이름+학교+학년이 같은 학생이 여러 명입니다. 학생ID를 입력해 주세요." });
-        return;
-      } else {
-        errors.push({ rowNumber, studentName: sheetStudentName || null, message: "학생을 매칭하지 못했습니다. 학생ID를 입력해 주세요." });
-        return;
-      }
+    const { matchedStudent, duplicate } = matchStudentFromSheetRow({
+      studentsById: params.studentsById,
+      fallbackStudentIdsByKey: params.fallbackStudentIdsByKey,
+      identifier: sheetStudentId,
+      name: sheetStudentName,
+      school: sheetSchool,
+      grade: sheetGrade,
+    });
+    if (!matchedStudent) {
+      errors.push({
+        rowNumber,
+        studentName: sheetStudentName || sheetStudentId || null,
+        message: duplicate
+          ? "같은 이름의 학생이 여러 명입니다. 학교/학년을 함께 입력하거나 실제 학생 UID를 입력해 주세요."
+          : "학생을 매칭하지 못했습니다. 앱에 등록된 학생 이름과 시트 이름이 같은지 확인해 주세요.",
+      });
+      return;
     }
 
-    if (!matchedStudent) return;
     const previousRowNumber = seenStudentIds.get(matchedStudent.id);
     if (previousRowNumber) {
       errors.push({ rowNumber, studentName: matchedStudent.studentName, message: `${previousRowNumber}행과 같은 학생이 중복 입력되었습니다.` });

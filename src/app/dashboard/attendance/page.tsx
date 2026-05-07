@@ -1502,7 +1502,7 @@ export default function AttendancePage() {
                   <div className="min-w-0">
                     <p className="text-[11px] font-black text-[#14295F]">시트 템플릿 예시</p>
                     <p className="mt-1 text-[11px] font-bold leading-5 text-[#5C6E97]">
-                      1행은 요일, 2행은 항목으로 두 줄 헤더를 만들면 가장 안정적으로 읽습니다.
+                      1행은 요일, 2행은 항목으로 두 줄 헤더를 만들면 가장 안정적으로 읽습니다. 학생ID 칸에는 UID 대신 학생 이름을 넣어도 됩니다.
                     </p>
                   </div>
                   <div className="flex flex-wrap gap-1.5">
@@ -1522,8 +1522,7 @@ export default function AttendancePage() {
                   <table className="min-w-[920px] text-left text-[11px]">
                     <thead className="bg-[#F8FBFF] text-[#14295F]">
                       <tr>
-                        <th className="border-r border-[#E6EEF9] px-3 py-2 font-black">학생ID</th>
-                        <th className="border-r border-[#E6EEF9] px-3 py-2 font-black">이름</th>
+                        <th className="border-r border-[#E6EEF9] px-3 py-2 font-black">학생ID/이름</th>
                         <th className="border-r border-[#E6EEF9] px-3 py-2 font-black">학교</th>
                         <th className="border-r border-[#E6EEF9] px-3 py-2 font-black">학년</th>
                         {ATTENDANCE_SHEET_DAY_LABELS.map((day) => (
@@ -1534,9 +1533,8 @@ export default function AttendancePage() {
                       </tr>
                       <tr>
                         <th className="border-r border-[#E6EEF9] px-3 py-2 font-bold text-[#5C6E97]">필수</th>
-                        <th className="border-r border-[#E6EEF9] px-3 py-2 font-bold text-[#5C6E97]">필수</th>
-                        <th className="border-r border-[#E6EEF9] px-3 py-2 font-bold text-[#5C6E97]">필수</th>
-                        <th className="border-r border-[#E6EEF9] px-3 py-2 font-bold text-[#5C6E97]">필수</th>
+                        <th className="border-r border-[#E6EEF9] px-3 py-2 font-bold text-[#5C6E97]">동명이인 구분</th>
+                        <th className="border-r border-[#E6EEF9] px-3 py-2 font-bold text-[#5C6E97]">동명이인 구분</th>
                         {ATTENDANCE_SHEET_DAY_LABELS.flatMap((day) =>
                           ATTENDANCE_SHEET_DAY_FIELDS.map((field) => (
                             <th key={`${day}-${field}`} className="border-r border-[#E6EEF9] px-3 py-2 font-bold text-[#5C6E97]">
@@ -1548,7 +1546,6 @@ export default function AttendancePage() {
                     </thead>
                     <tbody className="text-[#14295F]">
                       <tr>
-                        <td className="border-r border-t border-[#E6EEF9] px-3 py-2 font-bold">학생 UID</td>
                         <td className="border-r border-t border-[#E6EEF9] px-3 py-2 font-bold">김학생</td>
                         <td className="border-r border-t border-[#E6EEF9] px-3 py-2 font-bold">청덕고</td>
                         <td className="border-r border-t border-[#E6EEF9] px-3 py-2 font-bold">3학년</td>
@@ -1572,7 +1569,7 @@ export default function AttendancePage() {
                   </table>
                 </div>
                 <p className="mt-2 text-[11px] font-bold leading-5 text-[#5C6E97]">
-                  시간은 반드시 24시간제 HH:mm 형식으로 입력합니다. 정규 상태에서 하원을 비우면 등원이 있을 때 23:30으로 기본 처리됩니다.
+                  동명이인이 있으면 학교/학년을 함께 입력해 구분합니다. 시간은 반드시 24시간제 HH:mm 형식으로 입력합니다. 정규 상태에서 하원을 비우면 등원이 있을 때 23:30으로 기본 처리됩니다.
                 </p>
               </div>
             </div>
