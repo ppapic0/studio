@@ -27,11 +27,12 @@ import {
 } from '@/components/ui/select';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { differenceInMinutes, format } from 'date-fns';
-import { useCollection, useFirestore, useUser, useMemoFirebase } from '@/firebase';
+import { differenceInMinutes, format, startOfWeek } from 'date-fns';
+import { useCollection, useFirestore, useUser, useMemoFirebase, useDoc, useFunctions } from '@/firebase';
 import { useAppContext } from '@/contexts/app-context';
 import { collection, collectionGroup, deleteDoc, deleteField, doc, getDoc, getDocs, limit, serverTimestamp, query, where, orderBy, Timestamp, writeBatch, setDoc } from 'firebase/firestore';
-import { Loader2, CheckCircle2, XCircle, Clock, CalendarX, UserCheck, ClipboardCheck, BarChart3, Megaphone, TrendingUp, CalendarClock, LogIn, MapPinned, ShieldAlert, Plus, Pencil, Trash2 } from 'lucide-react';
+import { httpsCallable } from 'firebase/functions';
+import { Loader2, CheckCircle2, XCircle, Clock, CalendarX, UserCheck, ClipboardCheck, BarChart3, Megaphone, TrendingUp, CalendarClock, LogIn, MapPinned, ShieldAlert, Plus, Pencil, Trash2, FileSpreadsheet, RefreshCw, Settings2, AlertTriangle } from 'lucide-react';
 import {
   AttendanceCurrent,
   AttendanceRequest,
@@ -88,6 +89,7 @@ import {
 import { AdminWorkbenchCommandBar } from '@/components/dashboard/admin-workbench-command-bar';
 import { getStudyDayDate, getStudyDayKey } from '@/lib/study-day';
 import { isAutonomousAttendanceDate } from '@/lib/korean-public-holidays';
+import { firebaseConfig } from '@/firebase/config';
 
 type AttendanceRecord = {
   id: string;
@@ -125,6 +127,64 @@ type TodayScheduleInfo = {
   scheduleUpdatedAt: Date | null;
   scheduleStatus: StudentScheduleDoc['status'] | null;
   actualArrivalAt: Date | null;
+};
+
+type AttendanceScheduleSheetIntegrationDoc = {
+  spreadsheetId?: string;
+  sheetName?: string;
+  enabled?: boolean;
+  lastPreviewAt?: Timestamp;
+  lastAppliedAt?: Timestamp;
+  lastAppliedWeekStartKey?: string;
+  lastAppliedChangeCount?: number;
+};
+
+type AttendanceScheduleSheetSyncIssue = {
+  rowNumber?: number | null;
+  studentName?: string | null;
+  dateKey?: string | null;
+  weekdayLabel?: string | null;
+  field?: string | null;
+  message: string;
+};
+
+type AttendanceScheduleSheetSyncChange = {
+  studentId: string;
+  studentName: string;
+  rowNumber: number;
+  dateKey: string;
+  weekdayLabel: string;
+  mode: 'scheduled' | 'autonomous' | 'absent';
+  previousSummary: string;
+  nextSummary: string;
+};
+
+type AttendanceScheduleSheetSyncPreview = {
+  ok: boolean;
+  configured: boolean;
+  serviceAccountEmail: string;
+  spreadsheetId: string;
+  sheetName: string;
+  weekStartKey: string;
+  sheetHash: string;
+  generatedAt: string;
+  totalSheetRows: number;
+  matchedStudentCount: number;
+  parsedScheduleCount: number;
+  changeCount: number;
+  skippedPastCount: number;
+  errorCount: number;
+  warningCount: number;
+  errors: AttendanceScheduleSheetSyncIssue[];
+  warnings: AttendanceScheduleSheetSyncIssue[];
+  changes: AttendanceScheduleSheetSyncChange[];
+};
+
+type AttendanceScheduleSheetSyncApplyResult = {
+  ok?: boolean;
+  appliedChangeCount?: number;
+  skippedPastCount?: number;
+  preview?: AttendanceScheduleSheetSyncPreview;
 };
 
 function getScheduleTemplateTimestampMs(template: StudentScheduleTemplate) {
@@ -250,9 +310,32 @@ const WEEKDAY_OPTIONS = [
   { value: 0, label: '일' },
 ];
 
+function extractGoogleSpreadsheetId(value: string) {
+  const trimmed = value.trim();
+  if (!trimmed) return '';
+  const match = trimmed.match(/\/spreadsheets\/d\/([a-zA-Z0-9-_]+)/);
+  return match?.[1] || trimmed;
+}
+
+function resolveCallableErrorMessage(error: any, fallback: string) {
+  return error?.details?.userMessage || error?.message || fallback;
+}
+
+function formatOptionalTimestamp(value?: Timestamp | Date | null) {
+  const date = toDateSafe(value);
+  return date ? format(date, 'yyyy.MM.dd HH:mm') : '기록 없음';
+}
+
+function formatAttendanceSheetModeLabel(mode: AttendanceScheduleSheetSyncChange['mode']) {
+  if (mode === 'autonomous') return '자율';
+  if (mode === 'absent') return '미등원';
+  return '정규';
+}
+
 export default function AttendancePage() {
   const { user } = useUser();
   const firestore = useFirestore();
+  const functions = useFunctions();
   const { activeMembership, memberships, membershipsLoading } = useAppContext();
   const { toast } = useToast();
   
@@ -276,6 +359,14 @@ export default function AttendancePage() {
     createPeriodBlock({ label: '의무 트랙', startTime: '22:50', endTime: '23:30', description: '자습 / 오답정리 / 테스트' }),
     createPeriodBlock({ label: '4트랙', startTime: '23:30', endTime: '00:50', description: '심화반 / 보강 / 선택자습' }),
   ]);
+  const [sheetSyncSettingsOpen, setSheetSyncSettingsOpen] = useState(false);
+  const [sheetSyncSpreadsheetIdDraft, setSheetSyncSpreadsheetIdDraft] = useState('');
+  const [sheetSyncSheetNameDraft, setSheetSyncSheetNameDraft] = useState('등원일정');
+  const [sheetSyncEnabledDraft, setSheetSyncEnabledDraft] = useState(true);
+  const [isSavingSheetSyncSettings, setIsSavingSheetSyncSettings] = useState(false);
+  const [isPreviewingSheetSync, setIsPreviewingSheetSync] = useState(false);
+  const [isApplyingSheetSync, setIsApplyingSheetSync] = useState(false);
+  const [sheetSyncPreview, setSheetSyncPreview] = useState<AttendanceScheduleSheetSyncPreview | null>(null);
 
   useEffect(() => {
     setSelectedDate(getStudyDayDate(new Date()));
@@ -295,6 +386,7 @@ export default function AttendancePage() {
     (membership) => isTeacherOrAdminRole(membership.role) && isActiveMembershipStatus(membership.status)
   );
   const dateKey = selectedDate ? format(selectedDate, 'yyyy-MM-dd') : '';
+  const sheetSyncWeekStartKey = selectedDate ? format(startOfWeek(selectedDate, { weekStartsOn: 1 }), 'yyyy-MM-dd') : '';
   const weekKey = selectedDate ? format(selectedDate, "yyyy-'W'II") : '';
   const selectedWeekdayValue = selectedDate ? selectedDate.getDay() : null;
   const isAutonomousAttendanceDay = isAutonomousAttendanceDate(selectedDate);
@@ -302,7 +394,11 @@ export default function AttendancePage() {
   const centerId = classroomMembership?.id;
   const isTeacherOrAdmin = Boolean(classroomMembership);
   const canOpenSettings = canManageSettings(activeMembership?.role);
+  const canConfigureAttendanceSheet = canManageSettings(activeMembership?.role) && activeMembership?.role !== 'kiosk';
   const canOpenFinance = canReadFinance(activeMembership?.role);
+  const attendanceSheetServiceAccountEmail = firebaseConfig.projectId
+    ? `${firebaseConfig.projectId}@appspot.gserviceaccount.com`
+    : sheetSyncPreview?.serviceAccountEmail || '';
 
   // 1. 센터 모든 학생 조회
   const studentsQuery = useMemoFirebase(() => {
@@ -326,6 +422,28 @@ export default function AttendancePage() {
     return collection(firestore, 'centers', centerId, 'attendanceCurrent');
   }, [firestore, centerId]);
   const { data: attendanceCurrentDocs, isLoading: attendanceCurrentLoading } = useCollection<AttendanceCurrent>(attendanceCurrentQuery, { enabled: isTeacherOrAdmin });
+  const attendanceScheduleSheetIntegrationRef = useMemoFirebase(() => {
+    if (!firestore || !centerId) return null;
+    return doc(firestore, 'centers', centerId, 'integrations', 'attendanceScheduleSheet');
+  }, [firestore, centerId]);
+  const { data: attendanceScheduleSheetIntegration, isLoading: attendanceScheduleSheetIntegrationLoading } =
+    useDoc<AttendanceScheduleSheetIntegrationDoc>(attendanceScheduleSheetIntegrationRef, { enabled: isTeacherOrAdmin });
+
+  useEffect(() => {
+    if (!attendanceScheduleSheetIntegration) return;
+    setSheetSyncSpreadsheetIdDraft(attendanceScheduleSheetIntegration.spreadsheetId || '');
+    setSheetSyncSheetNameDraft(attendanceScheduleSheetIntegration.sheetName || '등원일정');
+    setSheetSyncEnabledDraft(attendanceScheduleSheetIntegration.enabled !== false);
+  }, [
+    attendanceScheduleSheetIntegration?.enabled,
+    attendanceScheduleSheetIntegration?.sheetName,
+    attendanceScheduleSheetIntegration?.spreadsheetId,
+  ]);
+
+  useEffect(() => {
+    setSheetSyncPreview(null);
+  }, [sheetSyncWeekStartKey, attendanceScheduleSheetIntegration?.spreadsheetId, attendanceScheduleSheetIntegration?.sheetName]);
+
   const todaySchedulesQuery = useMemoFirebase(() => {
     if (!firestore || !centerId || !dateKey) return null;
     return query(
@@ -777,6 +895,108 @@ export default function AttendancePage() {
     }
   };
 
+  const handleSaveSheetSyncSettings = async () => {
+    if (!firestore || !centerId || !user?.uid || !canConfigureAttendanceSheet) {
+      toast({ variant: 'destructive', title: '시트 연결 설정 권한이 없습니다.' });
+      return;
+    }
+    const spreadsheetId = extractGoogleSpreadsheetId(sheetSyncSpreadsheetIdDraft);
+    const sheetName = sheetSyncSheetNameDraft.trim();
+    if (!spreadsheetId) {
+      toast({ variant: 'destructive', title: '구글시트 ID 또는 URL을 입력해 주세요.' });
+      return;
+    }
+    if (!sheetName) {
+      toast({ variant: 'destructive', title: '시트 탭 이름을 입력해 주세요.' });
+      return;
+    }
+
+    setIsSavingSheetSyncSettings(true);
+    try {
+      await setDoc(doc(firestore, 'centers', centerId, 'integrations', 'attendanceScheduleSheet'), {
+        spreadsheetId,
+        sheetName,
+        enabled: sheetSyncEnabledDraft,
+        updatedAt: serverTimestamp(),
+        updatedByUid: user.uid,
+      }, { merge: true });
+      setSheetSyncPreview(null);
+      toast({
+        title: '등원일정 시트 연결을 저장했습니다.',
+        description: '시트 불러오기로 최신 내용을 검증할 수 있습니다.',
+      });
+    } catch (error) {
+      logHandledClientIssue('[attendance] save attendance sheet integration failed', error);
+      toast({ variant: 'destructive', title: '시트 연결 저장 실패' });
+    } finally {
+      setIsSavingSheetSyncSettings(false);
+    }
+  };
+
+  const handlePreviewSheetSync = async () => {
+    if (!functions || !centerId || !sheetSyncWeekStartKey) return;
+    setIsPreviewingSheetSync(true);
+    setSheetSyncPreview(null);
+    try {
+      const previewSync = httpsCallable<{ centerId: string; weekStartKey: string }, AttendanceScheduleSheetSyncPreview>(
+        functions,
+        'previewAttendanceScheduleSheetSync',
+        { timeout: 600000 }
+      );
+      const result = await previewSync({ centerId, weekStartKey: sheetSyncWeekStartKey });
+      setSheetSyncPreview(result.data);
+      toast({
+        title: result.data.errorCount > 0 ? '시트 확인이 필요합니다.' : '시트를 불러왔습니다.',
+        description: result.data.errorCount > 0
+          ? `오류 ${result.data.errorCount}건을 수정한 뒤 다시 불러와 주세요.`
+          : `변경 예정 ${result.data.changeCount}건 · 경고 ${result.data.warningCount}건`,
+      });
+    } catch (error) {
+      logHandledClientIssue('[attendance] preview attendance sheet sync failed', error);
+      toast({
+        variant: 'destructive',
+        title: '시트 불러오기 실패',
+        description: resolveCallableErrorMessage(error, '구글시트 연결과 공유 권한을 확인해 주세요.'),
+      });
+    } finally {
+      setIsPreviewingSheetSync(false);
+    }
+  };
+
+  const handleApplySheetSync = async () => {
+    if (!functions || !centerId || !sheetSyncWeekStartKey || !sheetSyncPreview?.sheetHash) return;
+    setIsApplyingSheetSync(true);
+    try {
+      const applySync = httpsCallable<
+        { centerId: string; weekStartKey: string; sheetHash: string },
+        AttendanceScheduleSheetSyncApplyResult
+      >(functions, 'applyAttendanceScheduleSheetSync', { timeout: 600000 });
+      const result = await applySync({
+        centerId,
+        weekStartKey: sheetSyncWeekStartKey,
+        sheetHash: sheetSyncPreview.sheetHash,
+      });
+      if (result.data.preview) {
+        setSheetSyncPreview(result.data.preview);
+      } else {
+        setSheetSyncPreview(null);
+      }
+      toast({
+        title: '등원일정 시트를 반영했습니다.',
+        description: `변경 ${result.data.appliedChangeCount || 0}건을 러닝시스템에 저장했습니다.`,
+      });
+    } catch (error) {
+      logHandledClientIssue('[attendance] apply attendance sheet sync failed', error);
+      toast({
+        variant: 'destructive',
+        title: '시트 반영 실패',
+        description: resolveCallableErrorMessage(error, '미리보기 이후 시트 변경 여부와 오류를 확인해 주세요.'),
+      });
+    } finally {
+      setIsApplyingSheetSync(false);
+    }
+  };
+
   const isLoading =
     membershipsLoading ||
     (Boolean(selectedDate) && (membersLoading || attendanceLoading || attendanceCurrentLoading || todaySchedulesLoading || studyLogLoading));
@@ -1118,6 +1338,269 @@ export default function AttendancePage() {
     setClassScheduleClassName(classNameOptions[0]);
   }, [classNameOptions, classScheduleClassName, editingClassScheduleId]);
 
+  const renderAttendanceScheduleSheetSyncPanel = () => {
+    const isConfigured = Boolean(
+      attendanceScheduleSheetIntegration?.enabled &&
+      attendanceScheduleSheetIntegration.spreadsheetId &&
+      attendanceScheduleSheetIntegration.sheetName
+    );
+    const previewReady = Boolean(sheetSyncPreview && sheetSyncPreview.errorCount === 0);
+    const issuePreview = [
+      ...(sheetSyncPreview?.errors || []).map((issue) => ({ ...issue, tone: 'error' as const })),
+      ...(sheetSyncPreview?.warnings || []).map((issue) => ({ ...issue, tone: 'warning' as const })),
+    ].slice(0, 8);
+    const visibleChanges = (sheetSyncPreview?.changes || []).slice(0, 12);
+
+    return (
+      <Card className="overflow-hidden rounded-[2rem] border border-[#DCE7FF] bg-white shadow-sm">
+        <CardHeader className="border-b border-[#E6EEF9] bg-[#F8FBFF] p-5">
+          <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+            <div className="min-w-0">
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="inline-flex h-9 w-9 items-center justify-center rounded-[1rem] bg-[#14295F] text-white">
+                  <FileSpreadsheet className="h-4 w-4" />
+                </span>
+                <div>
+                  <CardTitle className="text-lg font-black tracking-tight text-[#14295F]">등원일정 시트 동기화</CardTitle>
+                  <CardDescription className="mt-1 text-xs font-bold text-[#5C6E97]">
+                    구글시트를 원본으로 읽고, 선택 주의 오늘 이후 일정만 미리보기 후 반영합니다.
+                  </CardDescription>
+                </div>
+              </div>
+              <div className="mt-3 flex flex-wrap gap-2">
+                <Badge className={cn(
+                  'rounded-full border px-3 py-1 text-[10px] font-black shadow-none',
+                  isConfigured ? 'border-emerald-200 bg-emerald-50 text-emerald-800' : 'border-amber-200 bg-amber-50 text-amber-800'
+                )}>
+                  {attendanceScheduleSheetIntegrationLoading
+                    ? '연결 확인 중'
+                    : isConfigured
+                      ? '시트 연결됨'
+                      : '시트 연결 필요'}
+                </Badge>
+                <Badge variant="outline" className="rounded-full border-[#DCE7FF] bg-white px-3 py-1 text-[10px] font-black text-[#14295F]">
+                  기준 주차 {sheetSyncWeekStartKey || '날짜 선택 필요'}
+                </Badge>
+                {attendanceScheduleSheetIntegration?.lastAppliedAt ? (
+                  <Badge variant="outline" className="rounded-full border-[#DCE7FF] bg-white px-3 py-1 text-[10px] font-black text-[#5C6E97]">
+                    최근 반영 {formatOptionalTimestamp(attendanceScheduleSheetIntegration.lastAppliedAt)}
+                  </Badge>
+                ) : null}
+              </div>
+            </div>
+            <div className="flex flex-wrap items-center gap-2">
+              {canConfigureAttendanceSheet ? (
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setSheetSyncSettingsOpen((open) => !open)}
+                  className="h-10 rounded-xl border-[#DCE7FF] bg-white px-3 text-xs font-black text-[#14295F]"
+                >
+                  <Settings2 className="mr-1.5 h-4 w-4" />
+                  연결 설정
+                </Button>
+              ) : null}
+              <Button
+                type="button"
+                size="sm"
+                disabled={!isConfigured || !sheetSyncWeekStartKey || isPreviewingSheetSync || isApplyingSheetSync}
+                onClick={() => void handlePreviewSheetSync()}
+                className="h-10 rounded-xl bg-[#14295F] px-4 text-xs font-black text-white hover:bg-[#10224C]"
+              >
+                {isPreviewingSheetSync ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> : <RefreshCw className="mr-1.5 h-4 w-4" />}
+                시트 불러오기
+              </Button>
+              <Button
+                type="button"
+                size="sm"
+                disabled={!previewReady || !sheetSyncPreview?.sheetHash || sheetSyncPreview.changeCount === 0 || isPreviewingSheetSync || isApplyingSheetSync}
+                onClick={() => void handleApplySheetSync()}
+                className="h-10 rounded-xl bg-[#FF7A16] px-4 text-xs font-black text-white hover:bg-[#E66B10] disabled:bg-[#FFB478]"
+              >
+                {isApplyingSheetSync ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> : <CheckCircle2 className="mr-1.5 h-4 w-4" />}
+                러닝시스템에 반영
+              </Button>
+            </div>
+          </div>
+        </CardHeader>
+
+        <CardContent className="space-y-4 p-5">
+          {sheetSyncSettingsOpen && canConfigureAttendanceSheet ? (
+            <div className="rounded-[1.35rem] border border-[#DCE7FF] bg-[#FBFCFF] p-4">
+              <div className="grid gap-3 lg:grid-cols-[1.45fr_0.65fr_auto]">
+                <div className="grid gap-1.5">
+                  <Label className="text-[10px] font-black uppercase tracking-[0.14em] text-[#5C6E97]">구글시트 URL 또는 ID</Label>
+                  <Input
+                    value={sheetSyncSpreadsheetIdDraft}
+                    onChange={(event) => setSheetSyncSpreadsheetIdDraft(event.target.value)}
+                    placeholder="https://docs.google.com/spreadsheets/d/..."
+                    className="h-11 rounded-xl border-[#DCE7FF] bg-white font-bold text-[#14295F]"
+                  />
+                </div>
+                <div className="grid gap-1.5">
+                  <Label className="text-[10px] font-black uppercase tracking-[0.14em] text-[#5C6E97]">시트 탭 이름</Label>
+                  <Input
+                    value={sheetSyncSheetNameDraft}
+                    onChange={(event) => setSheetSyncSheetNameDraft(event.target.value)}
+                    placeholder="등원일정"
+                    className="h-11 rounded-xl border-[#DCE7FF] bg-white font-bold text-[#14295F]"
+                  />
+                </div>
+                <div className="flex items-end gap-2">
+                  <label className="flex h-11 items-center gap-2 rounded-xl border border-[#DCE7FF] bg-white px-3 text-xs font-black text-[#14295F]">
+                    <input
+                      type="checkbox"
+                      checked={sheetSyncEnabledDraft}
+                      onChange={(event) => setSheetSyncEnabledDraft(event.target.checked)}
+                      className="h-4 w-4 accent-[#14295F]"
+                    />
+                    사용
+                  </label>
+                  <Button
+                    type="button"
+                    disabled={isSavingSheetSyncSettings}
+                    onClick={() => void handleSaveSheetSyncSettings()}
+                    className="h-11 rounded-xl bg-[#14295F] px-4 text-xs font-black text-white hover:bg-[#10224C]"
+                  >
+                    {isSavingSheetSyncSettings ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> : null}
+                    저장
+                  </Button>
+                </div>
+              </div>
+              <div className="mt-3 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-[11px] font-bold leading-5 text-amber-800">
+                구글시트 공유 설정에서 서비스 계정 <span className="font-black">{attendanceSheetServiceAccountEmail || '프로젝트 서비스 계정'}</span>을 뷰어로 추가해 주세요.
+              </div>
+            </div>
+          ) : null}
+
+          <div className="grid gap-3 md:grid-cols-4">
+            <div className="rounded-[1.15rem] border border-[#DCE7FF] bg-[#F7FAFF] px-4 py-3">
+              <p className="text-[10px] font-black uppercase tracking-[0.16em] text-[#5C6E97]">시트 학생</p>
+              <p className="mt-1 text-xl font-black text-[#14295F]">{sheetSyncPreview?.totalSheetRows ?? '-'}</p>
+            </div>
+            <div className="rounded-[1.15rem] border border-[#DCE7FF] bg-white px-4 py-3">
+              <p className="text-[10px] font-black uppercase tracking-[0.16em] text-[#5C6E97]">매칭 학생</p>
+              <p className="mt-1 text-xl font-black text-[#14295F]">{sheetSyncPreview?.matchedStudentCount ?? '-'}</p>
+            </div>
+            <div className="rounded-[1.15rem] border border-[#FFD7BA] bg-[#FFF8F2] px-4 py-3">
+              <p className="text-[10px] font-black uppercase tracking-[0.16em] text-[#C95A08]">변경 예정</p>
+              <p className="mt-1 text-xl font-black text-[#C95A08]">{sheetSyncPreview?.changeCount ?? '-'}</p>
+            </div>
+            <div className={cn(
+              'rounded-[1.15rem] border px-4 py-3',
+              sheetSyncPreview?.errorCount ? 'border-rose-200 bg-rose-50' : 'border-emerald-200 bg-emerald-50'
+            )}>
+              <p className={cn(
+                'text-[10px] font-black uppercase tracking-[0.16em]',
+                sheetSyncPreview?.errorCount ? 'text-rose-600' : 'text-emerald-700'
+              )}>오류/경고</p>
+              <p className={cn(
+                'mt-1 text-xl font-black',
+                sheetSyncPreview?.errorCount ? 'text-rose-700' : 'text-emerald-800'
+              )}>
+                {sheetSyncPreview ? `${sheetSyncPreview.errorCount}/${sheetSyncPreview.warningCount}` : '-'}
+              </p>
+            </div>
+          </div>
+
+          {!isConfigured ? (
+            <Alert className="rounded-2xl border-amber-200 bg-amber-50/70">
+              <AlertTriangle className="h-4 w-4 text-amber-700" />
+              <AlertTitle className="font-black text-amber-800">등원일정 시트 연결이 필요합니다.</AlertTitle>
+              <AlertDescription className="text-xs font-bold leading-5 text-amber-800/90">
+                센터관리자가 구글시트 ID와 탭 이름을 저장한 뒤 시트를 불러올 수 있습니다.
+              </AlertDescription>
+            </Alert>
+          ) : sheetSyncPreview ? (
+            <div className="space-y-4">
+              {issuePreview.length > 0 ? (
+                <div className="rounded-[1.35rem] border border-[#FFE0D5] bg-[#FFF8F5] p-4">
+                  <p className="text-xs font-black text-[#B44D2D]">확인 필요 항목</p>
+                  <div className="mt-3 grid gap-2">
+                    {issuePreview.map((issue, index) => (
+                      <div key={`${issue.tone}-${index}-${issue.message}`} className="rounded-xl border border-white bg-white px-3 py-2 text-[11px] font-bold leading-5 text-[#14295F]">
+                        <Badge className={cn(
+                          'mr-2 rounded-full border-none px-2 py-0.5 text-[9px] font-black',
+                          issue.tone === 'error' ? 'bg-rose-100 text-rose-700' : 'bg-amber-100 text-amber-700'
+                        )}>
+                          {issue.tone === 'error' ? '오류' : '경고'}
+                        </Badge>
+                        {issue.rowNumber ? `${issue.rowNumber}행 · ` : ''}
+                        {issue.studentName ? `${issue.studentName} · ` : ''}
+                        {issue.dateKey ? `${issue.dateKey} · ` : ''}
+                        {issue.weekdayLabel ? `${issue.weekdayLabel}요일 · ` : ''}
+                        {issue.message}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ) : null}
+
+              <div className="rounded-[1.35rem] border border-[#DCE7FF] bg-white">
+                <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[#E6EEF9] px-4 py-3">
+                  <p className="text-xs font-black text-[#14295F]">변경 미리보기</p>
+                  <p className="text-[11px] font-bold text-[#5C6E97]">
+                    {sheetSyncPreview.generatedAt ? `불러온 시각 ${format(new Date(sheetSyncPreview.generatedAt), 'yyyy.MM.dd HH:mm')}` : ''}
+                  </p>
+                </div>
+                {visibleChanges.length === 0 ? (
+                  <div className="px-4 py-8 text-center text-xs font-black text-[#8A98B8]">
+                    {sheetSyncPreview.errorCount > 0 ? '오류를 수정하면 변경 미리보기가 표시됩니다.' : '반영할 변경 사항이 없습니다.'}
+                  </div>
+                ) : (
+                  <Table>
+                    <TableHeader className="bg-[#F8FBFF]">
+                      <TableRow>
+                        <TableHead className="pl-4 text-[10px] font-black">학생</TableHead>
+                        <TableHead className="text-[10px] font-black">날짜</TableHead>
+                        <TableHead className="text-[10px] font-black">구분</TableHead>
+                        <TableHead className="hidden md:table-cell text-[10px] font-black">현재</TableHead>
+                        <TableHead className="pr-4 text-[10px] font-black">시트 반영값</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {visibleChanges.map((change) => (
+                        <TableRow key={`${change.studentId}-${change.dateKey}`}>
+                          <TableCell className="pl-4 text-xs font-black text-[#14295F]">{change.studentName}</TableCell>
+                          <TableCell className="text-xs font-bold text-[#5C6E97]">{change.dateKey} ({change.weekdayLabel})</TableCell>
+                          <TableCell>
+                            <Badge className={cn(
+                              'rounded-full border-none px-2 py-0.5 text-[9px] font-black',
+                              change.mode === 'scheduled'
+                                ? 'bg-[#EEF4FF] text-[#14295F]'
+                                : change.mode === 'autonomous'
+                                  ? 'bg-sky-100 text-sky-700'
+                                  : 'bg-rose-100 text-rose-700'
+                            )}>
+                              {formatAttendanceSheetModeLabel(change.mode)}
+                            </Badge>
+                          </TableCell>
+                          <TableCell className="hidden md:table-cell text-xs font-bold text-[#6E7EA3]">{change.previousSummary}</TableCell>
+                          <TableCell className="pr-4 text-xs font-black text-[#14295F]">{change.nextSummary}</TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                )}
+                {sheetSyncPreview.changes.length > visibleChanges.length ? (
+                  <div className="border-t border-[#E6EEF9] px-4 py-3 text-[11px] font-bold text-[#5C6E97]">
+                    외 {sheetSyncPreview.changes.length - visibleChanges.length}건은 반영 버튼으로 함께 저장됩니다.
+                  </div>
+                ) : null}
+              </div>
+            </div>
+          ) : (
+            <div className="rounded-[1.35rem] border border-dashed border-[#DCE7FF] bg-[#FBFCFF] px-4 py-8 text-center">
+              <p className="text-sm font-black text-[#14295F]">아직 불러온 시트 미리보기가 없습니다.</p>
+              <p className="mt-2 text-xs font-bold text-[#5C6E97]">시트 불러오기를 누르면 학생 매칭, 오류, 변경 예정 건수를 확인합니다.</p>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+    );
+  };
+
   if (membershipsLoading && !classroomMembership) {
     return (
       <div className="p-8">
@@ -1165,6 +1648,8 @@ export default function AttendancePage() {
           />
         </div>
       </AdminWorkbenchCommandBar>
+
+      {renderAttendanceScheduleSheetSyncPanel()}
 
       <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value === 'requests' ? 'requests' : 'kpi')} className="w-full">
         <TabsList className="grid grid-cols-2 bg-muted/30 p-1 rounded-2xl border h-14 mb-8 max-w-2xl">

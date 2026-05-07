@@ -11,6 +11,10 @@ import {
 } from "./openclawSnapshot";
 import { generateStudyPlanInputSchema, validateStudyPlanOutput } from "./plannerSchema";
 import { isAutonomousAttendanceDateKey } from "./koreanPublicHolidays";
+export {
+  previewAttendanceScheduleSheetSync,
+  applyAttendanceScheduleSheetSync,
+} from "./attendanceScheduleSheetSync";
 
 if (admin.apps.length === 0) {
   admin.initializeApp();
