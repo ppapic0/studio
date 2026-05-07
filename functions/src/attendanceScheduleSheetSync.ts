@@ -307,17 +307,57 @@ async function readIntegrationConfig(db: admin.firestore.Firestore, centerId: st
 }
 
 async function readSheetRows(params: { spreadsheetId: string; sheetName: string }): Promise<string[][]> {
-  const auth = await google.auth.getClient({
-    scopes: ["https://www.googleapis.com/auth/spreadsheets.readonly"],
-  });
-  const sheets = google.sheets({ version: "v4", auth });
-  const response = await sheets.spreadsheets.values.get({
-    spreadsheetId: params.spreadsheetId,
-    range: `${quoteSheetName(params.sheetName)}!${SHEET_SYNC_RANGE_COLUMNS}`,
-    valueRenderOption: "FORMATTED_VALUE",
-    dateTimeRenderOption: "FORMATTED_STRING",
-  });
-  return (response.data.values || []).map((row) => row.map((cell) => String(cell ?? "")));
+  try {
+    const auth = await google.auth.getClient({
+      scopes: ["https://www.googleapis.com/auth/spreadsheets.readonly"],
+    });
+    const sheets = google.sheets({ version: "v4", auth });
+    const response = await sheets.spreadsheets.values.get({
+      spreadsheetId: params.spreadsheetId,
+      range: `${quoteSheetName(params.sheetName)}!${SHEET_SYNC_RANGE_COLUMNS}`,
+      valueRenderOption: "FORMATTED_VALUE",
+      dateTimeRenderOption: "FORMATTED_STRING",
+    });
+    return (response.data.values || []).map((row) => row.map((cell) => String(cell ?? "")));
+  } catch (error: any) {
+    const status = Number(error?.code || error?.response?.status || 0);
+    const reason = asTrimmedString(error?.errors?.[0]?.reason || error?.response?.data?.error?.status).toLowerCase();
+    const serviceAccountEmail = getServiceAccountEmail() || "Functions 서비스 계정";
+    console.warn("[attendance-sheet-sync] failed to read sheet", {
+      spreadsheetId: params.spreadsheetId,
+      sheetName: params.sheetName,
+      status,
+      reason,
+      message: error?.message,
+    });
+
+    if (status === 403 || reason.includes("permission")) {
+      throwUserError(
+        "permission-denied",
+        "Google Sheets permission denied.",
+        `구글시트 공유 권한이 없습니다. ${serviceAccountEmail} 계정을 시트 뷰어로 추가해 주세요.`
+      );
+    }
+    if (status === 404 || reason.includes("not_found")) {
+      throwUserError(
+        "not-found",
+        "Google spreadsheet not found.",
+        "구글시트를 찾지 못했습니다. 시트 URL/ID가 맞는지, 서비스 계정에 공유되었는지 확인해 주세요."
+      );
+    }
+    if (status === 400 || reason.includes("bad_request")) {
+      throwUserError(
+        "invalid-argument",
+        "Google Sheets range is invalid.",
+        `시트 탭 이름 \`${params.sheetName}\`을 찾지 못했거나 범위가 올바르지 않습니다. 탭 이름을 확인해 주세요.`
+      );
+    }
+    throwUserError(
+      "internal",
+      "Failed to read Google Sheets.",
+      "구글시트를 읽는 중 오류가 발생했습니다. 시트 공유 권한과 탭 이름을 확인한 뒤 다시 시도해 주세요."
+    );
+  }
 }
 
 function buildSheetHash(rows: string[][], params: { spreadsheetId: string; sheetName: string; weekStartKey: string }): string {

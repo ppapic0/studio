@@ -223,17 +223,42 @@ async function readIntegrationConfig(db, centerId) {
     return { spreadsheetId, sheetName, enabled };
 }
 async function readSheetRows(params) {
-    const auth = await googleapis_1.google.auth.getClient({
-        scopes: ["https://www.googleapis.com/auth/spreadsheets.readonly"],
-    });
-    const sheets = googleapis_1.google.sheets({ version: "v4", auth });
-    const response = await sheets.spreadsheets.values.get({
-        spreadsheetId: params.spreadsheetId,
-        range: `${quoteSheetName(params.sheetName)}!${SHEET_SYNC_RANGE_COLUMNS}`,
-        valueRenderOption: "FORMATTED_VALUE",
-        dateTimeRenderOption: "FORMATTED_STRING",
-    });
-    return (response.data.values || []).map((row) => row.map((cell) => String(cell !== null && cell !== void 0 ? cell : "")));
+    var _a, _b, _c, _d, _e, _f;
+    try {
+        const auth = await googleapis_1.google.auth.getClient({
+            scopes: ["https://www.googleapis.com/auth/spreadsheets.readonly"],
+        });
+        const sheets = googleapis_1.google.sheets({ version: "v4", auth });
+        const response = await sheets.spreadsheets.values.get({
+            spreadsheetId: params.spreadsheetId,
+            range: `${quoteSheetName(params.sheetName)}!${SHEET_SYNC_RANGE_COLUMNS}`,
+            valueRenderOption: "FORMATTED_VALUE",
+            dateTimeRenderOption: "FORMATTED_STRING",
+        });
+        return (response.data.values || []).map((row) => row.map((cell) => String(cell !== null && cell !== void 0 ? cell : "")));
+    }
+    catch (error) {
+        const status = Number((error === null || error === void 0 ? void 0 : error.code) || ((_a = error === null || error === void 0 ? void 0 : error.response) === null || _a === void 0 ? void 0 : _a.status) || 0);
+        const reason = asTrimmedString(((_c = (_b = error === null || error === void 0 ? void 0 : error.errors) === null || _b === void 0 ? void 0 : _b[0]) === null || _c === void 0 ? void 0 : _c.reason) || ((_f = (_e = (_d = error === null || error === void 0 ? void 0 : error.response) === null || _d === void 0 ? void 0 : _d.data) === null || _e === void 0 ? void 0 : _e.error) === null || _f === void 0 ? void 0 : _f.status)).toLowerCase();
+        const serviceAccountEmail = getServiceAccountEmail() || "Functions 서비스 계정";
+        console.warn("[attendance-sheet-sync] failed to read sheet", {
+            spreadsheetId: params.spreadsheetId,
+            sheetName: params.sheetName,
+            status,
+            reason,
+            message: error === null || error === void 0 ? void 0 : error.message,
+        });
+        if (status === 403 || reason.includes("permission")) {
+            throwUserError("permission-denied", "Google Sheets permission denied.", `구글시트 공유 권한이 없습니다. ${serviceAccountEmail} 계정을 시트 뷰어로 추가해 주세요.`);
+        }
+        if (status === 404 || reason.includes("not_found")) {
+            throwUserError("not-found", "Google spreadsheet not found.", "구글시트를 찾지 못했습니다. 시트 URL/ID가 맞는지, 서비스 계정에 공유되었는지 확인해 주세요.");
+        }
+        if (status === 400 || reason.includes("bad_request")) {
+            throwUserError("invalid-argument", "Google Sheets range is invalid.", `시트 탭 이름 \`${params.sheetName}\`을 찾지 못했거나 범위가 올바르지 않습니다. 탭 이름을 확인해 주세요.`);
+        }
+        throwUserError("internal", "Failed to read Google Sheets.", "구글시트를 읽는 중 오류가 발생했습니다. 시트 공유 권한과 탭 이름을 확인한 뒤 다시 시도해 주세요.");
+    }
 }
 function buildSheetHash(rows, params) {
     return (0, crypto_1.createHash)("sha256")

@@ -310,6 +310,15 @@ const WEEKDAY_OPTIONS = [
   { value: 0, label: '일' },
 ];
 
+const ATTENDANCE_SHEET_DAY_FIELDS = ['상태', '등원', '하원', '외출시작', '복귀', '외출사유'] as const;
+const ATTENDANCE_SHEET_DAY_LABELS = ['월', '화', '수', '목', '금', '토', '일'] as const;
+const ATTENDANCE_SHEET_STATUS_EXAMPLES = [
+  { label: '정규', description: '등원/하원 시간을 반영합니다.' },
+  { label: '자율', description: '시간 없이 자율등원으로 저장합니다.' },
+  { label: '미등원', description: '해당 날짜를 미등원으로 저장합니다.' },
+  { label: '공백', description: '값이 모두 비어 있으면 건너뜁니다.' },
+];
+
 function extractGoogleSpreadsheetId(value: string) {
   const trimmed = value.trim();
   if (!trimmed) return '';
@@ -318,7 +327,24 @@ function extractGoogleSpreadsheetId(value: string) {
 }
 
 function resolveCallableErrorMessage(error: any, fallback: string) {
-  return error?.details?.userMessage || error?.message || fallback;
+  const userMessage = error?.details?.userMessage;
+  if (userMessage) return userMessage;
+
+  const code = String(error?.code || '').toLowerCase();
+  const message = String(error?.message || '').toLowerCase();
+  if (code.includes('not-found') || message.includes('not found') || message.includes('not-found')) {
+    return '등원일정 시트 동기화 서버 함수가 아직 배포되지 않았습니다. Functions 배포 후 다시 시도해 주세요.';
+  }
+  if (code.includes('permission-denied') || message.includes('permission')) {
+    return '구글시트 공유 권한을 확인해 주세요. 서비스 계정을 시트 뷰어로 추가해야 합니다.';
+  }
+  if (code.includes('failed-precondition')) {
+    return '시트 연결 설정, 사용 여부, 시트 탭 이름을 확인해 주세요.';
+  }
+  if (code.includes('invalid-argument')) {
+    return '시트 양식 또는 선택 주차 값이 올바르지 않습니다. 필수 컬럼과 HH:mm 시간 형식을 확인해 주세요.';
+  }
+  return error?.message || fallback;
 }
 
 function formatOptionalTimestamp(value?: Timestamp | Date | null) {
@@ -1470,6 +1496,84 @@ export default function AttendancePage() {
               </div>
               <div className="mt-3 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-[11px] font-bold leading-5 text-amber-800">
                 구글시트 공유 설정에서 서비스 계정 <span className="font-black">{attendanceSheetServiceAccountEmail || '프로젝트 서비스 계정'}</span>을 뷰어로 추가해 주세요.
+              </div>
+              <div className="mt-3 rounded-xl border border-[#DCE7FF] bg-white px-3 py-3">
+                <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+                  <div className="min-w-0">
+                    <p className="text-[11px] font-black text-[#14295F]">시트 템플릿 예시</p>
+                    <p className="mt-1 text-[11px] font-bold leading-5 text-[#5C6E97]">
+                      1행은 요일, 2행은 항목으로 두 줄 헤더를 만들면 가장 안정적으로 읽습니다.
+                    </p>
+                  </div>
+                  <div className="flex flex-wrap gap-1.5">
+                    {ATTENDANCE_SHEET_STATUS_EXAMPLES.map((status) => (
+                      <Badge
+                        key={status.label}
+                        variant="outline"
+                        className="rounded-full border-[#DCE7FF] bg-[#F8FBFF] px-2.5 py-1 text-[10px] font-black text-[#14295F]"
+                        title={status.description}
+                      >
+                        {status.label}
+                      </Badge>
+                    ))}
+                  </div>
+                </div>
+                <div className="mt-3 overflow-x-auto rounded-lg border border-[#E6EEF9]">
+                  <table className="min-w-[920px] text-left text-[11px]">
+                    <thead className="bg-[#F8FBFF] text-[#14295F]">
+                      <tr>
+                        <th className="border-r border-[#E6EEF9] px-3 py-2 font-black">학생ID</th>
+                        <th className="border-r border-[#E6EEF9] px-3 py-2 font-black">이름</th>
+                        <th className="border-r border-[#E6EEF9] px-3 py-2 font-black">학교</th>
+                        <th className="border-r border-[#E6EEF9] px-3 py-2 font-black">학년</th>
+                        {ATTENDANCE_SHEET_DAY_LABELS.map((day) => (
+                          <th key={day} colSpan={ATTENDANCE_SHEET_DAY_FIELDS.length} className="border-r border-[#E6EEF9] px-3 py-2 text-center font-black">
+                            {day}
+                          </th>
+                        ))}
+                      </tr>
+                      <tr>
+                        <th className="border-r border-[#E6EEF9] px-3 py-2 font-bold text-[#5C6E97]">필수</th>
+                        <th className="border-r border-[#E6EEF9] px-3 py-2 font-bold text-[#5C6E97]">필수</th>
+                        <th className="border-r border-[#E6EEF9] px-3 py-2 font-bold text-[#5C6E97]">필수</th>
+                        <th className="border-r border-[#E6EEF9] px-3 py-2 font-bold text-[#5C6E97]">필수</th>
+                        {ATTENDANCE_SHEET_DAY_LABELS.flatMap((day) =>
+                          ATTENDANCE_SHEET_DAY_FIELDS.map((field) => (
+                            <th key={`${day}-${field}`} className="border-r border-[#E6EEF9] px-3 py-2 font-bold text-[#5C6E97]">
+                              {field}
+                            </th>
+                          ))
+                        )}
+                      </tr>
+                    </thead>
+                    <tbody className="text-[#14295F]">
+                      <tr>
+                        <td className="border-r border-t border-[#E6EEF9] px-3 py-2 font-bold">학생 UID</td>
+                        <td className="border-r border-t border-[#E6EEF9] px-3 py-2 font-bold">김학생</td>
+                        <td className="border-r border-t border-[#E6EEF9] px-3 py-2 font-bold">청덕고</td>
+                        <td className="border-r border-t border-[#E6EEF9] px-3 py-2 font-bold">3학년</td>
+                        {ATTENDANCE_SHEET_DAY_LABELS.flatMap((day, dayIndex) => {
+                          const sampleValues =
+                            dayIndex === 0
+                              ? ['정규', '18:00', '23:30', '20:00', '21:00', '수학학원']
+                              : dayIndex === 1
+                                ? ['자율', '', '', '', '', '']
+                                : dayIndex === 2
+                                  ? ['미등원', '', '', '', '', '']
+                                  : ['', '', '', '', '', ''];
+                          return ATTENDANCE_SHEET_DAY_FIELDS.map((field, fieldIndex) => (
+                            <td key={`${day}-${field}-sample`} className="border-r border-t border-[#E6EEF9] px-3 py-2 font-bold">
+                              {sampleValues[fieldIndex]}
+                            </td>
+                          ));
+                        })}
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+                <p className="mt-2 text-[11px] font-bold leading-5 text-[#5C6E97]">
+                  시간은 반드시 24시간제 HH:mm 형식으로 입력합니다. 정규 상태에서 하원을 비우면 등원이 있을 때 23:30으로 기본 처리됩니다.
+                </p>
               </div>
             </div>
           ) : null}
